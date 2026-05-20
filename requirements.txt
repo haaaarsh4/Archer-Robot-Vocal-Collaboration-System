@@ -1,0 +1,14 @@
+numpy>=1.24.0
+scipy>=1.11.0
+sounddevice>=0.4.6
+librosa>=0.10.1
+crepe>=0.0.13
+tensorflow>=2.13.0
+ddsp>=1.6.0
+music21>=9.1.0
+pyaudio>=0.2.13
+resampy>=0.4.2
+aubio>=0.4.9
+pyyaml>=6.0.1
+loguru>=0.7.2
+pytest>=7.4.0
