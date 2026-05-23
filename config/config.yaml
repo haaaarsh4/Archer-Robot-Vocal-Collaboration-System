@@ -1,0 +1,62 @@
+audio:
+  sample_rate: 44100
+  frame_size: 1024          # 1024 / 44100 ~ 23ms per frame
+  channels: 1               # mono audio: uses a single channel to combine all sounds
+  dtype: float32
+  input_device: null        # null null gives us the system default USB mic
+  output_device: null       # null gives us the system default output
+
+preprocessing:
+  noise_gate_threshold: 0.01   # We ignore sounds below this RMS
+  normalize_target_rms: 0.1    # all audio gets transformed to this RMS
+
+pitch:
+  engine: crepe              # what pitch detection method to use
+  confidence_threshold: 0.5  # we ignore detected pitches below this confidence
+  viterbi_smoothing: true    # smooth pitch contour over time
+  min_frequency: 80          # lowest expected vocal note
+  max_frequency: 1200        # highest expected vocal note
+
+rhythm:
+  onset_threshold: 0.3       # sensitivity for onset detection
+  min_bpm: 40
+  max_bpm: 240
+  phrase_end_silence_ms: 300 # phases has ended and robot stops
+
+harmony:
+  default_interval: third    # musical distance between Archer's note and robot's note
+  intervals:
+    unison: 0
+    third: 4
+    fifth: 7
+    octave: 12
+  detune_cents: 0            # slight detune for drone effect (0 = off)
+  scale_lock: true           # constrain robot notes to detected scale
+
+synthesis:
+  engine: wavetable          # how the robot makes the sound
+  vocable_set:               # built-in vocable sounds to cycle through
+    - aah
+    - ooo
+    - mmm
+    - hey
+  crossfade_ms: 30           # transition from one vocable to another
+  ddsp_model_path: null      # depends on if we need to add a DDSP model
+
+timing:
+  response_delay_ms: 70      # waits 70ms after Archer's note to respond
+  max_hold_ms: 4000          # robot won't hold a note longer than 4s
+
+cree_tokenizer:
+  enabled: false             
+  model_path: null           
+  phoneme_influence: 0.6     # how strongly the Cree phoneme analysis shapes the robot's sounds
+
+output:
+  volume: 0.8                # master output volume 
+  speaker_resonance: false   
+
+logging:
+  level: INFO
+  log_to_file: true
+  log_path: logs/session.log
