@@ -11,7 +11,7 @@ preprocessing:
   normalize_target_rms: 0.1    # all audio gets transformed to this RMS
 
 pitch:
-  engine: crepe              # what pitch detection method to use
+  engine: pyin               # what pitch detection method to use
   confidence_threshold: 0.5  # we ignore detected pitches below this confidence
   viterbi_smoothing: true    # smooth pitch contour over time
   min_frequency: 80          # lowest expected vocal note
@@ -34,7 +34,7 @@ harmony:
   scale_lock: true           # constrain robot notes to detected scale
 
 synthesis:
-  engine: wavetable          # how the robot makes the sound
+  engine: sinusoidal         # how the robot makes the sound
   vocable_set:               # built-in vocable sounds to cycle through
     - aah
     - ooo
