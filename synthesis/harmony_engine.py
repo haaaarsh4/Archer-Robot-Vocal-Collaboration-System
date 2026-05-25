@@ -208,7 +208,6 @@ class HarmonyEngine:
             return "mmm"     # dark/nasal
 
     # function to let the pipeline change the harmony interval live during a performance without restarting anything
-
     def set_interval(self, interval: str):
         if interval in self.INTERVALS:
             self._current_interval = interval

@@ -5,9 +5,8 @@ from loguru import logger
 from config.config_loader import get_config
 from synthesis.harmony_engine import HarmonyDecision
 import librosa
-import tensorflow as tf
-from scipy.signal import lfilter, butter
-import ddsp
+from scipy.signal import lfilter
+
 
 # Generates a numpy audio array for the robot to sing based on the decision from HarmonyDecision 
 class VocableSynthesizer:
@@ -36,7 +35,7 @@ class VocableSynthesizer:
 
         self._init_engine()
 
-    # function to toute to the right loader based on which engine is configured
+    # Routes to the right loader based on which engine is configured
     def _init_engine(self):
         if self.engine == "ddsp":
             self._load_ddsp_model()
@@ -44,21 +43,7 @@ class VocableSynthesizer:
             self._load_wavetable_samples()
         logger.info(f"Vocable synthesizer engine: {self.engine}")
 
-    # Function to load the trained DDSP neural network model from the disk
-    def _load_ddsp_model(self):
-        if self.ddsp_model_path and Path(self.ddsp_model_path).exists():
-            try:
-                self._ddsp_model = ddsp.training.models.Autoencoder()
-                self._ddsp_model.restore(self.ddsp_model_path)
-                logger.info(f"DDSP model loaded from {self.ddsp_model_path}")
-            except Exception as e:
-                logger.error(f"DDSP model load failed: {e} — falling back to sinusoidal")
-                self.engine = "sinusoidal"
-        else:
-            logger.warning("No DDSP model path set — falling back to sinusoidal")
-            self.engine = "sinusoidal"
-
-    # Loads pre-recorded WAV files from synthesis/samples/ 
+    # Loads pre-recorded WAV files from synthesis/samples/
     def _load_wavetable_samples(self):
         try:
             samples_dir = Path(__file__).parent / "samples"
@@ -99,9 +84,7 @@ class VocableSynthesizer:
         if n_samples <= 0:
             return np.zeros(1024, dtype=np.float32)
 
-        if self.engine == "ddsp":
-            audio = self._synthesize_ddsp(decision, n_samples)
-        elif self.engine == "wavetable":
+        if self.engine == "wavetable":
             audio = self._synthesize_wavetable(decision, n_samples)
         else:
             audio = self._synthesize_sinusoidal(decision, n_samples)
@@ -122,9 +105,7 @@ class VocableSynthesizer:
         return audio.astype(np.float32)
 
     # Builds a vocal-like sound entirely from sine waves stacked on top of each other
-    def _synthesize_sinusoidal(
-        self, decision, n_samples
-    ):
+    def _synthesize_sinusoidal(self, decision, n_samples):
         t = np.linspace(0, decision.duration_s, n_samples, endpoint=False)
         audio = np.zeros(n_samples, dtype=np.float64)
 
@@ -156,9 +137,7 @@ class VocableSynthesizer:
         return audio.astype(np.float32)
 
     # Takes a pre-recorded human voice sample and shifts its pitch to match the target frequency
-    def _synthesize_wavetable(
-        self, decision, n_samples
-    ):
+    def _synthesize_wavetable(self, decision, n_samples):
         try:
             sample = self._wavetable_samples.get(
                 decision.vocable,
@@ -191,28 +170,6 @@ class VocableSynthesizer:
             logger.error(f"Wavetable synthesis error: {e} — using sinusoidal fallback")
             return self._synthesize_sinusoidal(decision, n_samples)
 
-    # Uses Google's DDSP library with a model trained on Archer's voice
-    def _synthesize_ddsp(
-        self, decision, n_samples
-    ):
-        try:
-            f0_hz = np.full([1, n_samples // 64, 1], decision.target_hz, dtype=np.float32)
-            loudness_db = np.full([1, n_samples // 64, 1], -20.0, dtype=np.float32)
-
-            controls = self._ddsp_model({
-                "f0_hz": tf.constant(f0_hz),
-                "loudness_db": tf.constant(loudness_db),
-            }, training=False)
-
-            audio = controls["audio_synth"].numpy().flatten()
-            if len(audio) < n_samples:
-                audio = np.pad(audio, (0, n_samples - len(audio)))
-            return audio[:n_samples].astype(np.float32)
-
-        except Exception as e:
-            logger.error(f"DDSP synthesis error: {e} — using sinusoidal fallback")
-            return self._synthesize_sinusoidal(decision, n_samples)
-
     # Prevents clicks at note boundaries by fading in and out
     def _apply_envelope(self, audio):
         attack_samples = min(int(0.01 * self.sample_rate), len(audio) // 4)
@@ -225,9 +182,7 @@ class VocableSynthesizer:
         return audio * envelope
 
     # Applies two filters based on the Cree phoneme profile to shape the frequency content
-    def _apply_phoneme_shaping(
-        self, audio, decision
-    ):
+    def _apply_phoneme_shaping(self, audio, decision):
         try:
             # Spectral tilt based on brightness
             if decision.brightness > 0.6:
