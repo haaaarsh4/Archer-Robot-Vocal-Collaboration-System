@@ -8,12 +8,12 @@ _config = None
 _CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
 
 
-def get_config(path):
+def get_config():
     global _config
     if _config is not None:
         return _config
 
-    target = Path(path) if path else _CONFIG_PATH
+    target = _CONFIG_PATH
     if not target.exists():
         raise FileNotFoundError(f"Config file not found at {target}")
 
@@ -24,10 +24,10 @@ def get_config(path):
     return _config
 
 
-def reload_config(path):
+def reload_config():
     global _config
     _config = None
-    return get_config(path)
+    return get_config()
 
 
 def get(section, key, default=None):
