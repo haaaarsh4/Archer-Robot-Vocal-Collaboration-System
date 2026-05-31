@@ -8,12 +8,12 @@ import librosa
 @dataclass
 class PhonemeProfile:
     # Creating a data container here to hold a snapshot of the phonetric character of the audio frame (based on the following fields)
-    vowel_color : float         # 0=bright front vowels (ee,ay)  1=dark back vowels (oo,aw)
-    nasality    : float         # how nasal/resonant the sound is
-    brightness  : float         # spectral brightness of the sound
-    detected_class : str        # which Cree phoneme class was detected
-    confidence  : float         # how sure the model is
-    influence   : float         # how strongly this shapes the robot's output
+    vowel_color : float = 0.5         # 0=bright front vowels (ee,ay)  1=dark back vowels (oo,aw)
+    nasality    : float = 0.0         # how nasal/resonant the sound is
+    brightness  : float = 0.5         # spectral brightness of the sound
+    detected_class : str = "neutral"  # which Cree phoneme class was detected
+    confidence  : float = 0.0         # how sure the model is
+    influence   : float = 0.0         # how strongly this shapes the robot's output
 
 
 class CreeTokenizer:

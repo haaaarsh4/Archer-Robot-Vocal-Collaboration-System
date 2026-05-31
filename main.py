@@ -59,7 +59,7 @@ def main():
         sys.exit(0)
 
     from config.config_loader import get_config, reload_config
-    cfg = get_config(args.config)
+    cfg = get_config()
     logger.info(f"Synthesis engine : {cfg['synthesis']['engine']}")
     logger.info(f"Pitch engine     : {cfg['pitch']['engine']}")
     logger.info(f"Cree tokenizer   : {'enabled' if cfg['cree_tokenizer']['enabled'] else 'disabled'}")

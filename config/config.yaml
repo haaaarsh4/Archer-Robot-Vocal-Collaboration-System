@@ -24,7 +24,7 @@ rhythm:
   phrase_end_silence_ms: 300 # phases has ended and robot stops
 
 harmony:
-  default_interval: third    # musical distance between Archer's note and robot's note
+  default_interval: fifth    # musical distance between Archer's note and robot's note
   intervals:
     unison: 0
     third: 4
