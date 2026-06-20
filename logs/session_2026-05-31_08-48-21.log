@@ -1,8 +1,0 @@
-2026-05-31 08:48:21.911 | INFO     | __main__:main:52 - ============================================================
-2026-05-31 08:48:21.911 | INFO     | __main__:main:53 -   Archer-Robot Vocal Collaboration System
-2026-05-31 08:48:21.911 | INFO     | __main__:main:54 - ============================================================
-2026-05-31 08:48:21.930 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
-2026-05-31 08:48:21.930 | INFO     | __main__:main:63 - Synthesis engine : sinusoidal
-2026-05-31 08:48:21.930 | INFO     | __main__:main:64 - Pitch engine     : pyin
-2026-05-31 08:48:21.930 | INFO     | __main__:main:65 - Cree tokenizer   : disabled
-2026-05-31 08:48:21.930 | INFO     | __main__:main:66 - ------------------------------------------------------------
