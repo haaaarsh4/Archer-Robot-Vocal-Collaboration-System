@@ -21,7 +21,7 @@ class HarmonyEngine:
     # Semitone intervals above Archer's note
     INTERVALS = {
         "unison": 0,
-        "third":  4,   
+        "third":  4,
         "fifth":  7,
         "octave": 12,
     }
@@ -44,9 +44,13 @@ class HarmonyEngine:
 
         # Rolling pitch history to infer key
         self._pitch_history: collections.deque = collections.deque(maxlen=32)
-        self._current_key_root: int = 0       # MIDI note of detected key root
+        self._current_key_root: int = 0
         self._current_scale: list = self.PENTATONIC
         self._current_interval: str = self.default_interval
+
+        # Key inference cooldown — only re-infer key once per second (~43 frames)
+        self._key_infer_counter: int = 0
+        self._key_update_interval: int = 43
 
         # Track what the robot is currently doing
         self._current_decision: HarmonyDecision | None = None
@@ -61,9 +65,10 @@ class HarmonyEngine:
         tempo_bpm: float,
         phoneme_profile: PhonemeProfile,
     ):
-
         # If Archer is silent then the robot rests
         if archer_hz is None or phrase_state in ("phrase_end", "silence"):
+            self._current_decision = None
+            self._frames_on_current_note = 0
             return HarmonyDecision(
                 target_hz=0.0,
                 vocable="mmm",
@@ -74,9 +79,12 @@ class HarmonyEngine:
                 action="rest",
             )
 
-        # Update pitch history and infer key
+        # Update pitch history and infer key (with cooldown)
         self._pitch_history.append(archer_hz)
-        self._infer_key()
+        self._key_infer_counter += 1
+        if self._key_infer_counter >= self._key_update_interval:
+            self._key_infer_counter = 0
+            self._infer_key()
 
         # Choose harmony note
         harmony_hz = self._choose_harmony_pitch(archer_hz)
@@ -94,6 +102,16 @@ class HarmonyEngine:
         nasality    = phoneme_profile.nasality * influence
         brightness  = 0.5 * (1 - influence) + phoneme_profile.brightness * influence
 
+        # Decide if this is a new note (sing) or continuing the same note (sustain)
+        if (self._current_decision is None
+                or abs(harmony_hz - self._current_decision.target_hz) > 5.0
+                or self._frames_on_current_note >= self._max_frames_per_note):
+            action = "sing"
+            self._frames_on_current_note = 0
+        else:
+            action = "sustain"
+            self._frames_on_current_note += 1
+
         decision = HarmonyDecision(
             target_hz=harmony_hz,
             vocable=vocable,
@@ -101,11 +119,10 @@ class HarmonyEngine:
             vowel_color=vowel_color,
             nasality=nasality,
             brightness=brightness,
-            action="sing",
+            action=action,
         )
 
         self._current_decision = decision
-        self._frames_on_current_note += 1
         return decision
 
     # Decide what the robot's note should be
@@ -127,13 +144,11 @@ class HarmonyEngine:
             midi = librosa.hz_to_midi(freq_hz)
             note_class = int(round(midi)) % 12
 
-            # Find the nearest scale degree
             distances = [abs(note_class - (self._current_key_root + d) % 12)
                          for d in self._current_scale]
             nearest_degree = self._current_scale[int(np.argmin(distances))]
             snapped_note_class = (self._current_key_root + nearest_degree) % 12
 
-            # Reconstruct the MIDI note in the same octave
             octave = int(midi) // 12
             snapped_midi = octave * 12 + snapped_note_class
             return float(librosa.midi_to_hz(snapped_midi))
@@ -142,7 +157,7 @@ class HarmonyEngine:
             logger.error(f"Scale snap error: {e}")
             return freq_hz
 
-    # Figures out what key Archer is singing in by analyzing his last 32 pitches
+    # Figures out what key Archer is singing in — runs at most once per second
     def _infer_key(self):
         if len(self._pitch_history) < 8:
             return
@@ -152,14 +167,11 @@ class HarmonyEngine:
             if not midi_notes:
                 return
 
-            # Build a chroma distribution from recent notes
             chroma = np.zeros(12)
             for n in midi_notes:
                 chroma[n % 12] += 1
             chroma /= chroma.sum()
 
-            # Simple Krumhansl-style key finding:
-            # correlate against major and minor key profiles
             major_profile = np.array([6.35,2.23,3.48,2.33,4.38,4.09,
                                        2.52,5.19,2.39,3.66,2.29,2.88])
             minor_profile = np.array([6.33,2.68,3.52,5.38,2.60,3.53,
@@ -192,22 +204,20 @@ class HarmonyEngine:
     # Picks which vowel shape the robot should use based on the Cree phoneme profile
     def _choose_vocable(self, profile: PhonemeProfile) -> str:
         if profile.influence < 0.1:
-            # No Cree influence the cycle through defaults
             defaults = ["aah", "ooo", "mmm", "hey"]
             idx = len(self._pitch_history) % len(defaults)
             return defaults[idx]
 
-        # Map vowel color to vocable
         if profile.vowel_color < 0.25:
-            return "hey"     # front/bright vowel
+            return "hey"
         elif profile.vowel_color < 0.5:
-            return "aah"     # mid vowel
+            return "aah"
         elif profile.vowel_color < 0.75:
-            return "ooo"     # back vowel
+            return "ooo"
         else:
-            return "mmm"     # dark/nasal
+            return "mmm"
 
-    # function to let the pipeline change the harmony interval live during a performance without restarting anything
+    # Let the pipeline change the harmony interval live during a performance
     def set_interval(self, interval: str):
         if interval in self.INTERVALS:
             self._current_interval = interval

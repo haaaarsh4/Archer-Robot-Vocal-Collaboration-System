@@ -1,0 +1,211 @@
+2026-06-07 08:46:18.135 | INFO     | __main__:main:52 - ============================================================
+2026-06-07 08:46:18.136 | INFO     | __main__:main:53 -   Archer-Robot Vocal Collaboration System
+2026-06-07 08:46:18.136 | INFO     | __main__:main:54 - ============================================================
+2026-06-07 08:46:18.150 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+2026-06-07 08:46:18.150 | INFO     | __main__:main:63 - Synthesis engine : sinusoidal
+2026-06-07 08:46:18.150 | INFO     | __main__:main:64 - Pitch engine     : pyin
+2026-06-07 08:46:18.150 | INFO     | __main__:main:65 - Cree tokenizer   : disabled
+2026-06-07 08:46:18.150 | INFO     | __main__:main:66 - ------------------------------------------------------------
+2026-06-07 08:46:19.092 | INFO     | core.pipeline:__init__:22 - Initializing Archer-Robot Vocal Collaboration pipeline
+2026-06-07 08:46:19.093 | INFO     | analysis.pitch_detector:__init__:17 - Pitch engine: pYIN
+2026-06-07 08:46:19.093 | INFO     | analysis.cree_tokenizer:__init__:48 - Cree tokenizer disabled — running in neutral mode
+2026-06-07 08:46:19.093 | INFO     | synthesis.vocable_synthesizer:_init_engine:44 - Vocable synthesizer engine: sinusoidal
+2026-06-07 08:46:19.093 | INFO     | core.pipeline:__init__:38 - Pipeline initialized, all modules ready!
+2026-06-07 08:46:19.093 | INFO     | __main__:main:75 - Starting pipeline!
+2026-06-07 08:46:19.094 | INFO     | output.timing_sync:start:31 - TimingSync playback thread started
+2026-06-07 08:46:19.094 | INFO     | core.audio_capture:start:41 - Opening audio stream: device=default, rate=44100Hz, frame=1024 samples
+2026-06-07 08:46:19.113 | INFO     | core.audio_capture:start:58 - Audio capture started
+2026-06-07 08:46:19.114 | INFO     | core.pipeline:start:49 - Pipeline running, Archer can sing now
+2026-06-07 08:46:19.941 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=0.087s
+2026-06-07 08:46:24.895 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=1.916s
+2026-06-07 08:46:25.395 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.171s
+2026-06-07 08:46:26.690 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:26.753 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:26.823 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:26.915 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.056 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.167 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.276 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.381 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.470 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.572 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.681 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.784 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.890 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:27.996 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.108 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.208 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.318 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.419 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.515 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.583 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.654 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.727 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.806 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.887 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:28.994 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.095 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.217 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.330 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.432 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.536 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.651 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.764 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.870 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:29.969 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.065 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.174 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.266 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.379 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.486 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.580 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.664 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.736 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.819 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:30.921 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.056 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.162 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.228s
+2026-06-07 08:46:31.176 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.284 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.383 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.477 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.582 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.673 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.769 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.361s
+2026-06-07 08:46:31.787 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.883 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:31.988 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.087 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.210 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.304 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.422 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.519 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.590 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.656 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.731 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.834 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:32.986 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.090 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.194 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.297 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.406 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.529 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.655 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.759 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.864 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:33.961 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.070 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.192 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.317 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.432 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.529 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.623 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.705 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.812 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:34.937 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.063 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.160 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.271 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.381 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.487 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.597 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.701 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.807 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:35.937 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.059 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.171 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.284 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.421 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.530 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.618 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.738 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:36.885 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.056 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.183 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.308 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.404 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.509 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.613 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.701 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.798 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:37.903 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.044 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.138 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.259 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.368 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.477 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.581 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.674 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.740 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.827 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:38.928 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.049 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.172 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.286 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.396 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.540 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.669 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.795 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:39.911 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.015 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.135 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.273 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.366 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.477 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.623 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.726 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.833 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:40.948 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.035 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.317s
+2026-06-07 08:46:41.048 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.146 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.253 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.354 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.437 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.404s
+2026-06-07 08:46:41.451 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.555 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.679 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.772 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.474s
+2026-06-07 08:46:41.786 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:41.885 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.016 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.147 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.239 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.573s
+2026-06-07 08:46:42.253 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.357 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.464 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.568 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.678 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.781 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:42.893 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.050 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.160 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.268 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.376 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.472 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.594 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.746 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.850 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:43.969 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.089 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.183 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.291 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.400 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.518 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.629 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.700 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.773 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.860 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:44.982 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.100 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.202 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.315 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.411 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.542 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.628 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.708 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.782 | ERROR    | analysis.rhythm_analyzer:_estimate_tempo:114 - Tempo estimation error: only 0-dimensional arrays can be converted to Python scalars
+2026-06-07 08:46:45.881 | INFO     | core.pipeline:start:54 - KeyboardInterrupt stopping pipeline
+2026-06-07 08:46:45.918 | INFO     | core.audio_capture:stop:67 - Audio capture stopped
+2026-06-07 08:46:45.945 | INFO     | output.timing_sync:stop:37 - TimingSync stopped
+2026-06-07 08:46:45.945 | INFO     | core.pipeline:stop:65 - Pipeline stopped after 26.9s, 274 frames processed
