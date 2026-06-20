@@ -1,0 +1,123 @@
+2026-06-08 19:33:27.483 | INFO     | __main__:main:52 - ============================================================
+2026-06-08 19:33:27.483 | INFO     | __main__:main:53 -   Archer-Robot Vocal Collaboration System
+2026-06-08 19:33:27.483 | INFO     | __main__:main:54 - ============================================================
+2026-06-08 19:33:27.500 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+2026-06-08 19:33:27.500 | INFO     | __main__:main:63 - Synthesis engine : sinusoidal
+2026-06-08 19:33:27.500 | INFO     | __main__:main:64 - Pitch engine     : pyin
+2026-06-08 19:33:27.500 | INFO     | __main__:main:65 - Cree tokenizer   : disabled
+2026-06-08 19:33:27.500 | INFO     | __main__:main:66 - ------------------------------------------------------------
+2026-06-08 19:33:28.444 | INFO     | core.pipeline:__init__:22 - Initializing Archer-Robot Vocal Collaboration pipeline
+2026-06-08 19:33:28.444 | INFO     | analysis.pitch_detector:__init__:17 - Pitch engine: pYIN
+2026-06-08 19:33:28.444 | INFO     | analysis.cree_tokenizer:__init__:48 - Cree tokenizer disabled — running in neutral mode
+2026-06-08 19:33:28.444 | INFO     | synthesis.vocable_synthesizer:_init_engine:44 - Vocable synthesizer engine: sinusoidal
+2026-06-08 19:33:28.444 | INFO     | core.pipeline:__init__:38 - Pipeline initialized, all modules ready!
+2026-06-08 19:33:28.444 | INFO     | __main__:main:75 - Starting pipeline!
+2026-06-08 19:33:28.445 | INFO     | output.timing_sync:start:31 - TimingSync playback thread started
+2026-06-08 19:33:28.445 | INFO     | core.audio_capture:start:41 - Opening audio stream: device=default, rate=44100Hz, frame=1024 samples
+2026-06-08 19:33:28.452 | INFO     | core.audio_capture:start:58 - Audio capture started
+2026-06-08 19:33:28.452 | INFO     | core.pipeline:start:49 - Pipeline running, Archer can sing now
+2026-06-08 19:33:29.306 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=0.087s
+2026-06-08 19:33:29.827 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=0.435s
+2026-06-08 19:33:30.482 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=0.900s
+2026-06-08 19:33:31.424 | DEBUG    | analysis.rhythm_analyzer:_estimate_tempo:113 - Tempo updated: 120.2 BPM
+2026-06-08 19:33:32.815 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=1.712s
+2026-06-08 19:33:33.774 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.038s
+2026-06-08 19:33:34.349 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.386s
+2026-06-08 19:33:34.919 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.664s
+2026-06-08 19:33:35.315 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.844s
+2026-06-08 19:33:35.554 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.966s
+2026-06-08 19:33:35.983 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.170s
+2026-06-08 19:33:36.225 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.291s
+2026-06-08 19:33:36.752 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.547s
+2026-06-08 19:33:36.895 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.617s
+2026-06-08 19:33:37.136 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.733s
+2026-06-08 19:33:37.468 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.895s
+2026-06-08 19:33:37.659 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=3.988s
+2026-06-08 19:33:38.040 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.174s
+2026-06-08 19:33:38.183 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.243s
+2026-06-08 19:33:38.661 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.476s
+2026-06-08 19:33:38.852 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.569s
+2026-06-08 19:33:39.142 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.702s
+2026-06-08 19:33:39.382 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.818s
+2026-06-08 19:33:39.578 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.917s
+2026-06-08 19:33:39.823 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.033s
+2026-06-08 19:33:40.115 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.172s
+2026-06-08 19:33:40.462 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.335s
+2026-06-08 19:33:40.608 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.404s
+2026-06-08 19:33:40.850 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.521s
+2026-06-08 19:33:41.292 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.730s
+2026-06-08 19:33:41.633 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.886s
+2026-06-08 19:33:41.780 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.962s
+2026-06-08 19:33:42.268 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.200s
+2026-06-08 19:33:42.415 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.264s
+2026-06-08 19:33:42.661 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.374s
+2026-06-08 19:33:43.049 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.531s
+2026-06-08 19:33:43.635 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.844s
+2026-06-08 19:33:44.178 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=7.094s
+2026-06-08 19:33:44.477 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=7.245s
+2026-06-08 19:33:46.525 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=8.156s
+2026-06-08 19:33:46.875 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=8.324s
+2026-06-08 19:33:50.761 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=9.886s
+2026-06-08 19:33:51.134 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.257s
+2026-06-08 19:33:51.607 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.490s
+2026-06-08 19:33:51.757 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.559s
+2026-06-08 19:33:52.011 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.675s
+2026-06-08 19:33:52.722 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.931s
+2026-06-08 19:33:52.876 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.064s
+2026-06-08 19:33:53.434 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.326s
+2026-06-08 19:33:54.294 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.714s
+2026-06-08 19:33:54.497 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.807s
+2026-06-08 19:33:54.649 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.877s
+2026-06-08 19:33:54.954 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.022s
+2026-06-08 19:33:55.107 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.086s
+2026-06-08 19:33:55.577 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.295s
+2026-06-08 19:33:55.833 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.417s
+2026-06-08 19:33:56.448 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.696s
+2026-06-08 19:33:56.657 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.783s
+2026-06-08 19:33:56.864 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.881s
+2026-06-08 19:33:57.221 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.044s
+2026-06-08 19:33:57.430 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.131s
+2026-06-08 19:33:57.891 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.346s
+2026-06-08 19:33:58.355 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.555s
+2026-06-08 19:33:58.817 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.764s
+2026-06-08 19:33:59.283 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.973s
+2026-06-08 19:33:59.439 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=14.042s
+2026-06-08 19:33:59.695 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=14.164s
+2026-06-08 19:34:04.366 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=15.877s
+2026-06-08 19:34:04.470 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.173s
+2026-06-08 19:34:04.887 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.364s
+2026-06-08 19:34:05.255 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.504s
+2026-06-08 19:34:05.415 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.596s
+2026-06-08 19:34:05.727 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.736s
+2026-06-08 19:34:06.198 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.939s
+2026-06-08 19:34:06.408 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.014s
+2026-06-08 19:34:06.512 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.084s
+2026-06-08 19:34:06.721 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.177s
+2026-06-08 19:34:06.932 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.270s
+2026-06-08 19:34:07.401 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.479s
+2026-06-08 19:34:07.818 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.665s
+2026-06-08 19:34:08.078 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.757s
+2026-06-08 19:34:08.286 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.874s
+2026-06-08 19:34:08.598 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.007s
+2026-06-08 19:34:09.175 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.268s
+2026-06-08 19:34:09.540 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.431s
+2026-06-08 19:34:09.937 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.593s
+2026-06-08 19:34:10.094 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.657s
+2026-06-08 19:34:10.876 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.011s
+2026-06-08 19:34:11.292 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.151s
+2026-06-08 19:34:11.397 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.244s
+2026-06-08 19:34:11.605 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.336s
+2026-06-08 19:34:12.387 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.679s
+2026-06-08 19:34:12.543 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.754s
+2026-06-08 19:34:13.480 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.167s
+2026-06-08 19:34:13.740 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.288s
+2026-06-08 19:34:14.573 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.654s
+2026-06-08 19:34:14.936 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.817s
+2026-06-08 19:34:15.095 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.886s
+2026-06-08 19:34:15.308 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.979s
+2026-06-08 19:34:15.464 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=21.055s
+2026-06-08 19:34:15.881 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=21.235s
+2026-06-08 19:34:16.060 | INFO     | core.pipeline:start:54 - KeyboardInterrupt stopping pipeline
+2026-06-08 19:34:16.074 | INFO     | core.audio_capture:stop:67 - Audio capture stopped
+2026-06-08 19:34:16.082 | INFO     | output.timing_sync:stop:37 - TimingSync stopped
+2026-06-08 19:34:16.082 | INFO     | core.pipeline:stop:65 - Pipeline stopped after 47.6s, 918 frames processed

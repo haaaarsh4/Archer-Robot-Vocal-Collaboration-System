@@ -102,3 +102,11 @@ class TimingSync:
                 self._last_play_time = time.perf_counter()
             except Exception as e:
                 logger.error(f"Playback error: {e}")
+
+    def flush(self):
+        while not self._playback_queue.empty():
+            try:
+                self._playback_queue.get_nowait()
+            except Exception:
+                break
+        sd.stop()

@@ -1,62 +1,62 @@
 audio:
   sample_rate: 44100
   frame_size: 1024          # 1024 / 44100 ~ 23ms per frame
-  channels: 1               # mono audio: uses a single channel to combine all sounds
+  channels: 1               # mono audio
   dtype: float32
-  input_device: null        # null null gives us the system default USB mic
-  output_device: null       # null gives us the system default output
+  input_device: 3           # null = system default mic; set to your USB mic index
+  output_device: null       # null = system default output
 
 preprocessing:
-  noise_gate_threshold: 0.01   # We ignore sounds below this RMS
-  normalize_target_rms: 0.1    # all audio gets transformed to this RMS
+  noise_gate_threshold: 0.01
+  normalize_target_rms: 0.1   # all voiced frames are normalized to this RMS
 
 pitch:
-  engine: pyin               # what pitch detection method to use
-  confidence_threshold: 0.5  # we ignore detected pitches below this confidence
-  viterbi_smoothing: true    # smooth pitch contour over time
-  min_frequency: 80          # lowest expected vocal note
-  max_frequency: 1200        # highest expected vocal note
+  engine: pyin
+  confidence_threshold: 0.5   # ignore pitch estimates below this confidence
+  viterbi_smoothing: true
+  min_frequency: 80            # lowest expected vocal note (~E2)
+  max_frequency: 1200          # highest expected vocal note
 
 rhythm:
-  onset_threshold: 0.3       # sensitivity for onset detection
+  onset_threshold: 0.1
   min_bpm: 40
   max_bpm: 240
-  phrase_end_silence_ms: 300 # phases has ended and robot stops
+  phrase_end_silence_ms: 800   # gap before a phrase is declared ended
 
 harmony:
-  default_interval: fifth    # musical distance between Archer's note and robot's note
+  default_interval: fifth      # musical distance between Archer's note and robot's note
   intervals:
     unison: 0
     third: 4
     fifth: 7
     octave: 12
-  detune_cents: 0            # slight detune for drone effect (0 = off)
-  scale_lock: true           # constrain robot notes to detected scale
+  detune_cents: 0              # slight detune for drone effect (0 = off)
+  scale_lock: true             # constrain robot notes to the detected scale
 
 synthesis:
-  engine: sinusoidal         # how the robot makes the sound
-  vocable_set:               # built-in vocable sounds to cycle through
+  engine: sinusoidal           # 'sinusoidal', 'wavetable', or 'ddsp'
+  vocable_set:
     - aah
     - ooo
     - mmm
     - hey
-  crossfade_ms: 30           # transition from one vocable to another
-  ddsp_model_path: null      # depends on if we need to add a DDSP model
+  crossfade_ms: 30
+  ddsp_model_path: null
 
 timing:
-  response_delay_ms: 70      # waits 70ms after Archer's note to respond
-  max_hold_ms: 4000          # robot won't hold a note longer than 4s
+  response_delay_ms: 70        # robot waits 70ms after Archer's note to respond
+  max_hold_ms: 4000            # robot won't hold a note longer than 4s
 
 cree_tokenizer:
-  enabled: false             
-  model_path: null           
-  phoneme_influence: 0.6     # how strongly the Cree phoneme analysis shapes the robot's sounds
+  enabled: false
+  model_path: null
+  phoneme_influence: 0.6       # how strongly Cree phoneme analysis shapes the robot's timbre
 
 output:
-  volume: 0.8                # master output volume 
-  speaker_resonance: false   
+  volume: 0.8
+  speaker_resonance: false
 
 logging:
-  level: INFO
+  level: DEBUG
   log_to_file: true
   log_path: logs/session.log

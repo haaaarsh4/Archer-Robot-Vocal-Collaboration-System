@@ -1,0 +1,125 @@
+2026-06-07 10:05:45.100 | INFO     | __main__:main:52 - ============================================================
+2026-06-07 10:05:45.100 | INFO     | __main__:main:53 -   Archer-Robot Vocal Collaboration System
+2026-06-07 10:05:45.100 | INFO     | __main__:main:54 - ============================================================
+2026-06-07 10:05:45.119 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+2026-06-07 10:05:45.119 | INFO     | __main__:main:63 - Synthesis engine : sinusoidal
+2026-06-07 10:05:45.119 | INFO     | __main__:main:64 - Pitch engine     : pyin
+2026-06-07 10:05:45.119 | INFO     | __main__:main:65 - Cree tokenizer   : disabled
+2026-06-07 10:05:45.119 | INFO     | __main__:main:66 - ------------------------------------------------------------
+2026-06-07 10:05:45.872 | INFO     | core.pipeline:__init__:22 - Initializing Archer-Robot Vocal Collaboration pipeline
+2026-06-07 10:05:45.872 | INFO     | analysis.pitch_detector:__init__:17 - Pitch engine: pYIN
+2026-06-07 10:05:45.872 | INFO     | analysis.cree_tokenizer:__init__:48 - Cree tokenizer disabled — running in neutral mode
+2026-06-07 10:05:45.872 | INFO     | synthesis.vocable_synthesizer:_init_engine:44 - Vocable synthesizer engine: sinusoidal
+2026-06-07 10:05:45.872 | INFO     | core.pipeline:__init__:38 - Pipeline initialized, all modules ready!
+2026-06-07 10:05:45.872 | INFO     | __main__:main:75 - Starting pipeline!
+2026-06-07 10:05:45.872 | INFO     | output.timing_sync:start:31 - TimingSync playback thread started
+2026-06-07 10:05:45.872 | INFO     | core.audio_capture:start:41 - Opening audio stream: device=default, rate=44100Hz, frame=1024 samples
+2026-06-07 10:05:45.881 | INFO     | core.audio_capture:start:58 - Audio capture started
+2026-06-07 10:05:45.881 | INFO     | core.pipeline:start:49 - Pipeline running, Archer can sing now
+2026-06-07 10:05:46.631 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=0.087s
+2026-06-07 10:05:50.527 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.026s
+2026-06-07 10:05:50.849 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.101s
+2026-06-07 10:05:52.009 | DEBUG    | analysis.rhythm_analyzer:_estimate_tempo:113 - Tempo updated: 143.6 BPM
+2026-06-07 10:05:53.132 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=2.479s
+2026-06-07 10:05:57.067 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.000s
+2026-06-07 10:05:57.425 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.133s
+2026-06-07 10:05:58.825 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=4.644s
+2026-06-07 10:06:00.250 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.143s
+2026-06-07 10:06:01.596 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=5.637s
+2026-06-07 10:06:02.995 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.142s
+2026-06-07 10:06:04.507 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=6.641s
+2026-06-07 10:06:05.961 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=7.129s
+2026-06-07 10:06:06.023 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=8, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:07.586 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=7.622s
+2026-06-07 10:06:09.029 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=8.139s
+2026-06-07 10:06:10.470 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=8.661s
+2026-06-07 10:06:12.042 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=9.154s
+2026-06-07 10:06:14.247 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=11, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:14.337 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=0, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:14.503 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=11, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:14.729 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=0, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:15.094 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=9.665s
+2026-06-07 10:06:15.290 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.170s
+2026-06-07 10:06:15.959 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.257s
+2026-06-07 10:06:17.163 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=10.693s
+2026-06-07 10:06:18.821 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.175s
+2026-06-07 10:06:20.395 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=11.697s
+2026-06-07 10:06:21.690 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.185s
+2026-06-07 10:06:22.929 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.608s
+2026-06-07 10:06:23.139 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=12.661s
+2026-06-07 10:06:24.664 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.154s
+2026-06-07 10:06:24.794 | DEBUG    | core.pipeline:_processing_loop:97 - [38.92s] Archer: 1181.5Hz (D6), conf=0.32, BPM=143.6
+2026-06-07 10:06:24.796 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=2, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:24.899 | DEBUG    | core.pipeline:_processing_loop:97 - [39.03s] Archer: 1181.5Hz (D6), conf=0.37, BPM=143.6
+2026-06-07 10:06:24.981 | DEBUG    | core.pipeline:_processing_loop:97 - [39.11s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.053 | DEBUG    | core.pipeline:_processing_loop:97 - [39.18s] Archer: 1174.7Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.128 | DEBUG    | core.pipeline:_processing_loop:97 - [39.26s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.211 | DEBUG    | core.pipeline:_processing_loop:97 - [39.34s] Archer: 1181.5Hz (D6), conf=0.48, BPM=143.6
+2026-06-07 10:06:25.301 | DEBUG    | core.pipeline:_processing_loop:97 - [39.43s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.382 | DEBUG    | core.pipeline:_processing_loop:97 - [39.51s] Archer: 1174.7Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.455 | DEBUG    | core.pipeline:_processing_loop:97 - [39.58s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.457 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=2, scale=[0, 2, 4, 5, 7, 9, 11]
+2026-06-07 10:06:25.525 | DEBUG    | core.pipeline:_processing_loop:97 - [39.65s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.585 | DEBUG    | core.pipeline:_processing_loop:97 - [39.71s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.640 | DEBUG    | core.pipeline:_processing_loop:97 - [39.77s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.695 | DEBUG    | core.pipeline:_processing_loop:97 - [39.82s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.767 | DEBUG    | core.pipeline:_processing_loop:97 - [39.90s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.836 | DEBUG    | core.pipeline:_processing_loop:97 - [39.96s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.910 | DEBUG    | core.pipeline:_processing_loop:97 - [40.04s] Archer: 1181.5Hz (D6), conf=0.43, BPM=143.6
+2026-06-07 10:06:25.919 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.549s
+2026-06-07 10:06:26.280 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=13.642s
+2026-06-07 10:06:27.938 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=14.124s
+2026-06-07 10:06:29.325 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=14.605s
+2026-06-07 10:06:29.385 | ERROR    | analysis.pitch_detector:_detect_pyin:39 - pYIN pitch detection error: CPUDispatcher(<function _viterbi at 0x7707ae967b00>) returned a result with an exception set
+2026-06-07 10:06:29.389 | DEBUG    | core.pipeline:_processing_loop:97 - [43.52s] Archer: 1056.6Hz (C6), conf=0.60, BPM=143.6
+2026-06-07 10:06:30.126 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=14.878s
+2026-06-07 10:06:30.812 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=7, scale=[0, 2, 4, 5, 7, 9, 11]
+2026-06-07 10:06:30.819 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=15.105s
+2026-06-07 10:06:31.278 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=7, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:31.288 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=15.273s
+2026-06-07 10:06:32.157 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=15.598s
+2026-06-07 10:06:33.088 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=15.911s
+2026-06-07 10:06:33.604 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.080s
+2026-06-07 10:06:34.237 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.306s
+2026-06-07 10:06:34.983 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=16.591s
+2026-06-07 10:06:36.580 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.084s
+2026-06-07 10:06:37.988 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.548s
+2026-06-07 10:06:38.091 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=17.607s
+2026-06-07 10:06:39.698 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.001s
+2026-06-07 10:06:41.314 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.553s
+2026-06-07 10:06:42.282 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=18.814s
+2026-06-07 10:06:43.448 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=19.209s
+2026-06-07 10:06:44.046 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=7, scale=[0, 2, 4, 5, 7, 9, 11]
+2026-06-07 10:06:45.773 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.016s
+2026-06-07 10:06:46.506 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.271s
+2026-06-07 10:06:46.728 | DEBUG    | core.pipeline:_processing_loop:97 - [60.86s] Archer: 1488.6Hz (F♯6), conf=0.48, BPM=143.6
+2026-06-07 10:06:46.792 | DEBUG    | core.pipeline:_processing_loop:97 - [60.92s] Archer: 1488.6Hz (F♯6), conf=0.55, BPM=143.6
+2026-06-07 10:06:46.856 | DEBUG    | core.pipeline:_processing_loop:97 - [60.98s] Archer: 1488.6Hz (F♯6), conf=0.55, BPM=143.6
+2026-06-07 10:06:46.923 | DEBUG    | core.pipeline:_processing_loop:97 - [61.05s] Archer: 1480.0Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:46.995 | DEBUG    | core.pipeline:_processing_loop:97 - [61.12s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.068 | DEBUG    | core.pipeline:_processing_loop:97 - [61.20s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.137 | DEBUG    | core.pipeline:_processing_loop:97 - [61.27s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.209 | DEBUG    | core.pipeline:_processing_loop:97 - [61.34s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.276 | DEBUG    | core.pipeline:_processing_loop:97 - [61.40s] Archer: 1488.6Hz (F♯6), conf=0.55, BPM=143.6
+2026-06-07 10:06:47.345 | DEBUG    | core.pipeline:_processing_loop:97 - [61.47s] Archer: 1488.6Hz (F♯6), conf=0.55, BPM=143.6
+2026-06-07 10:06:47.414 | DEBUG    | core.pipeline:_processing_loop:97 - [61.54s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.484 | DEBUG    | core.pipeline:_processing_loop:97 - [61.61s] Archer: 1488.6Hz (F♯6), conf=0.55, BPM=143.6
+2026-06-07 10:06:47.551 | DEBUG    | core.pipeline:_processing_loop:97 - [61.68s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.552 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=6, scale=[0, 2, 3, 5, 7, 8, 10]
+2026-06-07 10:06:47.606 | DEBUG    | core.pipeline:_processing_loop:97 - [61.73s] Archer: 1488.6Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.662 | DEBUG    | core.pipeline:_processing_loop:97 - [61.79s] Archer: 1480.0Hz (F♯6), conf=0.62, BPM=143.6
+2026-06-07 10:06:47.719 | DEBUG    | core.pipeline:_processing_loop:97 - [61.85s] Archer: 1480.0Hz (F♯6), conf=0.48, BPM=143.6
+2026-06-07 10:06:47.727 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=20.672s
+2026-06-07 10:06:48.629 | ERROR    | analysis.pitch_detector:_detect_pyin:39 - pYIN pitch detection error: CPUDispatcher(<function _viterbi at 0x7707ae967b00>) returned a result with an exception set
+2026-06-07 10:06:48.632 | DEBUG    | core.pipeline:_processing_loop:97 - [62.76s] Archer: 850.3Hz (G♯5), conf=0.60, BPM=143.6
+2026-06-07 10:06:50.090 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=21.461s
+2026-06-07 10:06:50.999 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=21.821s
+2026-06-07 10:06:51.309 | DEBUG    | core.pipeline:_processing_loop:97 - [65.44s] Archer: 1326.1Hz (E6), conf=0.32, BPM=143.6
+2026-06-07 10:06:51.965 | DEBUG    | synthesis.harmony_engine:_infer_key:187 - Key updated: root=4, scale=[0, 2, 4, 5, 7, 9, 11]
+2026-06-07 10:06:52.176 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=22.216s
+2026-06-07 10:06:52.763 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=22.407s
+2026-06-07 10:06:54.221 | DEBUG    | analysis.rhythm_analyzer:_detect_onset_in_buffer:90 - Onset detected at t=22.895s
+2026-06-07 10:06:54.735 | INFO     | core.pipeline:start:54 - KeyboardInterrupt stopping pipeline
+2026-06-07 10:06:54.770 | INFO     | core.audio_capture:stop:67 - Audio capture stopped
+2026-06-07 10:06:54.800 | INFO     | output.timing_sync:stop:37 - TimingSync stopped
+2026-06-07 10:06:54.800 | INFO     | core.pipeline:stop:65 - Pipeline stopped after 68.9s, 993 frames processed
