@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: archer-robot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
