@@ -1,40 +1,39 @@
 audio:
   sample_rate: 44100
-  frame_size: 1024          # 1024 / 44100 ~ 23ms per frame
-  channels: 1               # mono audio
+  frame_size: 1024
+  channels: 1
   dtype: float32
-  input_device: 3           # null = system default mic; set to your USB mic index
-  output_device: null       # null = system default output
+  input_device: null
+  output_device: null
 
 preprocessing:
-  noise_gate_threshold: 0.01
-  normalize_target_rms: 0.1   # all voiced frames are normalized to this RMS
+  silence_threshold_db: -40
+  normalize_target_rms: 0.1
 
 pitch:
-  engine: pyin
-  confidence_threshold: 0.5   # ignore pitch estimates below this confidence
-  viterbi_smoothing: true
-  min_frequency: 80            # lowest expected vocal note (~E2)
-  max_frequency: 1200          # highest expected vocal note
+  engine: aubio_yin
+  confidence_threshold: 0.3
+  min_frequency: 80
+  max_frequency: 1200
 
 rhythm:
   onset_threshold: 0.1
   min_bpm: 40
   max_bpm: 240
-  phrase_end_silence_ms: 800   # gap before a phrase is declared ended
+  phrase_end_silence_ms: 800
 
 harmony:
-  default_interval: fifth      # musical distance between Archer's note and robot's note
+  default_interval: fifth
   intervals:
     unison: 0
     third: 4
     fifth: 7
     octave: 12
-  detune_cents: 0              # slight detune for drone effect (0 = off)
-  scale_lock: true             # constrain robot notes to the detected scale
+  detune_cents: 0
+  scale_lock: true
 
 synthesis:
-  engine: sinusoidal           # 'sinusoidal', 'wavetable', or 'ddsp'
+  engine: sinusoidal
   vocable_set:
     - aah
     - ooo
@@ -44,13 +43,13 @@ synthesis:
   ddsp_model_path: null
 
 timing:
-  response_delay_ms: 70        # robot waits 70ms after Archer's note to respond
-  max_hold_ms: 4000            # robot won't hold a note longer than 4s
+  response_delay_ms: 70
+  max_hold_ms: 4000
 
 cree_tokenizer:
   enabled: false
   model_path: null
-  phoneme_influence: 0.6       # how strongly Cree phoneme analysis shapes the robot's timbre
+  phoneme_influence: 0.6
 
 output:
   volume: 0.8
@@ -58,5 +57,3 @@ output:
 
 logging:
   level: DEBUG
-  log_to_file: true
-  log_path: logs/session.log

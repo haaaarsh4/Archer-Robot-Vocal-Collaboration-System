@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archer-Robot — Vocal Collaboration System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f8f8fc;
+    --bg2:       #ffffff;
+    --bg3:       #f0f0f7;
+    --border:    #dcdce8;
+    --text:      #18181f;
+    --muted:     #50506a;
+    --accent:    #6254e8;
+    --accent2:   #7c6af7;
+    --green:     #059669;
+    --orange:    #d97706;
+    --red:       #dc2626;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Space Grotesk', sans-serif;
+  }
+
+  body.dark-mode {
+    --bg:      #0a0a0f;
+    --bg2:     #111118;
+    --bg3:     #1a1a26;
+    --border:  #2a2a3a;
+    --text:    #e8e8f0;
+    --muted:   #9090b8;
+    --accent:  #7c6af7;
+    --accent2: #a78bfa;
+    --green:   #34d399;
+    --orange:  #fb923c;
+    --red:     #f87171;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    height: 64px;
+    background: rgba(248,248,252,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  body.dark-mode nav {
+    background: rgba(10,10,15,0.92);
+    border-bottom-color: #2a2a3a;
+  }
+
+  .nav-logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .nav-tab {
+    padding: 8px 24px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .nav-tab:hover { color: var(--text); background: var(--bg2); }
+  .nav-tab.active { color: var(--accent2); background: rgba(124,106,247,0.12); }
+
+  /* PAGES */
+  .page { display: none; padding-top: 64px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(98,84,232,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 24px;
+  }
+
+  .hero-title {
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    max-width: 800px;
+    margin-bottom: 24px;
+  }
+
+  .hero-title span {
+    background: linear-gradient(135deg, var(--accent2), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 560px;
+    margin-bottom: 48px;
+    font-weight: 400;
+  }
+
+  .hero-badges {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 64px;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .badge.highlight { border-color: var(--border); color: var(--muted); }
+
+  /* Waveform animation */
+  .waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+
+  .waveform-bar {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: wave 1.4s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  @keyframes wave {
+    0%, 100% { height: 4px; opacity: 0.3; }
+    50% { height: 100%; opacity: 1; }
+  }
+
+  /* ===== SECTION BASICS ===== */
+  .section {
+    padding: 96px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: clamp(28px, 3vw, 40px);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+
+  .section-body {
+    color: var(--muted);
+    font-size: 16px;
+    margin-bottom: 56px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0 48px;
+  }
+
+  /* ===== PIPELINE FLOW ===== */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pipeline-row {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .pipeline-node {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pipeline-node:hover {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.05);
+  }
+
+  .pipeline-node::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .pipeline-node:hover::before { opacity: 1; }
+
+  .pipeline-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    color: var(--accent);
+    opacity: 0.5;
+    font-size: 18px;
+  }
+
+  .node-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .node-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .node-body {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .node-tech {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .node-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--muted);
+  }
+
+  /* ===== HARMONY LOGIC ===== */
+  .harmony-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .harmony-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .harmony-interval {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 6px;
+  }
+
+  .harmony-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .harmony-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .harmony-example {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg3);
+    border-radius: 8px;
+  }
+
+  .note-pill {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid;
+  }
+
+  .note-pill.singer { color: var(--green); border-color: var(--green); background: rgba(52,211,153,0.08); }
+  .note-pill.robot  { color: var(--accent2); border-color: var(--accent2); background: rgba(167,139,250,0.08); }
+  .note-arrow { color: var(--muted); font-size: 12px; }
+
+  /* ===== LIVE NOTE DEMO ===== */
+  .note-demo {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    margin-top: 40px;
+  }
+
+  .note-demo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .note-demo-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .mic-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 22px;
+    background: rgba(124,106,247,0.15);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--accent2);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mic-btn:hover { background: rgba(124,106,247,0.25); }
+  .mic-btn.active { background: rgba(248,113,113,0.15); border-color: var(--red); color: var(--red); }
+
+  .mic-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    transition: background 0.2s;
+  }
+
+  .mic-btn.active .mic-dot {
+    background: var(--red);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .note-displays {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .note-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 24px;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+
+  .note-box.active-singer { border-color: var(--green); box-shadow: 0 0 24px rgba(52,211,153,0.1); }
+  .note-box.active-robot  { border-color: var(--accent); box-shadow: 0 0 24px rgba(124,106,247,0.1); }
+
+  .note-box-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .note-box-label.singer { color: var(--green); }
+  .note-box-label.robot  { color: var(--accent2); }
+
+  .note-display {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 8px;
+    min-height: 52px;
+    transition: all 0.2s;
+  }
+
+  .note-display.singer { color: var(--green); }
+  .note-display.robot  { color: var(--accent2); }
+
+  .note-freq {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    min-height: 20px;
+  }
+
+  .note-arrow-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .interval-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .interval-select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+    outline: none;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .interval-select:focus { border-color: var(--accent); }
+
+  /* Pitch meter */
+  .pitch-meter {
+    position: relative;
+    height: 48px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .pitch-bar {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 4px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    background: var(--green);
+    transition: all 0.1s;
+  }
+
+  .pitch-center-line {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 1px;
+    background: var(--border);
+    opacity: 0.5;
+  }
+
+  .pitch-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* Explanation */
+  .note-explanation {
+    margin-top: 24px;
+    padding: 20px 24px;
+    background: var(--bg3);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    min-height: 64px;
+  }
+
+  /* ===== CREE SECTION ===== */
+  .cree-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 40px;
+  }
+
+  .cree-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .phoneme-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+
+  .phoneme-row:last-child { border-bottom: none; }
+
+  .phoneme-name {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent2);
+    min-width: 72px;
+    flex-shrink: 0;
+  }
+
+  .phoneme-desc { font-size: 13px; color: var(--muted); flex: 1; padding: 0 12px; }
+
+  .phoneme-vocable {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--muted);
+  }
+
+  /* ===== DEMO TAB ===== */
+  .demo-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding: 40px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .demo-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px;
+  }
+
+  .demo-panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .demo-panel-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.04);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .upload-text {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .upload-text strong { color: var(--text); }
+
+  .demo-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+  .audio-player {
+    margin-top: 20px;
+    display: none;
+  }
+
+  .audio-player.visible { display: block; }
+
+  .audio-waveform {
+    height: 64px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .wv-bar {
+    flex: 1;
+    max-width: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: 0.6;
+    transition: height 0.05s;
+  }
+
+  .progress-bar-outer {
+    height: 4px;
+    background: var(--bg3);
+    border-radius: 2px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .progress-bar-inner {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  .audio-time {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .harmony-overlay-note {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg3);
+    border-radius: 8px;
+    margin-top: 16px;
+    min-height: 52px;
+  }
+
+  .overlay-singer, .overlay-robot {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    min-width: 48px;
+  }
+
+  .overlay-singer { color: var(--green); }
+  .overlay-robot  { color: var(--accent2); }
+  .overlay-label  { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .overlay-arrow  { color: var(--border); font-size: 16px; }
+
+  /* Mic demo */
+  .mic-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 24px 0;
+  }
+
+  .big-mic-btn {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    background: rgba(124,106,247,0.12);
+    border: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 36px;
+  }
+
+  .big-mic-btn:hover { background: rgba(124,106,247,0.2); transform: scale(1.05); }
+  .big-mic-btn.recording {
+    background: rgba(248,113,113,0.12);
+    border-color: var(--red);
+    animation: ring 1.5s ease-in-out infinite;
+  }
+
+  @keyframes ring {
+    0%   { box-shadow: 0 0 0 0 rgba(248,113,113,0.3); }
+    70%  { box-shadow: 0 0 0 20px rgba(248,113,113,0); }
+    100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); }
+  }
+
+  .level-meter {
+    width: 100%;
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .level-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--orange), var(--red));
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.05s;
+  }
+
+  .live-note-big {
+    font-family: var(--mono);
+    font-size: 72px;
+    font-weight: 700;
+    color: var(--green);
+    min-height: 80px;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .live-response-big {
+    font-family: var(--mono);
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--accent2);
+    min-height: 56px;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .live-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .live-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .live-label.you   { color: var(--green); }
+  .live-label.robot { color: var(--accent2); }
+
+  .status-text {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 20px;
+  }
+
+  /* INTERVAL PICKER in demo */
+  .interval-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .interval-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .interval-btn:hover { border-color: var(--accent); color: var(--text); }
+  .interval-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
+
+  /* ===== FOOTER ===== */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  /* ===== CANVAS for piano ===== */
+  #piano-canvas {
+    width: 100%;
+    height: 100px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+
+  /* misc */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+
+  .code-block .kw  { color: var(--accent2); }
+  .code-block .fn  { color: var(--green); }
+  .code-block .str { color: var(--orange); }
+  .code-block .cm  { color: #3a3a5c; }
+
+  /* ===== PROSE PIPELINE ===== */
+  .prose-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .prose-stage {
+    display: flex;
+    gap: 32px;
+    align-items: stretch;
+  }
+
+  .prose-stage-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 40px;
+  }
+
+  .prose-stage-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--accent);
+    color: var(--accent2);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: 0;
+  }
+
+  .prose-stage-line {
+    width: 1px;
+    flex: 1;
+    background: var(--border);
+    margin: 8px 0;
+    min-height: 40px;
+  }
+
+  .prose-stage-content {
+    padding: 0 0 56px 0;
+    flex: 1;
+  }
+
+  .prose-stage-file {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+    margin-top: 8px;
+  }
+
+  .prose-stage-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .prose-stage-body {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  /* ===== LIGHT MODE ===== */
+  body.light-mode {
+    --bg:      #f8f8fc;
+    --bg2:     #ffffff;
+    --bg3:     #f0f0f7;
+    --border:  #dcdce8;
+    --text:    #18181f;
+    --muted:   #60607a;
+    --accent:  #6254e8;
+    --accent2: #7c6af7;
+  }
+
+
+
+
+
+
+  code {
+    background: var(--bg3);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+
+
+  .code-block .cm { color: #9090b0; }
+  body.dark-mode .code-block .cm { color: #3a3a5c; }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+  @media (max-width: 900px) {
+    .harmony-grid { grid-template-columns: 1fr; }
+    .cree-grid    { grid-template-columns: 1fr; }
+    .two-col      { grid-template-columns: 1fr; }
+    .demo-layout  { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 768px) {
+    nav {
+      padding: 0 16px;
+      flex-wrap: wrap;
+      height: auto;
+      gap: 8px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+    }
+    .nav-tabs { order: 3; width: 100%; justify-content: center; }
+    .nav-tab  { padding: 8px 16px; font-size: 12px; }
+    .page     { padding-top: 112px; }
+    .section  { padding: 48px 16px; }
+    .hero     { padding: 48px 16px; min-height: auto; }
+    .hero-title { font-size: 28px; }
+    .hero-sub   { font-size: 15px; }
+    .hero-badges { gap: 8px; }
+    .badge      { font-size: 10px; padding: 4px 10px; }
+    .section-title { font-size: 24px; }
+    .prose-stage  { gap: 16px; }
+    .prose-stage-title { font-size: 18px; }
+    .prose-stage-body  { font-size: 14px; }
+    .prose-stage-content { padding-bottom: 36px; }
+    .note-displays { gap: 12px; }
+    .note-display  { font-size: 36px; }
+    .note-box      { padding: 20px 12px; }
+    .harmony-interval { font-size: 22px; }
+    .demo-layout  { padding: 16px; gap: 16px; }
+    .demo-panel   { padding: 20px; }
+    .live-note-big   { font-size: 52px; }
+    .live-response-big { font-size: 36px; }
+    .big-mic-btn  { width: 72px; height: 72px; font-size: 28px; }
+    footer { flex-direction: column; gap: 12px; padding: 24px 16px; text-align: center; }
+    .note-demo    { padding: 24px 16px; }
+    #piano-canvas { height: 70px; }
+    .cree-card, .harmony-card { padding: 20px; }
+    .phoneme-name { min-width: 60px; font-size: 12px; }
+    .code-block   { font-size: 11px; padding: 14px 16px; }
+  }
+
+  @media (max-width: 480px) {
+    .hero-title { font-size: 22px; }
+    .nav-logo   { font-size: 11px; }
+    .note-displays { grid-template-columns: 1fr 24px 1fr; gap: 8px; }
+    .note-display  { font-size: 28px; }
+    .section-title { font-size: 20px; }
+    .interval-picker { gap: 6px; }
+    .interval-btn { padding: 6px 10px; font-size: 11px; }
+    .demo-panel-title { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Archer-Robot / VCS</div>
+  <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+    <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
+    pipeline: <span id="ws-status" style="color:var(--red);">disconnected</span>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('architecture')">Architecture</button>
+    <button class="nav-tab" onclick="showPage('demo')">Live Demo</button>
+  </div>
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+  </div>
+</nav>
+
+<!-- ===================== ARCHITECTURE PAGE ===================== -->
+<div id="page-architecture" class="page active">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-eyebrow">Archer-Robot Vocal Collaboration System</div>
+    <h1 class="hero-title">A robot that listens, then <span>sings back</span></h1>
+    <p class="hero-sub">Real-time pitch detection, harmony generation, and vocal synthesis — built to create a musical dialogue between a human singer and a machine.</p>
+    <div class="hero-badges">
+      <span class="badge highlight">aubio YIN pitch detection</span>
+      <span class="badge">Cree vocal phonetics</span>
+      <span class="badge">Key inference via Krumhansl profiles</span>
+      <span class="badge">Sinusoidal vocable synthesis</span>
+      <span class="badge">44100 Hz / real-time</span>
+    </div>
+    <div class="waveform" id="hero-waveform"></div>
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">signal processing pipeline</div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Pipeline -->
+  <section class="section">
+    <div class="section-label">System Pipeline</div>
+    <h2 class="section-title">From microphone to harmony, in under 100ms</h2>
+    <p class="section-body">Every frame of audio moves through six stages before the robot makes a sound. The pipeline runs continuously at 44100 Hz, chewing through 1024-sample blocks roughly every 23 milliseconds. What follows is a full walkthrough of what actually happens, in order, from the moment sound enters the microphone to the moment the robot's voice comes out the other side.</p>
+
+    <div class="prose-pipeline">
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">1</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">core/audio_capture.py</div>
+          <h3 class="prose-stage-title">Audio capture</h3>
+          <p class="prose-stage-body">Everything starts here. PyAudio opens a float32 input stream on whichever device you pass in with <code>-input</code>. The stream runs in a background thread and fires a callback every 1024 samples, which at 44100 Hz works out to about 23 milliseconds of audio per frame. Each callback drops those samples into a thread-safe queue. The main pipeline loop sits on the other end of that queue, pulling frames as fast as they arrive without ever touching the audio thread directly. This separation is important: if the pipeline ever slows down momentarily, the audio thread keeps running uninterrupted, so you never get dropouts or buffer underruns.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">PyAudio</span>
+            <span class="node-pill">44100 Hz</span>
+            <span class="node-pill">1024 samples / frame</span>
+            <span class="node-pill">float32</span>
+            <span class="node-pill">threaded callback</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">2</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">core/preprocessor.py</div>
+          <h3 class="prose-stage-title">Silence detection and normalization</h3>
+          <p class="prose-stage-body">Before any analysis happens, the system needs to know whether a given frame contains real audio or just room noise. It measures the frame's loudness in dBFS using <code>aubio.db_spl()</code>, which returns the sound pressure level as a negative decibel value relative to digital full scale. Frames that come in below the threshold (set to -40 dBFS by default) get discarded immediately. Frames that pass are then normalized to a fixed RMS target, so the pitch detector always receives audio at a consistent level regardless of how far the singer is from the microphone. Without this step, a singer stepping back half a meter would cause the confidence scores to drop and pitch detection to become unreliable.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">aubio.db_spl</span>
+            <span class="node-pill">-40 dBFS threshold</span>
+            <span class="node-pill">RMS normalization</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">analysis/pitch_detector.py</div>
+          <h3 class="prose-stage-title">Pitch detection</h3>
+          <p class="prose-stage-body">This is where the system figures out what note is being sung. The 1024-sample frame gets split into two 512-sample hops, and each hop is fed through <code>aubio.pitch("yin")</code>. YIN is a time-domain autocorrelation algorithm developed specifically for monophonic pitch detection. Unlike FFT-based approaches, YIN looks at the periodicity of the waveform directly rather than its frequency components, which makes it far more robust against harmonics and overtones. A singing voice produces a rich harmonic series, and a naive FFT detector will often latch onto one of those overtones instead of the fundamental frequency. YIN avoids this by construction.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Each hop returns two values: a frequency in Hz and a confidence score between 0 and 1. Only results in the 80 to 1200 Hz range with confidence above 0.3 are accepted. The best result from the two hops is passed through a 3-frame median smoother, which eliminates single-frame glitches without introducing noticeable lag.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">aubio YIN</span>
+            <span class="node-pill">512 hop size</span>
+            <span class="node-pill">2048 buf size</span>
+            <span class="node-pill">80 to 1200 Hz range</span>
+            <span class="node-pill">3-frame median smoother</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3b</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">analysis/rhythm_analyzer.py</div>
+          <h3 class="prose-stage-title">Rhythm and phrase tracking</h3>
+          <p class="prose-stage-body">While pitch detection is running, a parallel process keeps a 2-second rolling buffer of raw audio and uses it to understand the rhythmic structure of what is being sung. Onset detection runs every time approximately one second of new audio has accumulated, using librosa's spectral flux method to find note attacks. Running it on every single frame, as earlier versions of this system did, caused the same onset to be re-detected hundreds of times as the buffer slid forward by just 23 milliseconds per frame. Throttling it to once per second of new audio solves this cleanly.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Beyond individual onsets, the analyzer maintains a phrase state machine with three states: singing, phrase_end, and silence. Any gap of 800 milliseconds or more transitions the state to phrase_end, which signals the harmony engine and synthesizer to wrap up and wait. Tempo is estimated from the distribution of inter-onset intervals and updated every two seconds.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">librosa onset detection</span>
+            <span class="node-pill">spectral flux</span>
+            <span class="node-pill">BPM estimation</span>
+            <span class="node-pill">3-state phrase machine</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">analysis/cree_tokenizer.py</div>
+          <h3 class="prose-stage-title">Cree phonetic analysis</h3>
+          <p class="prose-stage-body">When enabled, this stage listens not just to the pitch but to the shape of the sound. It extracts 13 Mel-frequency cepstral coefficients and the spectral centroid from each voiced frame. MFCCs capture the resonant character of the vocal tract, which is what makes one vowel sound different from another even at the same pitch. The centroid captures the overall brightness of the sound. Together, these features are mapped to a PhonemeProfile with three values: brightness (0 is dark, 1 is bright), vowel color (0 is a front vowel like "ee", 1 is a back vowel like "oo"), and nasality (0 is oral, 1 is fully nasal).</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">The goal is not to identify or reproduce Cree language. It is to mirror the physical feeling of what the singer's mouth is doing, so the robot's voice shifts its timbre in sympathy. If a trained sklearn model is available at the path specified in config, it is used for classification. Otherwise the system falls back to the heuristic feature rules.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">13 MFCCs</span>
+            <span class="node-pill">spectral centroid</span>
+            <span class="node-pill">Cree vowel mapping</span>
+            <span class="node-pill">optional sklearn model</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">5</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/harmony_engine.py</div>
+          <h3 class="prose-stage-title">Harmony decision</h3>
+          <p class="prose-stage-body">Given a detected pitch, the harmony engine decides what note the robot should sing. It starts by maintaining a rolling history of the last 32 detected pitches, which it uses to infer the current musical key. Key inference runs once per second using the Krumhansl-Kessler algorithm: the distribution of pitch classes in the history is compared against reference major and minor tonal profiles via Pearson correlation, and the root and mode that produce the best fit are selected as the current key.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">With the key established, the engine computes the raw harmony pitch by transposing the singer's note upward by the configured interval (0, 4, 7, or 12 semitones for unison, third, fifth, or octave). It then snaps that pitch to the nearest note in the detected scale, so the robot's response is always musically valid. Finally, the engine compares the new target to the note it is currently holding. If the two are within 5 Hz of each other, it issues a "sustain" action to keep the current note playing. If they differ, it issues a "sing" action to start the new note.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">Krumhansl-Kessler profiles</span>
+            <span class="node-pill">scale-lock</span>
+            <span class="node-pill">major / minor detection</span>
+            <span class="node-pill">configurable interval</span>
+            <span class="node-pill">sustain logic</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage" style="--line-display: none;">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">6</div>
+          <div class="prose-stage-line" style="display: none;"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/vocable_synthesizer.py + output/timing_sync.py</div>
+          <h3 class="prose-stage-title">Synthesis and playback</h3>
+          <p class="prose-stage-body">When the harmony engine issues a "sing" action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">The synthesized audio is handed to TimingSync, which schedules playback 70 milliseconds after the note was detected. That delay is intentional. It gives the robot the feel of a real performer responding with a slight human lag, rather than an instantaneous echo that would feel mechanical. The audio is played back through sounddevice on the configured output device.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">additive synthesis</span>
+            <span class="node-pill">F1 / F2 formants</span>
+            <span class="node-pill">30ms crossfade</span>
+            <span class="node-pill">70ms response delay</span>
+            <span class="node-pill">sounddevice</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Harmony logic -->
+  <section class="section">
+    <div class="section-label">Harmony Logic</div>
+    <h2 class="section-title">How the robot chooses its note</h2>
+    <p class="section-body">The interval between the singer's note and the robot's response is the core musical decision. Here is what each option sounds like and why it works the way it does.</p>
+
+    <div class="harmony-grid">
+      <div class="harmony-card">
+        <div class="harmony-interval">+0</div>
+        <div class="harmony-name">Unison</div>
+        <div class="harmony-desc">The robot sings exactly the same pitch. This creates a doubling effect that makes the voice sound fuller and more powerful. It is used when you want the robot to reinforce rather than harmonize.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label">You sing</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">→</span>
+          <div>
+            <div class="overlay-label">Robot sings</div>
+            <span class="note-pill robot">A4 / 440 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-interval">+4</div>
+        <div class="harmony-name">Major Third</div>
+        <div class="harmony-desc">Four semitones above the singer's note. This is the interval that defines whether a chord sounds major (happy) or minor (sad). A major third above any root is the most recognizable two-note harmony in Western music.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label">You sing</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">→</span>
+          <div>
+            <div class="overlay-label">Robot sings</div>
+            <span class="note-pill robot">C#5 / 554 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-interval">+7</div>
+        <div class="harmony-name">Perfect Fifth</div>
+        <div class="harmony-desc">Seven semitones above. The most consonant interval after the octave, used in every culture's music. The frequency ratio is exactly 3:2, which means the overtone series of the two notes align closely. This produces a stable, powerful, almost ancient sound, which is why it is the default interval for this system.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label">You sing</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">→</span>
+          <div>
+            <div class="overlay-label">Robot sings</div>
+            <span class="note-pill robot">E5 / 660 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-interval">+12</div>
+        <div class="harmony-name">Octave</div>
+        <div class="harmony-desc">Twelve semitones above, exactly double the frequency. The two pitches sound so similar that many people perceive them as the same note in different registers. This is ideal for creating a wide, spacious texture while staying completely consonant with the singer at all times.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label">You sing</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">→</span>
+          <div>
+            <div class="overlay-label">Robot sings</div>
+            <span class="note-pill robot">A5 / 880 Hz</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scale Lock explanation -->
+    <div style="margin-top: 24px; padding: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;">
+      <div class="node-tag" style="margin-bottom: 12px;">Scale Lock</div>
+      <div class="node-title" style="margin-bottom: 10px;">Why the robot never plays a wrong note</div>
+      <div class="node-body" style="color: var(--muted); font-size: 14px; max-width: 680px;">
+        After computing the raw harmony pitch, the engine snaps it to the nearest note in the detected key. The key is inferred every second using the Krumhansl-Kessler algorithm: the pitch class distribution of recent notes is compared against reference major and minor profiles using correlation, and the best-matching root is selected. This means that even if the interval calculation would land on an out-of-scale note, the engine nudges it to the nearest valid scale degree. The result sounds intentional rather than accidental.
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Live Note Demo in Architecture -->
+  <section class="section">
+    <div class="section-label">Interactive Architecture Demo</div>
+    <h2 class="section-title">See the system respond to your voice</h2>
+    <p class="section-body">Sing or speak into your microphone and watch the system detect your pitch in real time and display what note the robot would respond with. This runs entirely in the browser using the Web Audio API and the YIN algorithm. No audio is sent anywhere.</p>
+
+    <div class="note-demo">
+      <div class="note-demo-header">
+        <div class="note-demo-title">Real-time pitch detection</div>
+        <button class="mic-btn" id="arch-mic-btn" onclick="toggleArchMic()">
+          <div class="mic-dot"></div>
+          Start microphone
+        </button>
+      </div>
+
+      <!-- Interval selector -->
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+        <span style="font-size: 13px; color: var(--muted);">Harmony interval:</span>
+        <div class="interval-picker" style="margin: 0;">
+          <button class="interval-btn" data-semitones="0" onclick="setArchInterval(0, this)">Unison (+0)</button>
+          <button class="interval-btn" data-semitones="4" onclick="setArchInterval(4, this)">Third (+4)</button>
+          <button class="interval-btn active" data-semitones="7" onclick="setArchInterval(7, this)">Fifth (+7)</button>
+          <button class="interval-btn" data-semitones="12" onclick="setArchInterval(12, this)">Octave (+12)</button>
+        </div>
+      </div>
+
+      <div class="note-displays">
+        <div class="note-box" id="arch-singer-box">
+          <div class="note-box-label singer">You are singing</div>
+          <div class="note-display singer" id="arch-singer-note">-</div>
+          <div class="note-freq" id="arch-singer-freq"></div>
+        </div>
+
+        <div class="note-arrow-center">
+          <div style="font-size: 24px; color: var(--border);">→</div>
+          <div class="interval-label" id="arch-interval-label">+7 semitones<br>perfect fifth</div>
+        </div>
+
+        <div class="note-box" id="arch-robot-box">
+          <div class="note-box-label robot">Robot would sing</div>
+          <div class="note-display robot" id="arch-robot-note">-</div>
+          <div class="note-freq" id="arch-robot-freq"></div>
+        </div>
+      </div>
+
+      <!-- Pitch deviation meter -->
+      <div style="margin-bottom: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono);">PITCH DEVIATION FROM NEAREST NOTE</div>
+      <div class="pitch-meter">
+        <div class="pitch-center-line"></div>
+        <div class="pitch-bar" id="arch-pitch-bar" style="width: 4px; left: 50%;"></div>
+      </div>
+      <div class="pitch-labels">
+        <span>-50 cents</span>
+        <span>in tune</span>
+        <span>+50 cents</span>
+      </div>
+
+      <div class="note-explanation" id="arch-explanation">
+        Click "Start microphone" and sing or hum. The system will detect your pitch using the YIN algorithm, the same approach used by the physical robot.
+      </div>
+
+      <!-- Piano keyboard canvas -->
+      <canvas id="piano-canvas" height="100"></canvas>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Cree section -->
+  <section class="section">
+    <div class="section-label">Cree Phonetic Layer</div>
+    <h2 class="section-title">The robot doesn't just match pitch. It matches feeling.</h2>
+    <p class="section-body">When the Cree tokenizer is enabled, the system analyzes the phonetic character of each voiced frame and uses it to shape the robot's voice. The goal is not to reproduce the Cree language but to mirror its resonance and vowel quality.</p>
+
+    <div class="cree-grid">
+      <div class="cree-card">
+        <div class="node-tag" style="margin-bottom: 16px;">Cree vowel mapping</div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">long-a</span>
+          <span class="phoneme-desc">Bright, open front vowel. High spectral centroid.</span>
+          <span class="phoneme-vocable">aah</span>
+        </div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">long-e</span>
+          <span class="phoneme-desc">Very bright, tense. Highest spectral centroid of all vowels.</span>
+          <span class="phoneme-vocable">hey</span>
+        </div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">long-i</span>
+          <span class="phoneme-desc">Bright and close. Front of the mouth.</span>
+          <span class="phoneme-vocable">hey</span>
+        </div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">long-o</span>
+          <span class="phoneme-desc">Dark, round back vowel. Low spectral centroid.</span>
+          <span class="phoneme-vocable">ooo</span>
+        </div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">nasal-n</span>
+          <span class="phoneme-desc">Strong nasal resonance. Mid-range brightness.</span>
+          <span class="phoneme-vocable">mmm</span>
+        </div>
+        <div class="phoneme-row">
+          <span class="phoneme-name">nasal-m</span>
+          <span class="phoneme-desc">Full nasal resonance. Dark and rounded.</span>
+          <span class="phoneme-vocable">mmm</span>
+        </div>
+      </div>
+
+      <div class="cree-card">
+        <div class="node-tag" style="margin-bottom: 16px;">How the classifier works</div>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 20px;">The classifier extracts 13 Mel-frequency cepstral coefficients (MFCCs) and the spectral centroid from each voiced frame. MFCCs capture the shape of the vocal tract, which is what distinguishes one vowel from another. The centroid captures the overall brightness of the sound.</p>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 20px;">In heuristic mode (no trained model), these features are mapped directly to brightness, vowel color, and nasality values using acoustic rules. The PhonemeProfile that comes out the other side is used by the synthesis engine to adjust the robot's F1 and F2 formant frequencies in real time.</p>
+        <div class="code-block">
+<span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="fn">PhonemeProfile</span>:
+    vowel_color : <span class="kw">float</span>  <span class="cm"># 0=bright front  1=dark back</span>
+    nasality    : <span class="kw">float</span>  <span class="cm"># 0=oral  1=fully nasal</span>
+    brightness  : <span class="kw">float</span>  <span class="cm"># 0=dark  1=bright</span>
+    influence   : <span class="kw">float</span>  <span class="cm"># how much this shapes timbre</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
+  </footer>
+</div>
+
+<!-- ===================== DEMO PAGE ===================== -->
+<div id="page-demo" class="page">
+  <div style="padding: 48px 48px 24px; max-width: 1100px; margin: 0 auto;">
+    <div class="section-label">Live Demo</div>
+    <h2 class="section-title">Try the collaboration system</h2>
+    <p style="color: var(--muted); font-size: 15px; margin-bottom: 8px;">Two ways to experience the system. Upload an MP3 to hear harmony added over it, or use your microphone to sing live and hear what the robot would respond with.</p>
+  </div>
+
+  <div class="demo-layout">
+
+    <!-- Live Python Pipeline Panel -->
+    <div class="demo-panel" style="grid-column: 1 / -1;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="demo-panel-title">Live from Python pipeline</div>
+        <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+          <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);transition:background 0.3s;"></div>
+          <span id="ws-status" style="color:var(--red);">server offline</span>
+        </div>
+      </div>
+      <p class="demo-panel-sub" style="margin-bottom:20px;">First run <code style="font-family:var(--mono);color:var(--accent2);">python server.py</code> in your project folder. Then select your mic and click Start — the pipeline begins only when you do.</p>
+
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+        <select id="device-select" class="interval-select" style="max-width:320px;font-size:13px;padding:10px 14px;">
+          <option value="">Loading devices...</option>
+        </select>
+        <button class="btn btn-primary" id="pipeline-start-btn" onclick="startPipeline()" style="flex:0;padding:10px 28px;">
+          ▶ Start
+        </button>
+        <button class="btn btn-ghost" id="pipeline-stop-btn" onclick="stopPipeline()" style="flex:0;padding:10px 28px;" disabled>
+          ■ Stop
+        </button>
+      </div>
+
+      <div class="note-displays">
+        <div class="note-box" id="live-singer-box">
+          <div class="note-box-label singer">Archer is singing</div>
+          <div class="note-display singer" id="live-singer-note">-</div>
+          <div class="note-freq" id="live-singer-hz"></div>
+        </div>
+        <div class="note-arrow-center">
+          <div style="font-size:24px;color:var(--border);">→</div>
+          <div class="interval-label">python pipeline</div>
+        </div>
+        <div class="note-box" id="live-robot-box">
+          <div class="note-box-label robot">Robot responds</div>
+          <div class="note-display robot" id="live-robot-note">-</div>
+          <div class="note-freq" id="live-robot-hz"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--muted);">
+        <span>status: <span id="live-status" style="color:var(--text);">idle</span></span>
+        <span>tempo: <span id="live-tempo" style="color:var(--text);">-</span></span>
+      </div>
+    </div>
+
+    <!-- MP3 Upload Panel -->
+    <div class="demo-panel">
+      <div class="demo-panel-title">Upload an MP3</div>
+      <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and plays a generated harmony voice alongside it.</div>
+
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" accept="audio/*" id="audio-file-input" onchange="handleFileUpload(event)">
+        <div class="upload-icon">🎵</div>
+        <div class="upload-text"><strong>Drop an audio file here</strong><br>or click to browse</div>
+      </div>
+
+      <div class="audio-player" id="audio-player">
+        <div class="audio-waveform" id="waveform-vis"></div>
+        <div class="progress-bar-outer" id="progress-outer" onclick="seekAudio(event)">
+          <div class="progress-bar-inner" id="progress-inner"></div>
+        </div>
+        <div class="audio-time">
+          <span id="time-current">0:00</span>
+          <span id="track-name" style="color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 180px;"></span>
+          <span id="time-total">0:00</span>
+        </div>
+      </div>
+
+      <div class="demo-controls">
+        <button class="btn btn-primary" id="play-btn" onclick="togglePlay()" disabled>▶ Play with Harmony</button>
+        <button class="btn btn-ghost" id="stop-btn" onclick="stopAudio()" disabled>■ Stop</button>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
+        <div class="interval-picker">
+          <button class="interval-btn" data-semitones="0" onclick="setDemoInterval(0, this)">Unison</button>
+          <button class="interval-btn" data-semitones="4" onclick="setDemoInterval(4, this)">3rd</button>
+          <button class="interval-btn active" data-semitones="7" onclick="setDemoInterval(7, this)">5th</button>
+          <button class="interval-btn" data-semitones="12" onclick="setDemoInterval(12, this)">Octave</button>
+        </div>
+      </div>
+
+      <div class="harmony-overlay-note" id="demo-live-notes">
+        <div>
+          <div class="overlay-label">Source pitch</div>
+          <div class="overlay-singer" id="demo-src-note">-</div>
+        </div>
+        <span class="overlay-arrow">→</span>
+        <div>
+          <div class="overlay-label">Robot response</div>
+          <div class="overlay-robot" id="demo-rob-note">-</div>
+        </div>
+        <div style="margin-left: auto; text-align: right;">
+          <div class="overlay-label">Confidence</div>
+          <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Microphone Panel -->
+    <div class="demo-panel">
+      <div class="demo-panel-title">Sing live</div>
+      <div class="demo-panel-sub">Use your microphone. Sing or hum and the system shows you what note it detects and what the robot would sing back in real time.</div>
+
+      <div class="mic-visual">
+        <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">🎤</button>
+
+        <div class="level-meter" style="width: 100%; max-width: 320px;">
+          <div class="level-fill" id="demo-level"></div>
+        </div>
+
+        <div style="width: 100%; max-width: 320px;">
+          <div class="live-labels">
+            <span class="live-label you">YOU</span>
+            <span class="live-label robot">ROBOT</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div class="live-note-big" id="demo-mic-note">-</div>
+            <div style="color: var(--border); font-size: 32px;">→</div>
+            <div class="live-response-big" id="demo-mic-robot">-</div>
+          </div>
+        </div>
+
+        <div class="status-text" id="demo-mic-status">Click the microphone to start</div>
+
+        <div style="width: 100%; max-width: 320px;">
+          <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
+          <div class="interval-picker" style="margin: 0;">
+            <button class="interval-btn" data-semitones="0" onclick="setMicInterval(0, this)">Unison</button>
+            <button class="interval-btn" data-semitones="4" onclick="setMicInterval(4, this)">3rd</button>
+            <button class="interval-btn active" data-semitones="7" onclick="setMicInterval(7, this)">5th</button>
+            <button class="interval-btn" data-semitones="12" onclick="setMicInterval(12, this)">Octave</button>
+          </div>
+        </div>
+
+        <div class="note-explanation" id="demo-mic-explanation" style="max-width: 320px; width: 100%;">
+          The robot responds to each note you sing with a harmony a perfect fifth above, snapped to the key it infers from your pitch history.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/cyanbx/Prompt-Singer" target="_blank">GitHub</a>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// THEME TOGGLE
+// ============================================================
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
+// Default is light mode; only apply dark if user previously chose it
+if (localStorage.getItem('theme') === 'dark') {
+  document.body.classList.add('dark-mode');
+  document.getElementById('theme-toggle').textContent = '☀️';
+}
+
+// ============================================================
+// PAGE SWITCHING
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ============================================================
+// HERO WAVEFORM ANIMATION
+// ============================================================
+(function() {
+  const container = document.getElementById('hero-waveform');
+  const N = 32;
+  for (let i = 0; i < N; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'waveform-bar';
+    bar.style.animationDelay = (i * 1.4 / N) + 's';
+    bar.style.height = (4 + Math.random() * 20) + 'px';
+    container.appendChild(bar);
+  }
+})();
+
+// ============================================================
+// YIN PITCH DETECTION (pure JS Web Audio implementation)
+// Based on the same algorithm as aubio YIN used by the robot
+// ============================================================
+function yinPitch(buffer, sampleRate, threshold) {
+  const bufLen = buffer.length;
+  const halfLen = Math.floor(bufLen / 2);
+  const diff = new Float32Array(halfLen);
+  const cmndf = new Float32Array(halfLen);
+
+  // Step 1: difference function
+  for (let tau = 0; tau < halfLen; tau++) {
+    let s = 0;
+    for (let i = 0; i < halfLen; i++) {
+      const d = buffer[i] - buffer[i + tau];
+      s += d * d;
+    }
+    diff[tau] = s;
+  }
+
+  // Step 2: cumulative mean normalised difference
+  cmndf[0] = 1;
+  let runningSum = 0;
+  for (let tau = 1; tau < halfLen; tau++) {
+    runningSum += diff[tau];
+    cmndf[tau] = diff[tau] * tau / runningSum;
+  }
+
+  // Step 3: absolute threshold
+  let tau = 2;
+  while (tau < halfLen) {
+    if (cmndf[tau] < threshold) {
+      while (tau + 1 < halfLen && cmndf[tau + 1] < cmndf[tau]) tau++;
+      break;
+    }
+    tau++;
+  }
+  if (tau === halfLen || cmndf[tau] >= threshold) return null;
+
+  // Step 4: parabolic interpolation for sub-sample accuracy
+  const x0 = tau < 1 ? tau : tau - 1;
+  const x2 = tau + 1 < halfLen ? tau + 1 : tau;
+  let betterTau;
+  if (x0 === tau) betterTau = cmndf[tau] <= cmndf[x2] ? tau : x2;
+  else if (x2 === tau) betterTau = cmndf[tau] <= cmndf[x0] ? tau : x0;
+  else {
+    const s0 = cmndf[x0], s1 = cmndf[tau], s2 = cmndf[x2];
+    betterTau = tau + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+  }
+
+  return sampleRate / betterTau;
+}
+
+// Convert Hz to note name
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function hzToMidi(hz) { return 12 * Math.log2(hz / 440) + 69; }
+function midiToHz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+function hzToNote(hz) {
+  if (!hz || hz < 40) return null;
+  const midi = Math.round(hzToMidi(hz));
+  const octave = Math.floor(midi / 12) - 1;
+  const name = NOTE_NAMES[midi % 12];
+  return { name: name + octave, midi, octave, nameOnly: name };
+}
+function hzToCents(hz) {
+  if (!hz) return 0;
+  const midi = hzToMidi(hz);
+  const rounded = Math.round(midi);
+  return (midi - rounded) * 100;
+}
+
+// Harmony computation with scale lock
+const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+const MAJOR_SCALE   = [0,2,4,5,7,9,11];
+const MINOR_SCALE   = [0,2,3,5,7,8,10];
+
+function inferKey(pitchHistory) {
+  if (pitchHistory.length < 6) return { root: 9, scale: MAJOR_SCALE }; // default A major
+  const chroma = new Array(12).fill(0);
+  pitchHistory.forEach(hz => { if (hz > 0) chroma[Math.round(hzToMidi(hz)) % 12]++; });
+  const total = chroma.reduce((a, b) => a + b, 0);
+  if (total === 0) return { root: 9, scale: MAJOR_SCALE };
+  const norm = chroma.map(v => v / total);
+
+  let bestCorr = -Infinity, bestRoot = 0, bestScale = MAJOR_SCALE;
+  for (let r = 0; r < 12; r++) {
+    const shifted = [...norm.slice(r), ...norm.slice(0, r)];
+    const mCorr = pearson(shifted, MAJOR_PROFILE);
+    const nCorr = pearson(shifted, MINOR_PROFILE);
+    if (mCorr > bestCorr) { bestCorr = mCorr; bestRoot = r; bestScale = MAJOR_SCALE; }
+    if (nCorr > bestCorr) { bestCorr = nCorr; bestRoot = r; bestScale = MINOR_SCALE; }
+  }
+  return { root: bestRoot, scale: bestScale };
+}
+
+function pearson(a, b) {
+  const n = a.length;
+  const ma = a.reduce((s,v) => s+v,0)/n, mb = b.reduce((s,v) => s+v,0)/n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (a[i]-ma)*(b[i]-mb); da += (a[i]-ma)**2; db += (b[i]-mb)**2; }
+  return num / (Math.sqrt(da)*Math.sqrt(db)+1e-10);
+}
+
+function snapToScale(hz, key) {
+  const midi = hzToMidi(hz);
+  const noteClass = Math.round(midi) % 12;
+  const dists = key.scale.map(d => {
+    let diff = Math.abs(noteClass - (key.root + d) % 12);
+    return Math.min(diff, 12 - diff);
+  });
+  const nearest = key.scale[dists.indexOf(Math.min(...dists))];
+  const snappedClass = (key.root + nearest) % 12;
+  const octave = Math.floor(midi / 12);
+  return midiToHz(octave * 12 + snappedClass);
+}
+
+function computeHarmony(singerHz, semitones, pitchHistory) {
+  const rawHz = singerHz * Math.pow(2, semitones / 12);
+  const key = inferKey(pitchHistory);
+  const snapped = snapToScale(rawHz, key);
+  return snapped;
+}
+
+const INTERVAL_NAMES = { 0: 'unison', 4: 'major third', 7: 'perfect fifth', 12: 'octave' };
+const INTERVAL_EXPLANATIONS = {
+  0: 'The robot sings the same note as you. This creates a doubling effect, reinforcing your voice.',
+  4: 'The robot sings a major third above. This is the interval that defines a major chord and gives harmony its emotional warmth.',
+  7: 'The robot sings a perfect fifth above. The 3:2 frequency ratio makes this the most naturally consonant two-voice harmony. It is the default.',
+  12: 'The robot sings an octave above — exactly double your frequency. The two voices blend closely while filling a wider range.',
+};
+
+// ============================================================
+// ARCHITECTURE PAGE MIC DEMO
+// ============================================================
+let archAudioCtx = null, archAnalyser = null, archBuffer = null;
+let archMicStream = null, archAnimId = null;
+let archSemitones = 7;
+let archPitchHistory = [];
+let archMediaSource = null;
+
+function setArchInterval(semitones, btn) {
+  archSemitones = semitones;
+  document.querySelectorAll('.interval-picker .interval-btn').forEach(b => {
+    if (b.closest('.note-demo')) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  const name = INTERVAL_NAMES[semitones] || ('+' + semitones);
+  document.getElementById('arch-interval-label').textContent = '+' + semitones + ' semitones\n' + name;
+  document.getElementById('arch-explanation').textContent = INTERVAL_EXPLANATIONS[semitones] || '';
+}
+
+async function toggleArchMic() {
+  const btn = document.getElementById('arch-mic-btn');
+  if (archMicStream) {
+    stopArchMic();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    archMicStream = stream;
+    archAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    archMediaSource = archAudioCtx.createMediaStreamSource(stream);
+    archAnalyser = archAudioCtx.createAnalyser();
+    archAnalyser.fftSize = 2048;
+    archMediaSource.connect(archAnalyser);
+    archBuffer = new Float32Array(archAnalyser.fftSize);
+    btn.classList.add('active');
+    btn.innerHTML = '<div class="mic-dot"></div>Stop microphone';
+    archDetectLoop();
+  } catch (e) {
+    document.getElementById('arch-explanation').textContent = 'Microphone access denied. Please allow microphone access in your browser and try again.';
+  }
+}
+
+function stopArchMic() {
+  if (archMicStream) { archMicStream.getTracks().forEach(t => t.stop()); archMicStream = null; }
+  if (archAnimId) { cancelAnimationFrame(archAnimId); archAnimId = null; }
+  if (archAudioCtx) { archAudioCtx.close(); archAudioCtx = null; }
+  const btn = document.getElementById('arch-mic-btn');
+  btn.classList.remove('active');
+  btn.innerHTML = '<div class="mic-dot"></div>Start microphone';
+  document.getElementById('arch-singer-note').textContent = '-';
+  document.getElementById('arch-singer-freq').textContent = '';
+  document.getElementById('arch-robot-note').textContent = '-';
+  document.getElementById('arch-robot-freq').textContent = '';
+  document.getElementById('arch-singer-box').className = 'note-box';
+  document.getElementById('arch-robot-box').className = 'note-box';
+  drawPiano(null, null);
+}
+
+let archPitchSmooth = [];
+function archDetectLoop() {
+  archAnimId = requestAnimationFrame(archDetectLoop);
+  if (!archAnalyser) return;
+  archAnalyser.getFloatTimeDomainData(archBuffer);
+
+  const rms = Math.sqrt(archBuffer.reduce((s,v) => s+v*v, 0) / archBuffer.length);
+  if (rms < 0.005) {
+    document.getElementById('arch-singer-note').textContent = '-';
+    document.getElementById('arch-singer-freq').textContent = '';
+    document.getElementById('arch-robot-note').textContent = '-';
+    document.getElementById('arch-robot-freq').textContent = '';
+    document.getElementById('arch-singer-box').className = 'note-box';
+    document.getElementById('arch-robot-box').className = 'note-box';
+    document.getElementById('arch-explanation').textContent = 'Listening... sing or hum into your microphone.';
+    drawPiano(null, null);
+    return;
+  }
+
+  const hz = yinPitch(archBuffer, archAudioCtx.sampleRate, 0.15);
+  if (!hz || hz < 80 || hz > 1200) return;
+
+  // 3-frame median smooth
+  archPitchSmooth.push(hz);
+  if (archPitchSmooth.length > 3) archPitchSmooth.shift();
+  const sorted = [...archPitchSmooth].sort((a,b) => a-b);
+  const smoothHz = sorted[Math.floor(sorted.length/2)];
+
+  archPitchHistory.push(smoothHz);
+  if (archPitchHistory.length > 32) archPitchHistory.shift();
+
+  const singerNote = hzToNote(smoothHz);
+  if (!singerNote) return;
+
+  const robotHz = computeHarmony(smoothHz, archSemitones, archPitchHistory);
+  const robotNote = hzToNote(robotHz);
+
+  document.getElementById('arch-singer-note').textContent = singerNote.name;
+  document.getElementById('arch-singer-freq').textContent = smoothHz.toFixed(1) + ' Hz';
+  document.getElementById('arch-singer-box').className = 'note-box active-singer';
+
+  if (robotNote) {
+    document.getElementById('arch-robot-note').textContent = robotNote.name;
+    document.getElementById('arch-robot-freq').textContent = robotHz.toFixed(1) + ' Hz';
+    document.getElementById('arch-robot-box').className = 'note-box active-robot';
+
+    const iname = INTERVAL_NAMES[archSemitones] || ('+' + archSemitones + ' semitones');
+    document.getElementById('arch-explanation').textContent =
+      `You are singing ${singerNote.name} (${smoothHz.toFixed(0)} Hz). The robot responds with ${robotNote.name} (${robotHz.toFixed(0)} Hz), a ${iname} above, snapped to the detected key.`;
+  }
+
+  // Pitch deviation meter
+  const cents = hzToCents(smoothHz);
+  const pct = 50 + (cents / 50) * 45;
+  const bar = document.getElementById('arch-pitch-bar');
+  bar.style.left = Math.max(5, Math.min(95, pct)) + '%';
+  bar.style.background = Math.abs(cents) < 15 ? 'var(--green)' : Math.abs(cents) < 30 ? 'var(--orange)' : 'var(--red)';
+
+  drawPiano(singerNote.midi, robotNote ? robotNote.midi : null);
+}
+
+// ============================================================
+// PIANO KEYBOARD
+// ============================================================
+function drawPiano(singerMidi, robotMidi) {
+  const canvas = document.getElementById('piano-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw 2 octaves centred around middle C (C3-C5)
+  const startMidi = 48; // C3
+  const numKeys = 25;
+  const whiteKeys = [];
+  for (let m = startMidi; m < startMidi + numKeys; m++) {
+    if (![1,3,6,8,10].includes(m % 12)) whiteKeys.push(m);
+  }
+  const wkW = W / whiteKeys.length;
+  const wkH = H;
+  const bkW = wkW * 0.6;
+  const bkH = H * 0.6;
+
+  // White keys
+  whiteKeys.forEach((midi, i) => {
+    const x = i * wkW;
+    const isSinger = midi === singerMidi;
+    const isRobot  = midi === robotMidi;
+    ctx.fillStyle = isSinger ? 'rgba(52,211,153,0.7)' : isRobot ? 'rgba(124,106,247,0.7)' : '#e8e8f0';
+    ctx.strokeStyle = '#1a1a26';
+    ctx.lineWidth = 1;
+    ctx.fillRect(x+1, 0, wkW-2, wkH-1);
+    ctx.strokeRect(x+1, 0, wkW-2, wkH-1);
+  });
+
+  // Black keys
+  whiteKeys.forEach((midi, i) => {
+    const next = midi + 1;
+    if ([1,3,6,8,10].includes(next % 12) && next < startMidi + numKeys) {
+      const x = (i + 1) * wkW - bkW / 2;
+      const isSinger = next === singerMidi;
+      const isRobot  = next === robotMidi;
+      ctx.fillStyle = isSinger ? '#34d399' : isRobot ? '#7c6af7' : '#1a1a26';
+      ctx.fillRect(x, 0, bkW, bkH);
+    }
+  });
+}
+
+drawPiano(null, null);
+
+// ============================================================
+// DEMO PAGE: MP3 UPLOAD
+// ============================================================
+let demoAudioCtx = null, demoSource = null, demoAnalyser = null;
+let demoBuffer = null, demoAudioBuffer = null;
+let demoIsPlaying = false, demoStartTime = 0, demoOffset = 0;
+let demoPitchHistory = [], demoPitchBuf = null;
+let demoSemitones = 7, demoAnimId = null;
+let demoOscillator = null, demoGain = null;
+let demoScriptNode = null;
+
+function setDemoInterval(s, btn) {
+  demoSemitones = s;
+  btn.closest('.demo-panel').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    demoAudioBuffer = await demoAudioCtx.decodeAudioData(ev.target.result);
+    document.getElementById('audio-player').classList.add('visible');
+    document.getElementById('play-btn').disabled = false;
+    document.getElementById('stop-btn').disabled = false;
+    document.getElementById('track-name').textContent = file.name.replace(/\.[^.]+$/, '');
+    document.getElementById('time-total').textContent = fmtTime(demoAudioBuffer.duration);
+    drawWaveformVis(demoAudioBuffer);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function drawWaveformVis(ab) {
+  const container = document.getElementById('waveform-vis');
+  container.innerHTML = '';
+  const data = ab.getChannelData(0);
+  const N = 60;
+  const step = Math.floor(data.length / N);
+  for (let i = 0; i < N; i++) {
+    let max = 0;
+    for (let j = 0; j < step; j++) max = Math.max(max, Math.abs(data[i * step + j]));
+    const bar = document.createElement('div');
+    bar.className = 'wv-bar';
+    bar.style.height = Math.max(4, max * 56) + 'px';
+    container.appendChild(bar);
+  }
+}
+
+function togglePlay() {
+  if (demoIsPlaying) pauseAudio();
+  else playAudio();
+}
+
+function playAudio() {
+  if (!demoAudioBuffer) return;
+  if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  demoSource = demoAudioCtx.createBufferSource();
+  demoSource.buffer = demoAudioBuffer;
+
+  demoAnalyser = demoAudioCtx.createAnalyser();
+  demoAnalyser.fftSize = 2048;
+  demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
+
+  // Harmony oscillator
+  demoOscillator = demoAudioCtx.createOscillator();
+  demoGain = demoAudioCtx.createGain();
+  demoOscillator.type = 'sine';
+  demoGain.gain.value = 0;
+  demoOscillator.connect(demoGain);
+  demoGain.connect(demoAudioCtx.destination);
+  demoOscillator.start();
+
+  demoSource.connect(demoAnalyser);
+  demoSource.connect(demoAudioCtx.destination);
+  demoSource.start(0, demoOffset);
+  demoStartTime = demoAudioCtx.currentTime - demoOffset;
+  demoIsPlaying = true;
+  document.getElementById('play-btn').textContent = '⏸ Pause';
+  demoSource.onended = () => { if (demoIsPlaying) stopAudio(); };
+  demoProgressLoop();
+}
+
+function pauseAudio() {
+  demoOffset = demoAudioCtx.currentTime - demoStartTime;
+  if (demoSource) demoSource.stop();
+  if (demoOscillator) { demoOscillator.stop(); demoOscillator = null; }
+  demoIsPlaying = false;
+  document.getElementById('play-btn').textContent = '▶ Play with Harmony';
+  if (demoAnimId) cancelAnimationFrame(demoAnimId);
+}
+
+function stopAudio() {
+  if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
+  if (demoOscillator) { try { demoOscillator.stop(); } catch(e){} demoOscillator = null; }
+  demoIsPlaying = false; demoOffset = 0;
+  document.getElementById('play-btn').textContent = '▶ Play with Harmony';
+  document.getElementById('progress-inner').style.width = '0%';
+  document.getElementById('time-current').textContent = '0:00';
+  document.getElementById('demo-src-note').textContent = '-';
+  document.getElementById('demo-rob-note').textContent = '-';
+  document.getElementById('demo-conf').textContent = '-';
+  if (demoAnimId) cancelAnimationFrame(demoAnimId);
+}
+
+function seekAudio(e) {
+  if (!demoAudioBuffer) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  demoOffset = pct * demoAudioBuffer.duration;
+  if (demoIsPlaying) { pauseAudio(); playAudio(); }
+  else document.getElementById('progress-inner').style.width = (pct*100) + '%';
+}
+
+let lastDemoHz = 0;
+function demoProgressLoop() {
+  demoAnimId = requestAnimationFrame(demoProgressLoop);
+  if (!demoIsPlaying || !demoAudioCtx) return;
+
+  const elapsed = demoAudioCtx.currentTime - demoStartTime;
+  const pct = Math.min(1, elapsed / demoAudioBuffer.duration);
+  document.getElementById('progress-inner').style.width = (pct * 100) + '%';
+  document.getElementById('time-current').textContent = fmtTime(elapsed);
+
+  // Pitch detect
+  if (demoAnalyser && demoPitchBuf) {
+    demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
+    const rms = Math.sqrt(demoPitchBuf.reduce((s,v) => s+v*v, 0) / demoPitchBuf.length);
+    if (rms > 0.003) {
+      const hz = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
+      if (hz && hz > 60 && hz < 1200) {
+        demoPitchHistory.push(hz);
+        if (demoPitchHistory.length > 32) demoPitchHistory.shift();
+
+        const robotHz = computeHarmony(hz, demoSemitones, demoPitchHistory);
+        const sNote = hzToNote(hz);
+        const rNote = hzToNote(robotHz);
+
+        if (sNote) document.getElementById('demo-src-note').textContent = sNote.name;
+        if (rNote) document.getElementById('demo-rob-note').textContent = rNote.name;
+        document.getElementById('demo-conf').textContent = (rms * 100).toFixed(0) + '%';
+
+        // Update harmony oscillator
+        if (demoOscillator && demoGain) {
+          demoOscillator.frequency.setTargetAtTime(robotHz, demoAudioCtx.currentTime, 0.05);
+          demoGain.gain.setTargetAtTime(rms * 0.3, demoAudioCtx.currentTime, 0.05);
+        }
+        lastDemoHz = hz;
+      }
+    } else {
+      if (demoGain) demoGain.gain.setTargetAtTime(0, demoAudioCtx.currentTime, 0.1);
+    }
+  }
+}
+
+// ============================================================
+// DEMO PAGE: MICROPHONE
+// ============================================================
+let micAudioCtx = null, micStream = null, micAnalyser = null;
+let micBuffer = null, micAnimId = null;
+let micSemitones = 7, micPitchHistory = [], micPitchSmooth = [];
+let micIsRunning = false;
+let micOscillator = null, micGain = null;
+
+function setMicInterval(s, btn) {
+  micSemitones = s;
+  btn.closest('.demo-panel').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function toggleDemoMic() {
+  if (micIsRunning) { stopDemoMic(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    micStream = stream;
+    micAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    const source = micAudioCtx.createMediaStreamSource(stream);
+    micAnalyser = micAudioCtx.createAnalyser();
+    micAnalyser.fftSize = 2048;
+    source.connect(micAnalyser);
+    micBuffer = new Float32Array(micAnalyser.fftSize);
+
+    micOscillator = micAudioCtx.createOscillator();
+    micGain = micAudioCtx.createGain();
+    micOscillator.type = 'sine';
+    micGain.gain.value = 0;
+    micOscillator.connect(micGain);
+    micGain.connect(micAudioCtx.destination);
+    micOscillator.start();
+
+    micIsRunning = true;
+    document.getElementById('demo-mic-btn').classList.add('recording');
+    document.getElementById('demo-mic-btn').textContent = '⏹';
+    document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
+    micLoop();
+  } catch(e) {
+    document.getElementById('demo-mic-status').textContent = 'Microphone access denied. Allow it in your browser settings.';
+  }
+}
+
+function stopDemoMic() {
+  micIsRunning = false;
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micAnimId) { cancelAnimationFrame(micAnimId); micAnimId = null; }
+  if (micOscillator) { try { micOscillator.stop(); } catch(e){} micOscillator = null; }
+  if (micAudioCtx) { micAudioCtx.close(); micAudioCtx = null; }
+  document.getElementById('demo-mic-btn').classList.remove('recording');
+  document.getElementById('demo-mic-btn').textContent = '🎤';
+  document.getElementById('demo-mic-status').textContent = 'Click the microphone to start';
+  document.getElementById('demo-mic-note').textContent = '-';
+  document.getElementById('demo-mic-robot').textContent = '-';
+  document.getElementById('demo-level').style.width = '0%';
+}
+
+function micLoop() {
+  micAnimId = requestAnimationFrame(micLoop);
+  if (!micAnalyser) return;
+  micAnalyser.getFloatTimeDomainData(micBuffer);
+
+  const rms = Math.sqrt(micBuffer.reduce((s,v) => s+v*v, 0) / micBuffer.length);
+  const levelPct = Math.min(100, rms * 400);
+  document.getElementById('demo-level').style.width = levelPct + '%';
+
+  if (rms < 0.005) {
+    document.getElementById('demo-mic-note').textContent = '-';
+    document.getElementById('demo-mic-robot').textContent = '-';
+    document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
+    if (micGain) micGain.gain.setTargetAtTime(0, micAudioCtx.currentTime, 0.1);
+    return;
+  }
+
+  const hz = yinPitch(micBuffer, micAudioCtx.sampleRate, 0.15);
+  if (!hz || hz < 80 || hz > 1200) return;
+
+  micPitchSmooth.push(hz);
+  if (micPitchSmooth.length > 3) micPitchSmooth.shift();
+  const smoothHz = [...micPitchSmooth].sort((a,b)=>a-b)[Math.floor(micPitchSmooth.length/2)];
+
+  micPitchHistory.push(smoothHz);
+  if (micPitchHistory.length > 32) micPitchHistory.shift();
+
+  const sNote = hzToNote(smoothHz);
+  if (!sNote) return;
+
+  const robotHz = computeHarmony(smoothHz, micSemitones, micPitchHistory);
+  const rNote = hzToNote(robotHz);
+
+  document.getElementById('demo-mic-note').textContent = sNote.name;
+  if (rNote) document.getElementById('demo-mic-robot').textContent = rNote.name;
+
+  const iname = INTERVAL_NAMES[micSemitones] || ('+' + micSemitones + ' semitones');
+  document.getElementById('demo-mic-status').textContent =
+    `Singing ${sNote.name} → Robot responds ${rNote ? rNote.name : '?'} (${iname})`;
+
+  if (micOscillator && micGain) {
+    micOscillator.frequency.setTargetAtTime(robotHz, micAudioCtx.currentTime, 0.03);
+    micGain.gain.setTargetAtTime(Math.min(0.3, rms * 1.5), micAudioCtx.currentTime, 0.03);
+  }
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function fmtTime(s) {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+// Drag over styling
+const uz = document.getElementById('upload-zone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drag-over'); });
+uz.addEventListener('dragleave', () => uz.classList.remove('drag-over'));
+uz.addEventListener('drop', e => {
+  e.preventDefault(); uz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) { document.getElementById('audio-file-input').files = e.dataTransfer.files; handleFileUpload({target:{files:[f]}}); }
+});
+
+// ============================================================
+// PIPELINE CONTROLS
+// ============================================================
+async function loadDevices() {
+  try {
+    const res = await fetch('/devices');
+    const data = await res.json();
+    const sel = document.getElementById('device-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+    data.devices.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.index;
+      opt.textContent = `(${d.index}) ${d.name}`;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    const sel = document.getElementById('device-select');
+    if (sel) sel.innerHTML = '<option>Server offline — run python server.py first</option>';
+  }
+}
+
+async function startPipeline() {
+  const sel = document.getElementById('device-select');
+  if (!sel || sel.value === '') return;
+  document.getElementById('live-status').textContent = 'starting...';
+  try {
+    const res = await fetch('/pipeline/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({input_device: parseInt(sel.value)})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('pipeline-start-btn').disabled = true;
+      document.getElementById('pipeline-stop-btn').disabled  = false;
+      document.getElementById('live-status').textContent = 'running';
+    } else {
+      document.getElementById('live-status').textContent = 'error: ' + data.error;
+    }
+  } catch(e) {
+    document.getElementById('live-status').textContent = 'server offline';
+  }
+}
+
+async function stopPipeline() {
+  try {
+    await fetch('/pipeline/stop', {method: 'POST'});
+  } catch(e) {}
+  document.getElementById('pipeline-start-btn').disabled = false;
+  document.getElementById('pipeline-stop-btn').disabled  = true;
+  document.getElementById('live-status').textContent = 'stopped';
+  document.getElementById('live-singer-note').textContent = '-';
+  document.getElementById('live-robot-note').textContent  = '-';
+  document.getElementById('live-singer-hz').textContent   = '';
+  document.getElementById('live-robot-hz').textContent    = '';
+  document.getElementById('live-singer-box').className    = 'note-box';
+  document.getElementById('live-robot-box').className     = 'note-box';
+}
+
+loadDevices();
+
+// ============================================================
+// WEBSOCKET — live connection to the Python pipeline
+// ============================================================
+let socket = null;
+let wsReconnectTimer = null;
+
+function connectWebSocket() {
+  if (socket && socket.readyState <= 1) return;
+  socket = new WebSocket('ws://' + location.host + '/ws');
+
+  socket.onopen = () => {
+    document.getElementById('ws-status').textContent = 'connected';
+    document.getElementById('ws-status').style.color = 'var(--green)';
+    document.getElementById('ws-dot').style.background = 'var(--green)';
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+  };
+
+  socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    updateLiveDisplay(msg);
+  };
+
+  socket.onclose = () => {
+    document.getElementById('ws-status').textContent = 'disconnected';
+    document.getElementById('ws-status').style.color = 'var(--red)';
+    document.getElementById('ws-dot').style.background = 'var(--red)';
+    wsReconnectTimer = setTimeout(connectWebSocket, 2000);
+  };
+
+  socket.onerror = () => socket.close();
+}
+
+function updateLiveDisplay(msg) {
+  const singerEl  = document.getElementById('live-singer-note');
+  const robotEl   = document.getElementById('live-robot-note');
+  const singerHzEl = document.getElementById('live-singer-hz');
+  const robotHzEl  = document.getElementById('live-robot-hz');
+  const statusEl  = document.getElementById('live-status');
+  const tempoEl   = document.getElementById('live-tempo');
+  const singerBox = document.getElementById('live-singer-box');
+  const robotBox  = document.getElementById('live-robot-box');
+
+  if (!singerEl) return;
+
+  if (msg.type === 'pitch' && msg.singer_note) {
+    singerEl.textContent  = msg.singer_note;
+    robotEl.textContent   = msg.robot_note || '-';
+    singerHzEl.textContent = msg.singer_hz + ' Hz';
+    robotHzEl.textContent  = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
+    singerBox.className   = 'note-box active-singer';
+    robotBox.className    = 'note-box active-robot';
+    statusEl.textContent  = `${msg.action} · ${msg.phrase_state} · ${msg.elapsed_s}s`;
+    if (msg.tempo_bpm > 0) tempoEl.textContent = msg.tempo_bpm + ' BPM';
+  } else {
+    singerEl.textContent  = '-';
+    singerHzEl.textContent = '';
+    singerBox.className   = 'note-box';
+    robotBox.className    = 'note-box';
+    statusEl.textContent  = msg.phrase_state || 'silence';
+  }
+
+  // Mirror to the arch demo boxes too if on arch page
+  if (document.getElementById('arch-singer-note')) {
+    if (msg.type === 'pitch' && msg.singer_note) {
+      document.getElementById('arch-singer-note').textContent  = msg.singer_note;
+      document.getElementById('arch-singer-freq').textContent  = msg.singer_hz + ' Hz';
+      document.getElementById('arch-robot-note').textContent   = msg.robot_note || '-';
+      document.getElementById('arch-robot-freq').textContent   = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
+      document.getElementById('arch-singer-box').className     = 'note-box active-singer';
+      document.getElementById('arch-robot-box').className      = 'note-box active-robot';
+      document.getElementById('arch-explanation').textContent  =
+        `Python pipeline: Archer singing ${msg.singer_note} (${msg.singer_hz} Hz) → robot responds ${msg.robot_note || '?'} (${msg.robot_hz || '?'} Hz). Action: ${msg.action}.`;
+      if (msg.singer_hz) {
+        const sNote = hzToNote(msg.singer_hz);
+        const rNote = msg.robot_hz ? hzToNote(msg.robot_hz) : null;
+        if (sNote) drawPiano(sNote.midi, rNote ? rNote.midi : null);
+      }
+    }
+  }
+}
+
+connectWebSocket();
+
+</script>
+</body>
+</html>
