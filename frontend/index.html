@@ -1454,7 +1454,7 @@
       <div class="note-displays">
         <div class="note-box" id="arch-singer-box">
           <div class="note-box-label singer">You are singing</div>
-          <div class="note-display singer" id="arch-singer-note">-</div>
+          <div class b="note-display singer" id="arch-singer-note">-</div>
           <div class="note-freq" id="arch-singer-freq"></div>
         </div>
 
@@ -2339,6 +2339,7 @@ uz.addEventListener('drop', e => {
 // ============================================================
 // PIPELINE CONTROLS
 // ============================================================
+// FIND the loadDevices function and replace it:
 async function loadDevices() {
   try {
     const res = await fetch('/devices');
@@ -2346,6 +2347,14 @@ async function loadDevices() {
     const sel = document.getElementById('device-select');
     if (!sel) return;
     sel.innerHTML = '';
+    if (!data.available) {
+      const opt = document.createElement('option');
+      opt.textContent = data.message || 'Local mic not available — use the browser mic below';
+      sel.appendChild(opt);
+      const startBtn = document.getElementById('pipeline-start-btn');
+      if (startBtn) startBtn.disabled = true;
+      return;
+    }
     data.devices.forEach(d => {
       const opt = document.createElement('option');
       opt.value = d.index;
@@ -2406,7 +2415,8 @@ let wsReconnectTimer = null;
 
 function connectWebSocket() {
   if (socket && socket.readyState <= 1) return;
-  socket = new WebSocket('ws://' + location.host + '/ws');
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  socket = new WebSocket(wsProto + '//' + location.host + '/ws');
 
   socket.onopen = () => {
     document.getElementById('ws-status').textContent = 'connected';
