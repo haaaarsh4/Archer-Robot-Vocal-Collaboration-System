@@ -1,98 +1,62 @@
-import collections
 import numpy as np
+import aubio
 from loguru import logger
 from config.config_loader import get_config
 import librosa
 
-
 class PitchDetector:
-    ACCUMULATE_FRAMES: int = 8
+
+    HOP_SIZE = 512
+    BUF_SIZE = 2048
 
     def __init__(self):
         cfg = get_config()
-        self.engine = "pyin"
+        self.sample_rate          = cfg["audio"]["sample_rate"]
+        self.frame_size           = cfg["audio"]["frame_size"]
         self.confidence_threshold = cfg["pitch"]["confidence_threshold"]
-        self.viterbi = cfg["pitch"]["viterbi_smoothing"]
-        self.sample_rate = cfg["audio"]["sample_rate"]
-        self.frame_size  = cfg["audio"]["frame_size"]
+        self.min_freq             = float(cfg["pitch"]["min_frequency"])
+        self.max_freq             = float(cfg["pitch"]["max_frequency"])
 
-        self.min_freq = float(cfg["pitch"]["min_frequency"])
-        self.max_freq = float(cfg["pitch"]["max_frequency"])
+        self._pitch_o = aubio.pitch("yin", self.BUF_SIZE, self.HOP_SIZE, self.sample_rate)
+        self._pitch_o.set_unit("Hz")
+        self._pitch_o.set_silence(-40)
+        self._pitch_o.set_tolerance(0.8)
 
-        self._acc_buffer: collections.deque = collections.deque(
-            maxlen=self.ACCUMULATE_FRAMES
-        )
+        self._leftovers   = np.array([], dtype=np.float32)
+        self._history     = []
+        self._HISTORY_LEN = 3
 
-        self._last_hz:   float | None = None
-        self._last_conf: float = 0.0
+        logger.info(f"Pitch engine: aubio YIN (hop={self.HOP_SIZE}, buf={self.BUF_SIZE}, sr={self.sample_rate}, fmin={self.min_freq:.0f} Hz, fmax={self.max_freq:.0f} Hz)")
 
-        logger.info(
-            f"Pitch engine: pYIN  "
-            f"(accumulate={self.ACCUMULATE_FRAMES} frames ≈ "
-            f"{self.ACCUMULATE_FRAMES * self.frame_size / self.sample_rate * 1000:.0f} ms, "
-            f"fmin={self.min_freq:.0f} Hz, fmax={self.max_freq:.0f} Hz)"
-        )
+    def detect(self, frame: np.ndarray) -> tuple:
+        samples   = np.concatenate([self._leftovers, frame.astype(np.float32)])
+        best_hz   = None
+        best_conf = 0.0
+        i = 0
 
+        while i + self.HOP_SIZE <= len(samples):
+            hop  = samples[i : i + self.HOP_SIZE]
+            hz   = float(self._pitch_o(hop)[0])
+            conf = float(self._pitch_o.get_confidence())
+            i   += self.HOP_SIZE
+            if self.min_freq <= hz <= self.max_freq and conf >= self.confidence_threshold:
+                best_hz   = hz
+                best_conf = conf
 
-    def detect(self, frame: np.ndarray) -> tuple[float | None, float]:
-        self._acc_buffer.append(frame)
+        self._leftovers = samples[i:]
 
-        if len(self._acc_buffer) < self.ACCUMULATE_FRAMES:
-            return self._last_hz, self._last_conf
+        if best_hz is None:
+            return None, 0.0
 
-        window = np.concatenate(list(self._acc_buffer)).astype(np.float32)
+        self._history.append(best_hz)
+        if len(self._history) > self._HISTORY_LEN:
+            self._history.pop(0)
 
-        hz, conf = self._detect_pyin(window)
-
-        if hz is not None and conf >= self.confidence_threshold:
-            self._last_hz   = hz
-            self._last_conf = conf
-        elif hz is None:
-            self._last_hz   = None
-            self._last_conf = 0.0
-
-        return self._last_hz, self._last_conf
+        return float(np.median(self._history)), best_conf
 
     def reset(self):
-        self._acc_buffer.clear()
-        self._last_hz   = None
-        self._last_conf = 0.0
-
-    def _detect_pyin(self, audio: np.ndarray) -> tuple[float | None, float]:
-        try:
-            f0, voiced_flag, voiced_probs = librosa.pyin(
-                audio,
-                fmin=self.min_freq,
-                fmax=self.max_freq,
-                sr=self.sample_rate,
-            )
-
-            voiced = f0[voiced_flag]
-            if len(voiced) == 0:
-                return None, 0.0
-
-            hz   = float(np.nanmedian(voiced))
-            conf = float(np.nanmedian(voiced_probs[voiced_flag]))
-
-            return hz, conf
-
-        except Exception as e:
-            logger.error(f"pYIN pitch detection error: {e}")
-            try:
-                hz_arr = librosa.yin(
-                    audio,
-                    fmin=self.min_freq,
-                    fmax=self.max_freq,
-                    sr=self.sample_rate,
-                )
-                hz = float(np.nanmedian(hz_arr))
-                if hz > 0:
-                    return hz, 0.6   
-                return None, 0.0
-            except Exception as e2:
-                logger.error(f"YIN fallback also failed: {e2}")
-                return None, 0.0
-
+        self._history.clear()
+        self._leftovers = np.array([], dtype=np.float32)
 
     @staticmethod
     def hz_to_note_name(freq_hz: float) -> str:
