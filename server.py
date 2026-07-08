@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -33,6 +34,19 @@ try:
 except Exception:
     pass
 
+# Load the trained Cree -> English translation model once at startup
+translator = None
+translator_load_error = None
+try:
+    from translation.translate_transformer import NeuralTranslator
+    translator = NeuralTranslator()
+    print("Translation model loaded successfully.")
+except Exception as e:
+    translator_load_error = str(e)
+    print(f"Translation model not loaded: {translator_load_error}")
+    print("Check that data/models/transformer_mt.pt, spm.model, and "
+          "spm_config.json exist relative to your project root.")
+
 
 # ------------------------------------------------------------------ #
 # STATIC ROUTES
@@ -40,6 +54,13 @@ except Exception:
 
 @app.get("/")
 def index():
+    return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+
+@app.get("/architecture")
+@app.get("/sentiment")
+@app.get("/live-demo")
+def spa_routes():
     return FileResponse(str(FRONTEND_DIR / "index.html"))
 
 
@@ -64,6 +85,35 @@ def list_devices():
         return {"devices": devices, "available": True}
     except Exception as e:
         return {"devices": [], "available": False, "message": str(e)}
+
+
+# ------------------------------------------------------------------ #
+# TRANSLATION (Cree -> English)
+# ------------------------------------------------------------------ #
+
+class TranslateRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/translate")
+def translate(req: TranslateRequest):
+    if translator is None:
+        return JSONResponse({"error": f"Model not loaded: {translator_load_error}"}, status_code=503)
+
+    text = (req.text or "").strip()
+    if not text:
+        return JSONResponse({"error": "No text provided"}, status_code=400)
+
+    try:
+        translation = translator.translate(text)
+        return {"input": text, "translation": translation}
+    except Exception as e:
+        return JSONResponse({"error": f"Translation failed: {e}"}, status_code=500)
+
+
+@app.get("/api/translate/health")
+def translate_health():
+    return {"status": "ok" if translator else "model_not_loaded", "error": translator_load_error}
 
 
 # ------------------------------------------------------------------ #
@@ -131,7 +181,7 @@ async def ws_mic(ws: WebSocket):
         from config.config_loader import get_config
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
-        from analysis.cree_tokenizer import CreeTokenizer
+        from analysis.phonetic_analysis import CreeTokenizer
         from synthesis.harmony_engine import HarmonyEngine
         import librosa as _lib
 
@@ -207,7 +257,7 @@ def run_local_pipeline(stop_event, input_device: int):
         from core.preprocessor import Preprocessor
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
-        from analysis.cree_tokenizer import CreeTokenizer
+        from analysis.phonetic_analysis import CreeTokenizer
         from synthesis.harmony_engine import HarmonyEngine
         from synthesis.vocable_synthesizer import VocableSynthesizer
         from output.timing_sync import TimingSync

@@ -38,9 +38,7 @@
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   html { scroll-behavior: smooth; }
-
   body {
     background: var(--bg);
     color: var(--text);
@@ -48,1004 +46,831 @@
     font-size: 16px;
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 
-  /* NAV */
   nav {
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 100;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
+    column-gap: 16px;
     padding: 0 48px;
     height: 64px;
     background: rgba(248,248,252,0.92);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
   }
-
   body.dark-mode nav {
     background: rgba(10,10,15,0.92);
     border-bottom-color: #2a2a3a;
   }
-
-  .nav-logo {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--accent2);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .nav-tabs {
+  .nav-logo { font-family: var(--mono); font-size: 13px; color: var(--accent2); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+  .nav-status {
+    justify-self: center;
     display: flex;
-    gap: 0;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .nav-tab {
-    padding: 8px 24px;
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 500;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
     color: var(--muted);
-    cursor: pointer;
-    border: none;
-    background: transparent;
-    transition: all 0.2s;
-    letter-spacing: 0.02em;
+    white-space: nowrap;
   }
-
+  .nav-right { justify-self: end; display: flex; align-items: center; gap: 12px; }
+  .nav-tabs { display: flex; gap: 0; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .nav-tab { padding: 8px 24px; font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border: none; background: transparent; transition: all 0.2s; letter-spacing: 0.02em; }
   .nav-tab:hover { color: var(--text); background: var(--bg2); }
   .nav-tab.active { color: var(--accent2); background: rgba(124,106,247,0.12); }
 
-  /* PAGES */
+  .nav-hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    width: 36px;
+    height: 36px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    justify-self: end;
+    flex-shrink: 0;
+  }
+  .nav-hamburger span {
+    display: block;
+    width: 16px;
+    height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+  .nav-hamburger.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+  .nav-hamburger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
   .page { display: none; padding-top: 64px; min-height: 100vh; }
   .page.active { display: block; }
 
-  /* ===== HERO ===== */
   .hero {
     min-height: calc(100vh - 64px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 80px 48px;
-    position: relative;
-    overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 80px 48px; position: relative; overflow: hidden;
   }
-
   .hero::before {
-    content: '';
-    position: absolute;
-    top: -200px; left: 50%;
-    transform: translateX(-50%);
+    content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
     width: 800px; height: 800px;
     background: radial-gradient(circle, rgba(98,84,232,0.06) 0%, transparent 70%);
     pointer-events: none;
   }
+  .hero-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+  .hero-title { font-size: clamp(40px, 6vw, 72px); font-weight: 600; line-height: 1.1; letter-spacing: -0.03em; max-width: 800px; margin-bottom: 24px; }
+  .hero-title span { background: linear-gradient(135deg, var(--accent2), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero-sub { font-size: 18px; color: var(--muted); max-width: 560px; margin-bottom: 48px; font-weight: 400; }
+  .hero-badges { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 64px; }
+  .badge { font-family: var(--mono); font-size: 11px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 100px; color: var(--muted); letter-spacing: 0.05em; }
 
-  .hero-eyebrow {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 24px;
-  }
+  .waveform { display: flex; align-items: center; gap: 3px; height: 48px; margin-bottom: 16px; }
+  .waveform-bar { width: 3px; background: var(--accent); border-radius: 2px; animation: wave 1.4s ease-in-out infinite; opacity: 0.7; }
+  @keyframes wave { 0%, 100% { height: 4px; opacity: 0.3; } 50% { height: 100%; opacity: 1; } }
 
-  .hero-title {
-    font-size: clamp(40px, 6vw, 72px);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    max-width: 800px;
-    margin-bottom: 24px;
-  }
+  .section { padding: 96px 48px; max-width: 1100px; margin: 0 auto; }
+  .section-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .section-title { font-size: clamp(28px, 3vw, 40px); font-weight: 600; letter-spacing: -0.02em; margin-bottom: 20px; line-height: 1.2; }
+  .section-body { color: var(--muted); font-size: 16px; margin-bottom: 56px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 0 48px; }
 
-  .hero-title span {
-    background: linear-gradient(135deg, var(--accent2), var(--green));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .hero-sub {
-    font-size: 18px;
-    color: var(--muted);
-    max-width: 560px;
-    margin-bottom: 48px;
-    font-weight: 400;
-  }
-
-  .hero-badges {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 64px;
-  }
-
-  .badge {
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 6px 14px;
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-  }
-
-  .badge.highlight { border-color: var(--border); color: var(--muted); }
-
-  /* Waveform animation */
-  .waveform {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    height: 48px;
-    margin-bottom: 16px;
-  }
-
-  .waveform-bar {
-    width: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    animation: wave 1.4s ease-in-out infinite;
-    opacity: 0.7;
-  }
-
-  @keyframes wave {
-    0%, 100% { height: 4px; opacity: 0.3; }
-    50% { height: 100%; opacity: 1; }
-  }
-
-  /* ===== SECTION BASICS ===== */
-  .section {
-    padding: 96px 48px;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-
-  .section-label {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 16px;
-  }
-
-  .section-title {
-    font-size: clamp(28px, 3vw, 40px);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    margin-bottom: 20px;
-    line-height: 1.2;
-  }
-
-  .section-body {
-    color: var(--muted);
-    font-size: 16px;
-    margin-bottom: 56px;
-  }
-
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 0 48px;
-  }
-
-  /* ===== PIPELINE FLOW ===== */
-  .pipeline {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .pipeline-row {
-    display: flex;
-    align-items: stretch;
-    gap: 2px;
-  }
-
-  .pipeline-node {
-    flex: 1;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-    transition: border-color 0.2s, background 0.2s;
-    cursor: default;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .pipeline-node:hover {
-    border-color: var(--accent);
-    background: rgba(124,106,247,0.05);
-  }
-
-  .pipeline-node::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), transparent);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
+  .pipeline { display: flex; flex-direction: column; gap: 2px; }
+  .pipeline-row { display: flex; align-items: stretch; gap: 2px; }
+  .pipeline-node { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; transition: border-color 0.2s, background 0.2s; cursor: default; position: relative; overflow: hidden; }
+  .pipeline-node:hover { border-color: var(--accent); background: rgba(124,106,247,0.05); }
+  .pipeline-node::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); opacity: 0; transition: opacity 0.2s; }
   .pipeline-node:hover::before { opacity: 1; }
+  .pipeline-connector { display: flex; align-items: center; justify-content: center; padding: 8px 0; color: var(--accent); opacity: 0.5; font-size: 18px; }
+  .node-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .node-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+  .node-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .node-tech { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .node-pill { font-family: var(--mono); font-size: 10px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
 
-  .pipeline-connector {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 0;
-    color: var(--accent);
-    opacity: 0.5;
-    font-size: 18px;
-  }
-
-  .node-tag {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 10px;
-  }
-
-  .node-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--text);
-  }
-
-  .node-body {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .node-tech {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 14px;
-  }
-
-  .node-pill {
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 3px 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    color: var(--muted);
-  }
-
-  /* ===== HARMONY LOGIC ===== */
-  .harmony-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  .harmony-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-  }
-
-  .harmony-interval {
-    font-family: var(--mono);
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--accent2);
-    margin-bottom: 6px;
-  }
-
-  .harmony-name {
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
-
-  .harmony-desc {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.6;
-  }
-
-  .harmony-example {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding: 12px 16px;
-    background: var(--bg3);
-    border-radius: 8px;
-  }
-
-  .note-pill {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid;
-  }
-
+  .harmony-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .harmony-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+  .harmony-interval { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--accent2); margin-bottom: 6px; }
+  .harmony-name { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .harmony-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .harmony-example { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 16px; background: var(--bg3); border-radius: 8px; }
+  .note-pill { font-family: var(--mono); font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 6px; border: 1px solid; }
   .note-pill.singer { color: var(--green); border-color: var(--green); background: rgba(52,211,153,0.08); }
   .note-pill.robot  { color: var(--accent2); border-color: var(--accent2); background: rgba(167,139,250,0.08); }
   .note-arrow { color: var(--muted); font-size: 12px; }
 
-  /* ===== LIVE NOTE DEMO ===== */
-  .note-demo {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 40px;
-    margin-top: 40px;
-  }
-
-  .note-demo-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-  }
-
-  .note-demo-title {
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .mic-btn {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 22px;
-    background: rgba(124,106,247,0.15);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    color: var(--accent2);
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
+  .note-demo { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 40px; margin-top: 40px; }
+  .note-demo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  .note-demo-title { font-size: 16px; font-weight: 600; }
+  .mic-btn { display: flex; align-items: center; gap: 10px; padding: 10px 22px; background: rgba(124,106,247,0.15); border: 1px solid var(--accent); border-radius: 8px; color: var(--accent2); font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
   .mic-btn:hover { background: rgba(124,106,247,0.25); }
   .mic-btn.active { background: rgba(248,113,113,0.15); border-color: var(--red); color: var(--red); }
+  .mic-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); transition: background 0.2s; }
+  .mic-btn.active .mic-dot { background: var(--red); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
 
-  .mic-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    transition: background 0.2s;
-  }
-
-  .mic-btn.active .mic-dot {
-    background: var(--red);
-    animation: pulse 1s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .note-displays {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 32px;
-  }
-
-  .note-box {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 32px 24px;
-    text-align: center;
-    transition: border-color 0.3s;
-  }
-
+  .note-displays { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; margin-bottom: 32px; }
+  .note-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 32px 24px; text-align: center; transition: border-color 0.3s; }
   .note-box.active-singer { border-color: var(--green); box-shadow: 0 0 24px rgba(52,211,153,0.1); }
   .note-box.active-robot  { border-color: var(--accent); box-shadow: 0 0 24px rgba(124,106,247,0.1); }
-
-  .note-box-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-  }
-
+  .note-box-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 12px; }
   .note-box-label.singer { color: var(--green); }
   .note-box-label.robot  { color: var(--accent2); }
-
-  .note-display {
-    font-family: var(--mono);
-    font-size: 52px;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 8px;
-    min-height: 52px;
-    transition: all 0.2s;
-  }
-
+  .note-display { font-family: var(--mono); font-size: 52px; font-weight: 700; line-height: 1; margin-bottom: 8px; min-height: 52px; transition: all 0.2s; }
   .note-display.singer { color: var(--green); }
   .note-display.robot  { color: var(--accent2); }
-
-  .note-freq {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--muted);
-    min-height: 20px;
-  }
-
-  .note-arrow-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .interval-label {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    text-align: center;
-  }
-
-  .interval-select {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 6px 10px;
-    cursor: pointer;
-    outline: none;
-    width: 100%;
-    margin-top: 4px;
-  }
-
+  .note-freq { font-family: var(--mono); font-size: 13px; color: var(--muted); min-height: 20px; }
+  .note-arrow-center { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .interval-label { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: center; }
+  .interval-select { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 6px 10px; cursor: pointer; outline: none; width: 100%; margin-top: 4px; }
   .interval-select:focus { border-color: var(--accent); }
 
-  /* Pitch meter */
-  .pitch-meter {
-    position: relative;
-    height: 48px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
+  .pitch-meter { position: relative; height: 48px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .pitch-bar { position: absolute; top: 0; bottom: 0; left: 50%; width: 4px; border-radius: 2px; transform: translateX(-50%); background: var(--green); transition: all 0.1s; }
+  .pitch-center-line { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--border); opacity: 0.5; }
+  .pitch-labels { display: flex; justify-content: space-between; margin-top: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .note-explanation { margin-top: 24px; padding: 20px 24px; background: var(--bg3); border-left: 2px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--muted); line-height: 1.7; min-height: 64px; }
 
-  .pitch-bar {
-    position: absolute;
-    top: 0; bottom: 0; left: 50%;
-    width: 4px;
-    border-radius: 2px;
-    transform: translateX(-50%);
-    background: var(--green);
-    transition: all 0.1s;
-  }
-
-  .pitch-center-line {
-    position: absolute;
-    top: 0; bottom: 0; left: 50%;
-    width: 1px;
-    background: var(--border);
-    opacity: 0.5;
-  }
-
-  .pitch-labels {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 6px;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  /* Explanation */
-  .note-explanation {
-    margin-top: 24px;
-    padding: 20px 24px;
-    background: var(--bg3);
-    border-left: 2px solid var(--accent);
-    border-radius: 0 8px 8px 0;
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.7;
-    min-height: 64px;
-  }
-
-  /* ===== CREE SECTION ===== */
-  .cree-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-top: 40px;
-  }
-
-  .cree-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 28px;
-  }
-
-  .phoneme-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-    gap: 8px;
-  }
-
+  .cree-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px; }
+  .cree-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+  .phoneme-row { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 8px; }
   .phoneme-row:last-child { border-bottom: none; }
-
-  .phoneme-name {
-    font-family: var(--mono);
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--accent2);
-    min-width: 72px;
-    flex-shrink: 0;
-  }
-
+  .phoneme-name { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--accent2); min-width: 72px; flex-shrink: 0; }
   .phoneme-desc { font-size: 13px; color: var(--muted); flex: 1; padding: 0 12px; }
+  .phoneme-vocable { font-family: var(--mono); font-size: 12px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
 
-  .phoneme-vocable {
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 3px 10px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    color: var(--muted);
-  }
-
-  /* ===== DEMO TAB ===== */
-  .demo-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    padding: 40px 48px;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-
-  .demo-panel {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 36px;
-  }
-
-  .demo-panel-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-
-  .demo-panel-sub {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 28px;
-    line-height: 1.6;
-  }
-
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    padding: 48px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-  }
-
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(124,106,247,0.04);
-  }
-
-  .upload-zone input[type="file"] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    width: 100%;
-    height: 100%;
-  }
-
-  .upload-icon {
-    font-size: 32px;
-    margin-bottom: 12px;
-  }
-
-  .upload-text {
-    font-size: 14px;
-    color: var(--muted);
-  }
-
+  .demo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 40px 48px; max-width: 1100px; margin: 0 auto; }
+  .demo-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 36px; }
+  .demo-panel-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .demo-panel-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+  .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(124,106,247,0.04); }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 32px; margin-bottom: 12px; }
+  .upload-text { font-size: 14px; color: var(--muted); }
   .upload-text strong { color: var(--text); }
-
-  .demo-controls {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-  }
-
-  .btn {
-    flex: 1;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-
+  .demo-controls { display: flex; gap: 10px; margin-top: 20px; }
+  .btn { flex: 1; padding: 12px 20px; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-primary { background: var(--accent); color: white; }
   .btn-primary:hover { background: var(--accent2); }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-  }
-
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
   .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
-
-  .audio-player {
-    margin-top: 20px;
-    display: none;
-  }
-
+  .audio-player { margin-top: 20px; display: none; }
   .audio-player.visible { display: block; }
-
-  .audio-waveform {
-    height: 64px;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 8px;
-    overflow: hidden;
-  }
-
-  .wv-bar {
-    flex: 1;
-    max-width: 4px;
-    background: var(--accent);
-    border-radius: 2px;
-    opacity: 0.6;
-    transition: height 0.05s;
-  }
-
-  .progress-bar-outer {
-    height: 4px;
-    background: var(--bg3);
-    border-radius: 2px;
-    margin-bottom: 12px;
-    cursor: pointer;
-    position: relative;
-  }
-
-  .progress-bar-inner {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    width: 0%;
-    transition: width 0.1s linear;
-  }
-
-  .audio-time {
-    display: flex;
-    justify-content: space-between;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  .harmony-overlay-note {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--bg3);
-    border-radius: 8px;
-    margin-top: 16px;
-    min-height: 52px;
-  }
-
-  .overlay-singer, .overlay-robot {
-    font-family: var(--mono);
-    font-size: 20px;
-    font-weight: 700;
-    min-width: 48px;
-  }
-
+  .audio-waveform { height: 64px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 2px; padding: 8px; overflow: hidden; }
+  .wv-bar { flex: 1; max-width: 4px; background: var(--accent); border-radius: 2px; opacity: 0.6; transition: height 0.05s; }
+  .progress-bar-outer { height: 4px; background: var(--bg3); border-radius: 2px; margin-bottom: 12px; cursor: pointer; position: relative; }
+  .progress-bar-inner { height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width 0.1s linear; }
+  .audio-time { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .harmony-overlay-note { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg3); border-radius: 8px; margin-top: 16px; min-height: 52px; }
+  .overlay-singer, .overlay-robot { font-family: var(--mono); font-size: 20px; font-weight: 700; min-width: 48px; }
   .overlay-singer { color: var(--green); }
   .overlay-robot  { color: var(--accent2); }
   .overlay-label  { font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .overlay-arrow  { color: var(--border); font-size: 16px; }
-
-  /* Mic demo */
-  .mic-visual {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
-    padding: 24px 0;
-  }
-
-  .big-mic-btn {
-    width: 96px; height: 96px;
-    border-radius: 50%;
-    background: rgba(124,106,247,0.12);
-    border: 2px solid var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 36px;
-  }
-
+  .mic-visual { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; }
+  .big-mic-btn { width: 96px; height: 96px; border-radius: 50%; background: rgba(124,106,247,0.12); border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 36px; }
   .big-mic-btn:hover { background: rgba(124,106,247,0.2); transform: scale(1.05); }
-  .big-mic-btn.recording {
-    background: rgba(248,113,113,0.12);
-    border-color: var(--red);
-    animation: ring 1.5s ease-in-out infinite;
-  }
-
-  @keyframes ring {
-    0%   { box-shadow: 0 0 0 0 rgba(248,113,113,0.3); }
-    70%  { box-shadow: 0 0 0 20px rgba(248,113,113,0); }
-    100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); }
-  }
-
-  .level-meter {
-    width: 100%;
-    height: 6px;
-    background: var(--bg3);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .level-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green), var(--orange), var(--red));
-    border-radius: 3px;
-    width: 0%;
-    transition: width 0.05s;
-  }
-
-  .live-note-big {
-    font-family: var(--mono);
-    font-size: 72px;
-    font-weight: 700;
-    color: var(--green);
-    min-height: 80px;
-    text-align: center;
-    transition: all 0.15s;
-  }
-
-  .live-response-big {
-    font-family: var(--mono);
-    font-size: 48px;
-    font-weight: 700;
-    color: var(--accent2);
-    min-height: 56px;
-    text-align: center;
-    transition: all 0.15s;
-  }
-
-  .live-labels {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-  }
-
-  .live-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
+  .big-mic-btn.recording { background: rgba(248,113,113,0.12); border-color: var(--red); animation: ring 1.5s ease-in-out infinite; }
+  @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(248,113,113,0.3); } 70% { box-shadow: 0 0 0 20px rgba(248,113,113,0); } 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); } }
+  .level-meter { width: 100%; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .level-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--orange), var(--red)); border-radius: 3px; width: 0%; transition: width 0.05s; }
+  .live-note-big { font-family: var(--mono); font-size: 72px; font-weight: 700; color: var(--green); min-height: 80px; text-align: center; transition: all 0.15s; }
+  .live-response-big { font-family: var(--mono); font-size: 48px; font-weight: 700; color: var(--accent2); min-height: 56px; text-align: center; transition: all 0.15s; }
+  .live-labels { display: flex; justify-content: space-between; width: 100%; }
+  .live-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
   .live-label.you   { color: var(--green); }
   .live-label.robot { color: var(--accent2); }
-
-  .status-text {
-    font-size: 13px;
-    color: var(--muted);
-    text-align: center;
-    min-height: 20px;
-  }
-
-  /* INTERVAL PICKER in demo */
-  .interval-picker {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
-
-  .interval-btn {
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-family: var(--mono);
-    font-size: 12px;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--muted);
-    transition: all 0.2s;
-  }
-
+  .status-text { font-size: 13px; color: var(--muted); text-align: center; min-height: 20px; }
+  .interval-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .interval-btn { padding: 8px 16px; border-radius: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
   .interval-btn:hover { border-color: var(--accent); color: var(--text); }
   .interval-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
 
-  /* ===== FOOTER ===== */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 40px 48px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
+  footer { border-top: 1px solid var(--border); padding: 40px 48px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
   footer a { color: var(--muted); text-decoration: none; }
   footer a:hover { color: var(--text); }
+  #piano-canvas { width: 100%; height: 100px; border-radius: 8px; overflow: hidden; margin-top: 16px; }
 
-  /* ===== CANVAS for piano ===== */
-  #piano-canvas {
-    width: 100%;
-    height: 100px;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-top: 16px;
-  }
-
-  /* misc */
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    align-items: start;
-  }
-
-  .code-block {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 20px 24px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.8;
-    overflow-x: auto;
-  }
-
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+  .code-block { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.8; overflow-x: auto; }
   .code-block .kw  { color: var(--accent2); }
   .code-block .fn  { color: var(--green); }
   .code-block .str { color: var(--orange); }
-  .code-block .cm  { color: #3a3a5c; }
+  .code-block .cm  { color: #9090b0; }
+  body.dark-mode .code-block .cm { color: #3a3a5c; }
 
-  /* ===== PROSE PIPELINE ===== */
-  .prose-pipeline {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+  .prose-pipeline { display: flex; flex-direction: column; gap: 0; }
+  .prose-stage { display: flex; gap: 32px; align-items: stretch; }
+  .prose-stage-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 40px; }
+  .prose-stage-num { width: 40px; height: 40px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--accent); color: var(--accent2); font-family: var(--mono); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; letter-spacing: 0; }
+  .prose-stage-line { width: 1px; flex: 1; background: var(--border); margin: 8px 0; min-height: 40px; }
+  .prose-stage-content { padding: 0 0 56px 0; flex: 1; }
+  .prose-stage-file { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 10px; margin-top: 8px; }
+  .prose-stage-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 16px; color: var(--text); }
+  .prose-stage-body { font-size: 15px; color: var(--muted); line-height: 1.8; }
+
+  /* Token anatomy for Cree syllabics */
+  .token-anatomy { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px; margin-top: 20px; overflow-x: auto; }
+  .token-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  .token-row:last-child { margin-bottom: 0; }
+  .tok { padding: 8px 14px; border-radius: 8px; font-family: var(--mono); font-size: 14px; font-weight: 700; white-space: nowrap; cursor: default; transition: transform 0.15s; }
+  .tok-vowel    { background: rgba(124,106,247,0.12); color: var(--accent2); border: 1px solid rgba(124,106,247,0.3); }
+  .tok-cons     { background: rgba(5,150,105,0.10);   color: var(--green);   border: 1px solid rgba(5,150,105,0.25); }
+  .tok-syllabic { background: rgba(217,119,6,0.10);   color: var(--orange);  border: 1px solid rgba(217,119,6,0.25); }
+  .tok-sep      { color: var(--muted); font-size: 20px; line-height: 1; padding: 0 2px; }
+  .tok-label    { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 10px; display: block; }
+  .tok-note     { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .token-legend { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .legend-item  { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .legend-dot   { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Sentiment section */
+  .sentiment-output-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px; }
+  .sentiment-output-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px 20px; text-align: center; transition: border-color 0.2s; }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-num { font-family: var(--mono); font-size: 30px; font-weight: 700; color: var(--accent2); line-height: 1.1; margin-bottom: 8px; }
+  .stat-label { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .step-flow { display: flex; align-items: center; gap: 8px; margin-top: 48px; }
+  .step-flow-item { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 32px 24px; text-align: center; transition: border-color 0.2s, transform 0.2s; }
+  .step-flow-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .step-flow-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; }
+  .step-flow-circle { width: 44px; height: 44px; margin: 0 auto 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--accent2); background: var(--bg3); border: 1px solid var(--accent); }
+  .step-flow-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+  .step-flow-body { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .step-flow-arrow { font-size: 22px; color: var(--border); flex-shrink: 0; }
+
+  .translation-pointer { display: flex; align-items: center; justify-content: space-between; gap: 32px; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 32px 40px; }
+
+  .info-callout { background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 20px 24px; margin-top: 32px; }
+  .info-callout p { font-size: 14px; color: var(--muted); line-height: 1.8; }
+  .soc-tag   { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .soc-value { font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--accent2); margin-bottom: 6px; line-height: 1; }
+  .soc-name  { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+  .soc-desc  { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+  /* Cree mic demo */
+  .cree-mic-demo { 
+    background: linear-gradient(135deg, var(--bg2) 0%, rgba(124,106,247,0.03) 100%);
+    border: 1px solid var(--border); 
+    border-radius: 16px; 
+    padding: 48px;
+    margin-top: 40px;
+    position: relative;
+    overflow: hidden;
   }
 
-  .prose-stage {
-    display: flex;
-    gap: 32px;
-    align-items: stretch;
+  .cree-mic-header { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
   }
 
-  .prose-stage-marker {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  .cree-mic-title { 
+    font-size: 18px; 
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .cree-mic-status { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    font-family: var(--mono); 
+    font-size: 11px; 
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .cree-mic-dot { 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+    background: var(--muted); 
     flex-shrink: 0;
-    width: 40px;
+    transition: all 0.3s ease;
   }
 
-  .prose-stage-num {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--bg3);
-    border: 1px solid var(--accent);
-    color: var(--accent2);
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 700;
+  .cree-mic-dot.listening { 
+    background: var(--red); 
+    animation: cree-pulse 1.2s ease-in-out infinite; 
+  }
+
+  @keyframes cree-pulse { 
+    0%, 100% { opacity: 1; transform: scale(1); } 
+    50% { opacity: 0.4; transform: scale(0.8); } 
+  }
+
+  /* Dialect selector row */
+  .cree-dialect-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    letter-spacing: 0;
+    gap: 14px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
   }
 
-  .prose-stage-line {
-    width: 1px;
-    flex: 1;
-    background: var(--border);
-    margin: 8px 0;
-    min-height: 40px;
-  }
-
-  .prose-stage-content {
-    padding: 0 0 56px 0;
-    flex: 1;
-  }
-
-  .prose-stage-file {
+  .cree-dialect-label {
     font-family: var(--mono);
     font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 0.08em;
-    margin-bottom: 10px;
-    margin-top: 8px;
-  }
-
-  .prose-stage-title {
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    margin-bottom: 16px;
-    color: var(--text);
-  }
-
-  .prose-stage-body {
-    font-size: 15px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--muted);
-    line-height: 1.8;
+    flex-shrink: 0;
   }
 
-  /* ===== LIGHT MODE ===== */
+  .cree-dialect-sel {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+  }
+
+  .cree-dialect-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+    padding: 6px 12px;
+    background: var(--bg3);
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  /* Main demo layout */
+  .cree-demo-layout { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 32px;
+    margin-bottom: 32px;
+  }
+
+  .cree-demo-col { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 16px;
+  }
+
+  .cree-demo-col-label { 
+    font-family: var(--mono); 
+    font-size: 11px; 
+    letter-spacing: 0.14em; 
+    text-transform: uppercase; 
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Input elements */
+  .cree-waveform { 
+    height: 64px; 
+    background: var(--bg3); 
+    border: 1px solid var(--border); 
+    border-radius: 10px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 2px; 
+    padding: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+  }
+
+  .cree-waveform:has(~.cree-mic-trigger.active) {
+    border-color: var(--red);
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.1);
+  }
+
+  .cree-wv-bar { 
+    flex: 1; 
+    max-width: 3px; 
+    background: var(--accent); 
+    border-radius: 2px; 
+    opacity: 0.6;
+    transition: height 0.08s ease;
+  }
+
+  .cree-output-box { 
+    background: var(--bg3); 
+    border: 1px solid var(--border); 
+    border-radius: 10px; 
+    padding: 20px;
+    min-height: 80px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .cree-output-box-label { 
+    font-family: var(--mono); 
+    font-size: 10px; 
+    letter-spacing: 0.12em; 
+    text-transform: uppercase; 
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .cree-output-text { 
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text); 
+    line-height: 1.6;
+    min-height: 44px;
+  }
+
+  .cree-output-text.placeholder { 
+    color: var(--muted); 
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  .cree-syllabics-input { 
+    width: 100%; 
+    background: var(--bg2); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    color: var(--text); 
+    font-family: var(--mono); 
+    font-size: 13px; 
+    padding: 12px 14px; 
+    outline: none; 
+    resize: none; 
+    line-height: 1.6;
+    transition: all 0.2s ease;
+    flex: 1;
+    min-height: 80px;
+    box-sizing: border-box;
+  }
+
+  .cree-syllabics-input:focus { 
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,247,0.1);
+  }
+
+  .cree-syllabics-input::placeholder { 
+    color: var(--muted); 
+    opacity: 0.5;
+  }
+
+  /* Sentiment meter */
+  .cree-sentiment-meter { 
+    background: var(--bg3); 
+    border: 1px solid var(--border); 
+    border-radius: 10px; 
+    padding: 20px;
+  }
+
+  .cree-sentiment-meter-label { 
+    font-family: var(--mono); 
+    font-size: 10px; 
+    letter-spacing: 0.12em; 
+    text-transform: uppercase; 
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-weight: 500;
+  }
+
+  .cree-axis { 
+    margin-bottom: 16px;
+  }
+
+  .cree-axis:last-child {
+    margin-bottom: 0;
+  }
+
+  .cree-axis-label { 
+    display: flex; 
+    justify-content: space-between; 
+    font-family: var(--mono); 
+    font-size: 9px; 
+    color: var(--muted); 
+    margin-bottom: 8px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  .cree-track { 
+    height: 8px; 
+    background: var(--bg2); 
+    border: 1px solid var(--border); 
+    border-radius: 4px; 
+    position: relative; 
+    overflow: visible;
+  }
+
+  .cree-fill { 
+    position: absolute; 
+    top: 0; 
+    bottom: 0; 
+    left: 0; 
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                background 0.6s ease;
+    box-shadow: 0 0 12px rgba(124,106,247,0.2);
+  }
+
+  .cree-fill.valence { 
+    background: var(--accent); 
+  }
+
+  .cree-fill.arousal { 
+    background: var(--orange);
+  }
+
+  .cree-emotion-row { 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .cree-emotion-badge { 
+    font-family: var(--mono); 
+    font-size: 11px; 
+    font-weight: 700; 
+    padding: 6px 14px; 
+    border-radius: 100px; 
+    border: 1px solid;
+    text-transform: capitalize;
+    transition: all 0.3s ease;
+  }
+
+  .cree-emotion-badge.neutral { 
+    color: var(--muted); 
+    border-color: var(--border);
+    background: var(--bg2);
+  }
+
+  .cree-emotion-badge.joy { 
+    color: var(--green); 
+    border-color: var(--green);
+    background: rgba(5,150,105,0.1);
+    box-shadow: 0 0 12px rgba(5,150,105,0.15);
+  }
+
+  .cree-emotion-badge.grief { 
+    color: #818cf8; 
+    border-color: #818cf8;
+    background: rgba(129,140,248,0.1);
+    box-shadow: 0 0 12px rgba(129,140,248,0.15);
+  }
+
+  .cree-emotion-badge.intense { 
+    color: var(--orange); 
+    border-color: var(--orange);
+    background: rgba(217,119,6,0.1);
+    box-shadow: 0 0 12px rgba(217,119,6,0.15);
+  }
+
+  .cree-emotion-badge.longing { 
+    color: #818cf8; 
+    border-color: #818cf8;
+    background: rgba(129,140,248,0.1);
+    box-shadow: 0 0 12px rgba(129,140,248,0.15);
+  }
+
+  .cree-emotion-desc {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* Chips row */
+  .cree-chip-row { 
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .cree-chip { 
+    background: var(--bg2); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    padding: 12px 14px; 
+    text-align: center;
+    transition: all 0.2s ease;
+  }
+
+  .cree-chip:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(124,106,247,0.08);
+  }
+
+  .cree-chip-label { 
+    font-family: var(--mono); 
+    font-size: 9px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.1em; 
+    color: var(--muted); 
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .cree-chip-value { 
+    font-family: var(--mono); 
+    font-size: 13px; 
+    font-weight: 700; 
+    color: var(--accent2);
+    transition: color 0.3s ease;
+  }
+
+  /* Unified pipeline output card (sentiment demo) */
+  .cree-pipeline-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .cree-pipeline-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  .cree-chip-row-inline {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .cree-chip-inline {
+    flex: 1;
+    text-align: center;
+    padding: 0 8px;
+  }
+
+  .cree-chip-inline + .cree-chip-inline {
+    border-left: 1px solid var(--border);
+  }
+
+  .cree-example-block {
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .cree-example-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .cree-example-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Buttons */
+  .cree-mic-trigger { 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+    padding: 12px 22px; 
+    background: rgba(124,106,247,0.1); 
+    border: 1.5px solid var(--accent); 
+    border-radius: 8px; 
+    color: var(--accent2); 
+    font-family: var(--sans); 
+    font-size: 13px; 
+    font-weight: 500; 
+    cursor: pointer; 
+    transition: all 0.2s ease;
+    align-self: flex-start;
+  }
+
+  .cree-mic-trigger:hover { 
+    background: rgba(124,106,247,0.15);
+    transform: translateY(-2px);
+  }
+
+  .cree-mic-trigger.active { 
+    background: rgba(220,38,38,0.1); 
+    border-color: var(--red); 
+    color: var(--red);
+  }
+
+  .cree-mic-trigger .cmt-dot { 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+    background: var(--accent); 
+    transition: all 0.2s ease;
+  }
+
+  .cree-mic-trigger.active .cmt-dot { 
+    background: var(--red); 
+    animation: cree-pulse 1s ease-in-out infinite;
+  }
+
+  /* LED eyes section */
+  .cree-led-row { 
+    display: flex; 
+    align-items: center; 
+    gap: 20px; 
+    margin-top: 0;
+    padding: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex-wrap: wrap;
+  }
+
+  .cree-led-label { 
+    font-family: var(--mono); 
+    font-size: 10px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.12em; 
+    color: var(--accent);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .cree-led-eye-mini { 
+    width: 40px; 
+    height: 40px; 
+    border-radius: 8px; 
+    border: 2px solid var(--border); 
+    background: var(--bg2); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    flex-shrink: 0;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .cree-led-pupil { 
+    width: 16px; 
+    height: 16px; 
+    border-radius: 50%; 
+    background: var(--muted); 
+    opacity: 0.4;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .cree-led-desc { 
+    font-size: 13px; 
+    color: var(--muted); 
+    line-height: 1.6;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  /* Type selector styling */
+  .interval-select,
+  .cree-dialect-sel {
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--sans);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .interval-select:hover,
+  .cree-dialect-sel:hover {
+    border-color: var(--accent);
+  }
+
+  .interval-select:focus,
+  .cree-dialect-sel:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,247,0.1);
+  }
+
+  /* Theme toggle */
+  .theme-toggle { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg3); color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+  code { background: var(--bg3); padding: 1px 5px; border-radius: 3px; color: var(--accent); }
+
   body.light-mode {
     --bg:      #f8f8fc;
     --bg2:     #ffffff;
@@ -1057,82 +882,127 @@
     --accent2: #7c6af7;
   }
 
-  code {
-    background: var(--bg3);
-    padding: 1px 5px;
-    border-radius: 3px;
-    color: var(--accent);
-  }
-
-  .code-block .cm { color: #9090b0; }
-  body.dark-mode .code-block .cm { color: #3a3a5c; }
-
-  /* Theme toggle button */
-  .theme-toggle {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg3);
-    color: var(--muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
-
   @media (max-width: 900px) {
-    .harmony-grid { grid-template-columns: 1fr; }
-    .cree-grid    { grid-template-columns: 1fr; }
-    .two-col      { grid-template-columns: 1fr; }
-    .demo-layout  { grid-template-columns: 1fr; }
+    .harmony-grid, .two-col, .demo-layout { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .translation-pointer { flex-direction: column; align-items: flex-start; }
+    .step-flow { flex-direction: column; }
+    .step-flow-arrow { transform: rotate(90deg); }
+    .sentiment-output-grid {
+      grid-template-columns: 1fr;
+    }
+    .cree-demo-layout { 
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    
+    .cree-chip-row {
+      grid-template-columns: 1fr 1fr;
+    }
+    
+    .cree-mic-demo {
+      padding: 32px 24px;
+    }
   }
-
   @media (max-width: 768px) {
     nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 0 16px;
-      flex-wrap: wrap;
-      height: auto;
-      gap: 8px;
-      padding-top: 10px;
-      padding-bottom: 10px;
+      height: 60px;
+      gap: 10px;
     }
-    .nav-tabs { order: 3; width: 100%; justify-content: center; }
-    .nav-tab  { padding: 8px 16px; font-size: 12px; }
-    .page     { padding-top: 112px; }
+    .nav-logo, .nav-status {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .nav-status { font-size: 10px; }
+    .nav-right {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 0;
+      right: 0;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 16px 24px rgba(0,0,0,0.1);
+      flex-direction: column;
+      align-items: stretch;
+      justify-self: auto;
+      padding: 16px;
+      gap: 12px;
+    }
+    .nav-right.open { display: flex; }
+    .nav-right .theme-toggle { align-self: flex-end; }
+    .nav-tabs { flex-direction: column; }
+    .nav-hamburger { display: flex; }
+    .nav-tab  { width: 100%; text-align: left; padding: 12px 16px; font-size: 13px; }
+    .page     { padding-top: 76px; }
     .section  { padding: 48px 16px; }
     .hero     { padding: 48px 16px; min-height: auto; }
     .hero-title { font-size: 28px; }
     .hero-sub   { font-size: 15px; }
-    .hero-badges { gap: 8px; }
-    .badge      { font-size: 10px; padding: 4px 10px; }
-    .section-title { font-size: 24px; }
-    .prose-stage  { gap: 16px; }
+    .prose-stage       { gap: 16px; }
     .prose-stage-title { font-size: 18px; }
     .prose-stage-body  { font-size: 14px; }
     .prose-stage-content { padding-bottom: 36px; }
     .note-displays { gap: 12px; }
     .note-display  { font-size: 36px; }
     .note-box      { padding: 20px 12px; }
-    .harmony-interval { font-size: 22px; }
-    .demo-layout  { padding: 16px; gap: 16px; }
-    .demo-panel   { padding: 20px; }
-    .live-note-big   { font-size: 52px; }
+    .demo-layout   { padding: 16px; gap: 16px; }
+    .demo-panel    { padding: 20px; }
+    .live-note-big     { font-size: 52px; }
     .live-response-big { font-size: 36px; }
-    .big-mic-btn  { width: 72px; height: 72px; font-size: 28px; }
+    .big-mic-btn   { width: 72px; height: 72px; font-size: 28px; }
     footer { flex-direction: column; gap: 12px; padding: 24px 16px; text-align: center; }
     .note-demo    { padding: 24px 16px; }
     #piano-canvas { height: 70px; }
-    .cree-card, .harmony-card { padding: 20px; }
-    .phoneme-name { min-width: 60px; font-size: 12px; }
-    .code-block   { font-size: 11px; padding: 14px 16px; }
-  }
+    .harmony-card { padding: 20px; }
+    .phoneme-name  { min-width: 60px; font-size: 12px; }
+    .code-block    { font-size: 11px; padding: 14px 16px; }
+    .token-anatomy { padding: 20px; }
+    .cree-mic-demo { 
+      padding: 24px 16px;
+    }
+    
+    .cree-mic-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .cree-dialect-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .cree-dialect-hint {
+      margin-left: 0;
+      align-self: flex-start;
+      white-space: normal;
+    }
+    
+    .cree-chip-row { 
+      grid-template-columns: 1fr;
+    }
+    
+    .cree-led-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
 
+    .cree-chip-row-inline {
+      flex-wrap: wrap;
+      row-gap: 12px;
+    }
+
+    .cree-chip-inline {
+      flex: 1 1 45%;
+      border-left: none !important;
+    }
+  }
   @media (max-width: 480px) {
     .hero-title { font-size: 22px; }
     .nav-logo   { font-size: 11px; }
@@ -1141,31 +1011,46 @@
     .section-title { font-size: 20px; }
     .interval-picker { gap: 6px; }
     .interval-btn { padding: 6px 10px; font-size: 11px; }
-    .demo-panel-title { font-size: 16px; }
   }
 </style>
 </head>
 <body>
 
 <nav>
-  <div class="nav-logo">Archer-Robot / VCS</div>
-  <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+  <div class="nav-logo" onclick="goHome()" style="cursor: pointer;" title="Home">Archer-Robot / VCS</div>
+  <div class="nav-status">
     <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
     pipeline: <span id="ws-status" style="color:var(--red);">disconnected</span>
   </div>
-  <div style="display:flex; align-items:center; gap:12px;">
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('architecture')">Architecture</button>
-    <button class="nav-tab" onclick="showPage('demo')">Live Demo</button>
+  <div class="nav-right" id="nav-right">
+    <div class="nav-tabs">
+      <button class="nav-tab" data-page="architecture" onclick="showPage('architecture')">Architecture</button>
+      <button class="nav-tab" data-page="translation" onclick="showPage('translation')">Sentiment</button>
+      <button class="nav-tab" data-page="demo" onclick="showPage('demo')">Live Demo</button>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#x1F319;</button>
   </div>
-  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
-  </div>
+  <button class="nav-hamburger" id="nav-hamburger" onclick="toggleMobileNav()" aria-label="Open menu" title="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
 
-<!-- ===================== ARCHITECTURE PAGE ===================== -->
-<div id="page-architecture" class="page active">
+<!-- ===================== HOME PAGE ===================== -->
+<div id="page-home" class="page active">
+  <section class="hero">
+    <div class="hero-eyebrow">Archer-Robot Vocal Collaboration System</div>
+    <h1 class="hero-title">Under construction</h1>
+    <p class="hero-sub">This home page is being rebuilt right now. Check back soon. In the meantime, the Architecture, Sentiment, and Live Demo tabs above are all live.</p>
+  </section>
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
+  </footer>
+</div>
 
-  <!-- Hero -->
+<!-- ===================== ARCHITECTURE PAGE ===================== -->
+<div id="page-architecture" class="page">
+
   <section class="hero">
     <div class="hero-eyebrow">Archer-Robot Vocal Collaboration System</div>
     <h1 class="hero-title">A robot that listens, then <span>sings back</span></h1>
@@ -1187,10 +1072,11 @@
   <section class="section">
     <div class="section-label">System Pipeline</div>
     <h2 class="section-title">From microphone to harmony, in under 100ms</h2>
-    <p class="section-body">Every frame of audio moves through six stages before the robot makes a sound. The pipeline runs continuously at 44100 Hz, chewing through 1024-sample blocks roughly every 23 milliseconds. What follows is a full walkthrough of what actually happens, in order, from the moment sound enters the microphone to the moment the robot's voice comes out the other side.</p>
+    <p class="section-body">Every frame of audio moves through nine stages before the robot makes a sound. The pipeline runs continuously at 44100 Hz, chewing through 1024-sample blocks roughly every 23 milliseconds. What follows is a full walkthrough of what actually happens, in order, from the moment sound enters the microphone to the moment the robot's voice comes out the other side.</p>
 
     <div class="prose-pipeline">
 
+      <!-- Stage 1 -->
       <div class="prose-stage">
         <div class="prose-stage-marker">
           <div class="prose-stage-num">1</div>
@@ -1199,7 +1085,6 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">core/audio_capture.py</div>
           <h3 class="prose-stage-title">Audio capture</h3>
-          <!-- ✅ CORRECTED: removed false -input flag claim; reflects actual server.py + AudioCapture design -->
           <p class="prose-stage-body">Everything starts here. The input device is selected through the web UI on the Live Demo tab and sent to the server via a POST request to <code>/pipeline/start</code>, which writes the chosen device index into the config before handing it to <code>AudioCapture</code>. PyAudio then opens a float32 input stream on that device. The stream runs in a background thread and fires a callback every 1024 samples, which at 44100 Hz works out to about 23 milliseconds of audio per frame. Each callback drops those samples into a thread-safe queue. The main pipeline loop sits on the other end of that queue, pulling frames as fast as they arrive without ever touching the audio thread directly. This separation matters: if the pipeline slows down momentarily, the audio thread keeps running uninterrupted, so you never get dropouts or buffer underruns.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">PyAudio</span>
@@ -1212,6 +1097,7 @@
         </div>
       </div>
 
+      <!-- Stage 2 -->
       <div class="prose-stage">
         <div class="prose-stage-marker">
           <div class="prose-stage-num">2</div>
@@ -1229,6 +1115,7 @@
         </div>
       </div>
 
+      <!-- Stage 3 -->
       <div class="prose-stage">
         <div class="prose-stage-marker">
           <div class="prose-stage-num">3</div>
@@ -1249,6 +1136,7 @@
         </div>
       </div>
 
+      <!-- Stage 3b -->
       <div class="prose-stage">
         <div class="prose-stage-marker">
           <div class="prose-stage-num">3b</div>
@@ -1268,14 +1156,15 @@
         </div>
       </div>
 
+      <!-- Stage 4 -->
       <div class="prose-stage">
         <div class="prose-stage-marker">
-          <div class="prose-stage-num">4</div>
+          <div class="prose-stage-num">3c</div>
           <div class="prose-stage-line"></div>
         </div>
         <div class="prose-stage-content">
-          <div class="prose-stage-file">analysis/cree_tokenizer.py</div>
-          <h3 class="prose-stage-title">Cree phonetic analysis</h3>
+          <div class="prose-stage-file">analysis/phonetic_analysis.py</div>
+          <h3 class="prose-stage-title">Phonetic analysis</h3>
           <p class="prose-stage-body">When enabled, this stage listens not just to the pitch but to the shape of the sound. It extracts 13 Mel-frequency cepstral coefficients and the spectral centroid from each voiced frame. MFCCs capture the resonant character of the vocal tract, which is what makes one vowel sound different from another even at the same pitch. The centroid captures the overall brightness of the sound. Together, these features are mapped to a PhonemeProfile with three values: brightness (0 is dark, 1 is bright), vowel color (0 is a front vowel like "ee", 1 is a back vowel like "oo"), and nasality (0 is oral, 1 is fully nasal).</p>
           <p class="prose-stage-body" style="margin-top: 12px;">The goal is not to identify or reproduce Cree language. It is to mirror the physical feeling of what the singer's mouth is doing, so the robot's voice shifts its timbre in sympathy. If a trained sklearn model is available at the path specified in config, it is used for classification. Otherwise the system falls back to the heuristic feature rules.</p>
           <div class="node-tech" style="margin-top: 16px;">
@@ -1289,6 +1178,96 @@
 
       <div class="prose-stage">
         <div class="prose-stage-marker">
+          <div class="prose-stage-num">4a</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">planned</div>
+          <h3 class="prose-stage-title">nêhiyawêwin (Plains Cree) syllabics transcription</h3>
+          <p class="prose-stage-body">Before any of the translation work below can run, the sung Cree audio has to become Cree text. nêhiyawêwin is traditionally written in syllabics, where a single glyph stands for a consonant plus a vowel rather than one letter per sound, which is different from how English or French speech-to-text systems are built. This stage is planned but not yet trained: turning the pitch-tracked audio from earlier in the pipeline into syllabic text that the translation stage can read.</p>
+
+          <div class="token-anatomy">
+            <span class="tok-label" style="display:block; margin-bottom: 16px;">Example: a Plains Cree phrase broken into syllabics</span>
+            <div class="token-row">
+              <span class="tok tok-syllabic">&#x14C7;&#x1466;&#x14B3;&#x1455;</span>
+              <span class="tok-sep">&#8594;</span>
+              <span class="tok tok-cons">&#x14C7;</span>
+              <span class="tok tok-vowel">&#x1466;</span>
+              <span class="tok tok-cons">&#x14B3;</span>
+              <span class="tok tok-vowel">&#x1455;</span>
+            </div>
+            <div class="token-row">
+              <span class="tok tok-syllabic">&#x14D6;&#x14F1;&#x14EF;</span>
+              <span class="tok-sep">&#8594;</span>
+              <span class="tok tok-cons">&#x14D6;</span>
+              <span class="tok tok-vowel">&#x14F1;</span>
+              <span class="tok tok-cons">&#x14EF;</span>
+              <span class="tok-sep" style="margin-left: 12px;"></span>
+              <span class="tok-note">"how are you" (tanisi)</span>
+            </div>
+            <div class="token-legend">
+              <div class="legend-item">
+                <div class="legend-dot" style="background: rgba(124,106,247,0.7);"></div>
+                Vowel nucleus
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: rgba(5,150,105,0.7);"></div>
+                Consonant onset
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: rgba(217,119,6,0.7);"></div>
+                Full syllabic glyph
+              </div>
+            </div>
+          </div>
+
+          <div class="node-tech" style="margin-top: 20px;">
+            <span class="node-pill">Canadian Aboriginal Syllabics</span>
+            <span class="node-pill">consonant + vowel glyphs</span>
+            <span class="node-pill">in progress</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4b</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/translate_transformer.py</div>
+          <h3 class="prose-stage-title">Turning nêhiyawêwin into English</h3>
+          <p class="prose-stage-body">Once the words are on the page, a translation model turns them into English. There is no existing pretrained model for Plains Cree to build on, so this one is trained from scratch on real nêhiyawêwin text: community-contributed material from the Cree Corpus out of the University of Alberta, plus vocabulary pulled from Watkins' 1865 dictionary of the language. A transformer model reads the Cree and generates the English word by word, checking an exact-match lookup first for phrases it already knows well and falling back to the learned model for everything else.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Cree is a polysynthetic language, meaning a single word can carry what English needs a whole sentence to say, so a fair amount of the engineering here goes into how the text is broken into pieces before the model ever sees it. The full walkthrough, including where the training data comes from and how it's tokenized, lives on the <a href="#" onclick="showPage('translation'); return false;" style="color: var(--accent2);">Translation tab</a>.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">Transformer encoder-decoder</span>
+            <span class="node-pill">trained from scratch</span>
+            <span class="node-pill">exact-match fast path</span>
+            <span class="node-pill">beam search decoding</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4c</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">planned</div>
+          <h3 class="prose-stage-title">Reading the emotion in the English translation</h3>
+          <p class="prose-stage-body">This is the next piece being built. Once a phrase is translated, a sentiment model will read the English output and score it on two axes: valence (how negative or positive it is) and arousal (how calm or intense it is). That score becomes the SentimentProfile that the harmony engine and synthesizer use below, so a grief-laden phrase and a joyful one lead the robot to genuinely different musical choices rather than the same response regardless of meaning. The sentiment-to-sound mapping is already designed and demoed on the Translation tab, running on preview data while the live model gets connected.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">valence / arousal scoring</span>
+            <span class="node-pill">in progress</span>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Stage 5 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
           <div class="prose-stage-num">5</div>
           <div class="prose-stage-line"></div>
         </div>
@@ -1296,17 +1275,19 @@
           <div class="prose-stage-file">synthesis/harmony_engine.py</div>
           <h3 class="prose-stage-title">Harmony decision</h3>
           <p class="prose-stage-body">Given a detected pitch, the harmony engine decides what note the robot should sing. It starts by maintaining a rolling history of the last 32 detected pitches, which it uses to infer the current musical key. Key inference runs once per second using the Krumhansl-Kessler algorithm: the distribution of pitch classes in the history is compared against reference major and minor tonal profiles via Pearson correlation, and the root and mode that produce the best fit are selected as the current key.</p>
-          <p class="prose-stage-body" style="margin-top: 12px;">With the key established, the engine computes the raw harmony pitch by transposing the singer's note upward by the configured interval (0, 4, 7, or 12 semitones for unison, third, fifth, or octave). It then snaps that pitch to the nearest note in the detected scale, so the robot's response is always musically valid. Finally, the engine compares the new target to the note it is currently holding. If the two are within 5 Hz of each other, it issues a "sustain" action to keep the current note playing. If they differ, it issues a "sing" action to start the new note.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">With the key established, the engine computes the raw harmony pitch by transposing the singer's note upward by the configured interval (0, 4, 7, or 12 semitones for unison, third, fifth, or octave). It then snaps that pitch to the nearest note in the detected scale, so the robot's response is always musically valid. The SentimentProfile from stage 4c nudges this interval choice — a grief profile pushes toward a minor third, a joyful profile pushes toward an octave. Finally, the engine compares the new target to the note it is currently holding. If the two are within 5 Hz of each other, it issues a sustain action to keep the current note playing. If they differ, it issues a sing action to start the new note.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">Krumhansl-Kessler profiles</span>
             <span class="node-pill">scale-lock</span>
             <span class="node-pill">major / minor detection</span>
             <span class="node-pill">configurable interval</span>
+            <span class="node-pill">sentiment nudge</span>
             <span class="node-pill">sustain logic</span>
           </div>
         </div>
       </div>
 
+      <!-- Stage 6 -->
       <div class="prose-stage" style="--line-display: none;">
         <div class="prose-stage-marker">
           <div class="prose-stage-num">6</div>
@@ -1315,7 +1296,7 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">synthesis/vocable_synthesizer.py + output/timing_sync.py</div>
           <h3 class="prose-stage-title">Synthesis and playback</h3>
-          <p class="prose-stage-body">When the harmony engine issues a "sing" action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries.</p>
+          <p class="prose-stage-body">When the harmony engine issues a sing action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. The SentimentProfile from stage 4c also shapes the output: a grief state darkens the formants and adds a slow vibrato, a joyful state brightens them and opens the vowel toward a wider shape. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries.</p>
           <p class="prose-stage-body" style="margin-top: 12px;">The synthesized audio is handed to TimingSync, which schedules playback 70 milliseconds after the note was detected. That delay is intentional. It gives the robot the feel of a real performer responding with a slight human lag, rather than an instantaneous echo that would feel mechanical. The audio is played back through sounddevice on the configured output device.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">additive synthesis</span>
@@ -1345,12 +1326,12 @@
         <div class="harmony-desc">The robot sings exactly the same pitch. This creates a doubling effect that makes the voice sound fuller and more powerful. It is used when you want the robot to reinforce rather than harmonize.</div>
         <div class="harmony-example">
           <div>
-            <div class="overlay-label">You sing</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
             <span class="note-pill singer">A4 / 440 Hz</span>
           </div>
-          <span class="note-arrow">→</span>
+          <span class="note-arrow">&#8594;</span>
           <div>
-            <div class="overlay-label">Robot sings</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
             <span class="note-pill robot">A4 / 440 Hz</span>
           </div>
         </div>
@@ -1362,12 +1343,12 @@
         <div class="harmony-desc">Four semitones above the singer's note. This is the interval that defines whether a chord sounds major (happy) or minor (sad). A major third above any root is the most recognizable two-note harmony in Western music.</div>
         <div class="harmony-example">
           <div>
-            <div class="overlay-label">You sing</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
             <span class="note-pill singer">A4 / 440 Hz</span>
           </div>
-          <span class="note-arrow">→</span>
+          <span class="note-arrow">&#8594;</span>
           <div>
-            <div class="overlay-label">Robot sings</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
             <span class="note-pill robot">C#5 / 554 Hz</span>
           </div>
         </div>
@@ -1379,12 +1360,12 @@
         <div class="harmony-desc">Seven semitones above. The most consonant interval after the octave, used in every culture's music. The frequency ratio is exactly 3:2, which means the overtone series of the two notes align closely. This produces a stable, powerful, almost ancient sound, which is why it is the default interval for this system.</div>
         <div class="harmony-example">
           <div>
-            <div class="overlay-label">You sing</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
             <span class="note-pill singer">A4 / 440 Hz</span>
           </div>
-          <span class="note-arrow">→</span>
+          <span class="note-arrow">&#8594;</span>
           <div>
-            <div class="overlay-label">Robot sings</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
             <span class="note-pill robot">E5 / 660 Hz</span>
           </div>
         </div>
@@ -1396,19 +1377,18 @@
         <div class="harmony-desc">Twelve semitones above, exactly double the frequency. The two pitches sound so similar that many people perceive them as the same note in different registers. This is ideal for creating a wide, spacious texture while staying completely consonant with the singer at all times.</div>
         <div class="harmony-example">
           <div>
-            <div class="overlay-label">You sing</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
             <span class="note-pill singer">A4 / 440 Hz</span>
           </div>
-          <span class="note-arrow">→</span>
+          <span class="note-arrow">&#8594;</span>
           <div>
-            <div class="overlay-label">Robot sings</div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
             <span class="note-pill robot">A5 / 880 Hz</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Scale Lock explanation -->
     <div style="margin-top: 24px; padding: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;">
       <div class="node-tag" style="margin-bottom: 12px;">Scale Lock</div>
       <div class="node-title" style="margin-bottom: 10px;">Why the robot never plays a wrong note</div>
@@ -1420,7 +1400,7 @@
 
   <hr class="divider">
 
-  <!-- Live Note Demo in Architecture -->
+  <!-- Architecture live demo -->
   <section class="section">
     <div class="section-label">Interactive Architecture Demo</div>
     <h2 class="section-title">See the system respond to your voice</h2>
@@ -1435,7 +1415,6 @@
         </button>
       </div>
 
-      <!-- Interval selector -->
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
         <span style="font-size: 13px; color: var(--muted);">Harmony interval:</span>
         <div class="interval-picker" style="margin: 0;">
@@ -1452,12 +1431,10 @@
           <div class="note-display singer" id="arch-singer-note">-</div>
           <div class="note-freq" id="arch-singer-freq"></div>
         </div>
-
         <div class="note-arrow-center">
-          <div style="font-size: 24px; color: var(--border);">→</div>
+          <div style="font-size: 24px; color: var(--border);">&#8594;</div>
           <div class="interval-label" id="arch-interval-label">+7 semitones<br>perfect fifth</div>
         </div>
-
         <div class="note-box" id="arch-robot-box">
           <div class="note-box-label robot">Robot would sing</div>
           <div class="note-display robot" id="arch-robot-note">-</div>
@@ -1465,7 +1442,6 @@
         </div>
       </div>
 
-      <!-- Pitch deviation meter -->
       <div style="margin-bottom: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono);">PITCH DEVIATION FROM NEAREST NOTE</div>
       <div class="pitch-meter">
         <div class="pitch-center-line"></div>
@@ -1481,14 +1457,13 @@
         Click "Start microphone" and sing or hum. The system will detect your pitch using the YIN algorithm, the same approach used by the physical robot.
       </div>
 
-      <!-- Piano keyboard canvas -->
       <canvas id="piano-canvas" height="100"></canvas>
     </div>
   </section>
 
   <hr class="divider">
 
-  <!-- Cree section -->
+  <!-- Cree phonetic layer -->
   <section class="section">
     <div class="section-label">Cree Phonetic Layer</div>
     <h2 class="section-title">The robot doesn't just match pitch. It matches feeling.</h2>
@@ -1545,11 +1520,425 @@
     </div>
   </section>
 
+
+
   <footer>
     <span>Archer-Robot Vocal Collaboration System</span>
     <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
   </footer>
 </div>
+<!-- ===================== TRANSLATION PAGE ===================== -->
+<div id="page-translation" class="page">
+
+  <section class="hero">
+    <div class="hero-eyebrow">Sentiment Layer</div>
+    <h1 class="hero-title">Teaching the robot to feel what you're <span>singing</span></h1>
+    <p class="hero-sub">When someone sings in nêhiyawêwin (Plains Cree), the robot needs to know what the words mean before it can know how to feel about them. That means translating the Cree to English first, then reading the emotional tone of the translation. This tab covers both halves: the translation model underneath, and the sentiment reading built on top of it.</p>
+    <div class="hero-badges">
+      <span class="badge highlight">Valence / arousal sentiment</span>
+      <span class="badge">Transformer translation, trained from scratch</span>
+      <span class="badge">Morfessor + BPE tokenization</span>
+      <span class="badge">Watkins (1865) dictionary</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- How it fits together -->
+  <section class="section">
+    <div class="section-label">How It Fits Together</div>
+    <h2 class="section-title">Three steps between a sung word and a felt one</h2>
+    <p class="section-body">The sentiment layer sits between the ear and the voice. It doesn't do much on its own, it needs a working translation underneath it first, which is most of what this tab covers before getting to the sentiment reading itself.</p>
+
+    <div class="step-flow">
+      <div class="step-flow-item">
+        <div class="step-flow-tag">translation</div>
+        <div class="step-flow-circle">1</div>
+        <h3 class="step-flow-title">Translate</h3>
+        <p class="step-flow-body">The sung nêhiyawêwin becomes English, word by word, using the transformer trained from scratch below.</p>
+      </div>
+      <div class="step-flow-arrow">&#8594;</div>
+      <div class="step-flow-item">
+        <div class="step-flow-tag">sentiment</div>
+        <div class="step-flow-circle">2</div>
+        <h3 class="step-flow-title">Read the emotion</h3>
+        <p class="step-flow-body">The English translation gets scored on valence and arousal, how positive and how intense it feels.</p>
+      </div>
+      <div class="step-flow-arrow">&#8594;</div>
+      <div class="step-flow-item">
+        <div class="step-flow-tag">robot</div>
+        <div class="step-flow-circle">3</div>
+        <h3 class="step-flow-title">Respond</h3>
+        <p class="step-flow-body">That emotion score shapes the harmony the robot sings back and how its LED eyes light up.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Stats -->
+  <section class="section">
+    <div class="section-label">The Translation Layer, By The Numbers</div>
+    <h2 class="section-title">Building a translator where almost no digital text exists</h2>
+    <p class="section-body">Before any emotion can be read, the Cree has to become English, and that alone is a hard problem. Most machine translation runs on millions of sentence pairs. There isn't remotely that much nêhiyawêwin text online, so a real amount of the work below is squeezing every usable sentence out of what does exist.</p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-num">8,397</div>
+        <div class="stat-label">real sentence pairs, up from 1,030 before a custom sentence aligner recovered the rest</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">10,329</div>
+        <div class="stat-label">word-level entries pulled from an 1865 dictionary of the language</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">19,405</div>
+        <div class="stat-label">distinct Cree word forms the tokenizer has now seen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">1865</div>
+        <div class="stat-label">the year of the historical dictionary that fills in vocabulary gaps</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Detailed pipeline -->
+  <section class="section">
+    <div class="section-label">Step One: Translation</div>
+    <h2 class="section-title">How the translation layer underneath it gets built</h2>
+    <p class="section-body">This is the groundwork the sentiment reading depends on. Five stages, in order, from raw source text to a working translator. The sentiment layer itself picks up right after this, further down the page.</p>
+
+    <div class="prose-pipeline">
+
+      <!-- Stage 1 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">1</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/build_translation_corpus.py + sentence_aligner.py</div>
+          <h3 class="prose-stage-title">Gathering and lining up real sentences</h3>
+          <p class="prose-stage-body">The starting point is the <a href="https://github.com/EdTeKLA/IndigenousLanguages_Corpora" target="_blank" rel="noopener" style="color: var(--accent2);">Cree Corpus</a>, a collection of nêhiyawêwin texts out of the University of Alberta covering everything from Bible passages to Solomon Ratt's Cree language workbooks to literacy group materials and social media posts. Each text exists as a separate Cree file and English file, and for a lot of them the number of lines on each side doesn't match, sometimes a sentence gets split differently between the two, sometimes it comes down to how the original was formatted.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Lining these up by hand isn't practical at this scale, so a length-based sentence aligner compares how long each line is in Cree against how long the matching stretch is in English and works out the most likely pairing, similar to how sentence alignment has been handled in machine translation for decades. That one piece of engineering took the usable data from about 1,030 sentence pairs up to 8,397, recovering thousands of real sentences from Bible passages and workbooks that would otherwise have been unusable.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">length-based alignment</span>
+            <span class="node-pill">recovered 8,397 pairs from 1,030</span>
+            <span class="node-pill">handles split and merged lines</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 2 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">2</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/watkins_to_pairs.py + combine_corpora.py</div>
+          <h3 class="prose-stage-title">Bringing in a 160 year old dictionary</h3>
+          <p class="prose-stage-body">Modern nêhiyawêwin text online is genuinely rare, so the corpus above gets extended with vocabulary pulled from Watkins' 1865 "A Dictionary of the Cree Language," a public domain historical dictionary that was scanned, OCR'd, and parsed into individual word entries.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Each dictionary entry is a single word in each language rather than a full sentence, so it gets blended in carefully instead of dumped in at full volume. Mixing in too many single-word examples would teach the model that short, choppy answers are normal, so the ratio of dictionary entries to real sentences is capped, which keeps sentence-level fluency as the dominant signal while still closing real vocabulary gaps.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">Watkins (1865) dictionary</span>
+            <span class="node-pill">OCR + structured parsing</span>
+            <span class="node-pill">ratio-capped blending</span>
+            <span class="node-pill">public domain source</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 3 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/cree_morfessor.py + tokenizer.py</div>
+          <h3 class="prose-stage-title">Splitting Cree the way Cree actually splits</h3>
+          <p class="prose-stage-body">nêhiyawêwin is polysynthetic, meaning a single word can carry what English needs a whole phrase to say, built from a root plus a long chain of prefixes and suffixes. Standard subword tokenization, the kind most translation models use, looks for whatever character sequences repeat most often in the raw text, which tends to chop polysynthetic words apart in places that don't line up with any real piece of the word's meaning.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Instead, an unsupervised morphology learner called Morfessor studies the corpus first to find the word parts that actually recur as real prefixes, roots, and suffixes, and standard subword encoding only runs on top of those pieces afterward. Training and translation both apply the exact same segmentation automatically, so the two stages can never quietly drift out of sync with each other.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">Morfessor segmentation</span>
+            <span class="node-pill">SentencePiece BPE on top</span>
+            <span class="node-pill">polysynthetic-aware</span>
+            <span class="node-pill">shared Cree / English vocabulary</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 4 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/model.py + train_transformer.py</div>
+          <h3 class="prose-stage-title">Training the model itself</h3>
+          <p class="prose-stage-body">There is no existing pretrained model for Plains Cree anywhere to build on, unlike English, French, or Spanish, which all have huge pretrained models available off the shelf. The translation model here is a transformer encoder-decoder built and trained from scratch, sized deliberately small rather than huge, so its capacity roughly matches the amount of real training data available. An oversized model on a small dataset just memorizes the training examples instead of learning to generalize.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Training holds out a validation set of real sentence pairs the model never trains on, so progress gets tracked honestly against data it hasn't seen, and training stops automatically once validation performance stops improving rather than running blindly for a fixed number of steps.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">transformer encoder-decoder</span>
+            <span class="node-pill">trained from scratch</span>
+            <span class="node-pill">train / validation split</span>
+            <span class="node-pill">early stopping</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 5 -->
+      <div class="prose-stage" style="--line-display: none;">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">5</div>
+          <div class="prose-stage-line" style="display: none;"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">translation/translate_transformer.py</div>
+          <h3 class="prose-stage-title">Producing an actual translation</h3>
+          <p class="prose-stage-body">At translation time, the system checks an exact-match lookup table first. A phrase the model has seen word for word during training is more trustworthy coming straight from that lookup than from anything the neural model might generate on its own. Anything new goes to the transformer, which builds the English translation word by word using beam search, keeping several candidate translations alive at each step instead of committing early to a single guess, and returning the highest-scoring complete sentence at the end.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">exact-match fast path</span>
+            <span class="node-pill">beam search decoding</span>
+            <span class="node-pill">length-normalized scoring</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="info-callout">
+      <p><strong style="color: var(--text);">Where this stands today:</strong> this is genuinely early-stage work. nêhiyawêwin has vastly less digital text available than languages like English, so translations of anything the model hasn't seen something close to before can come out rough. The single biggest lever for improving this further is more real nêhiyawêwin text, more than any change to the model itself.</p>
+    </div>
+
+    <!-- Machine Translation demo -->
+    <div style="margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border);">
+      <div class="section-label">Interactive Demo</div>
+      <h3 class="section-title" style="font-size: clamp(24px, 2.5vw, 36px);">Try the translation model</h3>
+      <p class="section-body">This box is connected to the real translation model running on the server, not a canned demo, so what you see is exactly what the model currently produces. Type a nêhiyawêwin (Plains Cree) word or phrase and press Translate. A few words to start with: askiy pehtakwan, tanisi, nimiskweyihten, kihci kiskinwahamatowikamik.</p>
+    </div>
+
+    <div class="cree-mic-demo">
+      <div class="cree-mic-header">
+        <div class="cree-mic-title">Cree &#8594; English translation</div>
+        <div class="cree-mic-status">
+          <div class="cree-mic-dot" id="mt-status-dot"></div>
+          <span id="mt-status-text">translation: idle</span>
+        </div>
+      </div>
+
+      <div class="cree-demo-layout">
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Input</div>
+          <textarea class="cree-syllabics-input" id="mt-text-input" rows="3" placeholder="tanisi  or  nehiyawewin katawasisin..."></textarea>
+          <button class="cree-mic-trigger" style="align-self: flex-start; background: rgba(124,106,247,0.12);" onclick="runTranslationDemo()">
+            <div class="cmt-dot"></div>
+            Translate
+          </button>
+        </div>
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Output</div>
+          <div class="cree-output-box">
+            <div class="cree-output-box-label">English translation</div>
+            <div class="cree-output-text placeholder" id="mt-translation-out">translation will appear here</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CREE SENTIMENT LAYER -->
+  <section class="section">
+    <div class="section-label">Step Two: Sentiment</div>
+    <h2 class="section-title">The robot that understands what you're singing about</h2>
+    <p class="section-body">Pitch and rhythm tell the robot what notes to sing. This layer tells it how to feel about it. With the translation layer above turning the sung nêhiyawêwin into English, this stage reads the emotional tone of that translation, scoring it for valence (how negative or positive) and arousal (how calm or intense). That score is what actually flows back into how the robot sings and how its LED eyes light up.</p>
+
+    <div class="sentiment-output-grid">
+
+      <div class="sentiment-output-card">
+        <div class="soc-tag">Joy / Celebration</div>
+        <div class="soc-value" style="color: var(--green);">+1.0</div>
+        <div class="soc-name">Joyful</div>
+        <div class="soc-desc">Harmony shifts to a major third or octave. Waveform becomes a bright sawtooth. Formant brightness peaks and vowels open towards a bright "hey" shape. LED eyes pulse steady green at full brightness. Gain multiplier is at maximum.</div>
+        <div class="node-tech" style="margin-top: 14px;">
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">+4 or +12 semitones</span>
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">sawtooth</span>
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">LED: full green</span>
+        </div>
+      </div>
+
+      <div class="sentiment-output-card">
+        <div class="soc-tag">Grief / Sorrow</div>
+        <div class="soc-value" style="color: #818cf8;">-0.7</div>
+        <div class="soc-name">Grief</div>
+        <div class="soc-desc">Harmony drops to a minor third. Waveform becomes a pure sine with minimal harmonics. Formants darken towards "ooo" and "mmm" vowel shapes. Vibrato is added at 3.5 Hz. Gain drops to 75% for a softer, more interior sound. LED eyes breathe slowly in indigo.</div>
+        <div class="node-tech" style="margin-top: 14px;">
+          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">+3 semitones</span>
+          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">sine + vibrato</span>
+          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">LED: indigo breath</span>
+        </div>
+      </div>
+
+      <div class="sentiment-output-card">
+        <div class="soc-tag">Longing / Yearning</div>
+        <div class="soc-value" style="color: var(--accent2);">-0.2</div>
+        <div class="soc-name">Longing</div>
+        <div class="soc-desc">Harmony stays on the perfect fifth but with slow vibrato added. Crossfades between notes are extended to 60 milliseconds for a more legato feel. LED eyes dim to half brightness in a blue-violet with a gentle swell pattern, evoking distance and reaching.</div>
+        <div class="node-tech" style="margin-top: 14px;">
+          <span class="node-pill">+7 semitones</span>
+          <span class="node-pill">60ms crossfade</span>
+          <span class="node-pill">LED: violet swell</span>
+        </div>
+      </div>
+
+      <div class="sentiment-output-card">
+        <div class="soc-tag">Intensity / Power</div>
+        <div class="soc-value" style="color: var(--orange);">+0.6 arousal</div>
+        <div class="soc-name">Intense</div>
+        <div class="soc-desc">Arousal drives waveform richness from triangle at medium to sawtooth at peak. Harmony pushes to an octave for maximum spaciousness. Tempo multiplier increases up to 1.4x. LED eyes shift to warm amber with a rapid strobe pulse that tracks the detected tempo.</div>
+        <div class="node-tech" style="margin-top: 14px;">
+          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">+12 semitones</span>
+          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">sawtooth 1.4x tempo</span>
+          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">LED: amber strobe</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Sentiment demo -->
+    <div style="margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border);">
+      <div class="section-label">Interactive Demo</div>
+      <h3 class="section-title" style="font-size: clamp(24px, 2.5vw, 36px);">See the sentiment layer respond</h3>
+      <p class="section-body" style="margin-bottom: 0;">Pick an example phrase or use the microphone. This part is a preview built on known example phrases, since the sentiment model itself isn't trained yet, unlike the translation demo above. The microphone path simulates the full pipeline, since live speech transcription (stage 4a on the Architecture tab) isn't trained yet either.</p>
+    </div>
+
+    <div class="cree-mic-demo">
+      <div class="cree-mic-header">
+        <div class="cree-mic-title">nêhiyawêwin (Plains Cree) sentiment pipeline</div>
+        <div class="cree-mic-status">
+          <div class="cree-mic-dot" id="cree-status-dot"></div>
+          <span id="cree-status-text">idle</span>
+        </div>
+      </div>
+
+      <div class="cree-dialect-row">
+        <span class="cree-dialect-label">Language</span>
+        <span class="cree-dialect-sel" style="display: inline-flex; align-items: center;">nêhiyawêwin (Plains Cree)</span>
+        <span class="cree-dialect-hint">Prairies · y-dialect · Saskatchewan, Alberta</span>
+      </div>
+
+      <div class="cree-demo-layout">
+        <!-- INPUT COLUMN -->
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Input</div>
+          
+          <button class="cree-mic-trigger" id="cree-mic-btn" onclick="toggleCreeMic()">
+            <div class="cmt-dot"></div>
+            Start microphone
+          </button>
+          
+          <div class="cree-waveform" id="cree-waveform">
+            <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">waiting for audio...</div>
+          </div>
+          
+          <div class="cree-output-box">
+            <div class="cree-output-box-label">Detected syllabics</div>
+            <div class="cree-output-text placeholder" id="cree-syllabics-out">waiting for voiced phrase</div>
+          </div>
+
+          <div class="cree-example-block">
+            <div class="cree-example-label">Or pick an example phrase</div>
+            <div id="cree-example-pills" class="cree-example-pills"></div>
+          </div>
+        </div>
+
+        <!-- OUTPUT COLUMN -->
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Pipeline output</div>
+
+          <div class="cree-pipeline-card">
+            <div class="cree-output-box-label">English translation</div>
+            <div class="cree-output-text placeholder" id="cree-translation-out">translation will appear here</div>
+
+            <div class="cree-pipeline-divider"></div>
+
+            <div class="cree-sentiment-meter-label">Emotional character</div>
+
+            <div class="cree-axis">
+              <div class="cree-axis-label">
+                <span>grief / dark</span>
+                <span>Valence</span>
+                <span>joy / bright</span>
+              </div>
+              <div class="cree-track">
+                <div class="cree-fill valence" id="cree-val-fill" style="width: 50%;"></div>
+              </div>
+            </div>
+
+            <div class="cree-axis">
+              <div class="cree-axis-label">
+                <span>still / calm</span>
+                <span>Arousal</span>
+                <span>intense</span>
+              </div>
+              <div class="cree-track">
+                <div class="cree-fill arousal" id="cree-aro-fill" style="width: 40%;"></div>
+              </div>
+            </div>
+
+            <div class="cree-emotion-row">
+              <span class="cree-emotion-badge neutral" id="cree-emotion-badge">neutral</span>
+              <span class="cree-emotion-desc" id="cree-emotion-desc">waiting for translation</span>
+            </div>
+
+            <div class="cree-pipeline-divider"></div>
+
+            <div class="cree-chip-row-inline">
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Interval</div>
+                <div class="cree-chip-value" id="chip-interval">+7 (5th)</div>
+              </div>
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Waveform</div>
+                <div class="cree-chip-value" id="chip-osc">sine</div>
+              </div>
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Vibrato</div>
+                <div class="cree-chip-value" id="chip-vibrato">off</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LED EYES SECTION -->
+      <div class="cree-led-row">
+        <div class="cree-led-label">LED eyes</div>
+        <div class="cree-led-eye-mini" id="led-left">
+          <div class="cree-led-pupil" id="led-left-pupil"></div>
+        </div>
+        <div class="cree-led-eye-mini" id="led-right">
+          <div class="cree-led-pupil" id="led-right-pupil"></div>
+        </div>
+        <div class="cree-led-desc" id="led-desc">
+          LED state mirrors the detected sentiment. Colour, pupil shape, and pulse rate update with each translated phrase.
+        </div>
+      </div>
+    </div>
+
+  </section>
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
+  </footer>
+</div>
+
 
 <!-- ===================== DEMO PAGE ===================== -->
 <div id="page-demo" class="page">
@@ -1560,28 +1949,22 @@
   </div>
 
   <div class="demo-layout">
-
-    <!-- Live Python Pipeline Panel -->
     <div class="demo-panel" style="grid-column: 1 / -1;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div class="demo-panel-title">Live from Python pipeline</div>
         <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
-          <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);transition:background 0.3s;"></div>
-          <span id="ws-status" style="color:var(--red);">server offline</span>
+          <div id="ws-dot2" style="width:7px;height:7px;border-radius:50%;background:var(--red);transition:background 0.3s;"></div>
+          <span id="ws-status2" style="color:var(--red);">server offline</span>
         </div>
       </div>
-      <p class="demo-panel-sub" style="margin-bottom:20px;">First run <code style="font-family:var(--mono);color:var(--accent2);">python server.py</code> in your project folder. Then select your mic and click Start — the pipeline begins only when you do.</p>
+      <p class="demo-panel-sub" style="margin-bottom:20px;">First run <code style="font-family:var(--mono);color:var(--accent2);">python server.py</code> in your project folder. Then select your mic and click Start.</p>
 
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
         <select id="device-select" class="interval-select" style="max-width:320px;font-size:13px;padding:10px 14px;">
           <option value="">Loading devices...</option>
         </select>
-        <button class="btn btn-primary" id="pipeline-start-btn" onclick="startPipeline()" style="flex:0;padding:10px 28px;">
-          ▶ Start
-        </button>
-        <button class="btn btn-ghost" id="pipeline-stop-btn" onclick="stopPipeline()" style="flex:0;padding:10px 28px;" disabled>
-          ■ Stop
-        </button>
+        <button class="btn btn-primary" id="pipeline-start-btn" onclick="startPipeline()" style="flex:0;padding:10px 28px;">&#9654; Start</button>
+        <button class="btn btn-ghost"   id="pipeline-stop-btn"  onclick="stopPipeline()"  style="flex:0;padding:10px 28px;" disabled>&#9632; Stop</button>
       </div>
 
       <div class="note-displays">
@@ -1591,7 +1974,7 @@
           <div class="note-freq" id="live-singer-hz"></div>
         </div>
         <div class="note-arrow-center">
-          <div style="font-size:24px;color:var(--border);">→</div>
+          <div style="font-size:24px;color:var(--border);">&#8594;</div>
           <div class="interval-label">python pipeline</div>
         </div>
         <div class="note-box" id="live-robot-box">
@@ -1606,17 +1989,14 @@
       </div>
     </div>
 
-    <!-- MP3 Upload Panel -->
     <div class="demo-panel">
       <div class="demo-panel-title">Upload an MP3</div>
       <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and plays a generated harmony voice alongside it.</div>
-
       <div class="upload-zone" id="upload-zone">
         <input type="file" accept="audio/*" id="audio-file-input" onchange="handleFileUpload(event)">
-        <div class="upload-icon">🎵</div>
+        <div class="upload-icon">&#127925;</div>
         <div class="upload-text"><strong>Drop an audio file here</strong><br>or click to browse</div>
       </div>
-
       <div class="audio-player" id="audio-player">
         <div class="audio-waveform" id="waveform-vis"></div>
         <div class="progress-bar-outer" id="progress-outer" onclick="seekAudio(event)">
@@ -1628,12 +2008,10 @@
           <span id="time-total">0:00</span>
         </div>
       </div>
-
       <div class="demo-controls">
-        <button class="btn btn-primary" id="play-btn" onclick="togglePlay()" disabled>▶ Play with Harmony</button>
-        <button class="btn btn-ghost" id="stop-btn" onclick="stopAudio()" disabled>■ Stop</button>
+        <button class="btn btn-primary" id="play-btn" onclick="togglePlay()" disabled>&#9654; Play with Harmony</button>
+        <button class="btn btn-ghost"   id="stop-btn" onclick="stopAudio()" disabled>&#9632; Stop</button>
       </div>
-
       <div style="margin-top: 24px;">
         <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
         <div class="interval-picker">
@@ -1643,13 +2021,12 @@
           <button class="interval-btn" data-semitones="12" onclick="setDemoInterval(12, this)">Octave</button>
         </div>
       </div>
-
       <div class="harmony-overlay-note" id="demo-live-notes">
         <div>
           <div class="overlay-label">Source pitch</div>
           <div class="overlay-singer" id="demo-src-note">-</div>
         </div>
-        <span class="overlay-arrow">→</span>
+        <span class="overlay-arrow">&#8594;</span>
         <div>
           <div class="overlay-label">Robot response</div>
           <div class="overlay-robot" id="demo-rob-note">-</div>
@@ -1661,18 +2038,14 @@
       </div>
     </div>
 
-    <!-- Microphone Panel -->
     <div class="demo-panel">
       <div class="demo-panel-title">Sing live</div>
       <div class="demo-panel-sub">Use your microphone. Sing or hum and the system shows you what note it detects and what the robot would sing back in real time.</div>
-
       <div class="mic-visual">
-        <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">🎤</button>
-
+        <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">&#127908;</button>
         <div class="level-meter" style="width: 100%; max-width: 320px;">
           <div class="level-fill" id="demo-level"></div>
         </div>
-
         <div style="width: 100%; max-width: 320px;">
           <div class="live-labels">
             <span class="live-label you">YOU</span>
@@ -1680,13 +2053,11 @@
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
             <div class="live-note-big" id="demo-mic-note">-</div>
-            <div style="color: var(--border); font-size: 32px;">→</div>
+            <div style="color: var(--border); font-size: 32px;">&#8594;</div>
             <div class="live-response-big" id="demo-mic-robot">-</div>
           </div>
         </div>
-
         <div class="status-text" id="demo-mic-status">Click the microphone to start</div>
-
         <div style="width: 100%; max-width: 320px;">
           <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
           <div class="interval-picker" style="margin: 0;">
@@ -1696,7 +2067,6 @@
             <button class="interval-btn" data-semitones="12" onclick="setMicInterval(12, this)">Octave</button>
           </div>
         </div>
-
         <div class="note-explanation" id="demo-mic-explanation" style="max-width: 320px; width: 100%;">
           The robot responds to each note you sing with a harmony a perfect fifth above, snapped to the key it infers from your pitch history.
         </div>
@@ -1716,26 +2086,67 @@
 // ============================================================
 function toggleTheme() {
   const isDark = document.body.classList.toggle('dark-mode');
-  document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+  document.getElementById('theme-toggle').textContent = isDark ? '\u2600\uFE0F' : '\uD83C\uDF19';
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
 }
 if (localStorage.getItem('theme') === 'dark') {
   document.body.classList.add('dark-mode');
-  document.getElementById('theme-toggle').textContent = '☀️';
+  document.getElementById('theme-toggle').textContent = '\u2600\uFE0F';
 }
 
 // ============================================================
-// PAGE SWITCHING
+// PAGE SWITCHING + ROUTING
 // ============================================================
-function showPage(name) {
+const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', translation: '/sentiment', demo: '/live-demo' };
+const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'sentiment': 'translation', 'live-demo': 'demo' };
+
+function showPage(name, updateUrl = true) {
+  if (!document.getElementById('page-' + name)) name = 'home';
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
   document.getElementById('page-' + name).classList.add('active');
-  event.target.classList.add('active');
+  const tab = document.querySelector('.nav-tab[data-page="' + name + '"]');
+  if (tab) tab.classList.add('active');
+
+  if (updateUrl) {
+    const route = PAGE_TO_ROUTE[name] || '/';
+    history.pushState({ page: name }, '', route);
+  }
+
+  closeMobileNav();
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  showPage('home');
+}
+
+function routeFromLocation() {
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  const page = ROUTE_TO_PAGE[path] || 'home';
+  showPage(page, false);
+}
+
+window.addEventListener('popstate', routeFromLocation);
+routeFromLocation();
+
+// ============================================================
+// MOBILE NAV
+// ============================================================
+function toggleMobileNav() {
+  document.getElementById('nav-right').classList.toggle('open');
+  document.getElementById('nav-hamburger').classList.toggle('open');
+}
+
+function closeMobileNav() {
+  document.getElementById('nav-right').classList.remove('open');
+  document.getElementById('nav-hamburger').classList.remove('open');
 }
 
 // ============================================================
-// HERO WAVEFORM ANIMATION
+// HERO WAVEFORM
 // ============================================================
 (function() {
   const container = document.getElementById('hero-waveform');
@@ -1750,50 +2161,36 @@ function showPage(name) {
 })();
 
 // ============================================================
-// YIN PITCH DETECTION (pure JS Web Audio implementation)
+// YIN PITCH DETECTION
 // ============================================================
 function yinPitch(buffer, sampleRate, threshold) {
   const bufLen = buffer.length;
   const halfLen = Math.floor(bufLen / 2);
   const diff = new Float32Array(halfLen);
   const cmndf = new Float32Array(halfLen);
-
   for (let tau = 0; tau < halfLen; tau++) {
     let s = 0;
-    for (let i = 0; i < halfLen; i++) {
-      const d = buffer[i] - buffer[i + tau];
-      s += d * d;
-    }
+    for (let i = 0; i < halfLen; i++) { const d = buffer[i] - buffer[i + tau]; s += d * d; }
     diff[tau] = s;
   }
-
   cmndf[0] = 1;
   let runningSum = 0;
   for (let tau = 1; tau < halfLen; tau++) {
     runningSum += diff[tau];
     cmndf[tau] = diff[tau] * tau / runningSum;
   }
-
   let tau = 2;
   while (tau < halfLen) {
-    if (cmndf[tau] < threshold) {
-      while (tau + 1 < halfLen && cmndf[tau + 1] < cmndf[tau]) tau++;
-      break;
-    }
+    if (cmndf[tau] < threshold) { while (tau + 1 < halfLen && cmndf[tau + 1] < cmndf[tau]) tau++; break; }
     tau++;
   }
   if (tau === halfLen || cmndf[tau] >= threshold) return null;
-
   const x0 = tau < 1 ? tau : tau - 1;
   const x2 = tau + 1 < halfLen ? tau + 1 : tau;
   let betterTau;
   if (x0 === tau) betterTau = cmndf[tau] <= cmndf[x2] ? tau : x2;
   else if (x2 === tau) betterTau = cmndf[tau] <= cmndf[x0] ? tau : x0;
-  else {
-    const s0 = cmndf[x0], s1 = cmndf[tau], s2 = cmndf[x2];
-    betterTau = tau + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
-  }
-
+  else { const s0 = cmndf[x0], s1 = cmndf[tau], s2 = cmndf[x2]; betterTau = tau + (s2 - s0) / (2 * (2 * s1 - s2 - s0)); }
   return sampleRate / betterTau;
 }
 
@@ -1826,7 +2223,6 @@ function inferKey(pitchHistory) {
   const total = chroma.reduce((a, b) => a + b, 0);
   if (total === 0) return { root: 9, scale: MAJOR_SCALE };
   const norm = chroma.map(v => v / total);
-
   let bestCorr = -Infinity, bestRoot = 0, bestScale = MAJOR_SCALE;
   for (let r = 0; r < 12; r++) {
     const shifted = [...norm.slice(r), ...norm.slice(0, r)];
@@ -1849,10 +2245,7 @@ function pearson(a, b) {
 function snapToScale(hz, key) {
   const midi = hzToMidi(hz);
   const noteClass = Math.round(midi) % 12;
-  const dists = key.scale.map(d => {
-    let diff = Math.abs(noteClass - (key.root + d) % 12);
-    return Math.min(diff, 12 - diff);
-  });
+  const dists = key.scale.map(d => { let diff = Math.abs(noteClass - (key.root + d) % 12); return Math.min(diff, 12 - diff); });
   const nearest = key.scale[dists.indexOf(Math.min(...dists))];
   const snappedClass = (key.root + nearest) % 12;
   const octave = Math.floor(midi / 12);
@@ -1862,8 +2255,7 @@ function snapToScale(hz, key) {
 function computeHarmony(singerHz, semitones, pitchHistory) {
   const rawHz = singerHz * Math.pow(2, semitones / 12);
   const key = inferKey(pitchHistory);
-  const snapped = snapToScale(rawHz, key);
-  return snapped;
+  return snapToScale(rawHz, key);
 }
 
 const INTERVAL_NAMES = { 0: 'unison', 4: 'major third', 7: 'perfect fifth', 12: 'octave' };
@@ -1875,7 +2267,7 @@ const INTERVAL_EXPLANATIONS = {
 };
 
 // ============================================================
-// ARCHITECTURE PAGE MIC DEMO
+// ARCH PAGE MIC DEMO
 // ============================================================
 let archAudioCtx = null, archAnalyser = null, archBuffer = null;
 let archMicStream = null, archAnimId = null;
@@ -1896,10 +2288,7 @@ function setArchInterval(semitones, btn) {
 
 async function toggleArchMic() {
   const btn = document.getElementById('arch-mic-btn');
-  if (archMicStream) {
-    stopArchMic();
-    return;
-  }
+  if (archMicStream) { stopArchMic(); return; }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     archMicStream = stream;
@@ -1938,7 +2327,6 @@ function archDetectLoop() {
   archAnimId = requestAnimationFrame(archDetectLoop);
   if (!archAnalyser) return;
   archAnalyser.getFloatTimeDomainData(archBuffer);
-
   const rms = Math.sqrt(archBuffer.reduce((s,v) => s+v*v, 0) / archBuffer.length);
   if (rms < 0.005) {
     document.getElementById('arch-singer-note').textContent = '-';
@@ -1951,49 +2339,39 @@ function archDetectLoop() {
     drawPiano(null, null);
     return;
   }
-
   const hz = yinPitch(archBuffer, archAudioCtx.sampleRate, 0.15);
   if (!hz || hz < 80 || hz > 1200) return;
-
   archPitchSmooth.push(hz);
   if (archPitchSmooth.length > 3) archPitchSmooth.shift();
   const sorted = [...archPitchSmooth].sort((a,b) => a-b);
   const smoothHz = sorted[Math.floor(sorted.length/2)];
-
   archPitchHistory.push(smoothHz);
   if (archPitchHistory.length > 32) archPitchHistory.shift();
-
   const singerNote = hzToNote(smoothHz);
   if (!singerNote) return;
-
   const robotHz = computeHarmony(smoothHz, archSemitones, archPitchHistory);
   const robotNote = hzToNote(robotHz);
-
   document.getElementById('arch-singer-note').textContent = singerNote.name;
   document.getElementById('arch-singer-freq').textContent = smoothHz.toFixed(1) + ' Hz';
   document.getElementById('arch-singer-box').className = 'note-box active-singer';
-
   if (robotNote) {
     document.getElementById('arch-robot-note').textContent = robotNote.name;
     document.getElementById('arch-robot-freq').textContent = robotHz.toFixed(1) + ' Hz';
     document.getElementById('arch-robot-box').className = 'note-box active-robot';
-
     const iname = INTERVAL_NAMES[archSemitones] || ('+' + archSemitones + ' semitones');
     document.getElementById('arch-explanation').textContent =
-      `You are singing ${singerNote.name} (${smoothHz.toFixed(0)} Hz). The robot responds with ${robotNote.name} (${robotHz.toFixed(0)} Hz), a ${iname} above, snapped to the detected key.`;
+      'You are singing ' + singerNote.name + ' (' + smoothHz.toFixed(0) + ' Hz). The robot responds with ' + robotNote.name + ' (' + robotHz.toFixed(0) + ' Hz), a ' + iname + ' above, snapped to the detected key.';
   }
-
   const cents = hzToCents(smoothHz);
   const pct = 50 + (cents / 50) * 45;
   const bar = document.getElementById('arch-pitch-bar');
   bar.style.left = Math.max(5, Math.min(95, pct)) + '%';
   bar.style.background = Math.abs(cents) < 15 ? 'var(--green)' : Math.abs(cents) < 30 ? 'var(--orange)' : 'var(--red)';
-
   drawPiano(singerNote.midi, robotNote ? robotNote.midi : null);
 }
 
 // ============================================================
-// PIANO KEYBOARD
+// PIANO
 // ============================================================
 function drawPiano(singerMidi, robotMidi) {
   const canvas = document.getElementById('piano-canvas');
@@ -2001,45 +2379,34 @@ function drawPiano(singerMidi, robotMidi) {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   canvas.width = W; canvas.height = H;
   ctx.clearRect(0, 0, W, H);
-
-  const startMidi = 48;
-  const numKeys = 25;
+  const startMidi = 48, numKeys = 25;
   const whiteKeys = [];
   for (let m = startMidi; m < startMidi + numKeys; m++) {
     if (![1,3,6,8,10].includes(m % 12)) whiteKeys.push(m);
   }
-  const wkW = W / whiteKeys.length;
-  const wkH = H;
-  const bkW = wkW * 0.6;
-  const bkH = H * 0.6;
-
+  const wkW = W / whiteKeys.length, wkH = H, bkW = wkW * 0.6, bkH = H * 0.6;
   whiteKeys.forEach((midi, i) => {
     const x = i * wkW;
-    const isSinger = midi === singerMidi;
-    const isRobot  = midi === robotMidi;
+    const isSinger = midi === singerMidi, isRobot = midi === robotMidi;
     ctx.fillStyle = isSinger ? 'rgba(52,211,153,0.7)' : isRobot ? 'rgba(124,106,247,0.7)' : '#e8e8f0';
-    ctx.strokeStyle = '#1a1a26';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#1a1a26'; ctx.lineWidth = 1;
     ctx.fillRect(x+1, 0, wkW-2, wkH-1);
     ctx.strokeRect(x+1, 0, wkW-2, wkH-1);
   });
-
   whiteKeys.forEach((midi, i) => {
     const next = midi + 1;
     if ([1,3,6,8,10].includes(next % 12) && next < startMidi + numKeys) {
       const x = (i + 1) * wkW - bkW / 2;
-      const isSinger = next === singerMidi;
-      const isRobot  = next === robotMidi;
+      const isSinger = next === singerMidi, isRobot = next === robotMidi;
       ctx.fillStyle = isSinger ? '#34d399' : isRobot ? '#7c6af7' : '#1a1a26';
       ctx.fillRect(x, 0, bkW, bkH);
     }
   });
 }
-
 drawPiano(null, null);
 
 // ============================================================
-// DEMO PAGE: MP3 UPLOAD
+// DEMO PAGE: MP3
 // ============================================================
 let demoAudioCtx = null, demoSource = null, demoAnalyser = null;
 let demoBuffer = null, demoAudioBuffer = null;
@@ -2074,8 +2441,7 @@ function handleFileUpload(e) {
 function drawWaveformVis(ab) {
   const container = document.getElementById('waveform-vis');
   container.innerHTML = '';
-  const data = ab.getChannelData(0);
-  const N = 60;
+  const data = ab.getChannelData(0), N = 60;
   const step = Math.floor(data.length / N);
   for (let i = 0; i < N; i++) {
     let max = 0;
@@ -2087,22 +2453,16 @@ function drawWaveformVis(ab) {
   }
 }
 
-function togglePlay() {
-  if (demoIsPlaying) pauseAudio();
-  else playAudio();
-}
+function togglePlay() { if (demoIsPlaying) pauseAudio(); else playAudio(); }
 
 function playAudio() {
   if (!demoAudioBuffer) return;
   if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
   demoSource = demoAudioCtx.createBufferSource();
   demoSource.buffer = demoAudioBuffer;
-
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
-
   demoOscillator = demoAudioCtx.createOscillator();
   demoGain = demoAudioCtx.createGain();
   demoOscillator.type = 'sine';
@@ -2110,13 +2470,12 @@ function playAudio() {
   demoOscillator.connect(demoGain);
   demoGain.connect(demoAudioCtx.destination);
   demoOscillator.start();
-
   demoSource.connect(demoAnalyser);
   demoSource.connect(demoAudioCtx.destination);
   demoSource.start(0, demoOffset);
   demoStartTime = demoAudioCtx.currentTime - demoOffset;
   demoIsPlaying = true;
-  document.getElementById('play-btn').textContent = '⏸ Pause';
+  document.getElementById('play-btn').textContent = '\u23F8 Pause';
   demoSource.onended = () => { if (demoIsPlaying) stopAudio(); };
   demoProgressLoop();
 }
@@ -2126,7 +2485,7 @@ function pauseAudio() {
   if (demoSource) demoSource.stop();
   if (demoOscillator) { demoOscillator.stop(); demoOscillator = null; }
   demoIsPlaying = false;
-  document.getElementById('play-btn').textContent = '▶ Play with Harmony';
+  document.getElementById('play-btn').textContent = '\u25B6 Play with Harmony';
   if (demoAnimId) cancelAnimationFrame(demoAnimId);
 }
 
@@ -2134,7 +2493,7 @@ function stopAudio() {
   if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
   if (demoOscillator) { try { demoOscillator.stop(); } catch(e){} demoOscillator = null; }
   demoIsPlaying = false; demoOffset = 0;
-  document.getElementById('play-btn').textContent = '▶ Play with Harmony';
+  document.getElementById('play-btn').textContent = '\u25B6 Play with Harmony';
   document.getElementById('progress-inner').style.width = '0%';
   document.getElementById('time-current').textContent = '0:00';
   document.getElementById('demo-src-note').textContent = '-';
@@ -2156,12 +2515,10 @@ let lastDemoHz = 0;
 function demoProgressLoop() {
   demoAnimId = requestAnimationFrame(demoProgressLoop);
   if (!demoIsPlaying || !demoAudioCtx) return;
-
   const elapsed = demoAudioCtx.currentTime - demoStartTime;
   const pct = Math.min(1, elapsed / demoAudioBuffer.duration);
   document.getElementById('progress-inner').style.width = (pct * 100) + '%';
   document.getElementById('time-current').textContent = fmtTime(elapsed);
-
   if (demoAnalyser && demoPitchBuf) {
     demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
     const rms = Math.sqrt(demoPitchBuf.reduce((s,v) => s+v*v, 0) / demoPitchBuf.length);
@@ -2170,15 +2527,11 @@ function demoProgressLoop() {
       if (hz && hz > 60 && hz < 1200) {
         demoPitchHistory.push(hz);
         if (demoPitchHistory.length > 32) demoPitchHistory.shift();
-
         const robotHz = computeHarmony(hz, demoSemitones, demoPitchHistory);
-        const sNote = hzToNote(hz);
-        const rNote = hzToNote(robotHz);
-
+        const sNote = hzToNote(hz), rNote = hzToNote(robotHz);
         if (sNote) document.getElementById('demo-src-note').textContent = sNote.name;
         if (rNote) document.getElementById('demo-rob-note').textContent = rNote.name;
         document.getElementById('demo-conf').textContent = (rms * 100).toFixed(0) + '%';
-
         if (demoOscillator && demoGain) {
           demoOscillator.frequency.setTargetAtTime(robotHz, demoAudioCtx.currentTime, 0.05);
           demoGain.gain.setTargetAtTime(rms * 0.3, demoAudioCtx.currentTime, 0.05);
@@ -2192,7 +2545,7 @@ function demoProgressLoop() {
 }
 
 // ============================================================
-// DEMO PAGE: MICROPHONE
+// DEMO PAGE: MIC
 // ============================================================
 let micAudioCtx = null, micStream = null, micAnalyser = null;
 let micBuffer = null, micAnimId = null;
@@ -2217,7 +2570,6 @@ async function toggleDemoMic() {
     micAnalyser.fftSize = 2048;
     source.connect(micAnalyser);
     micBuffer = new Float32Array(micAnalyser.fftSize);
-
     micOscillator = micAudioCtx.createOscillator();
     micGain = micAudioCtx.createGain();
     micOscillator.type = 'sine';
@@ -2225,10 +2577,9 @@ async function toggleDemoMic() {
     micOscillator.connect(micGain);
     micGain.connect(micAudioCtx.destination);
     micOscillator.start();
-
     micIsRunning = true;
     document.getElementById('demo-mic-btn').classList.add('recording');
-    document.getElementById('demo-mic-btn').textContent = '⏹';
+    document.getElementById('demo-mic-btn').textContent = '\u23F9';
     document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
     micLoop();
   } catch(e) {
@@ -2243,7 +2594,7 @@ function stopDemoMic() {
   if (micOscillator) { try { micOscillator.stop(); } catch(e){} micOscillator = null; }
   if (micAudioCtx) { micAudioCtx.close(); micAudioCtx = null; }
   document.getElementById('demo-mic-btn').classList.remove('recording');
-  document.getElementById('demo-mic-btn').textContent = '🎤';
+  document.getElementById('demo-mic-btn').textContent = '\uD83C\uDF99';
   document.getElementById('demo-mic-status').textContent = 'Click the microphone to start';
   document.getElementById('demo-mic-note').textContent = '-';
   document.getElementById('demo-mic-robot').textContent = '-';
@@ -2254,11 +2605,9 @@ function micLoop() {
   micAnimId = requestAnimationFrame(micLoop);
   if (!micAnalyser) return;
   micAnalyser.getFloatTimeDomainData(micBuffer);
-
   const rms = Math.sqrt(micBuffer.reduce((s,v) => s+v*v, 0) / micBuffer.length);
   const levelPct = Math.min(100, rms * 400);
   document.getElementById('demo-level').style.width = levelPct + '%';
-
   if (rms < 0.005) {
     document.getElementById('demo-mic-note').textContent = '-';
     document.getElementById('demo-mic-robot').textContent = '-';
@@ -2266,39 +2615,27 @@ function micLoop() {
     if (micGain) micGain.gain.setTargetAtTime(0, micAudioCtx.currentTime, 0.1);
     return;
   }
-
   const hz = yinPitch(micBuffer, micAudioCtx.sampleRate, 0.15);
   if (!hz || hz < 80 || hz > 1200) return;
-
   micPitchSmooth.push(hz);
   if (micPitchSmooth.length > 3) micPitchSmooth.shift();
   const smoothHz = [...micPitchSmooth].sort((a,b)=>a-b)[Math.floor(micPitchSmooth.length/2)];
-
   micPitchHistory.push(smoothHz);
   if (micPitchHistory.length > 32) micPitchHistory.shift();
-
   const sNote = hzToNote(smoothHz);
   if (!sNote) return;
-
   const robotHz = computeHarmony(smoothHz, micSemitones, micPitchHistory);
   const rNote = hzToNote(robotHz);
-
   document.getElementById('demo-mic-note').textContent = sNote.name;
   if (rNote) document.getElementById('demo-mic-robot').textContent = rNote.name;
-
   const iname = INTERVAL_NAMES[micSemitones] || ('+' + micSemitones + ' semitones');
-  document.getElementById('demo-mic-status').textContent =
-    `Singing ${sNote.name} → Robot responds ${rNote ? rNote.name : '?'} (${iname})`;
-
+  document.getElementById('demo-mic-status').textContent = 'Singing ' + sNote.name + ' \u2192 Robot responds ' + (rNote ? rNote.name : '?') + ' (' + iname + ')';
   if (micOscillator && micGain) {
     micOscillator.frequency.setTargetAtTime(robotHz, micAudioCtx.currentTime, 0.03);
     micGain.gain.setTargetAtTime(Math.min(0.3, rms * 1.5), micAudioCtx.currentTime, 0.03);
   }
 }
 
-// ============================================================
-// UTILS
-// ============================================================
 function fmtTime(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return m + ':' + String(sec).padStart(2, '0');
@@ -2325,7 +2662,7 @@ async function loadDevices() {
     sel.innerHTML = '';
     if (!data.available) {
       const opt = document.createElement('option');
-      opt.textContent = data.message || 'Local mic not available — use the browser mic below';
+      opt.textContent = data.message || 'Local mic not available';
       sel.appendChild(opt);
       const startBtn = document.getElementById('pipeline-start-btn');
       if (startBtn) startBtn.disabled = true;
@@ -2334,7 +2671,7 @@ async function loadDevices() {
     data.devices.forEach(d => {
       const opt = document.createElement('option');
       opt.value = d.index;
-      opt.textContent = `(${d.index}) ${d.name}`;
+      opt.textContent = '(' + d.index + ') ' + d.name;
       sel.appendChild(opt);
     });
   } catch(e) {
@@ -2349,8 +2686,7 @@ async function startPipeline() {
   document.getElementById('live-status').textContent = 'starting...';
   try {
     const res = await fetch('/pipeline/start', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({input_device: parseInt(sel.value)})
     });
     const data = await res.json();
@@ -2367,9 +2703,7 @@ async function startPipeline() {
 }
 
 async function stopPipeline() {
-  try {
-    await fetch('/pipeline/stop', {method: 'POST'});
-  } catch(e) {}
+  try { await fetch('/pipeline/stop', {method: 'POST'}); } catch(e) {}
   document.getElementById('pipeline-start-btn').disabled = false;
   document.getElementById('pipeline-stop-btn').disabled  = true;
   document.getElementById('live-status').textContent = 'stopped';
@@ -2386,85 +2720,267 @@ loadDevices();
 // ============================================================
 // WEBSOCKET
 // ============================================================
-let socket = null;
-let wsReconnectTimer = null;
+let socket = null, wsReconnectTimer = null;
 
 function connectWebSocket() {
   if (socket && socket.readyState <= 1) return;
   const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   socket = new WebSocket(wsProto + '//' + location.host + '/ws');
-
   socket.onopen = () => {
-    document.getElementById('ws-status').textContent = 'connected';
-    document.getElementById('ws-status').style.color = 'var(--green)';
-    document.getElementById('ws-dot').style.background = 'var(--green)';
+    ['ws-status','ws-status2'].forEach(id => { const el = document.getElementById(id); if(el){el.textContent='connected';el.style.color='var(--green)';} });
+    ['ws-dot','ws-dot2'].forEach(id => { const el = document.getElementById(id); if(el) el.style.background='var(--green)'; });
     if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
   };
-
-  socket.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    updateLiveDisplay(msg);
-  };
-
+  socket.onmessage = (event) => { updateLiveDisplay(JSON.parse(event.data)); };
   socket.onclose = () => {
-    document.getElementById('ws-status').textContent = 'disconnected';
-    document.getElementById('ws-status').style.color = 'var(--red)';
-    document.getElementById('ws-dot').style.background = 'var(--red)';
+    ['ws-status','ws-status2'].forEach(id => { const el = document.getElementById(id); if(el){el.textContent='disconnected';el.style.color='var(--red)';} });
+    ['ws-dot','ws-dot2'].forEach(id => { const el = document.getElementById(id); if(el) el.style.background='var(--red)'; });
     wsReconnectTimer = setTimeout(connectWebSocket, 2000);
   };
-
   socket.onerror = () => socket.close();
 }
 
 function updateLiveDisplay(msg) {
-  const singerEl  = document.getElementById('live-singer-note');
-  const robotEl   = document.getElementById('live-robot-note');
-  const singerHzEl = document.getElementById('live-singer-hz');
-  const robotHzEl  = document.getElementById('live-robot-hz');
-  const statusEl  = document.getElementById('live-status');
-  const tempoEl   = document.getElementById('live-tempo');
-  const singerBox = document.getElementById('live-singer-box');
-  const robotBox  = document.getElementById('live-robot-box');
-
+  const singerEl = document.getElementById('live-singer-note');
+  const robotEl  = document.getElementById('live-robot-note');
   if (!singerEl) return;
-
   if (msg.type === 'pitch' && msg.singer_note) {
     singerEl.textContent  = msg.singer_note;
     robotEl.textContent   = msg.robot_note || '-';
-    singerHzEl.textContent = msg.singer_hz + ' Hz';
-    robotHzEl.textContent  = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
-    singerBox.className   = 'note-box active-singer';
-    robotBox.className    = 'note-box active-robot';
-    statusEl.textContent  = `${msg.action} · ${msg.phrase_state} · ${msg.elapsed_s}s`;
-    if (msg.tempo_bpm > 0) tempoEl.textContent = msg.tempo_bpm + ' BPM';
+    document.getElementById('live-singer-hz').textContent = msg.singer_hz + ' Hz';
+    document.getElementById('live-robot-hz').textContent  = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
+    document.getElementById('live-singer-box').className  = 'note-box active-singer';
+    document.getElementById('live-robot-box').className   = 'note-box active-robot';
+    document.getElementById('live-status').textContent    = msg.action + ' \u00B7 ' + msg.phrase_state + ' \u00B7 ' + msg.elapsed_s + 's';
+    if (msg.tempo_bpm > 0) document.getElementById('live-tempo').textContent = msg.tempo_bpm + ' BPM';
   } else {
-    singerEl.textContent  = '-';
-    singerHzEl.textContent = '';
-    singerBox.className   = 'note-box';
-    robotBox.className    = 'note-box';
-    statusEl.textContent  = msg.phrase_state || 'silence';
-  }
-
-  if (document.getElementById('arch-singer-note')) {
-    if (msg.type === 'pitch' && msg.singer_note) {
-      document.getElementById('arch-singer-note').textContent  = msg.singer_note;
-      document.getElementById('arch-singer-freq').textContent  = msg.singer_hz + ' Hz';
-      document.getElementById('arch-robot-note').textContent   = msg.robot_note || '-';
-      document.getElementById('arch-robot-freq').textContent   = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
-      document.getElementById('arch-singer-box').className     = 'note-box active-singer';
-      document.getElementById('arch-robot-box').className      = 'note-box active-robot';
-      document.getElementById('arch-explanation').textContent  =
-        `Python pipeline: Archer singing ${msg.singer_note} (${msg.singer_hz} Hz) → robot responds ${msg.robot_note || '?'} (${msg.robot_hz || '?'} Hz). Action: ${msg.action}.`;
-      if (msg.singer_hz) {
-        const sNote = hzToNote(msg.singer_hz);
-        const rNote = msg.robot_hz ? hzToNote(msg.robot_hz) : null;
-        if (sNote) drawPiano(sNote.midi, rNote ? rNote.midi : null);
-      }
-    }
+    singerEl.textContent = '-';
+    document.getElementById('live-singer-hz').textContent = '';
+    document.getElementById('live-singer-box').className  = 'note-box';
+    document.getElementById('live-robot-box').className   = 'note-box';
+    document.getElementById('live-status').textContent    = msg.phrase_state || 'silence';
   }
 }
 
 connectWebSocket();
+
+// ============================================================
+// CREE SENTIMENT DEMO
+// ============================================================
+const CREE_EXAMPLES = [
+  {
+    syllabics:   '\u14C7\u1466\u14B3\u1455 \u14D6\u14F1\u14EF',
+    latin: ['askiy pehtakwan', 'askiy'],
+    english:     'The Cree land speaks through the wind.',
+    emotion:     'longing', valence: 0.38, arousal: 0.42,
+    interval: '+7 (fifth)', osc: 'triangle', vibrato: '3.5 Hz',
+    ledColor: '#818cf8', ledBorder: '#818cf8', ledBg: 'rgba(129,140,248,0.12)',
+    ledPupilSize: '14px', desc: 'Quiet reverence for the land — gentle and reaching.',
+  },
+  {
+    syllabics:   '\u14D6\u14F1\u14EF \u14C5 \u14D0\u146D\u1456\u1423\u14D0\u14F1',
+    latin: ['tanisi', 'tansi', 'tanisi kiya'],
+    english:     'How are you, my relations.',
+    emotion:     'joy', valence: 0.82, arousal: 0.55,
+    interval: '+4 (major 3rd)', osc: 'triangle', vibrato: 'off',
+    ledColor: '#059669', ledBorder: '#059669', ledBg: 'rgba(5,150,105,0.12)',
+    ledPupilSize: '18px', desc: 'Warm greeting. Open and bright.',
+  },
+  {
+    syllabics:   '\u14C8\u1472\u1450\u14E9\u1450\u142A\u14D5',
+    latin: ['nimiskweyihten', 'kimiskaten'],
+    english:     'I am longing. I am missing.',
+    emotion:     'grief', valence: -0.6, arousal: 0.28,
+    interval: '+3 (minor 3rd)', osc: 'sine', vibrato: '3.5 Hz',
+    ledColor: '#818cf8', ledBorder: '#818cf8', ledBg: 'rgba(129,140,248,0.08)',
+    ledPupilSize: '12px', desc: 'Deep longing. Quiet sorrow with beauty inside it.',
+  },
+  {
+    syllabics:   '\u14CA\u14DC \u14B8\u14B3\u14C5\u14C5 \u14B8\u14B3\u14CE\u14DC\u14C5',
+    latin: ['kihci kiskinwahamatowikamik', 'kihci kiskinwahamâtowikamik'],
+    english:     'A place of higher learning.',
+    emotion:     'neutral', valence: 0.05, arousal: 0.48,
+    interval: '+7 (fifth)', osc: 'sine', vibrato: 'off',
+    ledColor: 'var(--muted)', ledBorder: 'var(--border)', ledBg: 'var(--bg3)',
+    ledPupilSize: '14px', desc: 'Steady and present. A neutral phrase with no strong pull.',
+  },
+];
+
+// --- Machine Translation demo (real, calls the FastAPI backend) ---
+
+async function runTranslationDemo() {
+  const typed = (document.getElementById('mt-text-input').value || '').trim();
+  const outEl = document.getElementById('mt-translation-out');
+  const statusDot = document.getElementById('mt-status-dot');
+  const statusText = document.getElementById('mt-status-text');
+
+  if (!typed) return;
+
+  outEl.textContent = 'translating...';
+  outEl.classList.remove('placeholder');
+  statusDot.classList.add('listening');
+  statusText.textContent = 'translation: running...';
+
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: typed }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    if (!data.translation || !data.translation.trim()) {
+      outEl.textContent = 'The model returned an empty result for this phrase, likely too far outside its small training vocabulary. Try one of the example phrases below.';
+      outEl.classList.add('placeholder');
+      statusText.textContent = 'translation: empty result';
+    } else {
+      outEl.textContent = data.translation;
+      statusText.textContent = 'translation: done';
+    }
+  } catch (err) {
+    outEl.textContent = 'Translation server not reachable. Run: uvicorn server:app --port 8000';
+    outEl.classList.add('placeholder');
+    statusText.textContent = 'translation: server unavailable';
+    console.warn('Translation request failed:', err);
+  } finally {
+    statusDot.classList.remove('listening');
+  }
+}
+
+// --- Sentiment demo (example-based preview) ---
+
+function normalizeCreeText(text) {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, '').trim();
+}
+
+(function buildCreeExamplePills() {
+  const wrap = document.getElementById('cree-example-pills');
+  if (!wrap) return;
+  CREE_EXAMPLES.forEach(ex => {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'node-pill';
+    pill.style.cursor = 'pointer';
+    pill.style.background = 'var(--bg3)';
+    pill.textContent = ex.latin[0];
+    pill.onclick = () => {
+      const sylEl = document.getElementById('cree-syllabics-out');
+      sylEl.textContent = ex.latin[0];
+      sylEl.classList.remove('placeholder');
+      renderCreeResult(ex);
+    };
+    wrap.appendChild(pill);
+  });
+})();
+
+let creeExIdx = 0, creeMicRunning = false, creeMicStream = null, creeAnimId = null, creeWvBars = null;
+
+(function buildCreePlaceholderWaveform() {
+  const wf = document.getElementById('cree-waveform');
+  wf.innerHTML = '';
+  for (let i = 0; i < 48; i++) {
+    const b = document.createElement('div');
+    b.className = 'cree-wv-bar';
+    b.style.height = (4 + Math.random() * 8) + 'px';
+    wf.appendChild(b);
+  }
+})();
+
+function toggleCreeMic() { if (creeMicRunning) stopCreeMic(); else startCreeMic(); }
+
+function startCreeMic() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    creeMicStream = stream;
+    creeMicRunning = true;
+    const btn = document.getElementById('cree-mic-btn');
+    btn.classList.add('active');
+    btn.innerHTML = '<div class="cmt-dot"></div>Stop microphone';
+    document.getElementById('cree-status-dot').classList.add('listening');
+    document.getElementById('cree-status-text').textContent = 'listening...';
+    const wf = document.getElementById('cree-waveform');
+    wf.innerHTML = '';
+    creeWvBars = [];
+    for (let i = 0; i < 48; i++) {
+      const b = document.createElement('div');
+      b.className = 'cree-wv-bar'; b.style.height = '4px';
+      wf.appendChild(b); creeWvBars.push(b);
+    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 128;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    function animWv() {
+      creeAnimId = requestAnimationFrame(animWv);
+      analyser.getByteFrequencyData(buf);
+      creeWvBars.forEach((bar, i) => {
+        const v = buf[Math.floor(i * buf.length / creeWvBars.length)] / 255;
+        bar.style.height = Math.max(3, v * 44) + 'px';
+        bar.style.opacity = 0.4 + v * 0.6;
+      });
+    }
+    animWv();
+    setTimeout(() => { if (creeMicRunning) { document.getElementById('cree-status-text').textContent = 'phrase detected'; showCreePlaceholderOutput(); } }, 3000);
+  }).catch(() => {
+    document.getElementById('cree-status-text').textContent = 'mic unavailable — showing simulation';
+    showCreePlaceholderOutput();
+  });
+}
+
+function stopCreeMic() {
+  creeMicRunning = false;
+  if (creeMicStream) { creeMicStream.getTracks().forEach(t => t.stop()); creeMicStream = null; }
+  if (creeAnimId) { cancelAnimationFrame(creeAnimId); creeAnimId = null; }
+  const btn = document.getElementById('cree-mic-btn');
+  btn.classList.remove('active');
+  btn.innerHTML = '<div class="cmt-dot"></div>Start microphone';
+  document.getElementById('cree-status-dot').classList.remove('listening');
+  document.getElementById('cree-status-text').textContent = 'idle';
+  const wf = document.getElementById('cree-waveform');
+  wf.innerHTML = '';
+  for (let i = 0; i < 48; i++) {
+    const b = document.createElement('div'); b.className = 'cree-wv-bar';
+    b.style.height = (4 + Math.random() * 8) + 'px'; wf.appendChild(b);
+  }
+}
+
+function showCreePlaceholderOutput() {
+  const ex = CREE_EXAMPLES[creeExIdx % CREE_EXAMPLES.length];
+  creeExIdx++;
+  const sylEl = document.getElementById('cree-syllabics-out');
+  if (sylEl.classList.contains('placeholder')) { sylEl.textContent = ex.syllabics; sylEl.classList.remove('placeholder'); }
+  renderCreeResult(ex);
+}
+
+function renderCreeResult(ex) {
+  const transEl = document.getElementById('cree-translation-out');
+  transEl.textContent = '...'; transEl.classList.remove('placeholder');
+  setTimeout(() => {
+    transEl.textContent = ex.english;
+    const valPct = ((ex.valence + 1) / 2) * 100;
+    document.getElementById('cree-val-fill').style.width = valPct + '%';
+    document.getElementById('cree-val-fill').style.background = ex.valence >= 0 ? 'var(--green)' : '#818cf8';
+    document.getElementById('cree-aro-fill').style.width = (ex.arousal * 100) + '%';
+    const badge = document.getElementById('cree-emotion-badge');
+    badge.textContent = ex.emotion; badge.className = 'cree-emotion-badge ' + ex.emotion;
+    document.getElementById('cree-emotion-desc').textContent = ex.desc;
+    document.getElementById('chip-interval').textContent = ex.interval;
+    document.getElementById('chip-osc').textContent      = ex.osc;
+    document.getElementById('chip-vibrato').textContent  = ex.vibrato;
+    ['led-left','led-right'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.borderColor = ex.ledBorder; el.style.background = ex.ledBg;
+    });
+    ['led-left-pupil','led-right-pupil'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.width = ex.ledPupilSize; el.style.height = ex.ledPupilSize;
+      el.style.background = ex.ledColor; el.style.opacity = '0.9';
+    });
+    document.getElementById('led-desc').textContent = ex.emotion.charAt(0).toUpperCase() + ex.emotion.slice(1) + ': ' + ex.desc;
+  }, 600);
+}
 </script>
 </body>
 </html>
