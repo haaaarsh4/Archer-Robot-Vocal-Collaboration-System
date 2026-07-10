@@ -4,6 +4,7 @@ from pathlib import Path
 from loguru import logger
 from config.config_loader import get_config
 from synthesis.harmony_engine import HarmonyDecision
+from synthesis.accompaniment_modes import AccompanimentMode
 import librosa
 from scipy.signal import lfilter
 
@@ -26,6 +27,7 @@ class VocableSynthesizer:
         self.ddsp_model_path = cfg["synthesis"]["ddsp_model_path"]
         self.vocable_set = cfg["synthesis"]["vocable_set"]
         self.volume = cfg["output"]["volume"]
+        self.timbral_detune_cents = cfg["synthesis"].get("timbral_detune_cents", 6)
 
         self._ddsp_model = None
         self._wavetable_samples: dict[str, np.ndarray] = {}
@@ -104,12 +106,14 @@ class VocableSynthesizer:
         self._prev_audio = audio
         return audio.astype(np.float32)
 
-    # Builds a vocal-like sound entirely from sine waves stacked on top of each other
     def _synthesize_sinusoidal(self, decision, n_samples):
         t = np.linspace(0, decision.duration_s, n_samples, endpoint=False)
         audio = np.zeros(n_samples, dtype=np.float64)
 
         f0 = decision.target_hz
+
+        if getattr(decision, "mode", None) == AccompanimentMode.TIMBRAL:
+            f0 *= 2 ** (self.timbral_detune_cents / 1200.0)
         formant_params = self.FORMANTS.get(decision.vocable, self.FORMANTS["aah"])
 
         # Blend formant position based on vowel_color (0=bright, 1=dark)

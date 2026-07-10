@@ -3,7 +3,7 @@ import collections
 from dataclasses import dataclass
 from loguru import logger
 from config.config_loader import get_config
-from analysis.cree_tokenizer import PhonemeProfile
+from analysis.phonetic_analysis import PhonemeProfile
 import librosa
 
 # Output container
