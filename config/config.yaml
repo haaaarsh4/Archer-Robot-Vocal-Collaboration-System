@@ -23,14 +23,31 @@ rhythm:
   phrase_end_silence_ms: 800
 
 harmony:
-  default_interval: fifth
-  intervals:
-    unison: 0
-    third: 4
-    fifth: 7
-    octave: 12
   detune_cents: 0
   scale_lock: true
+  default_mode: unison_shadowing        # which mode plays when no special condition applies
+  fusion_mode: false                     # triadic harmony is opt-in only — never the default
+  fast_tempo_threshold_bpm: 120          # above this tempo, prefer contour-following
+  sustain_frames_for_timbral: 30         # notes held this many frames shift to timbral thickening
+  silence_when_no_singer: false          # true = go silent (not drone) when Archer stops
+
+modes:
+  octave_direction: -1                   # -1 = octave below, +1 = octave above
+  delay_beats: 1.0                       # how many beats behind for delayed_response
+  drone_divisor: 2                       # 2 = sub-octave drone, 4 = two octaves down
+  contour_window: 6                      # frames of pitch history for contour direction
+  contour_step_semitones: 2              # step size when following melodic contour
+  call_response_semitones: 0             # interval offset for the response phrase
+
+protocol:
+  start_enabled: true
+  sensitive_phoneme_classes: []          # fill in as Archer identifies protocol-sensitive vocables
+  sound_cue_enabled: true
+  sound_cue_hz_range: [80, 140]          # low-register range for the toggle gesture
+  sound_cue_repetitions: 3               # number of hits required to trigger toggle
+  sound_cue_max_gap_s: 0.6               # max time between hits to count as one gesture
+  sound_cue_cooldown_s: 2.0              # debounce window after a toggle
+  physical_cue_gpio_pin: null            # e.g. 17 on a Raspberry Pi; null = no hardware button
 
 synthesis:
   engine: sinusoidal
@@ -41,6 +58,7 @@ synthesis:
     - hey
   crossfade_ms: 30
   ddsp_model_path: null
+  timbral_detune_cents: 6                # chorus-style detune used by timbral_thickening mode
 
 timing:
   response_delay_ms: 70

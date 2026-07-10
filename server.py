@@ -12,7 +12,6 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,39 +33,11 @@ try:
 except Exception:
     pass
 
-# Load the trained Cree -> English translation model once at startup
-translator = None
-translator_load_error = None
-try:
-    from translation.translate_transformer import NeuralTranslator
-    translator = NeuralTranslator()
-    print("Translation model loaded successfully.")
-except Exception as e:
-    translator_load_error = str(e)
-    print(f"Translation model not loaded: {translator_load_error}")
-    print("Check that data/models/transformer_mt.pt, spm.model, and "
-          "spm_config.json exist relative to your project root.")
-
-
-# ------------------------------------------------------------------ #
-# STATIC ROUTES
-# ------------------------------------------------------------------ #
 
 @app.get("/")
 def index():
     return FileResponse(str(FRONTEND_DIR / "index.html"))
 
-
-@app.get("/architecture")
-@app.get("/sentiment")
-@app.get("/live-demo")
-def spa_routes():
-    return FileResponse(str(FRONTEND_DIR / "index.html"))
-
-
-# ------------------------------------------------------------------ #
-# DEVICE LISTING (used by the frontend's device dropdown)
-# ------------------------------------------------------------------ #
 
 @app.get("/devices")
 def list_devices():
@@ -86,39 +57,6 @@ def list_devices():
     except Exception as e:
         return {"devices": [], "available": False, "message": str(e)}
 
-
-# ------------------------------------------------------------------ #
-# TRANSLATION (Cree -> English)
-# ------------------------------------------------------------------ #
-
-class TranslateRequest(BaseModel):
-    text: str
-
-
-@app.post("/api/translate")
-def translate(req: TranslateRequest):
-    if translator is None:
-        return JSONResponse({"error": f"Model not loaded: {translator_load_error}"}, status_code=503)
-
-    text = (req.text or "").strip()
-    if not text:
-        return JSONResponse({"error": "No text provided"}, status_code=400)
-
-    try:
-        translation = translator.translate(text)
-        return {"input": text, "translation": translation}
-    except Exception as e:
-        return JSONResponse({"error": f"Translation failed: {e}"}, status_code=500)
-
-
-@app.get("/api/translate/health")
-def translate_health():
-    return {"status": "ok" if translator else "model_not_loaded", "error": translator_load_error}
-
-
-# ------------------------------------------------------------------ #
-# PIPELINE CONTROL (local mode only)
-# ------------------------------------------------------------------ #
 
 @app.get("/pipeline/status")
 def pipeline_status():
@@ -151,10 +89,6 @@ def pipeline_stop():
     return {"ok": True}
 
 
-# ------------------------------------------------------------------ #
-# WEBSOCKET — broadcast from local pipeline to browser
-# ------------------------------------------------------------------ #
-
 @app.websocket("/ws")
 async def ws_broadcast(ws: WebSocket):
     await ws.accept()
@@ -169,13 +103,8 @@ async def ws_broadcast(ws: WebSocket):
         pass
 
 
-# ------------------------------------------------------------------ #
-# WEBSOCKET — browser streams mic audio → server analyses → returns note JSON
-# ------------------------------------------------------------------ #
-
 @app.websocket("/ws/mic")
 async def ws_mic(ws: WebSocket):
-    """Browser streams float32 PCM -> Python runs aubio YIN -> sends back note JSON."""
     await ws.accept()
     try:
         from config.config_loader import get_config
@@ -244,10 +173,6 @@ async def ws_mic(ws: WebSocket):
     except Exception as e:
         print(f"[ws/mic error] {e}")
 
-
-# ------------------------------------------------------------------ #
-# LOCAL PIPELINE (only used when running on a machine with a mic)
-# ------------------------------------------------------------------ #
 
 def run_local_pipeline(stop_event, input_device: int):
     global pipeline_running
@@ -340,10 +265,6 @@ def run_local_pipeline(stop_event, input_device: int):
     finally:
         pipeline_running = False
 
-
-# ------------------------------------------------------------------ #
-# ENTRYPOINT
-# ------------------------------------------------------------------ #
 
 if __name__ == "__main__":
     import argparse

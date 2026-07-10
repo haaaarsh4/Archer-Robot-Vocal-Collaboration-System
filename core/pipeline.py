@@ -9,7 +9,7 @@ from core.audio_capture    import AudioCapture
 from core.preprocessor     import Preprocessor
 from analysis.pitch_detector  import PitchDetector
 from analysis.rhythm_analyzer import RhythmAnalyzer
-from analysis.cree_tokenizer  import CreeTokenizer, PhonemeProfile
+from analysis.phonetic_analysis  import CreeTokenizer, PhonemeProfile
 from synthesis.harmony_engine    import HarmonyEngine
 from synthesis.vocable_synthesizer import VocableSynthesizer
 from output.timing_sync    import TimingSync
@@ -33,7 +33,6 @@ class Pipeline:
         self._frame_count   = 0
         self._start_time    = 0.0
 
-        # FIX (BUG 4): use confidence threshold from config, not hard-coded 0.4.
         cfg = get_config()
         self._confidence_threshold = cfg["pitch"]["confidence_threshold"]
 
