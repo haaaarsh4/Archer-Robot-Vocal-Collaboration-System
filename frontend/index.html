@@ -167,7 +167,7 @@
   .note-arrow { color: var(--muted); font-size: 12px; }
 
   .note-demo { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 40px; margin-top: 40px; }
-  .note-demo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  .note-demo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; flex-wrap: wrap; gap: 12px; }
   .note-demo-title { font-size: 16px; font-weight: 600; }
   .mic-btn { display: flex; align-items: center; gap: 10px; padding: 10px 22px; background: rgba(124,106,247,0.15); border: 1px solid var(--accent); border-radius: 8px; color: var(--accent2); font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
   .mic-btn:hover { background: rgba(124,106,247,0.25); }
@@ -255,10 +255,24 @@
   .interval-btn:hover { border-color: var(--accent); color: var(--text); }
   .interval-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
 
+  .mode-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .mode-btn { padding: 8px 16px; border-radius: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
+  .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
+  .mode-badge { font-family: var(--mono); font-size: 9px; padding: 3px 9px; border-radius: 100px; letter-spacing: 0.08em; text-transform: uppercase; display: inline-block; }
+  .mode-badge.default { background: rgba(52,211,153,0.12); color: var(--green); }
+  .mode-badge.optin   { background: rgba(217,119,6,0.14); color: var(--orange); }
+  .protocol-btn { display: flex; align-items: center; gap: 10px; padding: 10px 22px; border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 1px solid var(--green); background: rgba(52,211,153,0.12); color: var(--green); }
+  .protocol-btn:hover { background: rgba(52,211,153,0.2); }
+  .protocol-btn.off { border-color: var(--red); background: rgba(248,113,113,0.12); color: var(--red); }
+  .protocol-btn.off:hover { background: rgba(248,113,113,0.2); }
+  .protocol-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .protocol-btn.off .protocol-dot { background: var(--red); }
+
   footer { border-top: 1px solid var(--border); padding: 40px 48px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
   footer a { color: var(--muted); text-decoration: none; }
   footer a:hover { color: var(--text); }
-  #piano-canvas { width: 100%; height: 100px; border-radius: 8px; overflow: hidden; margin-top: 16px; }
+  #piano-canvas, #harmony-piano-canvas { width: 100%; height: 100px; border-radius: 8px; overflow: hidden; margin-top: 16px; }
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
   .code-block { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.8; overflow-x: auto; }
@@ -958,7 +972,7 @@
     .big-mic-btn   { width: 72px; height: 72px; font-size: 28px; }
     footer { flex-direction: column; gap: 12px; padding: 24px 16px; text-align: center; }
     .note-demo    { padding: 24px 16px; }
-    #piano-canvas { height: 70px; }
+    #piano-canvas, #harmony-piano-canvas { height: 70px; }
     .harmony-card { padding: 20px; }
     .phoneme-name  { min-width: 60px; font-size: 12px; }
     .code-block    { font-size: 11px; padding: 14px 16px; }
@@ -1011,6 +1025,12 @@
     .section-title { font-size: 20px; }
     .interval-picker { gap: 6px; }
     .interval-btn { padding: 6px 10px; font-size: 11px; }
+    .harmony-example { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
+    .harmony-example .note-arrow { transform: rotate(90deg); align-self: center; }
+    .note-pill { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
+    .mode-picker { gap: 6px; }
+    .mode-btn { padding: 6px 10px; font-size: 10.5px; }
+    .protocol-btn { padding: 8px 16px; font-size: 12px; }
   }
 </style>
 </head>
@@ -1025,6 +1045,7 @@
   <div class="nav-right" id="nav-right">
     <div class="nav-tabs">
       <button class="nav-tab" data-page="architecture" onclick="showPage('architecture')">Architecture</button>
+      <button class="nav-tab" data-page="harmony" onclick="showPage('harmony')">Harmony</button>
       <button class="nav-tab" data-page="translation" onclick="showPage('translation')">Sentiment</button>
       <button class="nav-tab" data-page="demo" onclick="showPage('demo')">Live Demo</button>
     </div>
@@ -1040,7 +1061,7 @@
   <section class="hero">
     <div class="hero-eyebrow">Archer-Robot Vocal Collaboration System</div>
     <h1 class="hero-title">Under construction</h1>
-    <p class="hero-sub">This home page is being rebuilt right now. Check back soon. In the meantime, the Architecture, Sentiment, and Live Demo tabs above are all live.</p>
+    <p class="hero-sub">This home page is being rebuilt right now. Check back soon. In the meantime, the Architecture, Harmony, Sentiment, and Live Demo tabs above are all live.</p>
   </section>
   <footer>
     <span>Archer-Robot Vocal Collaboration System</span>
@@ -1274,15 +1295,14 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">synthesis/harmony_engine.py</div>
           <h3 class="prose-stage-title">Harmony decision</h3>
-          <p class="prose-stage-body">Given a detected pitch, the harmony engine decides what note the robot should sing. It starts by maintaining a rolling history of the last 32 detected pitches, which it uses to infer the current musical key. Key inference runs once per second using the Krumhansl-Kessler algorithm: the distribution of pitch classes in the history is compared against reference major and minor tonal profiles via Pearson correlation, and the root and mode that produce the best fit are selected as the current key.</p>
-          <p class="prose-stage-body" style="margin-top: 12px;">With the key established, the engine computes the raw harmony pitch by transposing the singer's note upward by the configured interval (0, 4, 7, or 12 semitones for unison, third, fifth, or octave). It then snaps that pitch to the nearest note in the detected scale, so the robot's response is always musically valid. The SentimentProfile from stage 4c nudges this interval choice — a grief profile pushes toward a minor third, a joyful profile pushes toward an octave. Finally, the engine compares the new target to the note it is currently holding. If the two are within 5 Hz of each other, it issues a sustain action to keep the current note playing. If they differ, it issues a sing action to start the new note.</p>
+          <p class="prose-stage-body">Given a detected pitch, the harmony engine decides what the robot should do with it. It starts by maintaining a rolling history of the last 32 detected pitches, which it uses to infer the current musical key. Key inference runs once per second using the Krumhansl-Kessler algorithm: the distribution of pitch classes in the history is compared against reference major and minor tonal profiles via Pearson correlation, and the root and mode that produce the best fit are selected as the current key.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">With the key established, the engine no longer defaults to a single fixed interval above the singer. Instead it picks from eight distinct musical functions, unison shadowing, octave reinforcement, delayed response, timbral thickening, contour following, drone support, and call and response, plus triadic harmony as an explicit opt-in for fusion contexts only. A sovereignty check runs before any of this: if Archer has disabled the robot's participation, everything below is skipped and the robot stays silent. The full breakdown of how each function works and how the engine chooses between them lives on the <a href="#" onclick="showPage('harmony'); return false;" style="color: var(--accent2);">Harmony tab</a>.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">Krumhansl-Kessler profiles</span>
             <span class="node-pill">scale-lock</span>
             <span class="node-pill">major / minor detection</span>
-            <span class="node-pill">configurable interval</span>
-            <span class="node-pill">sentiment nudge</span>
-            <span class="node-pill">sustain logic</span>
+            <span class="node-pill">8 accompaniment modes</span>
+            <span class="node-pill">sovereignty check first</span>
           </div>
         </div>
       </div>
@@ -1313,98 +1333,11 @@
 
   <hr class="divider">
 
-  <!-- Harmony logic -->
-  <section class="section">
-    <div class="section-label">Harmony Logic</div>
-    <h2 class="section-title">How the robot chooses its note</h2>
-    <p class="section-body">The interval between the singer's note and the robot's response is the core musical decision. Here is what each option sounds like and why it works the way it does.</p>
-
-    <div class="harmony-grid">
-      <div class="harmony-card">
-        <div class="harmony-interval">+0</div>
-        <div class="harmony-name">Unison</div>
-        <div class="harmony-desc">The robot sings exactly the same pitch. This creates a doubling effect that makes the voice sound fuller and more powerful. It is used when you want the robot to reinforce rather than harmonize.</div>
-        <div class="harmony-example">
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
-            <span class="note-pill singer">A4 / 440 Hz</span>
-          </div>
-          <span class="note-arrow">&#8594;</span>
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
-            <span class="note-pill robot">A4 / 440 Hz</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="harmony-card">
-        <div class="harmony-interval">+4</div>
-        <div class="harmony-name">Major Third</div>
-        <div class="harmony-desc">Four semitones above the singer's note. This is the interval that defines whether a chord sounds major (happy) or minor (sad). A major third above any root is the most recognizable two-note harmony in Western music.</div>
-        <div class="harmony-example">
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
-            <span class="note-pill singer">A4 / 440 Hz</span>
-          </div>
-          <span class="note-arrow">&#8594;</span>
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
-            <span class="note-pill robot">C#5 / 554 Hz</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="harmony-card">
-        <div class="harmony-interval">+7</div>
-        <div class="harmony-name">Perfect Fifth</div>
-        <div class="harmony-desc">Seven semitones above. The most consonant interval after the octave, used in every culture's music. The frequency ratio is exactly 3:2, which means the overtone series of the two notes align closely. This produces a stable, powerful, almost ancient sound, which is why it is the default interval for this system.</div>
-        <div class="harmony-example">
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
-            <span class="note-pill singer">A4 / 440 Hz</span>
-          </div>
-          <span class="note-arrow">&#8594;</span>
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
-            <span class="note-pill robot">E5 / 660 Hz</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="harmony-card">
-        <div class="harmony-interval">+12</div>
-        <div class="harmony-name">Octave</div>
-        <div class="harmony-desc">Twelve semitones above, exactly double the frequency. The two pitches sound so similar that many people perceive them as the same note in different registers. This is ideal for creating a wide, spacious texture while staying completely consonant with the singer at all times.</div>
-        <div class="harmony-example">
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">You sing</div>
-            <span class="note-pill singer">A4 / 440 Hz</span>
-          </div>
-          <span class="note-arrow">&#8594;</span>
-          <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
-            <span class="note-pill robot">A5 / 880 Hz</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top: 24px; padding: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;">
-      <div class="node-tag" style="margin-bottom: 12px;">Scale Lock</div>
-      <div class="node-title" style="margin-bottom: 10px;">Why the robot never plays a wrong note</div>
-      <div class="node-body" style="color: var(--muted); font-size: 14px; max-width: 680px;">
-        After computing the raw harmony pitch, the engine snaps it to the nearest note in the detected key. The key is inferred every second using the Krumhansl-Kessler algorithm: the pitch class distribution of recent notes is compared against reference major and minor profiles using correlation, and the best-matching root is selected. This means that even if the interval calculation would land on an out-of-scale note, the engine nudges it to the nearest valid scale degree. The result sounds intentional rather than accidental.
-      </div>
-    </div>
-  </section>
-
-  <hr class="divider">
-
   <!-- Architecture live demo -->
   <section class="section">
     <div class="section-label">Interactive Architecture Demo</div>
     <h2 class="section-title">See the system respond to your voice</h2>
-    <p class="section-body">Sing or speak into your microphone and watch the system detect your pitch in real time and display what note the robot would respond with. This runs entirely in the browser using the Web Audio API and the YIN algorithm. No audio is sent anywhere.</p>
+    <p class="section-body">Sing or speak into your microphone and watch the system detect your pitch in real time and display what note the robot would respond with. This runs entirely in the browser using the Web Audio API and the YIN algorithm. No audio is sent anywhere. This particular demo previews a single fixed interval at a time. For the full set of eight accompaniment functions the robot actually chooses between, see the <a href="#" onclick="showPage('harmony'); return false;" style="color: var(--accent2);">Harmony tab</a>.</p>
 
     <div class="note-demo">
       <div class="note-demo-header">
@@ -1527,6 +1460,393 @@
     <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
   </footer>
 </div>
+<!-- ===================== HARMONY PAGE ===================== -->
+<div id="page-harmony" class="page">
+
+  <section class="hero">
+    <div class="hero-eyebrow">Harmony Engine</div>
+    <h1 class="hero-title">Eight ways to sing <span>with</span> a voice, not over it</h1>
+    <p class="hero-sub">When Archer sings, the robot picks from eight different musical functions instead of one fixed harmony. It can shadow his exact pitch, echo him a beat later, hold a low note underneath him, follow the shape of his melody, or wait until he pauses and answer him. A regular chord only comes into play when fusion mode is switched on for a contemporary arrangement. Above all of that sits one switch that Archer fully controls, deciding whether the robot sings at all.</p>
+    <div class="hero-badges">
+      <span class="badge highlight">8 accompaniment modes</span>
+      <span class="badge">Sovereignty enforced at runtime</span>
+      <span class="badge">On-robot screen + sound cue toggle</span>
+      <span class="badge">Triadic harmony, fusion-only</span>
+      <span class="badge">Scale-locked to the inferred key</span>
+    </div>
+    <div class="waveform" id="harmony-hero-waveform"></div>
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">synthesis/accompaniment_modes.py + core/protocol_guard.py</div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Philosophy -->
+  <section class="section">
+    <div class="section-label">Why Not Just Harmonize</div>
+    <h2 class="section-title">A chord is one option, not the assumption</h2>
+    <p class="section-body">Triadic harmony, singing a third or a fifth above a melody, is the sound most people expect from a harmonizer, because it's how Western pop and choral music are built. But that isn't the only way two voices can relate to each other, and it isn't how Archer's own singing practice works either. A fixed chordal interval is treated as one option among many, reserved for contemporary or fusion moments, rather than the thing the robot defaults to every time it opens its mouth. The rest of the time, it's choosing between functions that come from how people actually accompany each other when they sing together: doubling a voice, echoing it a beat later, holding a drone underneath it, or simply waiting until it stops before answering.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- The eight modes -->
+  <section class="section">
+    <div class="section-label">The Eight Musical Functions</div>
+    <h2 class="section-title">What the robot can choose to do</h2>
+    <p class="section-body">Each of these is a small, separate piece of logic that answers one question: given what Archer just sang, what should the robot do right now? Here's what each one sounds like and when it tends to get used.</p>
+
+    <div class="harmony-grid">
+      <div class="harmony-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom: 4px;">
+          <span class="mode-badge default">default mode</span>
+        </div>
+        <div class="harmony-name">Unison shadowing</div>
+        <div class="harmony-desc">The robot matches Archer's pitch exactly. No interval, no offset, just the same note doubled. This is the resting default when nothing else applies, a full, reinforcing copy of his voice rather than a harmony on top of it.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer sings</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
+            <span class="note-pill robot">A4 / 440 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-name">Octave reinforcement</div>
+        <div class="harmony-desc">Same note as Archer, shifted a full octave, usually below. The two voices stay in complete agreement harmonically while spreading out across a much wider register, which thickens the sound without introducing any new pitch relationship to manage.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer sings</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
+            <span class="note-pill robot">A3 / 220 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-name">Delayed response</div>
+        <div class="harmony-desc">The robot sings what Archer was singing about a beat ago, not what he's singing right now. It keeps a short timestamped memory of his recent pitches and always trails slightly behind, like a real singer catching up to a phrase after hearing the start of it.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer sang, one beat ago</div>
+            <span class="note-pill singer">G4 / 392 Hz</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings, now</div>
+            <span class="note-pill robot">G4 / 392 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-name">Timbral thickening</div>
+        <div class="harmony-desc">The same pitch as Archer again, but this time the harmony is textural rather than intervallic. The synthesizer detunes it by a few cents and gives it a different vowel shape, which reads as chorus-like thickness instead of a second, separate note sitting beside his.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer sings</div>
+            <span class="note-pill singer">A4 / 440 Hz</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot sings</div>
+            <span class="note-pill robot">A4 / 441 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-name">Contour following</div>
+        <div class="harmony-desc">Instead of matching exact notes, the robot tracks the shape of Archer's melody: whether it's rising, falling, or holding level over the last few moments. It moves in the same direction he does without necessarily landing on the same pitches, following his musical gesture rather than his frequency.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer rises</div>
+            <span class="note-pill singer">A4 &#8594; C5</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot rises with him</div>
+            <span class="note-pill robot">A4 &#8594; B4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card">
+        <div class="harmony-name">Drone support</div>
+        <div class="harmony-desc">A low, sustained note drawn from the key the engine has inferred, held steady underneath whatever Archer is singing. It doesn't chase his melody at all. Its job is to give the sound a floor to stand on, the way a low sustained tone grounds a piece regardless of what moves above it.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer sings, anywhere in key</div>
+            <span class="note-pill singer">key of A minor</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot holds</div>
+            <span class="note-pill robot">A2 / 110 Hz</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="harmony-card" style="grid-column: 1 / -1;">
+        <div class="harmony-name">Call and response</div>
+        <div class="harmony-desc">The robot stays completely silent while Archer is actively singing a phrase. Once he pauses, it answers with the last note of what he just sang. This is the one mode built entirely around turn-taking rather than simultaneous sound, and it never sings over him.</div>
+        <div class="harmony-example">
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer finishes a phrase on</div>
+            <span class="note-pill singer">E4 / 330 Hz</span>
+          </div>
+          <span class="note-arrow">&#8594;</span>
+          <div>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot answers, after he stops</div>
+            <span class="note-pill robot">E4 / 330 Hz</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px; padding: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom: 12px;">
+        <span class="mode-badge optin">opt-in only, never default</span>
+      </div>
+      <div class="node-title" style="margin-bottom: 10px;">The exception: triadic harmony</div>
+      <div class="node-body" style="color: var(--muted); font-size: 14px;">
+        Regular chordal harmony, a third or a fifth above the singer, still exists in the system, but it is reachable only when fusion mode is explicitly switched on for a contemporary or fusion arrangement. It is never the fallback the engine reaches for on its own. This flips the old behaviour of the system, where a fixed interval was always the answer, into something closer to how the eight functions above actually work: chords are a deliberate choice for a specific context, not an assumption baked into every note.
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- How the mode is chosen -->
+  <section class="section">
+    <div class="section-label">Mode Selection</div>
+    <h2 class="section-title">How the robot decides which one to use</h2>
+    <p class="section-body">Every audio frame, the engine runs through a short, ordered list of questions to decide which of the eight functions applies. It's deliberately simple and readable right now rather than a learned model, since the priority order itself is still being tuned against Archer's direct feedback. Here's the order it checks, top to bottom, first match wins.</p>
+
+    <div class="prose-pipeline">
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">1</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">core/protocol_guard.py</div>
+          <h3 class="prose-stage-title">Is sovereignty switched on at all</h3>
+          <p class="prose-stage-body">Before the engine does anything else, before it even considers what note to sing, it asks one question: is <code>protocol_enabled</code> true? That flag lives inside <code>ProtocolGuard</code>, and it gets checked on every single frame, dozens of times a second. If it's false, the selector returns SILENT immediately. Fusion mode doesn't get evaluated. The tempo threshold doesn't get checked. Nothing else in the priority chain below even runs.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">That's deliberate. This check sits first in the function, not because it happened to be convenient to write it that way, but because nothing later in the chain is allowed to override it. Archer can turn the harmony engine off through the on-robot screen or the sound cue, and whichever one he uses flips the same underlying flag. He doesn't need a reason. The engine doesn't ask for one.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">2</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/harmony_engine.py</div>
+          <h3 class="prose-stage-title">Is this moment protocol-sensitive</h3>
+          <p class="prose-stage-body">Sovereignty being on doesn't mean the robot has blanket permission to sing over anything. Right after the <code>protocol_enabled</code> check, the engine looks at a second, separate condition: is the current phoneme classified as protocol-sensitive? That list, <code>sensitive_phoneme_classes</code> in config.yaml, is empty by default, and that's intentional rather than an oversight. Deciding what counts as sensitive isn't something the engine should guess at on its own.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Instead it's meant to grow the way Archer wants it to, as he reviews his own recordings and identifies specific moments that should stay off limits, and those get added to the list by name. If the current phoneme matches one of them, the engine returns SILENT here too, even with sovereignty otherwise on. Being allowed to participate in general and being welcome in this exact moment are two different checks, and the code treats them that way.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/accompaniment_modes.py</div>
+          <h3 class="prose-stage-title">Did Archer just finish a phrase</h3>
+          <p class="prose-stage-body">The engine tracks <code>phrase_state</code> as singing, phrase_end, or silence, and the selector watches for the specific transition from singing to phrase_end. When that transition just happened, meaning Archer was singing a moment ago and has now gone quiet, the selector treats it differently from ordinary silence. It returns CALL_RESPONSE.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">That mode reaches back into the pitch history, finds the last note from the phrase that just ended, and answers with it. It's the one branch in the whole priority chain built around timing rather than restraint, waiting for exactly the moment Archer stops before it responds, instead of either staying silent through the pause or trying to sing along while he's still going.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/accompaniment_modes.py</div>
+          <h3 class="prose-stage-title">Is Archer singing at all right now</h3>
+          <p class="prose-stage-body">If there's no pitch detected, and it isn't the specific moment right after a phrase ends, the selector has to decide what silence means by default. Out of the box, it returns DRONE, a low sustained note pulled from whatever key the engine has inferred, so the space underneath Archer doesn't go completely empty the moment he pauses.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">That's a default, not a fixed rule. The <code>silence_when_no_singer</code> flag in config.yaml flips it: set that to true and the selector returns SILENT instead, leaving genuinely empty space until Archer sings again. Which one is right depends entirely on what kind of quiet Archer wants, which is exactly why it's a config value instead of something hardcoded into the logic.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">5</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">config/config.yaml</div>
+          <h3 class="prose-stage-title">Has fusion mode been explicitly turned on</h3>
+          <p class="prose-stage-body">Everything else in this priority chain exists specifically so the robot doesn't default to a chord. Triadic harmony still exists in the code, as the TRIADIC mode, but the selector only ever returns it if <code>fusion_mode</code> is set to true in config.yaml.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">There's no tempo, no phrase length, no combination of the other conditions above that can trigger it on its own. It's a single boolean, checked explicitly, and it has to be flipped on purpose before the engine will ever reach for a fixed chordal interval.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">6</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/accompaniment_modes.py</div>
+          <h3 class="prose-stage-title">Is the tempo fast right now</h3>
+          <p class="prose-stage-body">Past a certain tempo, chasing every exact pitch starts working against the music instead of for it. The selector checks <code>tempo_bpm</code> against <code>fast_tempo_threshold_bpm</code>, a value set in config, and if the current tempo clears that threshold, it returns CONTOUR instead of whatever mode would otherwise apply.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Contour following doesn't try to land on Archer's exact notes. It tracks the direction of his melody instead, moving up when he moves up and down when he moves down, over a short rolling window of recent pitches. It's a looser match, but at speed it holds together far better than a robot straining to hit targets that keep moving before it can catch them.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">7</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">synthesis/accompaniment_modes.py</div>
+          <h3 class="prose-stage-title">Has Archer been holding one note for a while</h3>
+          <p class="prose-stage-body">The selector keeps a running count, <code>frames_on_current_note</code>, tracking how long Archer has held his current pitch. Once that count passes <code>sustain_frames_for_timbral</code>, a threshold set in config, the selector returns TIMBRAL instead of continuing to match the note plainly.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Timbral thickening keeps the exact same pitch, but the synthesizer detunes it by a few cents and shifts to a different vowel shape underneath it. The result reads as chorus-like richness rather than a flat, static double sitting on top of a note that's already been going on for a while. Long sustained notes are where that kind of texture actually gets noticed, so that's exactly where the extra work happens.</p>
+        </div>
+      </div>
+
+      <div class="prose-stage" style="--line-display: none;">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">8</div>
+          <div class="prose-stage-line" style="display: none;"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">config/config.yaml</div>
+          <h3 class="prose-stage-title">None of the above</h3>
+          <p class="prose-stage-body">If none of the checks above have returned anything, the selector falls through to <code>default_mode</code>, whatever's configured in config.yaml, unison shadowing out of the box. This isn't a fallback in the sense of something going wrong. It's just the answer for the ordinary middle of a phrase, where nothing about the timing, tempo, or duration is asking for anything specific to happen.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">The robot sings Archer's note back to him, exactly. It used to be the only thing the system could do at all. Now it's one branch out of eight, reached only when the other seven have nothing to say, but it's still the one doing most of the actual work, the same way most of a real conversation is quiet agreement rather than anything dramatic.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Sovereignty -->
+  <section class="section">
+    <div class="section-label">Sovereignty</div>
+    <h2 class="section-title">The switch that overrides everything else</h2>
+    <p class="section-body">None of the eight functions above matter if Archer hasn't chosen to have the robot participate. That choice needs to be his, guaranteed, and impossible for any part of the accompaniment logic to talk its way around. The system checks this before any musical decision is made, not after, through the robot's own on-robot screen, with a sound cue as a backup in case the screen isn't within reach.</p>
+
+    <div style="margin-top: 32px; padding: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;">
+      <div class="node-tag" style="margin-bottom: 12px;">On-robot screen</div>
+      <div class="node-title" style="margin-bottom: 10px;">A control panel Archer can reach directly</div>
+      <div class="node-body" style="color: var(--muted); font-size: 14px;">
+        The robot is meant to carry its own screen, where Archer can switch the harmony engine on or off and adjust settings like the default mode or fusion mode in real time, without needing a laptop or a second person in the room. A sound cue, a short burst of low, quick hums, backs up the same switch, so there's always a way to shut the robot down even if the screen isn't within reach in the moment.
+      </div>
+    </div>
+
+    <p class="section-body" style="margin-top: 28px;">Try it below: switch sovereignty off, then pick any of the eight modes and sing into the microphone. The robot stays silent no matter which mode is selected, because the check happens first, before any of that mode's logic ever runs.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Scale lock -->
+  <section class="section">
+    <div class="section-label">Scale Lock</div>
+    <h2 class="section-title">Why the robot never plays a wrong note</h2>
+    <p class="section-body">Whatever pitch a mode proposes, unison, an octave down, a delayed echo, gets snapped to the nearest note in the key the engine has inferred, before it's ever sung. The key is re-estimated once a second using the Krumhansl-Kessler algorithm: the distribution of Archer's recent pitches is compared against reference major and minor tonal profiles, and the closest match becomes the current key. Even if a mode's raw calculation lands slightly off, the engine nudges it to the nearest valid scale degree, so the result always sounds intentional. Drone support is the one exception, since a grounding root note is meant to sit outside the melodic scale entirely.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Interactive demo -->
+  <section class="section">
+    <div class="section-label">Interactive Demo</div>
+    <h2 class="section-title">Try each musical function yourself</h2>
+    <p class="section-body">Pick a mode, sing or hum into your microphone, and watch what the robot would do. This runs entirely in the browser using the same YIN pitch detection and key inference as the Architecture tab, approximating the real accompaniment logic. No audio leaves your device.</p>
+
+    <div class="note-demo">
+      <div class="note-demo-header">
+        <div class="note-demo-title">Try a musical function</div>
+        <button class="mic-btn" id="harmony-mic-btn" onclick="toggleHarmonyMic()">
+          <div class="mic-dot"></div>
+          Start microphone
+        </button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+        <span style="font-size: 13px; color: var(--muted);">Accompaniment mode:</span>
+        <div class="mode-picker" style="margin: 0;">
+          <button class="mode-btn active" data-mode="unison_shadowing" onclick="setHarmonyMode('unison_shadowing', this)">Unison shadowing</button>
+          <button class="mode-btn" data-mode="octave_reinforcement" onclick="setHarmonyMode('octave_reinforcement', this)">Octave reinforcement</button>
+          <button class="mode-btn" data-mode="delayed_response" onclick="setHarmonyMode('delayed_response', this)">Delayed response</button>
+          <button class="mode-btn" data-mode="timbral_thickening" onclick="setHarmonyMode('timbral_thickening', this)">Timbral thickening</button>
+          <button class="mode-btn" data-mode="contour_following" onclick="setHarmonyMode('contour_following', this)">Contour following</button>
+          <button class="mode-btn" data-mode="drone_support" onclick="setHarmonyMode('drone_support', this)">Drone support</button>
+          <button class="mode-btn" data-mode="call_and_response" onclick="setHarmonyMode('call_and_response', this)">Call and response</button>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+        <span style="font-size: 13px; color: var(--muted);">Sovereignty:</span>
+        <button class="protocol-btn" id="harmony-protocol-btn" onclick="toggleHarmonyProtocol()">
+          <div class="protocol-dot"></div>
+          <span class="protocol-btn-label">Sovereignty: ON</span>
+        </button>
+      </div>
+
+      <div class="note-displays">
+        <div class="note-box" id="harmony-singer-box">
+          <div class="note-box-label singer">Archer sings</div>
+          <div class="note-display singer" id="harmony-singer-note">-</div>
+          <div class="note-freq" id="harmony-singer-freq"></div>
+        </div>
+        <div class="note-arrow-center">
+          <div style="font-size: 24px; color: var(--border);">&#8594;</div>
+          <div class="interval-label" id="harmony-mode-label">Unison shadowing</div>
+        </div>
+        <div class="note-box" id="harmony-robot-box">
+          <div class="note-box-label robot">Robot responds</div>
+          <div class="note-display robot" id="harmony-robot-note">-</div>
+          <div class="note-freq" id="harmony-robot-freq"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono);">PITCH DEVIATION FROM NEAREST NOTE</div>
+      <div class="pitch-meter">
+        <div class="pitch-center-line"></div>
+        <div class="pitch-bar" id="harmony-pitch-bar" style="width: 4px; left: 50%;"></div>
+      </div>
+      <div class="pitch-labels">
+        <span>-50 cents</span>
+        <span>in tune</span>
+        <span>+50 cents</span>
+      </div>
+
+      <div class="note-explanation" id="harmony-explanation">
+        Click "Start microphone", pick a mode above, and sing or hum. Try switching sovereignty off to see it override every mode.
+      </div>
+
+      <canvas id="harmony-piano-canvas" height="100"></canvas>
+    </div>
+  </section>
+
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
+  </footer>
+</div>
 <!-- ===================== TRANSLATION PAGE ===================== -->
 <div id="page-translation" class="page">
 
@@ -1540,6 +1860,8 @@
       <span class="badge">Morfessor + BPE tokenization</span>
       <span class="badge">Watkins (1865) dictionary</span>
     </div>
+    <div class="waveform" id="translation-hero-waveform"></div>
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">translation/translate_transformer.py</div>
   </section>
 
   <hr class="divider">
@@ -2097,8 +2419,8 @@ if (localStorage.getItem('theme') === 'dark') {
 // ============================================================
 // PAGE SWITCHING + ROUTING
 // ============================================================
-const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', translation: '/sentiment', demo: '/live-demo' };
-const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'sentiment': 'translation', 'live-demo': 'demo' };
+const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', harmony: '/harmony', translation: '/sentiment', demo: '/live-demo' };
+const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'harmony': 'harmony', 'sentiment': 'translation', 'live-demo': 'demo' };
 
 function showPage(name, updateUrl = true) {
   if (!document.getElementById('page-' + name)) name = 'home';
@@ -2150,6 +2472,30 @@ function closeMobileNav() {
 // ============================================================
 (function() {
   const container = document.getElementById('hero-waveform');
+  const N = 32;
+  for (let i = 0; i < N; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'waveform-bar';
+    bar.style.animationDelay = (i * 1.4 / N) + 's';
+    bar.style.height = (4 + Math.random() * 20) + 'px';
+    container.appendChild(bar);
+  }
+})();
+(function() {
+  const container = document.getElementById('harmony-hero-waveform');
+  if (!container) return;
+  const N = 32;
+  for (let i = 0; i < N; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'waveform-bar';
+    bar.style.animationDelay = (i * 1.4 / N) + 's';
+    bar.style.height = (4 + Math.random() * 20) + 'px';
+    container.appendChild(bar);
+  }
+})();
+(function() {
+  const container = document.getElementById('translation-hero-waveform');
+  if (!container) return;
   const N = 32;
   for (let i = 0; i < N; i++) {
     const bar = document.createElement('div');
@@ -2373,8 +2719,9 @@ function archDetectLoop() {
 // ============================================================
 // PIANO
 // ============================================================
-function drawPiano(singerMidi, robotMidi) {
-  const canvas = document.getElementById('piano-canvas');
+function drawPiano(singerMidi, robotMidi, canvasId) {
+  const canvas = document.getElementById(canvasId || 'piano-canvas');
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   canvas.width = W; canvas.height = H;
@@ -2404,6 +2751,239 @@ function drawPiano(singerMidi, robotMidi) {
   });
 }
 drawPiano(null, null);
+
+// ============================================================
+// HARMONY PAGE: TRY EACH MUSICAL FUNCTION
+// ============================================================
+const HARMONY_DEMO_BEAT_S = 0.6;          // approximate beat length for the browser demo
+const HARMONY_PHRASE_END_S = 0.8;         // matches phrase_end_silence_ms server-side
+const MODE_LABELS = {
+  unison_shadowing:     'Unison shadowing',
+  octave_reinforcement: 'Octave reinforcement',
+  delayed_response:     'Delayed response',
+  timbral_thickening:   'Timbral thickening',
+  contour_following:    'Contour following',
+  drone_support:        'Drone support',
+  call_and_response:    'Call and response',
+};
+
+let harmonySelectedMode = 'unison_shadowing';
+let harmonyProtocolEnabled = true;
+
+let harmonyAudioCtx = null, harmonyAnalyser = null, harmonyBuffer = null;
+let harmonyMicStream = null, harmonyAnimId = null, harmonyMediaSource = null;
+let harmonyPitchSmooth = [];
+let harmonyPitchHistory = [];      // plain hz values, for key inference
+let harmonyTimedHistory = [];      // { t, hz } pairs, for delay + contour
+let harmonyPhraseFinals = [];      // last pitch of each finished phrase
+let harmonyWasVoiced = false;
+let harmonyLastVoicedAt = 0;
+
+function setHarmonyMode(mode, btn) {
+  harmonySelectedMode = mode;
+  document.querySelectorAll('#page-harmony .mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('harmony-mode-label').textContent = MODE_LABELS[mode];
+}
+
+function toggleHarmonyProtocol() {
+  harmonyProtocolEnabled = !harmonyProtocolEnabled;
+  const btn = document.getElementById('harmony-protocol-btn');
+  btn.classList.toggle('off', !harmonyProtocolEnabled);
+  btn.querySelector('.protocol-btn-label').textContent = harmonyProtocolEnabled ? 'Sovereignty: ON' : 'Sovereignty: OFF';
+}
+
+async function toggleHarmonyMic() {
+  const btn = document.getElementById('harmony-mic-btn');
+  if (harmonyMicStream) { stopHarmonyMic(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    harmonyMicStream = stream;
+    harmonyAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    harmonyMediaSource = harmonyAudioCtx.createMediaStreamSource(stream);
+    harmonyAnalyser = harmonyAudioCtx.createAnalyser();
+    harmonyAnalyser.fftSize = 2048;
+    harmonyMediaSource.connect(harmonyAnalyser);
+    harmonyBuffer = new Float32Array(harmonyAnalyser.fftSize);
+    btn.classList.add('active');
+    btn.innerHTML = '<div class="mic-dot"></div>Stop microphone';
+    harmonyDetectLoop();
+  } catch (e) {
+    document.getElementById('harmony-explanation').textContent = 'Microphone access denied. Please allow microphone access in your browser and try again.';
+  }
+}
+
+function stopHarmonyMic() {
+  if (harmonyMicStream) { harmonyMicStream.getTracks().forEach(t => t.stop()); harmonyMicStream = null; }
+  if (harmonyAnimId) { cancelAnimationFrame(harmonyAnimId); harmonyAnimId = null; }
+  if (harmonyAudioCtx) { harmonyAudioCtx.close(); harmonyAudioCtx = null; }
+  const btn = document.getElementById('harmony-mic-btn');
+  btn.classList.remove('active');
+  btn.innerHTML = '<div class="mic-dot"></div>Start microphone';
+  harmonyPitchSmooth = [];
+  harmonyPitchHistory = [];
+  harmonyTimedHistory = [];
+  harmonyPhraseFinals = [];
+  harmonyWasVoiced = false;
+  resetHarmonyNoteBoxes();
+  document.getElementById('harmony-explanation').textContent = 'Click "Start microphone", pick a mode above, and sing or hum. Try switching sovereignty off to see it override every mode.';
+  drawPiano(null, null, 'harmony-piano-canvas');
+}
+
+function resetHarmonyNoteBoxes() {
+  document.getElementById('harmony-singer-note').textContent = '-';
+  document.getElementById('harmony-singer-freq').textContent = '';
+  document.getElementById('harmony-robot-note').textContent = '-';
+  document.getElementById('harmony-robot-freq').textContent = '';
+  document.getElementById('harmony-singer-box').className = 'note-box';
+  document.getElementById('harmony-robot-box').className = 'note-box';
+}
+
+function harmonyDetectLoop() {
+  harmonyAnimId = requestAnimationFrame(harmonyDetectLoop);
+  if (!harmonyAnalyser) return;
+  harmonyAnalyser.getFloatTimeDomainData(harmonyBuffer);
+  const rms = Math.sqrt(harmonyBuffer.reduce((s,v) => s+v*v, 0) / harmonyBuffer.length);
+  const now = performance.now() / 1000;
+
+  let smoothHz = null;
+  if (rms >= 0.005) {
+    const hz = yinPitch(harmonyBuffer, harmonyAudioCtx.sampleRate, 0.15);
+    if (hz && hz >= 80 && hz <= 1200) {
+      harmonyPitchSmooth.push(hz);
+      if (harmonyPitchSmooth.length > 3) harmonyPitchSmooth.shift();
+      const sorted = [...harmonyPitchSmooth].sort((a,b) => a-b);
+      smoothHz = sorted[Math.floor(sorted.length/2)];
+    }
+  } else {
+    harmonyPitchSmooth = [];
+  }
+
+  if (smoothHz) {
+    harmonyPitchHistory.push(smoothHz);
+    if (harmonyPitchHistory.length > 32) harmonyPitchHistory.shift();
+    harmonyTimedHistory.push({ t: now, hz: smoothHz });
+    if (harmonyTimedHistory.length > 128) harmonyTimedHistory.shift();
+    harmonyWasVoiced = true;
+    harmonyLastVoicedAt = now;
+  } else if (harmonyWasVoiced && harmonyTimedHistory.length && (now - harmonyLastVoicedAt) > HARMONY_PHRASE_END_S) {
+    harmonyPhraseFinals.push(harmonyTimedHistory[harmonyTimedHistory.length - 1].hz);
+    if (harmonyPhraseFinals.length > 8) harmonyPhraseFinals.shift();
+    harmonyWasVoiced = false;
+  }
+
+  const result = computeHarmonyMode(harmonySelectedMode, smoothHz, now);
+  const singerNote = smoothHz ? hzToNote(smoothHz) : null;
+  renderHarmonyResult(singerNote, smoothHz, result);
+}
+
+function computeHarmonyMode(mode, singerHz, now) {
+  if (!harmonyProtocolEnabled) {
+    return { hz: null, action: 'rest', text: 'Sovereignty is off, so the robot stays completely silent no matter which mode is selected. This check always runs first, before any mode logic.' };
+  }
+
+  const key = inferKey(harmonyPitchHistory);
+
+  switch (mode) {
+    case 'unison_shadowing': {
+      if (!singerHz) return { hz: null, action: 'rest', text: 'Sing or hum something and the robot will match your pitch exactly.' };
+      return { hz: snapToScale(singerHz, key), action: 'sing', text: 'Matching your pitch exactly. This is the default mode, full, doubled reinforcement of your voice.' };
+    }
+    case 'octave_reinforcement': {
+      if (!singerHz) return { hz: null, action: 'rest', text: 'Sing or hum something and the robot will answer an octave below.' };
+      return { hz: snapToScale(singerHz / 2, key), action: 'sing', text: 'Singing the same note as you, one octave below. Same harmonic content, wider register.' };
+    }
+    case 'delayed_response': {
+      if (harmonyTimedHistory.length < 3) {
+        return { hz: null, action: 'rest', text: 'Not enough of your singing has happened yet to echo. Keep singing and the robot will start trailing about a beat behind you.' };
+      }
+      const targetT = now - HARMONY_DEMO_BEAT_S;
+      let best = null, bestDiff = Infinity;
+      for (const p of harmonyTimedHistory) {
+        const diff = Math.abs(p.t - targetT);
+        if (diff < bestDiff) { bestDiff = diff; best = p.hz; }
+      }
+      return { hz: snapToScale(best, key), action: 'sing', text: 'Echoing what you were singing about one beat ago, not what you are singing right now. It always trails slightly behind you.' };
+    }
+    case 'timbral_thickening': {
+      if (!singerHz) return { hz: null, action: 'rest', text: 'Sing or hum something and the robot will thicken it with a detuned double.' };
+      const hz = snapToScale(singerHz, key) * Math.pow(2, 6 / 1200);
+      return { hz, action: 'sing', text: 'Singing your exact pitch again, but detuned by a few cents with a different vowel shape. In the real synthesizer this reads as chorus-like thickness, not a second note.' };
+    }
+    case 'contour_following': {
+      if (!singerHz) return { hz: null, action: 'rest', text: 'Sing or hum something so the robot has a melodic shape to follow.' };
+      const window = harmonyTimedHistory.slice(-6);
+      let direction = 0;
+      if (window.length >= 2) {
+        const delta = window[window.length - 1].hz - window[0].hz;
+        if (Math.abs(delta) > 1e-6) direction = delta > 0 ? 1 : -1;
+      }
+      const hz = snapToScale(singerHz * Math.pow(2, direction * 2 / 12), key);
+      const shape = direction > 0 ? 'rising' : direction < 0 ? 'falling' : 'level';
+      return { hz, action: 'sing', text: 'Tracking the shape of your melody rather than your exact notes. Right now your line is ' + shape + ', so the robot moves the same direction.' };
+    }
+    case 'drone_support': {
+      if (!harmonyPitchHistory.length) {
+        return { hz: null, action: 'rest', text: 'Waiting for a pitch reference before it can find a root to drone on. Sing a few notes first.' };
+      }
+      const refHz = singerHz || harmonyPitchHistory[harmonyPitchHistory.length - 1];
+      const refMidi = Math.round(hzToMidi(refHz));
+      const refOctave = Math.floor(refMidi / 12);
+      const rootHz = midiToHz(refOctave * 12 + key.root);
+      return { hz: rootHz / 2, action: 'sustain', text: 'Holding a low, sustained root note under your phrase, drawn from the key the robot has inferred from your recent singing. It grounds the sound rather than following your melody.' };
+    }
+    case 'call_and_response': {
+      if (!harmonyPhraseFinals.length) {
+        return { hz: null, action: 'rest', text: 'Waiting for you to finish a full phrase. This mode only answers after you stop, it never sings over you. Sing something, then pause for about a second.' };
+      }
+      const hz = snapToScale(harmonyPhraseFinals[harmonyPhraseFinals.length - 1], key);
+      return { hz, action: 'sing', text: 'Answering the last note of your most recent phrase, now that you have paused. Sing and pause again to trigger a new response.' };
+    }
+    default:
+      return { hz: null, action: 'rest', text: '' };
+  }
+}
+
+function renderHarmonyResult(singerNote, singerHz, result) {
+  const singerNoteEl = document.getElementById('harmony-singer-note');
+  const singerFreqEl = document.getElementById('harmony-singer-freq');
+  const singerBoxEl  = document.getElementById('harmony-singer-box');
+  const robotNoteEl  = document.getElementById('harmony-robot-note');
+  const robotFreqEl  = document.getElementById('harmony-robot-freq');
+  const robotBoxEl   = document.getElementById('harmony-robot-box');
+  const explEl       = document.getElementById('harmony-explanation');
+  const barEl        = document.getElementById('harmony-pitch-bar');
+
+  if (singerNote) {
+    singerNoteEl.textContent = singerNote.name;
+    singerFreqEl.textContent = singerHz.toFixed(1) + ' Hz';
+    singerBoxEl.className = 'note-box active-singer';
+    const cents = hzToCents(singerHz);
+    const pct = 50 + (cents / 50) * 45;
+    barEl.style.left = Math.max(5, Math.min(95, pct)) + '%';
+    barEl.style.background = Math.abs(cents) < 15 ? 'var(--green)' : Math.abs(cents) < 30 ? 'var(--orange)' : 'var(--red)';
+  } else {
+    singerNoteEl.textContent = '-';
+    singerFreqEl.textContent = '';
+    singerBoxEl.className = 'note-box';
+  }
+
+  let robotMidi = null;
+  if (result.hz && result.action !== 'rest') {
+    const robotNote = hzToNote(result.hz);
+    robotNoteEl.textContent = robotNote ? robotNote.name : '-';
+    robotFreqEl.textContent = result.hz.toFixed(1) + ' Hz';
+    robotBoxEl.className = 'note-box active-robot';
+    robotMidi = robotNote ? robotNote.midi : null;
+  } else {
+    robotNoteEl.textContent = '-';
+    robotFreqEl.textContent = result.action === 'rest' ? 'silent' : '';
+    robotBoxEl.className = 'note-box';
+  }
+
+  if (result.text) explEl.textContent = result.text;
+  drawPiano(singerNote ? singerNote.midi : null, robotMidi, 'harmony-piano-canvas');
+}
 
 // ============================================================
 // DEMO PAGE: MP3

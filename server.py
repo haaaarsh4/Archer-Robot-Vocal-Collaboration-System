@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -33,9 +34,41 @@ try:
 except Exception:
     pass
 
+# Load the trained Cree -> English translation model once at startup
+translator = None
+translator_load_error = None
+try:
+    from translation.translate_transformer import NeuralTranslator
+    translator = NeuralTranslator()
+    print("Translation model loaded successfully.")
+except Exception as e:
+    translator_load_error = str(e)
+    print(f"Translation model not loaded: {translator_load_error}")
+    print("Check that data/models/transformer_mt.pt, spm.model, and "
+          "spm_config.json exist relative to your project root.")
+
+
+harmony_engine = None
+harmony_load_error = None
+try:
+    from synthesis.harmony_engine import HarmonyEngine
+    harmony_engine = HarmonyEngine()
+    print("Shared HarmonyEngine initialized (sovereignty + mode selection live here).")
+except Exception as e:
+    harmony_load_error = str(e)
+    print(f"HarmonyEngine not loaded: {harmony_load_error}")
+
 
 @app.get("/")
 def index():
+    return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+
+@app.get("/architecture")
+@app.get("/harmony")
+@app.get("/sentiment")
+@app.get("/live-demo")
+def spa_routes():
     return FileResponse(str(FRONTEND_DIR / "index.html"))
 
 
@@ -56,6 +89,75 @@ def list_devices():
         return {"devices": devices, "available": True}
     except Exception as e:
         return {"devices": [], "available": False, "message": str(e)}
+
+
+class TranslateRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/translate")
+def translate(req: TranslateRequest):
+    if translator is None:
+        return JSONResponse({"error": f"Model not loaded: {translator_load_error}"}, status_code=503)
+
+    text = (req.text or "").strip()
+    if not text:
+        return JSONResponse({"error": "No text provided"}, status_code=400)
+
+    try:
+        translation = translator.translate(text)
+        return {"input": text, "translation": translation}
+    except Exception as e:
+        return JSONResponse({"error": f"Translation failed: {e}"}, status_code=500)
+
+
+@app.get("/api/translate/health")
+def translate_health():
+    return {"status": "ok" if translator else "model_not_loaded", "error": translator_load_error}
+
+
+@app.get("/protocol/status")
+def protocol_status():
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    return harmony_engine.protocol.status()
+
+
+@app.post("/protocol/toggle")
+def protocol_toggle():
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    new_state = harmony_engine.protocol.toggle(source="manual_ui")
+    return {"ok": True, "enabled": new_state}
+
+
+@app.post("/protocol/enable")
+def protocol_enable():
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    harmony_engine.protocol.enable(source="manual_ui")
+    return {"ok": True, "enabled": True}
+
+
+@app.post("/protocol/disable")
+def protocol_disable():
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    harmony_engine.protocol.disable(source="manual_ui")
+    return {"ok": True, "enabled": False}
+
+
+class FusionModeRequest(BaseModel):
+    enabled: bool
+
+
+@app.post("/harmony/fusion-mode")
+def set_fusion_mode(req: FusionModeRequest):
+    """Explicit opt-in for triadic harmony (contemporary/fusion only — never the default)."""
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    harmony_engine.set_fusion_mode(req.enabled)
+    return {"ok": True, "fusion_mode": req.enabled}
 
 
 @app.get("/pipeline/status")
@@ -105,20 +207,24 @@ async def ws_broadcast(ws: WebSocket):
 
 @app.websocket("/ws/mic")
 async def ws_mic(ws: WebSocket):
+    """Browser streams float32 PCM -> Python runs aubio YIN -> sends back note JSON."""
     await ws.accept()
+    if harmony_engine is None:
+        await ws.send_text(json.dumps({"type": "error", "message": f"HarmonyEngine not loaded: {harmony_load_error}"}))
+        await ws.close()
+        return
     try:
         from config.config_loader import get_config
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
         from analysis.phonetic_analysis import CreeTokenizer
-        from synthesis.harmony_engine import HarmonyEngine
         import librosa as _lib
 
         cfg     = get_config()
         pitch   = PitchDetector()
         rhythm  = RhythmAnalyzer()
         cree    = CreeTokenizer()
-        harmony = HarmonyEngine()
+        harmony = harmony_engine   # shared instance, sovereignty state persists across sessions
         conf_thresh = cfg["pitch"]["confidence_threshold"]
         sil_db      = cfg["preprocessing"]["silence_threshold_db"]
         start       = time.perf_counter()
@@ -150,21 +256,29 @@ async def ws_mic(ws: WebSocket):
             if archer_hz and phrase in ("silence", "phrase_end"):
                 phrase = "singing"
 
+            elapsed_s = time.perf_counter() - start
+
+            # Sovereignty: checked every frame, independent of translation/pitch
+            harmony.protocol.check_sound_cue(archer_hz, is_voiced, elapsed_s)
+
             decision = harmony.decide(
                 archer_hz=archer_hz, phrase_state=phrase,
                 tempo_bpm=rhythm.current_tempo, phoneme_profile=phoneme_profile,
             )
 
             msg = {
-                "type":         "pitch" if archer_hz else "silence",
-                "singer_hz":    round(archer_hz, 1) if archer_hz else None,
-                "singer_note":  _lib.hz_to_note(archer_hz) if archer_hz else None,
-                "robot_hz":     round(decision.target_hz, 1) if decision.target_hz else None,
-                "robot_note":   _lib.hz_to_note(decision.target_hz) if decision.target_hz and decision.target_hz > 0 else None,
-                "action":       decision.action,
-                "tempo_bpm":    round(rhythm.current_tempo, 1),
-                "phrase_state": phrase,
-                "elapsed_s":    round(time.perf_counter() - start, 1),
+                "type":            "pitch" if archer_hz else "silence",
+                "singer_hz":       round(archer_hz, 1) if archer_hz else None,
+                "singer_note":     _lib.hz_to_note(archer_hz) if archer_hz else None,
+                "robot_hz":        round(decision.target_hz, 1) if decision.target_hz else None,
+                "robot_note":      _lib.hz_to_note(decision.target_hz) if decision.target_hz and decision.target_hz > 0 else None,
+                "action":          decision.action,
+                "mode":            decision.mode.value,
+                "mode_note":       decision.mode_note,
+                "protocol_enabled": harmony.protocol.enabled,
+                "tempo_bpm":       round(rhythm.current_tempo, 1),
+                "phrase_state":    phrase,
+                "elapsed_s":       round(elapsed_s, 1),
             }
             await ws.send_text(json.dumps(msg))
 
@@ -183,7 +297,6 @@ def run_local_pipeline(stop_event, input_device: int):
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
         from analysis.phonetic_analysis import CreeTokenizer
-        from synthesis.harmony_engine import HarmonyEngine
         from synthesis.vocable_synthesizer import VocableSynthesizer
         from output.timing_sync import TimingSync
         import librosa as _lib
@@ -195,7 +308,7 @@ def run_local_pipeline(stop_event, input_device: int):
         pitch        = PitchDetector()
         rhythm       = RhythmAnalyzer()
         cree         = CreeTokenizer()
-        harmony      = HarmonyEngine()
+        harmony      = harmony_engine   # shared instance — same sovereignty state as /ws/mic
         synth        = VocableSynthesizer()
         timing       = TimingSync()
         conf_thresh  = cfg["pitch"]["confidence_threshold"]
@@ -228,6 +341,8 @@ def run_local_pipeline(stop_event, input_device: int):
             if archer_hz and phrase in ("silence", "phrase_end"):
                 phrase = "singing"
 
+            harmony.protocol.check_sound_cue(archer_hz, is_voiced, time.perf_counter() - start)
+
             decision = harmony.decide(
                 archer_hz=archer_hz, phrase_state=phrase,
                 tempo_bpm=rhythm.current_tempo,
@@ -252,6 +367,9 @@ def run_local_pipeline(stop_event, input_device: int):
                     "robot_hz":     round(decision.target_hz, 1) if decision.target_hz else None,
                     "robot_note":   _lib.hz_to_note(decision.target_hz) if decision.target_hz and decision.target_hz > 0 else None,
                     "action":       decision.action,
+                    "mode":         decision.mode.value,
+                    "mode_note":    decision.mode_note,
+                    "protocol_enabled": harmony.protocol.enabled,
                     "tempo_bpm":    round(rhythm.current_tempo, 1),
                     "phrase_state": phrase,
                     "elapsed_s":    round(time.perf_counter() - start, 1),
