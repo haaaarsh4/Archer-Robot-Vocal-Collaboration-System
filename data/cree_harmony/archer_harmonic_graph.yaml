@@ -1,0 +1,1390 @@
+_generated_from:
+- AIM - Db 125.mp3
+- Ahasiw F 120.mp3
+- Alanise Obomsawin. Cm 144.mp3
+- Hummingbird A (F#m)  160.mp3
+- Muwekma Ohlone. Fm 130 bpm.mp3
+- Sara Rocque Cm 100.mp3
+- Suzanne Kite Fm 120.mp3
+_generated_by: analysis/build_archer_harmonic_graph.py
+_note: Built automatically from acoustic pitch patterns. Tones and transitions reflect
+  what was actually sung and how often. protocol_sensitive fields default to false
+  and can be edited directly in this file at any time.
+tones:
+- id: tone_01
+  reference_hz: 65.0
+  role: ''
+  protocol_sensitive: false
+- id: tone_02
+  reference_hz: 67.49
+  role: ''
+  protocol_sensitive: false
+- id: tone_03
+  reference_hz: 74.24
+  role: ''
+  protocol_sensitive: false
+- id: tone_04
+  reference_hz: 76.85
+  role: ''
+  protocol_sensitive: false
+- id: tone_05
+  reference_hz: 80.02
+  role: ''
+  protocol_sensitive: false
+- id: tone_06
+  reference_hz: 83.81
+  role: ''
+  protocol_sensitive: false
+- id: tone_07
+  reference_hz: 89.44
+  role: ''
+  protocol_sensitive: false
+- id: tone_08
+  reference_hz: 94.34
+  role: ''
+  protocol_sensitive: false
+- id: tone_09
+  reference_hz: 106.82
+  role: ''
+  protocol_sensitive: false
+- id: tone_10
+  reference_hz: 116.49
+  role: ''
+  protocol_sensitive: false
+- id: drone_root
+  reference_hz: 124.13
+  role: drone_root
+  protocol_sensitive: false
+- id: tone_12
+  reference_hz: 138.53
+  role: ''
+  protocol_sensitive: false
+- id: tone_13
+  reference_hz: 142.59
+  role: ''
+  protocol_sensitive: false
+- id: tone_14
+  reference_hz: 148.69
+  role: ''
+  protocol_sensitive: false
+- id: tone_15
+  reference_hz: 159.13
+  role: ''
+  protocol_sensitive: false
+- id: tone_16
+  reference_hz: 214.57
+  role: ''
+  protocol_sensitive: false
+- id: tone_17
+  reference_hz: 223.74
+  role: ''
+  protocol_sensitive: false
+- id: tone_18
+  reference_hz: 261.51
+  role: ''
+  protocol_sensitive: false
+- id: tone_19
+  reference_hz: 290.16
+  role: ''
+  protocol_sensitive: false
+- id: tone_20
+  reference_hz: 319.18
+  role: ''
+  protocol_sensitive: false
+- id: tone_21
+  reference_hz: 336.69
+  role: ''
+  protocol_sensitive: false
+- id: tone_22
+  reference_hz: 349.07
+  role: ''
+  protocol_sensitive: false
+- id: tone_23
+  reference_hz: 369.85
+  role: ''
+  protocol_sensitive: false
+- id: tone_24
+  reference_hz: 412.72
+  role: ''
+  protocol_sensitive: false
+- id: tone_25
+  reference_hz: 442.35
+  role: ''
+  protocol_sensitive: false
+- id: tone_26
+  reference_hz: 460.6
+  role: ''
+  protocol_sensitive: false
+- id: tone_27
+  reference_hz: 533.7
+  role: ''
+  protocol_sensitive: false
+- id: tone_28
+  reference_hz: 567.89
+  role: ''
+  protocol_sensitive: false
+- id: tone_29
+  reference_hz: 585.37
+  role: ''
+  protocol_sensitive: false
+- id: tone_30
+  reference_hz: 614.83
+  role: ''
+  protocol_sensitive: false
+- id: tone_31
+  reference_hz: 642.05
+  role: ''
+  protocol_sensitive: false
+- id: tone_32
+  reference_hz: 667.58
+  role: ''
+  protocol_sensitive: false
+relations:
+- from_tone: drone_root
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 1.0
+  protocol_sensitive: false
+  source_note: seen 49x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.98
+  protocol_sensitive: false
+  source_note: seen 48x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.82
+  protocol_sensitive: false
+  source_note: seen 40x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.78
+  protocol_sensitive: false
+  source_note: seen 38x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.57
+  protocol_sensitive: false
+  source_note: seen 28x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.53
+  protocol_sensitive: false
+  source_note: seen 26x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.53
+  protocol_sensitive: false
+  source_note: seen 26x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.45
+  protocol_sensitive: false
+  source_note: seen 22x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_15
+  relation_type: transitions_to
+  weight: 0.39
+  protocol_sensitive: false
+  source_note: seen 19x across 7 recording(s)
+- from_tone: tone_15
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.31
+  protocol_sensitive: false
+  source_note: seen 15x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: seen 14x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.27
+  protocol_sensitive: false
+  source_note: seen 13x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.18
+  protocol_sensitive: false
+  source_note: seen 9x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.18
+  protocol_sensitive: false
+  source_note: seen 9x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.16
+  protocol_sensitive: false
+  source_note: seen 8x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_28
+  relation_type: transitions_to
+  weight: 0.16
+  protocol_sensitive: false
+  source_note: seen 8x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: seen 7x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: seen 7x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: seen 7x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.1
+  protocol_sensitive: false
+  source_note: seen 5x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.1
+  protocol_sensitive: false
+  source_note: seen 5x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_22
+  relation_type: transitions_to
+  weight: 0.1
+  protocol_sensitive: false
+  source_note: seen 5x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.08
+  protocol_sensitive: false
+  source_note: seen 4x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.08
+  protocol_sensitive: false
+  source_note: seen 4x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.08
+  protocol_sensitive: false
+  source_note: seen 4x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.08
+  protocol_sensitive: false
+  source_note: seen 4x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_19
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_14
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_28
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_15
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_02
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_02
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_08
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_22
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_18
+  relation_type: transitions_to
+  weight: 0.06
+  protocol_sensitive: false
+  source_note: seen 3x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_25
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_25
+  to_tone: tone_16
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_16
+  to_tone: tone_25
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_29
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_29
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_14
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_16
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_16
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_16
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_08
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_22
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.04
+  protocol_sensitive: false
+  source_note: seen 2x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_23
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_23
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_25
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_23
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_23
+  to_tone: tone_19
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_25
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_14
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_29
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_17
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_17
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_28
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_15
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_13
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_14
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_14
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_19
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_12
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_16
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_29
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_26
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_26
+  to_tone: drone_root
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_28
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_19
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_16
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_14
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_14
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_01
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_02
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_01
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_02
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_20
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_04
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_21
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_08
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_32
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_32
+  to_tone: tone_28
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_32
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_08
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_08
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_27
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_27
+  to_tone: tone_10
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_09
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_01
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_31
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_31
+  to_tone: tone_05
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_18
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_22
+  to_tone: tone_19
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_18
+  to_tone: tone_22
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_18
+  to_tone: tone_27
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_27
+  to_tone: tone_22
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_07
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_24
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_24
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_22
+  to_tone: tone_03
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_22
+  to_tone: tone_30
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_30
+  to_tone: tone_06
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_22
+  relation_type: transitions_to
+  weight: 0.02
+  protocol_sensitive: false
+  source_note: seen 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 1.0
+  protocol_sensitive: false
+  source_note: phrase ends here 14x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.93
+  protocol_sensitive: false
+  source_note: phrase ends here 13x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_12
+  relation_type: phrase_final_candidate
+  weight: 0.79
+  protocol_sensitive: false
+  source_note: phrase ends here 11x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_12
+  relation_type: phrase_final_candidate
+  weight: 0.64
+  protocol_sensitive: false
+  source_note: phrase ends here 9x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_09
+  relation_type: phrase_final_candidate
+  weight: 0.5
+  protocol_sensitive: false
+  source_note: phrase ends here 7x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_12
+  relation_type: phrase_final_candidate
+  weight: 0.43
+  protocol_sensitive: false
+  source_note: phrase ends here 6x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_10
+  relation_type: phrase_final_candidate
+  weight: 0.43
+  protocol_sensitive: false
+  source_note: phrase ends here 6x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_13
+  relation_type: phrase_final_candidate
+  weight: 0.43
+  protocol_sensitive: false
+  source_note: phrase ends here 6x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.36
+  protocol_sensitive: false
+  source_note: phrase ends here 5x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_10
+  relation_type: phrase_final_candidate
+  weight: 0.36
+  protocol_sensitive: false
+  source_note: phrase ends here 5x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_13
+  relation_type: phrase_final_candidate
+  weight: 0.36
+  protocol_sensitive: false
+  source_note: phrase ends here 5x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_13
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_15
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_28
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_04
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_07
+  relation_type: phrase_final_candidate
+  weight: 0.29
+  protocol_sensitive: false
+  source_note: phrase ends here 4x across 7 recording(s)
+- from_tone: tone_15
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.21
+  protocol_sensitive: false
+  source_note: phrase ends here 3x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_05
+  relation_type: phrase_final_candidate
+  weight: 0.21
+  protocol_sensitive: false
+  source_note: phrase ends here 3x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_04
+  relation_type: phrase_final_candidate
+  weight: 0.21
+  protocol_sensitive: false
+  source_note: phrase ends here 3x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_06
+  relation_type: phrase_final_candidate
+  weight: 0.21
+  protocol_sensitive: false
+  source_note: phrase ends here 3x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_19
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_29
+  to_tone: tone_13
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_10
+  to_tone: tone_12
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_13
+  to_tone: tone_10
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_04
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_08
+  to_tone: tone_08
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_07
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_07
+  relation_type: phrase_final_candidate
+  weight: 0.14
+  protocol_sensitive: false
+  source_note: phrase ends here 2x across 7 recording(s)
+- from_tone: tone_19
+  to_tone: tone_19
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_25
+  to_tone: tone_16
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_23
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_23
+  to_tone: tone_19
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_25
+  to_tone: tone_25
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_28
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_12
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_29
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: drone_root
+  to_tone: tone_17
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_28
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_14
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_12
+  to_tone: tone_10
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: tone_20
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_10
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_03
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_01
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_20
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_05
+  to_tone: tone_03
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_02
+  to_tone: tone_05
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_05
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_01
+  to_tone: tone_06
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_05
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_21
+  to_tone: tone_28
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_28
+  to_tone: tone_21
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_08
+  to_tone: tone_06
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_32
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_09
+  to_tone: drone_root
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_07
+  to_tone: tone_04
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_20
+  to_tone: tone_18
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_18
+  to_tone: tone_22
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_03
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_03
+  to_tone: tone_22
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_06
+  to_tone: tone_22
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
+- from_tone: tone_04
+  to_tone: tone_03
+  relation_type: phrase_final_candidate
+  weight: 0.07
+  protocol_sensitive: false
+  source_note: phrase ends here 1x across 7 recording(s)
