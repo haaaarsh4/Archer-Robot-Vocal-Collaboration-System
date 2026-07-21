@@ -215,21 +215,20 @@ async def ws_mic(ws: WebSocket):
         return
     try:
         from config.config_loader import get_config
+        from core.preprocessor import Preprocessor
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
         from analysis.phonetic_analysis import CreeTokenizer
         import librosa as _lib
 
         cfg     = get_config()
+        preproc = Preprocessor()
         pitch   = PitchDetector()
         rhythm  = RhythmAnalyzer()
         cree    = CreeTokenizer()
         harmony = harmony_engine   # shared instance, sovereignty state persists across sessions
         conf_thresh = cfg["pitch"]["confidence_threshold"]
-        sil_db      = cfg["preprocessing"]["silence_threshold_db"]
         start       = time.perf_counter()
-
-        from aubio import db_spl
 
         while True:
             data  = await ws.receive_bytes()
@@ -237,18 +236,29 @@ async def ws_mic(ws: WebSocket):
             if len(frame) == 0:
                 continue
 
-            db        = float(db_spl(frame))
-            is_voiced = np.isfinite(db) and db > sil_db
-            rhythm.push_frame(frame, is_voiced)
+            # Same preprocessing path the local pipeline uses: one silence
+            # check, plus RMS normalization so quiet browser-mic input
+            # actually reaches the pitch detector at a usable level instead
+            # of being fed in raw. Previously this handler recomputed its
+            # own silence check inline and skipped normalization entirely,
+            # so the web demo and the local pipeline were quietly running
+            # on two different signal paths.
+            clean_frame, is_voiced = preproc.process(frame)
+            # This call was missing entirely. Without it, rhythm.phrase_state
+            # never leaves its starting value and rhythm.current_tempo never
+            # leaves 0.0, which meant call_and_response and the tempo-based
+            # switch to contour_following could never actually trigger on
+            # this path, only in the local pipeline, which does call this.
+            rhythm.push_frame(clean_frame, is_voiced)
 
             archer_hz       = None
             phoneme_profile = cree._neutral_profile
 
             if is_voiced:
-                hz, conf = pitch.detect(frame)
+                hz, conf = pitch.detect(clean_frame)
                 if hz and conf >= conf_thresh and pitch.min_freq < hz < pitch.max_freq:
                     archer_hz = hz
-                phoneme_profile = cree.analyze(frame)
+                phoneme_profile = cree.analyze(clean_frame)
             else:
                 pitch.reset()
 

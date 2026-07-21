@@ -35,6 +35,7 @@ class MusicalContext:
         self._timed_pitches: collections.deque = collections.deque(maxlen=sample_history_len)
         self._phrase_final_pitches: collections.deque = collections.deque(maxlen=8)
         self._beat_duration_s: float = 0.5
+        self._last_voiced_hz: Optional[float] = None
 
     def update(self, *, archer_hz: Optional[float], now_s: float,
                beat_duration_s: float, key_root_hz: Optional[float],
@@ -44,8 +45,12 @@ class MusicalContext:
         self._beat_duration_s = beat_duration_s if beat_duration_s > 0 else 0.5
         if archer_hz:
             self._timed_pitches.append((now_s, archer_hz))
-            if phrase_just_ended:
-                self._phrase_final_pitches.append(archer_hz)
+            self._last_voiced_hz = archer_hz
+        # phrase_just_ended fires on the frame Archer goes silent, so
+        # archer_hz is typically None right here — use the last pitch he
+        # was actually singing, not the (empty) current one.
+        if phrase_just_ended and self._last_voiced_hz is not None:
+            self._phrase_final_pitches.append(self._last_voiced_hz)
 
     def pitch_at_delay(self, beats: float) -> Optional[float]:
         if not self._timed_pitches:
