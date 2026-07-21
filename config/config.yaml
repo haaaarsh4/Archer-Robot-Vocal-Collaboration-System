@@ -59,6 +59,9 @@ synthesis:
   crossfade_ms: 30
   ddsp_model_path: null
   timbral_detune_cents: 6                # chorus-style detune used by timbral_thickening mode
+  breathiness: 0.045                     # 0.0-0.2ish; amount of formant-shaped breath noise mixed in
+  vibrato_rate_hz: 5.3                   # sung-vibrato rate on notes held longer than ~0.6s
+  vibrato_depth_cents: 12                # sung-vibrato depth in cents
 
 timing:
   response_delay_ms: 70

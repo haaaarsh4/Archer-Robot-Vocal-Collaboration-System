@@ -54,7 +54,7 @@
     top: 0; left: 0; right: 0;
     z-index: 100;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: auto 1fr;
     align-items: center;
     column-gap: 16px;
     padding: 0 48px;
@@ -1038,10 +1038,6 @@
 
 <nav>
   <div class="nav-logo" onclick="goHome()" style="cursor: pointer;" title="Home">Archer-Robot / VCS</div>
-  <div class="nav-status">
-    <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
-    pipeline: <span id="ws-status" style="color:var(--red);">disconnected</span>
-  </div>
   <div class="nav-right" id="nav-right">
     <div class="nav-tabs">
       <button class="nav-tab" data-page="architecture" onclick="showPage('architecture')">Architecture</button>
@@ -2267,53 +2263,22 @@
   <div style="padding: 48px 48px 24px; max-width: 1100px; margin: 0 auto;">
     <div class="section-label">Live Demo</div>
     <h2 class="section-title">Try the collaboration system</h2>
-    <p style="color: var(--muted); font-size: 15px; margin-bottom: 8px;">Two ways to experience the system. Upload an MP3 to hear harmony added over it, or use your microphone to sing live and hear what the robot would respond with.</p>
+    <p style="color: var(--muted); font-size: 15px; margin-bottom: 4px;">Two ways to experience the system, both running entirely in your browser: upload an MP3 to hear the robot accompany it, or sing live into your microphone. Pick any of the seven accompaniment modes from the harmony engine, same ones described on the Harmony tab, and the robot sings back using a real formant-based vocal synthesizer instead of a plain tone.</p>
+    <div style="display:flex;align-items:center;gap:16px;margin:16px 0 8px;">
+      <span style="font-size:13px;color:var(--muted);">Sovereignty:</span>
+      <button class="protocol-btn" id="live-demo-protocol-btn" onclick="toggleLiveDemoProtocol()">
+        <div class="protocol-dot"></div>
+        <span class="protocol-btn-label">Sovereignty: ON</span>
+      </button>
+      <br />
+      <span style="font-size:12px;color:var(--muted);max-width:420px;">Turn this off and the robot stays completely silent in both panels below, no matter which mode is selected. Same kill-switch behavior as the real engine.</span>
+    </div>
   </div>
 
   <div class="demo-layout">
-    <div class="demo-panel" style="grid-column: 1 / -1;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div class="demo-panel-title">Live from Python pipeline</div>
-        <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
-          <div id="ws-dot2" style="width:7px;height:7px;border-radius:50%;background:var(--red);transition:background 0.3s;"></div>
-          <span id="ws-status2" style="color:var(--red);">server offline</span>
-        </div>
-      </div>
-      <p class="demo-panel-sub" style="margin-bottom:20px;">First run <code style="font-family:var(--mono);color:var(--accent2);">python server.py</code> in your project folder. Then select your mic and click Start.</p>
-
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-        <select id="device-select" class="interval-select" style="max-width:320px;font-size:13px;padding:10px 14px;">
-          <option value="">Loading devices...</option>
-        </select>
-        <button class="btn btn-primary" id="pipeline-start-btn" onclick="startPipeline()" style="flex:0;padding:10px 28px;">&#9654; Start</button>
-        <button class="btn btn-ghost"   id="pipeline-stop-btn"  onclick="stopPipeline()"  style="flex:0;padding:10px 28px;" disabled>&#9632; Stop</button>
-      </div>
-
-      <div class="note-displays">
-        <div class="note-box" id="live-singer-box">
-          <div class="note-box-label singer">Archer is singing</div>
-          <div class="note-display singer" id="live-singer-note">-</div>
-          <div class="note-freq" id="live-singer-hz"></div>
-        </div>
-        <div class="note-arrow-center">
-          <div style="font-size:24px;color:var(--border);">&#8594;</div>
-          <div class="interval-label">python pipeline</div>
-        </div>
-        <div class="note-box" id="live-robot-box">
-          <div class="note-box-label robot">Robot responds</div>
-          <div class="note-display robot" id="live-robot-note">-</div>
-          <div class="note-freq" id="live-robot-hz"></div>
-        </div>
-      </div>
-      <div style="display:flex;gap:24px;margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--muted);">
-        <span>status: <span id="live-status" style="color:var(--text);">idle</span></span>
-        <span>tempo: <span id="live-tempo" style="color:var(--text);">-</span></span>
-      </div>
-    </div>
-
     <div class="demo-panel">
       <div class="demo-panel-title">Upload an MP3</div>
-      <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and plays a generated harmony voice alongside it.</div>
+      <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and sings a generated accompaniment voice alongside it.</div>
       <div class="upload-zone" id="upload-zone">
         <input type="file" accept="audio/*" id="audio-file-input" onchange="handleFileUpload(event)">
         <div class="upload-icon">&#127925;</div>
@@ -2335,12 +2300,15 @@
         <button class="btn btn-ghost"   id="stop-btn" onclick="stopAudio()" disabled>&#9632; Stop</button>
       </div>
       <div style="margin-top: 24px;">
-        <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
-        <div class="interval-picker">
-          <button class="interval-btn" data-semitones="0" onclick="setDemoInterval(0, this)">Unison</button>
-          <button class="interval-btn" data-semitones="4" onclick="setDemoInterval(4, this)">3rd</button>
-          <button class="interval-btn active" data-semitones="7" onclick="setDemoInterval(7, this)">5th</button>
-          <button class="interval-btn" data-semitones="12" onclick="setDemoInterval(12, this)">Octave</button>
+        <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">ACCOMPANIMENT MODE</div>
+        <div class="mode-picker">
+          <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
+          <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
+          <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
+          <button class="mode-btn" data-mode="delayed_response"     onclick="setDemoMode('delayed_response', this)">Delayed echo</button>
+          <button class="mode-btn" data-mode="contour_following"    onclick="setDemoMode('contour_following', this)">Contour following</button>
+          <button class="mode-btn" data-mode="drone_support"        onclick="setDemoMode('drone_support', this)">Drone support</button>
+          <button class="mode-btn" data-mode="call_and_response"    onclick="setDemoMode('call_and_response', this)">Call &amp; response</button>
         </div>
       </div>
       <div class="harmony-overlay-note" id="demo-live-notes">
@@ -2358,6 +2326,7 @@
           <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
         </div>
       </div>
+      <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
     </div>
 
     <div class="demo-panel">
@@ -2381,16 +2350,19 @@
         </div>
         <div class="status-text" id="demo-mic-status">Click the microphone to start</div>
         <div style="width: 100%; max-width: 320px;">
-          <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">HARMONY INTERVAL</div>
-          <div class="interval-picker" style="margin: 0;">
-            <button class="interval-btn" data-semitones="0" onclick="setMicInterval(0, this)">Unison</button>
-            <button class="interval-btn" data-semitones="4" onclick="setMicInterval(4, this)">3rd</button>
-            <button class="interval-btn active" data-semitones="7" onclick="setMicInterval(7, this)">5th</button>
-            <button class="interval-btn" data-semitones="12" onclick="setMicInterval(12, this)">Octave</button>
+          <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">ACCOMPANIMENT MODE</div>
+          <div class="mode-picker" style="margin: 0;">
+            <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setMicMode('unison_shadowing', this)">Unison shadowing</button>
+            <button class="mode-btn" data-mode="octave_reinforcement" onclick="setMicMode('octave_reinforcement', this)">Octave below</button>
+            <button class="mode-btn" data-mode="timbral_thickening"   onclick="setMicMode('timbral_thickening', this)">Timbral thickening</button>
+            <button class="mode-btn" data-mode="delayed_response"     onclick="setMicMode('delayed_response', this)">Delayed echo</button>
+            <button class="mode-btn" data-mode="contour_following"    onclick="setMicMode('contour_following', this)">Contour following</button>
+            <button class="mode-btn" data-mode="drone_support"        onclick="setMicMode('drone_support', this)">Drone support</button>
+            <button class="mode-btn" data-mode="call_and_response"    onclick="setMicMode('call_and_response', this)">Call &amp; response</button>
           </div>
         </div>
         <div class="note-explanation" id="demo-mic-explanation" style="max-width: 320px; width: 100%;">
-          The robot responds to each note you sing with a harmony a perfect fifth above, snapped to the key it infers from your pitch history.
+          Matching your pitch exactly, doubling your voice like someone singing along beside you.
         </div>
       </div>
     </div>
@@ -2540,6 +2512,43 @@ function yinPitch(buffer, sampleRate, threshold) {
   return sampleRate / betterTau;
 }
 
+// Jump-aware smoothing: absorbs the frame-to-frame jitter real vibrato
+// causes without adding lag when a genuine new note is sung. A pitch more
+// than jumpToleranceCents away from the last stable reading resets
+// immediately instead of blending in, which is what caused the pitch
+// display to visibly lag or momentarily show a wrong in-between value
+// every time a real note change happened.
+class SmoothedPitchTracker {
+  constructor(opts) {
+    opts = opts || {};
+    this.historyLen = opts.historyLen || 5;
+    this.jumpToleranceCents = opts.jumpToleranceCents || 80;
+    this.history = [];
+    this.lastStableHz = null;
+  }
+  push(rawHz) {
+    if (rawHz == null) return null;
+    if (this.lastStableHz != null && this.lastStableHz > 0) {
+      const centsDiff = Math.abs(1200 * Math.log2(rawHz / this.lastStableHz));
+      if (centsDiff > this.jumpToleranceCents) {
+        this.history = [rawHz];
+        this.lastStableHz = rawHz;
+        return rawHz;
+      }
+    }
+    this.history.push(rawHz);
+    if (this.history.length > this.historyLen) this.history.shift();
+    const sorted = [...this.history].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    this.lastStableHz = median;
+    return median;
+  }
+  reset() {
+    this.history = [];
+    this.lastStableHz = null;
+  }
+}
+
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function hzToMidi(hz) { return 12 * Math.log2(hz / 440) + 69; }
 function midiToHz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
@@ -2613,6 +2622,231 @@ const INTERVAL_EXPLANATIONS = {
 };
 
 // ============================================================
+// LIVE DEMO: SHARED ACCOMPANIMENT-MODE ENGINE
+// ============================================================
+// A browser-side port of the same seven-mode logic that drives the Python
+// HarmonyEngine (synthesis/harmony_engine.py + synthesis/accompaniment_modes.py):
+// unison shadowing, octave reinforcement, timbral thickening, delayed echo,
+// contour following, drone support, and call-and-response. Each panel below
+// gets its own engine instance so the MP3 player and the mic demo keep
+// independent pitch histories.
+const LIVE_MODE_DESCRIPTIONS = {
+  unison_shadowing:     'Matching the pitch exactly, doubling it like someone singing along beside it.',
+  octave_reinforcement: 'Singing the same note, one octave below, same harmony, wider register.',
+  timbral_thickening:   'Doubling the pitch with a slightly detuned, different vowel colour, for chorus-like thickness rather than a second note.',
+  delayed_response:     'Echoing what was sung about a beat ago, always trailing slightly behind rather than singing in the moment.',
+  contour_following:    'Tracking the shape of the melody rather than exact notes, moving up when it rises and down when it falls.',
+  drone_support:        'Holding a low, sustained root note under the phrase, drawn from the key it infers from recent pitch history.',
+  call_and_response:    'Waiting for a phrase to finish, then answering after the pause. It never sings over the source.',
+};
+const LIVE_MODE_BEAT_S = 0.55;    // fixed 'beat' duration used for the delayed_response echo
+const LIVE_PHRASE_END_S = 0.9;    // seconds of silence before a phrase counts as 'ended'
+const LIVE_VOCABLE_BY_MODE = {
+  unison_shadowing: 'aah', octave_reinforcement: 'ooo', timbral_thickening: 'mmm',
+  delayed_response: 'hey', contour_following: 'aah', drone_support: 'mmm', call_and_response: 'hey',
+};
+
+function createAccompanimentEngine() {
+  return {
+    pitchHistory: [],   // plain hz values, for key inference
+    timedHistory: [],   // { t, hz } pairs, for delay + contour
+    phraseFinals: [],   // last pitch of each finished phrase
+    lastVoicedHz: null,
+    wasVoiced: false,
+    lastVoicedAt: 0,
+
+    pushPitch(hz, now) {
+      if (hz) {
+        this.pitchHistory.push(hz);
+        if (this.pitchHistory.length > 32) this.pitchHistory.shift();
+        this.timedHistory.push({ t: now, hz });
+        if (this.timedHistory.length > 128) this.timedHistory.shift();
+        this.lastVoicedHz = hz;
+        this.wasVoiced = true;
+        this.lastVoicedAt = now;
+      } else if (this.wasVoiced && (now - this.lastVoicedAt) > LIVE_PHRASE_END_S) {
+        // The phrase just ended: bank the last pitch that was actually
+        // sung (not "now", which is silent) as the phrase-final pitch.
+        if (this.lastVoicedHz != null) {
+          this.phraseFinals.push(this.lastVoicedHz);
+          if (this.phraseFinals.length > 8) this.phraseFinals.shift();
+        }
+        this.wasVoiced = false;
+      }
+    },
+
+    compute(mode, singerHz, now, protocolEnabled) {
+      if (!protocolEnabled) {
+        return { hz: null, action: 'rest', text: 'Sovereignty is off, so the robot stays completely silent no matter which mode is selected.' };
+      }
+      const key = inferKey(this.pitchHistory);
+      const text = LIVE_MODE_DESCRIPTIONS[mode] || '';
+
+      switch (mode) {
+        case 'unison_shadowing':
+          if (!singerHz) return { hz: null, action: 'rest', text };
+          return { hz: snapToScale(singerHz, key), action: 'sing', text };
+        case 'octave_reinforcement':
+          if (!singerHz) return { hz: null, action: 'rest', text };
+          return { hz: snapToScale(singerHz / 2, key), action: 'sing', text };
+        case 'timbral_thickening':
+          if (!singerHz) return { hz: null, action: 'rest', text };
+          return { hz: snapToScale(singerHz, key) * Math.pow(2, 6 / 1200), action: 'sing', text };
+        case 'delayed_response': {
+          if (this.timedHistory.length < 3) {
+            return { hz: null, action: 'rest', text: 'Not enough singing has happened yet to echo. Keep going and the echo will start trailing about a beat behind.' };
+          }
+          const targetT = now - LIVE_MODE_BEAT_S;
+          let best = null, bestDiff = Infinity;
+          for (const p of this.timedHistory) {
+            const diff = Math.abs(p.t - targetT);
+            if (diff < bestDiff) { bestDiff = diff; best = p.hz; }
+          }
+          return { hz: snapToScale(best, key), action: 'sing', text };
+        }
+        case 'contour_following': {
+          if (!singerHz) return { hz: null, action: 'rest', text };
+          const window = this.timedHistory.slice(-6);
+          let direction = 0;
+          if (window.length >= 2) {
+            const delta = window[window.length - 1].hz - window[0].hz;
+            if (Math.abs(delta) > 1e-6) direction = delta > 0 ? 1 : -1;
+          }
+          return { hz: snapToScale(singerHz * Math.pow(2, direction * 2 / 12), key), action: 'sing', text };
+        }
+        case 'drone_support': {
+          if (!this.pitchHistory.length) {
+            return { hz: null, action: 'rest', text: 'Waiting for a pitch reference before it can find a root to drone on.' };
+          }
+          const refHz = singerHz || this.pitchHistory[this.pitchHistory.length - 1];
+          const refMidi = Math.round(hzToMidi(refHz));
+          const rootHz = midiToHz(Math.floor(refMidi / 12) * 12 + key.root);
+          return { hz: rootHz / 2, action: 'sustain', text };
+        }
+        case 'call_and_response': {
+          if (!this.phraseFinals.length) {
+            return { hz: null, action: 'rest', text: 'Waiting for a full phrase to finish. This mode only answers after a pause, never sings over the source.' };
+          }
+          return { hz: snapToScale(this.phraseFinals[this.phraseFinals.length - 1], key), action: 'sing', text };
+        }
+        default:
+          return { hz: null, action: 'rest', text: '' };
+      }
+    },
+  };
+}
+
+// ============================================================
+// LIVE DEMO: FORMANT-BASED ROBOT VOICE
+// ============================================================
+// Real vowel-formant synthesis via Web Audio: a bright sawtooth "glottal"
+// source run through three resonant bandpass filters tuned to each
+// vocable's formants, plus a low sub-oscillator for body and a touch of
+// vibrato. This mirrors the source-filter approach used in the Python
+// synthesizer (synthesis/vocable_synthesizer.py) and is what replaces the
+// old plain sine-wave "robot voice," which is what made it sound like a
+// dial tone rather than a singing voice.
+const VOICE_FORMANTS = {
+  aah: [700, 1150, 2600],
+  ooo: [400, 800,  2400],
+  mmm: [280, 900,  2200],
+  hey: [550, 1900, 2600],
+};
+
+class RobotVoice {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.osc = ctx.createOscillator();
+    this.osc.type = 'sawtooth';
+    this.osc.frequency.value = 220;
+
+    this.sub = ctx.createOscillator();
+    this.sub.type = 'sine';
+    this.sub.frequency.value = 110;
+
+    this.pre = ctx.createBiquadFilter();
+    this.pre.type = 'lowpass';
+    this.pre.frequency.value = 4200;
+    this.pre.Q.value = 0.4;
+    this.osc.connect(this.pre);
+
+    this.master = ctx.createGain();
+    this.master.gain.value = 0;
+
+    const freqs = VOICE_FORMANTS.aah, weights = [0.9, 0.55, 0.22], qs = [9, 11, 14];
+    this.formants = freqs.map((f, i) => {
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.frequency.value = f;
+      filt.Q.value = qs[i];
+      const gain = ctx.createGain();
+      gain.gain.value = weights[i];
+      this.pre.connect(filt);
+      filt.connect(gain);
+      gain.connect(this.master);
+      return { filt, gain };
+    });
+
+    this.subGain = ctx.createGain();
+    this.subGain.gain.value = 0.22;
+    this.sub.connect(this.subGain);
+    this.subGain.connect(this.master);
+
+    this.vibrato = ctx.createOscillator();
+    this.vibrato.type = 'sine';
+    this.vibrato.frequency.value = 5.3;
+    this.vibratoGain = ctx.createGain();
+    this.vibratoGain.gain.value = 0;
+    this.vibrato.connect(this.vibratoGain);
+    this.vibratoGain.connect(this.osc.frequency);
+    this.vibratoGain.connect(this.sub.frequency);
+
+    this.osc.start();
+    this.sub.start();
+    this.vibrato.start();
+    this._vocable = 'aah';
+    this._started = false;
+  }
+
+  connect(dest) { this.master.connect(dest); return this; }
+
+  setVocable(name) {
+    const F = VOICE_FORMANTS[name] || VOICE_FORMANTS.aah;
+    if (this._vocable === name) return;
+    this._vocable = name;
+    const now = this.ctx.currentTime;
+    this.formants.forEach((f, i) => f.filt.frequency.setTargetAtTime(F[i], now, 0.08));
+  }
+
+  setFrequency(hz) {
+    if (!hz || hz <= 0) return;
+    const now = this.ctx.currentTime;
+    this.osc.frequency.setTargetAtTime(hz, now, 0.035);
+    this.sub.frequency.setTargetAtTime(hz / 2, now, 0.035);
+    this.vibratoGain.gain.setTargetAtTime(hz * 0.006, now, 0.15);
+  }
+
+  setGain(g) {
+    this.master.gain.setTargetAtTime(Math.max(0, g), this.ctx.currentTime, 0.045);
+  }
+
+  stop() {
+    try { this.osc.stop(); this.sub.stop(); this.vibrato.stop(); } catch (e) {}
+  }
+}
+
+// ============================================================
+// LIVE DEMO: SHARED SOVEREIGNTY TOGGLE
+// ============================================================
+let liveDemoProtocolEnabled = true;
+function toggleLiveDemoProtocol() {
+  liveDemoProtocolEnabled = !liveDemoProtocolEnabled;
+  const btn = document.getElementById('live-demo-protocol-btn');
+  btn.classList.toggle('off', !liveDemoProtocolEnabled);
+  btn.querySelector('.protocol-btn-label').textContent = liveDemoProtocolEnabled ? 'Sovereignty: ON' : 'Sovereignty: OFF';
+}
+
+// ============================================================
 // ARCH PAGE MIC DEMO
 // ============================================================
 let archAudioCtx = null, archAnalyser = null, archBuffer = null;
@@ -2666,9 +2900,10 @@ function stopArchMic() {
   document.getElementById('arch-singer-box').className = 'note-box';
   document.getElementById('arch-robot-box').className = 'note-box';
   drawPiano(null, null);
+  archTracker.reset();
 }
 
-let archPitchSmooth = [];
+let archTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
 function archDetectLoop() {
   archAnimId = requestAnimationFrame(archDetectLoop);
   if (!archAnalyser) return;
@@ -2683,14 +2918,12 @@ function archDetectLoop() {
     document.getElementById('arch-robot-box').className = 'note-box';
     document.getElementById('arch-explanation').textContent = 'Listening... sing or hum into your microphone.';
     drawPiano(null, null);
+    archTracker.reset();
     return;
   }
   const hz = yinPitch(archBuffer, archAudioCtx.sampleRate, 0.15);
-  if (!hz || hz < 80 || hz > 1200) return;
-  archPitchSmooth.push(hz);
-  if (archPitchSmooth.length > 3) archPitchSmooth.shift();
-  const sorted = [...archPitchSmooth].sort((a,b) => a-b);
-  const smoothHz = sorted[Math.floor(sorted.length/2)];
+  if (!hz || hz < 65 || hz > 1200) return;
+  const smoothHz = archTracker.push(hz);
   archPitchHistory.push(smoothHz);
   if (archPitchHistory.length > 32) archPitchHistory.shift();
   const singerNote = hzToNote(smoothHz);
@@ -2772,7 +3005,7 @@ let harmonyProtocolEnabled = true;
 
 let harmonyAudioCtx = null, harmonyAnalyser = null, harmonyBuffer = null;
 let harmonyMicStream = null, harmonyAnimId = null, harmonyMediaSource = null;
-let harmonyPitchSmooth = [];
+let harmonyTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
 let harmonyPitchHistory = [];      // plain hz values, for key inference
 let harmonyTimedHistory = [];      // { t, hz } pairs, for delay + contour
 let harmonyPhraseFinals = [];      // last pitch of each finished phrase
@@ -2820,7 +3053,7 @@ function stopHarmonyMic() {
   const btn = document.getElementById('harmony-mic-btn');
   btn.classList.remove('active');
   btn.innerHTML = '<div class="mic-dot"></div>Start microphone';
-  harmonyPitchSmooth = [];
+  harmonyTracker.reset();
   harmonyPitchHistory = [];
   harmonyTimedHistory = [];
   harmonyPhraseFinals = [];
@@ -2849,14 +3082,11 @@ function harmonyDetectLoop() {
   let smoothHz = null;
   if (rms >= 0.005) {
     const hz = yinPitch(harmonyBuffer, harmonyAudioCtx.sampleRate, 0.15);
-    if (hz && hz >= 80 && hz <= 1200) {
-      harmonyPitchSmooth.push(hz);
-      if (harmonyPitchSmooth.length > 3) harmonyPitchSmooth.shift();
-      const sorted = [...harmonyPitchSmooth].sort((a,b) => a-b);
-      smoothHz = sorted[Math.floor(sorted.length/2)];
+    if (hz && hz >= 65 && hz <= 1200) {
+      smoothHz = harmonyTracker.push(hz);
     }
   } else {
-    harmonyPitchSmooth = [];
+    harmonyTracker.reset();
   }
 
   if (smoothHz) {
@@ -2989,16 +3219,20 @@ function renderHarmonyResult(singerNote, singerHz, result) {
 // DEMO PAGE: MP3
 // ============================================================
 let demoAudioCtx = null, demoSource = null, demoAnalyser = null;
-let demoBuffer = null, demoAudioBuffer = null;
+let demoAudioBuffer = null;
 let demoIsPlaying = false, demoStartTime = 0, demoOffset = 0;
-let demoPitchHistory = [], demoPitchBuf = null;
-let demoSemitones = 7, demoAnimId = null;
-let demoOscillator = null, demoGain = null;
+let demoPitchBuf = null;
+let demoMode = 'unison_shadowing', demoAnimId = null;
+let demoVoice = null;
+let demoEngine = createAccompanimentEngine();
+let demoTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
 
-function setDemoInterval(s, btn) {
-  demoSemitones = s;
-  btn.closest('.demo-panel').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+function setDemoMode(mode, btn) {
+  demoMode = mode;
+  btn.closest('.demo-panel').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const explEl = document.getElementById('demo-mode-explanation');
+  if (explEl) explEl.textContent = LIVE_MODE_DESCRIPTIONS[mode] || '';
 }
 
 function handleFileUpload(e) {
@@ -3014,6 +3248,9 @@ function handleFileUpload(e) {
     document.getElementById('track-name').textContent = file.name.replace(/\.[^.]+$/, '');
     document.getElementById('time-total').textContent = fmtTime(demoAudioBuffer.duration);
     drawWaveformVis(demoAudioBuffer);
+    // fresh pitch/phrase history for the new track
+    demoEngine = createAccompanimentEngine();
+    demoTracker.reset();
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3043,13 +3280,8 @@ function playAudio() {
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
-  demoOscillator = demoAudioCtx.createOscillator();
-  demoGain = demoAudioCtx.createGain();
-  demoOscillator.type = 'sine';
-  demoGain.gain.value = 0;
-  demoOscillator.connect(demoGain);
-  demoGain.connect(demoAudioCtx.destination);
-  demoOscillator.start();
+  if (!demoVoice) demoVoice = new RobotVoice(demoAudioCtx).connect(demoAudioCtx.destination);
+  demoVoice.setGain(0);
   demoSource.connect(demoAnalyser);
   demoSource.connect(demoAudioCtx.destination);
   demoSource.start(0, demoOffset);
@@ -3063,23 +3295,24 @@ function playAudio() {
 function pauseAudio() {
   demoOffset = demoAudioCtx.currentTime - demoStartTime;
   if (demoSource) demoSource.stop();
-  if (demoOscillator) { demoOscillator.stop(); demoOscillator = null; }
+  if (demoVoice) demoVoice.setGain(0);
   demoIsPlaying = false;
-  document.getElementById('play-btn').textContent = '\u25B6 Play with Harmony';
+  document.getElementById('play-btn').textContent = '\u25B6 Play with Robot Accompaniment';
   if (demoAnimId) cancelAnimationFrame(demoAnimId);
 }
 
 function stopAudio() {
   if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
-  if (demoOscillator) { try { demoOscillator.stop(); } catch(e){} demoOscillator = null; }
+  if (demoVoice) demoVoice.setGain(0);
   demoIsPlaying = false; demoOffset = 0;
-  document.getElementById('play-btn').textContent = '\u25B6 Play with Harmony';
+  document.getElementById('play-btn').textContent = '\u25B6 Play with Robot Accompaniment';
   document.getElementById('progress-inner').style.width = '0%';
   document.getElementById('time-current').textContent = '0:00';
   document.getElementById('demo-src-note').textContent = '-';
   document.getElementById('demo-rob-note').textContent = '-';
   document.getElementById('demo-conf').textContent = '-';
   if (demoAnimId) cancelAnimationFrame(demoAnimId);
+  demoTracker.reset();
 }
 
 function seekAudio(e) {
@@ -3087,11 +3320,12 @@ function seekAudio(e) {
   const rect = e.currentTarget.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
   demoOffset = pct * demoAudioBuffer.duration;
+  demoEngine = createAccompanimentEngine();
+  demoTracker.reset();
   if (demoIsPlaying) { pauseAudio(); playAudio(); }
   else document.getElementById('progress-inner').style.width = (pct*100) + '%';
 }
 
-let lastDemoHz = 0;
 function demoProgressLoop() {
   demoAnimId = requestAnimationFrame(demoProgressLoop);
   if (!demoIsPlaying || !demoAudioCtx) return;
@@ -3099,27 +3333,36 @@ function demoProgressLoop() {
   const pct = Math.min(1, elapsed / demoAudioBuffer.duration);
   document.getElementById('progress-inner').style.width = (pct * 100) + '%';
   document.getElementById('time-current').textContent = fmtTime(elapsed);
-  if (demoAnalyser && demoPitchBuf) {
-    demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
-    const rms = Math.sqrt(demoPitchBuf.reduce((s,v) => s+v*v, 0) / demoPitchBuf.length);
-    if (rms > 0.003) {
-      const hz = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
-      if (hz && hz > 60 && hz < 1200) {
-        demoPitchHistory.push(hz);
-        if (demoPitchHistory.length > 32) demoPitchHistory.shift();
-        const robotHz = computeHarmony(hz, demoSemitones, demoPitchHistory);
-        const sNote = hzToNote(hz), rNote = hzToNote(robotHz);
-        if (sNote) document.getElementById('demo-src-note').textContent = sNote.name;
-        if (rNote) document.getElementById('demo-rob-note').textContent = rNote.name;
-        document.getElementById('demo-conf').textContent = (rms * 100).toFixed(0) + '%';
-        if (demoOscillator && demoGain) {
-          demoOscillator.frequency.setTargetAtTime(robotHz, demoAudioCtx.currentTime, 0.05);
-          demoGain.gain.setTargetAtTime(rms * 0.3, demoAudioCtx.currentTime, 0.05);
-        }
-        lastDemoHz = hz;
-      }
+  if (!demoAnalyser || !demoPitchBuf) return;
+
+  demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
+  const rms = Math.sqrt(demoPitchBuf.reduce((s,v) => s+v*v, 0) / demoPitchBuf.length);
+  let hz = null;
+  if (rms > 0.003) {
+    const detected = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
+    if (detected && detected >= 65 && detected < 1200) hz = demoTracker.push(detected);
+  } else {
+    demoTracker.reset();
+  }
+
+  demoEngine.pushPitch(hz, elapsed);
+  const result = demoEngine.compute(demoMode, hz, elapsed, liveDemoProtocolEnabled);
+
+  const sNote = hz ? hzToNote(hz) : null;
+  const rNote = (result.hz && result.action !== 'rest') ? hzToNote(result.hz) : null;
+  document.getElementById('demo-src-note').textContent = sNote ? sNote.name : '-';
+  document.getElementById('demo-rob-note').textContent = rNote ? rNote.name : '-';
+  document.getElementById('demo-conf').textContent = hz ? (rms * 100).toFixed(0) + '%' : '-';
+  const explEl = document.getElementById('demo-mode-explanation');
+  if (explEl && result.text) explEl.textContent = result.text;
+
+  if (demoVoice) {
+    if (result.hz && result.action !== 'rest') {
+      demoVoice.setVocable(LIVE_VOCABLE_BY_MODE[demoMode] || 'aah');
+      demoVoice.setFrequency(result.hz);
+      demoVoice.setGain(Math.min(0.32, Math.max(rms, 0.05) * 0.55));
     } else {
-      if (demoGain) demoGain.gain.setTargetAtTime(0, demoAudioCtx.currentTime, 0.1);
+      demoVoice.setGain(0);
     }
   }
 }
@@ -3129,14 +3372,18 @@ function demoProgressLoop() {
 // ============================================================
 let micAudioCtx = null, micStream = null, micAnalyser = null;
 let micBuffer = null, micAnimId = null;
-let micSemitones = 7, micPitchHistory = [], micPitchSmooth = [];
-let micIsRunning = false;
-let micOscillator = null, micGain = null;
+let micMode = 'unison_shadowing';
+let micTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
+let micIsRunning = false, micStartTime = 0;
+let micVoice = null;
+let micEngine = createAccompanimentEngine();
 
-function setMicInterval(s, btn) {
-  micSemitones = s;
-  btn.closest('.demo-panel').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+function setMicMode(mode, btn) {
+  micMode = mode;
+  btn.closest('.demo-panel').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const explEl = document.getElementById('demo-mic-explanation');
+  if (explEl) explEl.textContent = LIVE_MODE_DESCRIPTIONS[mode] || '';
 }
 
 async function toggleDemoMic() {
@@ -3150,13 +3397,11 @@ async function toggleDemoMic() {
     micAnalyser.fftSize = 2048;
     source.connect(micAnalyser);
     micBuffer = new Float32Array(micAnalyser.fftSize);
-    micOscillator = micAudioCtx.createOscillator();
-    micGain = micAudioCtx.createGain();
-    micOscillator.type = 'sine';
-    micGain.gain.value = 0;
-    micOscillator.connect(micGain);
-    micGain.connect(micAudioCtx.destination);
-    micOscillator.start();
+    micVoice = new RobotVoice(micAudioCtx).connect(micAudioCtx.destination);
+    micVoice.setGain(0);
+    micEngine = createAccompanimentEngine();
+    micTracker.reset();
+    micStartTime = micAudioCtx.currentTime;
     micIsRunning = true;
     document.getElementById('demo-mic-btn').classList.add('recording');
     document.getElementById('demo-mic-btn').textContent = '\u23F9';
@@ -3171,7 +3416,7 @@ function stopDemoMic() {
   micIsRunning = false;
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (micAnimId) { cancelAnimationFrame(micAnimId); micAnimId = null; }
-  if (micOscillator) { try { micOscillator.stop(); } catch(e){} micOscillator = null; }
+  if (micVoice) { micVoice.stop(); micVoice = null; }
   if (micAudioCtx) { micAudioCtx.close(); micAudioCtx = null; }
   document.getElementById('demo-mic-btn').classList.remove('recording');
   document.getElementById('demo-mic-btn').textContent = '\uD83C\uDF99';
@@ -3179,6 +3424,7 @@ function stopDemoMic() {
   document.getElementById('demo-mic-note').textContent = '-';
   document.getElementById('demo-mic-robot').textContent = '-';
   document.getElementById('demo-level').style.width = '0%';
+  micTracker.reset();
 }
 
 function micLoop() {
@@ -3188,31 +3434,43 @@ function micLoop() {
   const rms = Math.sqrt(micBuffer.reduce((s,v) => s+v*v, 0) / micBuffer.length);
   const levelPct = Math.min(100, rms * 400);
   document.getElementById('demo-level').style.width = levelPct + '%';
-  if (rms < 0.005) {
-    document.getElementById('demo-mic-note').textContent = '-';
-    document.getElementById('demo-mic-robot').textContent = '-';
-    document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
-    if (micGain) micGain.gain.setTargetAtTime(0, micAudioCtx.currentTime, 0.1);
-    return;
+  const now = micAudioCtx.currentTime - micStartTime;
+
+  let smoothHz = null;
+  if (rms >= 0.005) {
+    const hz = yinPitch(micBuffer, micAudioCtx.sampleRate, 0.15);
+    if (hz && hz >= 65 && hz <= 1200) {
+      smoothHz = micTracker.push(hz);
+    }
+  } else {
+    micTracker.reset();
   }
-  const hz = yinPitch(micBuffer, micAudioCtx.sampleRate, 0.15);
-  if (!hz || hz < 80 || hz > 1200) return;
-  micPitchSmooth.push(hz);
-  if (micPitchSmooth.length > 3) micPitchSmooth.shift();
-  const smoothHz = [...micPitchSmooth].sort((a,b)=>a-b)[Math.floor(micPitchSmooth.length/2)];
-  micPitchHistory.push(smoothHz);
-  if (micPitchHistory.length > 32) micPitchHistory.shift();
-  const sNote = hzToNote(smoothHz);
-  if (!sNote) return;
-  const robotHz = computeHarmony(smoothHz, micSemitones, micPitchHistory);
-  const rNote = hzToNote(robotHz);
-  document.getElementById('demo-mic-note').textContent = sNote.name;
-  if (rNote) document.getElementById('demo-mic-robot').textContent = rNote.name;
-  const iname = INTERVAL_NAMES[micSemitones] || ('+' + micSemitones + ' semitones');
-  document.getElementById('demo-mic-status').textContent = 'Singing ' + sNote.name + ' \u2192 Robot responds ' + (rNote ? rNote.name : '?') + ' (' + iname + ')';
-  if (micOscillator && micGain) {
-    micOscillator.frequency.setTargetAtTime(robotHz, micAudioCtx.currentTime, 0.03);
-    micGain.gain.setTargetAtTime(Math.min(0.3, rms * 1.5), micAudioCtx.currentTime, 0.03);
+
+  micEngine.pushPitch(smoothHz, now);
+  const result = micEngine.compute(micMode, smoothHz, now, liveDemoProtocolEnabled);
+
+  const sNote = smoothHz ? hzToNote(smoothHz) : null;
+  const rNote = (result.hz && result.action !== 'rest') ? hzToNote(result.hz) : null;
+  document.getElementById('demo-mic-note').textContent = sNote ? sNote.name : '-';
+  document.getElementById('demo-mic-robot').textContent = rNote ? rNote.name : '-';
+
+  if (sNote && rNote) {
+    document.getElementById('demo-mic-status').textContent =
+      'Singing ' + sNote.name + ' \u2192 Robot responds ' + rNote.name;
+  } else if (rms < 0.005) {
+    document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
+  }
+  const explEl = document.getElementById('demo-mic-explanation');
+  if (explEl && result.text) explEl.textContent = result.text;
+
+  if (micVoice) {
+    if (result.hz && result.action !== 'rest') {
+      micVoice.setVocable(LIVE_VOCABLE_BY_MODE[micMode] || 'aah');
+      micVoice.setFrequency(result.hz);
+      micVoice.setGain(Math.min(0.3, Math.max(rms, 0.04) * 1.1));
+    } else {
+      micVoice.setGain(0);
+    }
   }
 }
 
@@ -3229,120 +3487,6 @@ uz.addEventListener('drop', e => {
   const f = e.dataTransfer.files[0];
   if (f) { document.getElementById('audio-file-input').files = e.dataTransfer.files; handleFileUpload({target:{files:[f]}}); }
 });
-
-// ============================================================
-// PIPELINE CONTROLS
-// ============================================================
-async function loadDevices() {
-  try {
-    const res = await fetch('/devices');
-    const data = await res.json();
-    const sel = document.getElementById('device-select');
-    if (!sel) return;
-    sel.innerHTML = '';
-    if (!data.available) {
-      const opt = document.createElement('option');
-      opt.textContent = data.message || 'Local mic not available';
-      sel.appendChild(opt);
-      const startBtn = document.getElementById('pipeline-start-btn');
-      if (startBtn) startBtn.disabled = true;
-      return;
-    }
-    data.devices.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.index;
-      opt.textContent = '(' + d.index + ') ' + d.name;
-      sel.appendChild(opt);
-    });
-  } catch(e) {
-    const sel = document.getElementById('device-select');
-    if (sel) sel.innerHTML = '<option>Server offline — run python server.py first</option>';
-  }
-}
-
-async function startPipeline() {
-  const sel = document.getElementById('device-select');
-  if (!sel || sel.value === '') return;
-  document.getElementById('live-status').textContent = 'starting...';
-  try {
-    const res = await fetch('/pipeline/start', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({input_device: parseInt(sel.value)})
-    });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('pipeline-start-btn').disabled = true;
-      document.getElementById('pipeline-stop-btn').disabled  = false;
-      document.getElementById('live-status').textContent = 'running';
-    } else {
-      document.getElementById('live-status').textContent = 'error: ' + data.error;
-    }
-  } catch(e) {
-    document.getElementById('live-status').textContent = 'server offline';
-  }
-}
-
-async function stopPipeline() {
-  try { await fetch('/pipeline/stop', {method: 'POST'}); } catch(e) {}
-  document.getElementById('pipeline-start-btn').disabled = false;
-  document.getElementById('pipeline-stop-btn').disabled  = true;
-  document.getElementById('live-status').textContent = 'stopped';
-  document.getElementById('live-singer-note').textContent = '-';
-  document.getElementById('live-robot-note').textContent  = '-';
-  document.getElementById('live-singer-hz').textContent   = '';
-  document.getElementById('live-robot-hz').textContent    = '';
-  document.getElementById('live-singer-box').className    = 'note-box';
-  document.getElementById('live-robot-box').className     = 'note-box';
-}
-
-loadDevices();
-
-// ============================================================
-// WEBSOCKET
-// ============================================================
-let socket = null, wsReconnectTimer = null;
-
-function connectWebSocket() {
-  if (socket && socket.readyState <= 1) return;
-  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  socket = new WebSocket(wsProto + '//' + location.host + '/ws');
-  socket.onopen = () => {
-    ['ws-status','ws-status2'].forEach(id => { const el = document.getElementById(id); if(el){el.textContent='connected';el.style.color='var(--green)';} });
-    ['ws-dot','ws-dot2'].forEach(id => { const el = document.getElementById(id); if(el) el.style.background='var(--green)'; });
-    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
-  };
-  socket.onmessage = (event) => { updateLiveDisplay(JSON.parse(event.data)); };
-  socket.onclose = () => {
-    ['ws-status','ws-status2'].forEach(id => { const el = document.getElementById(id); if(el){el.textContent='disconnected';el.style.color='var(--red)';} });
-    ['ws-dot','ws-dot2'].forEach(id => { const el = document.getElementById(id); if(el) el.style.background='var(--red)'; });
-    wsReconnectTimer = setTimeout(connectWebSocket, 2000);
-  };
-  socket.onerror = () => socket.close();
-}
-
-function updateLiveDisplay(msg) {
-  const singerEl = document.getElementById('live-singer-note');
-  const robotEl  = document.getElementById('live-robot-note');
-  if (!singerEl) return;
-  if (msg.type === 'pitch' && msg.singer_note) {
-    singerEl.textContent  = msg.singer_note;
-    robotEl.textContent   = msg.robot_note || '-';
-    document.getElementById('live-singer-hz').textContent = msg.singer_hz + ' Hz';
-    document.getElementById('live-robot-hz').textContent  = msg.robot_hz ? msg.robot_hz + ' Hz' : '';
-    document.getElementById('live-singer-box').className  = 'note-box active-singer';
-    document.getElementById('live-robot-box').className   = 'note-box active-robot';
-    document.getElementById('live-status').textContent    = msg.action + ' \u00B7 ' + msg.phrase_state + ' \u00B7 ' + msg.elapsed_s + 's';
-    if (msg.tempo_bpm > 0) document.getElementById('live-tempo').textContent = msg.tempo_bpm + ' BPM';
-  } else {
-    singerEl.textContent = '-';
-    document.getElementById('live-singer-hz').textContent = '';
-    document.getElementById('live-singer-box').className  = 'note-box';
-    document.getElementById('live-robot-box').className   = 'note-box';
-    document.getElementById('live-status').textContent    = msg.phrase_state || 'silence';
-  }
-}
-
-connectWebSocket();
 
 // ============================================================
 // CREE SENTIMENT DEMO

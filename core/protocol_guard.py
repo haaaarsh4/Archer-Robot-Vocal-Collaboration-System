@@ -3,9 +3,20 @@ from __future__ import annotations
 import threading
 import time
 from typing import Optional
-from gpiozero import Button  # only present on Raspberry Pi-style hardware
 
 from loguru import logger
+
+# gpiozero is only present on Raspberry Pi-style hardware and is deliberately
+# NOT in requirements.txt, since it isn't installable/usable on a cloud host
+# like Render. Importing it unconditionally used to mean ANY import of this
+# module would throw on a cloud deploy, which is why HarmonyEngine avoided
+# wiring ProtocolGuard in at all. Guard it instead, so physical-button support
+# is simply unavailable (physical_cue_gpio_pin is ignored) everywhere except
+# real Pi hardware, and everything else still works.
+try:
+    from gpiozero import Button
+except Exception:
+    Button = None
 
 
 class ProtocolGuard:
@@ -66,6 +77,14 @@ class ProtocolGuard:
         logger.info(f"Protocol {'ENABLED' if state else 'DISABLED'} via {source} cue")
 
     def _init_physical_cue(self) -> None:
+        if Button is None:
+            logger.warning(
+                "physical_cue_gpio_pin is set but gpiozero is not installed "
+                "(expected on a cloud host) — use the sound cue or the manual "
+                "/protocol/toggle endpoint instead."
+            )
+            self._gpio = None
+            return
         try:
             self._gpio = Button(self._gpio_pin, bounce_time=0.05)
             self._gpio.when_pressed = lambda: self.toggle(source="physical")
