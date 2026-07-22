@@ -23,20 +23,13 @@ class PitchDetector:
         # room tone) at a small extra CPU cost. Configurable rather than
         # picked for you, since which one performs better depends on your
         # actual input signal, not something to assume from a synthetic test.
-        pitch_method = cfg["pitch"].get("method", "yin")
+        self._pitch_method = cfg["pitch"].get("method", "yin")
+        # Stored so reset() can rebuild an identical aubio object. See the
+        # note in reset() for why that rebuild exists.
+        self._silence_threshold_db = cfg["preprocessing"]["silence_threshold_db"]
+        self._tolerance = cfg["pitch"].get("tolerance", 0.15)
 
-        self._pitch_o = aubio.pitch(pitch_method, self.BUF_SIZE, self.HOP_SIZE, self.sample_rate)
-        self._pitch_o.set_unit("Hz")
-        # Was hardcoded to -40 here, independently of preprocessing.silence_threshold_db.
-        # If that config value ever changed, this one silently wouldn't follow it,
-        # and the two silence gates could disagree without any error or warning.
-        self._pitch_o.set_silence(cfg["preprocessing"]["silence_threshold_db"])
-        # 0.15 is aubio's own documented default for this parameter. The
-        # previous 0.8 was far outside that. It didn't reproduce a failure
-        # in clean synthetic testing here, but it's still being reset to a
-        # value aubio's own docs consider reasonable rather than left as an
-        # unexplained outlier.
-        self._pitch_o.set_tolerance(cfg["pitch"].get("tolerance", 0.15))
+        self._pitch_o = self._build_pitch_object()
 
         self._leftovers   = np.array([], dtype=np.float32)
         self._history     = []
@@ -50,10 +43,26 @@ class PitchDetector:
         self._jump_tolerance_cents = cfg["pitch"].get("jump_tolerance_cents", 80.0)
         self._last_stable_hz: float | None = None
 
+        # A single frame landing far from the last stable pitch could be a
+        # real note change, or it could be one bad reading (see reset()'s
+        # docstring for where those come from). Rather than trusting it
+        # instantly, it's held as "pending" and only promoted to the new
+        # stable pitch once a second consecutive frame lands near it too.
+        # A lone bad frame in between just gets ignored, with the old
+        # stable pitch returned unchanged for that one frame.
+        self._pending_jump_hz: float | None = None
+
         logger.info(
-            f"Pitch engine: aubio {pitch_method} (hop={self.HOP_SIZE}, buf={self.BUF_SIZE}, "
+            f"Pitch engine: aubio {self._pitch_method} (hop={self.HOP_SIZE}, buf={self.BUF_SIZE}, "
             f"sr={self.sample_rate}, fmin={self.min_freq:.0f} Hz, fmax={self.max_freq:.0f} Hz)"
         )
+
+    def _build_pitch_object(self):
+        pitch_o = aubio.pitch(self._pitch_method, self.BUF_SIZE, self.HOP_SIZE, self.sample_rate)
+        pitch_o.set_unit("Hz")
+        pitch_o.set_silence(self._silence_threshold_db)
+        pitch_o.set_tolerance(self._tolerance)
+        return pitch_o
 
     def detect(self, frame: np.ndarray) -> tuple:
         samples = np.concatenate([self._leftovers, frame.astype(np.float32)])
@@ -83,18 +92,43 @@ class PitchDetector:
         """
         Median-of-recent smoothing, but aware of real jumps. A new pitch
         more than _jump_tolerance_cents away from the last stable reading
-        is treated as a new note: history resets to it immediately instead
-        of blending it in, which is what caused a couple of frames of
-        wrong, in-between output right at the start of every real pitch
-        change. Small drift (vibrato, natural pitch wobble) still gets
-        smoothed normally.
+        is treated as a candidate new note rather than blended into recent
+        history, which is what caused a couple of frames of wrong,
+        in-between output right at the start of every real pitch change.
+
+        That candidate isn't trusted on a single frame, though. It's held
+        as pending and only promoted to the new stable pitch once a second
+        consecutive frame confirms it by landing near the same value. A
+        single stray misread (see reset()'s docstring for where those come
+        from) gets ignored instead of instantly yanking the whole tracker
+        to a wrong note, which is what was happening before: one bad frame
+        was enough to overwrite _last_stable_hz outright, and because nothing
+        after that point still agreed with it, the tracker could bounce
+        between wrong anchors for several frames in a row before the real
+        pitch caught back up on its own.
+
+        Small drift (vibrato, natural pitch wobble) still gets smoothed
+        normally, since it never crosses the jump threshold at all.
         """
         if self._last_stable_hz is not None and self._last_stable_hz > 0:
             cents_diff = abs(1200.0 * np.log2(hz / self._last_stable_hz))
             if cents_diff > self._jump_tolerance_cents:
-                self._history = [hz]
-                self._last_stable_hz = hz
-                return hz
+                if self._pending_jump_hz is not None:
+                    confirm_diff = abs(1200.0 * np.log2(hz / self._pending_jump_hz))
+                    if confirm_diff <= self._jump_tolerance_cents:
+                        # Two consecutive frames agree on the new pitch — commit it.
+                        self._history = [self._pending_jump_hz, hz]
+                        self._last_stable_hz = hz
+                        self._pending_jump_hz = None
+                        return hz
+                # Not confirmed (or contradicts a still-pending candidate).
+                # Hold the old stable pitch and wait one more frame.
+                self._pending_jump_hz = hz
+                return self._last_stable_hz
+            else:
+                self._pending_jump_hz = None
+        else:
+            self._pending_jump_hz = None
 
         self._history.append(hz)
         if len(self._history) > self._HISTORY_LEN:
@@ -105,9 +139,52 @@ class PitchDetector:
         return result
 
     def reset(self):
+        """
+        Called every time the caller sees an unvoiced frame (server.py calls
+        this on every single silent frame, not just once per phrase — so
+        this runs constantly during any pause between notes).
+
+        Clearing the Python-side smoothing state here was already happening,
+        but the underlying aubio pitch object was left untouched. aubio's
+        YIN implementation keeps its own internal ring buffer of BUF_SIZE
+        (2048) samples spanning several hops of history, maintained inside
+        the C object across calls, on the assumption that it's being fed a
+        continuous audio stream. Silence still gets fed through detect() up
+        until the caller stops calling it, so the aubio object's internal
+        buffer doesn't go empty during a pause — it just sits there full of
+        stale pre-silence audio.
+
+        When singing resumes, the first several calls mix that stale
+        leftover audio with the new audio inside aubio's own window before
+        it's fully flushed out (up to BUF_SIZE / HOP_SIZE = 4 hops), which
+        can produce a handful of genuinely garbage pitch readings right at
+        the start of a new note — not just occasional jitter, but readings
+        confident enough to pass the confidence threshold. Since this reset
+        happens after every note (any brief gap between notes triggers it),
+        the effect compounds over a session: it's not that pitch detection
+        degrades on its own, it's that every new note after the first one
+        starts from a slightly corrupted analysis window.
+
+        The fix is to rebuild the aubio object itself on a real reset, so
+        it starts the next note with a clean internal buffer instead of one
+        full of the previous note's tail end. Guarded so it only rebuilds
+        once per silence, not on every one of the ~40 silent frames a second
+        that server.py's continuous reset() calls would otherwise trigger.
+        """
+        already_clean = (
+            not self._history
+            and self._last_stable_hz is None
+            and self._pending_jump_hz is None
+            and len(self._leftovers) == 0
+        )
+        if already_clean:
+            return
+
         self._history.clear()
         self._leftovers = np.array([], dtype=np.float32)
         self._last_stable_hz = None
+        self._pending_jump_hz = None
+        self._pitch_o = self._build_pitch_object()
 
     @staticmethod
     def hz_to_note_name(freq_hz: float) -> str:

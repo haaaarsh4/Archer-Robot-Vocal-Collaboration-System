@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+import numpy as np
+
 
 class AccompanimentMode(str, Enum):
     UNISON        = "unison_shadowing"
@@ -15,7 +17,40 @@ class AccompanimentMode(str, Enum):
     DRONE         = "drone_support"
     CALL_RESPONSE = "call_and_response"
     TRIADIC       = "triadic_harmony"      # fusion-only — never selected by default
+    HUM           = "solo_humming"         # one voice, closed-mouth, barely-there
     SILENT        = "protocol_silence"
+
+
+class VoiceTexture(str, Enum):
+    """
+    How many singers render a given AccompanimentMode, and how they're
+    spread out in pitch/time/space. This is orthogonal to *what* is being
+    sung (that's the AccompanimentMode's job) — it's the production layer
+    on top: one breathy voice right next to the mic, versus a wall of
+    people singing the same line in a hall.
+    """
+    SOLO   = "solo"     # a single voice
+    DUET   = "duet"     # two voices, small detune/timing spread
+    CHOIR  = "choir"    # many voices — the "concert" feel
+
+
+# Every mode has a natural default texture. UNISON is the one place a real
+# choir makes sense — everyone singing exactly what Archer sings, together.
+# CALL_RESPONSE and HUM are intentionally solo: one voice that's clearly
+# "listening" and answering, not a crowd. Everything else defaults to a
+# light duet so it reads as "accompanied" without swallowing Archer's voice.
+DEFAULT_TEXTURE = {
+    AccompanimentMode.UNISON:        VoiceTexture.CHOIR,
+    AccompanimentMode.OCTAVE:        VoiceTexture.DUET,
+    AccompanimentMode.DELAYED:       VoiceTexture.SOLO,
+    AccompanimentMode.TIMBRAL:       VoiceTexture.DUET,
+    AccompanimentMode.CONTOUR:       VoiceTexture.SOLO,
+    AccompanimentMode.DRONE:         VoiceTexture.DUET,
+    AccompanimentMode.CALL_RESPONSE: VoiceTexture.SOLO,
+    AccompanimentMode.TRIADIC:       VoiceTexture.CHOIR,
+    AccompanimentMode.HUM:           VoiceTexture.SOLO,
+    AccompanimentMode.SILENT:        VoiceTexture.SOLO,
+}
 
 
 @dataclass
@@ -133,17 +168,96 @@ class ModeFunctions:
         if last_pitch is None:
             return ModeProposal(AccompanimentMode.CALL_RESPONSE, None, "rest",
                                  note="no completed phrase to respond to yet")
-        target = last_pitch * (2 ** (self.call_response_semis / 12.0))
+
+        # "Completing" him, not just echoing him: if we know the key, answer
+        # by resolving toward the tonic rather than always sitting on a
+        # fixed interval above his last note. A phrase that ends away from
+        # the root reads as a question; landing the response on (or a step
+        # from) the root reads as a real cadence/answer instead of a copy.
+        if ctx.key_root_hz:
+            root = ctx.key_root_hz
+            ratio = last_pitch / root
+            octave_shift = round(np.log2(max(ratio, 1e-6)))
+            resolved_root = root * (2 ** octave_shift)
+            # blend toward the root rather than snapping dead onto it —
+            # keeps some of his contour, still reads as resolution
+            target = last_pitch * 0.35 + resolved_root * 0.65
+            note = "answering Archer's phrase by resolving toward the tonic — completing the thought"
+        else:
+            target = last_pitch * (2 ** (self.call_response_semis / 12.0))
+            note = "answering Archer's phrase after he finishes"
+
         return ModeProposal(AccompanimentMode.CALL_RESPONSE, target, "sing",
-                             hold_beats=2.0, note="answering Archer's phrase after he finishes")
+                             hold_beats=2.0, note=note)
 
     def triadic(self, ctx: MusicalContext, third_semitones: int) -> ModeProposal:
         target = ctx.archer_hz * (2 ** (third_semitones / 12.0))
         return ModeProposal(AccompanimentMode.TRIADIC, target, "sing",
                              note="fusion-mode triadic harmony (explicit opt-in only)")
 
+    def hum(self, ctx: MusicalContext) -> ModeProposal:
+        # Same pitch as Archer, but rendered later as a closed-mouth "mmm" —
+        # a single voice sitting quietly under/beside him rather than
+        # singing the vowel he's singing. Softer hold than unison so it
+        # breathes between his phrases instead of locking on note-for-note.
+        return ModeProposal(AccompanimentMode.HUM, ctx.archer_hz, "sing",
+                             hold_beats=1.5,
+                             note="one voice humming quietly alongside him")
+
     def silent(self, reason: str) -> ModeProposal:
         return ModeProposal(AccompanimentMode.SILENT, None, "rest", note=reason)
+
+
+@dataclass
+class VoiceLayerParams:
+    """Production settings the synthesizer uses to render N voices for a texture."""
+    num_voices: int
+    detune_spread_cents: float   # max +/- random detune per voice
+    timing_jitter_ms: float      # max +/- onset offset per voice (humanizes ensemble)
+    formant_spread: float        # 0-1, how much each voice's vocal-tract size varies
+    reverb_amount: float         # 0-1, wet/dry — bigger for "concert hall" choir
+    stereo_spread: float         # 0-1, how wide voices are panned (used if output is stereo)
+
+
+class TextureParams:
+    """Reads synthesis.texture config and hands out VoiceLayerParams per VoiceTexture."""
+
+    def __init__(self, cfg: dict):
+        tcfg = cfg.get("synthesis", {}).get("texture", {})
+
+        solo = tcfg.get("solo", {})
+        duet = tcfg.get("duet", {})
+        choir = tcfg.get("choir", {})
+
+        self._by_texture = {
+            VoiceTexture.SOLO: VoiceLayerParams(
+                num_voices=1,
+                detune_spread_cents=0.0,
+                timing_jitter_ms=0.0,
+                formant_spread=0.0,
+                reverb_amount=solo.get("reverb_amount", 0.08),
+                stereo_spread=0.0,
+            ),
+            VoiceTexture.DUET: VoiceLayerParams(
+                num_voices=duet.get("num_voices", 2),
+                detune_spread_cents=duet.get("detune_spread_cents", 9.0),
+                timing_jitter_ms=duet.get("timing_jitter_ms", 12.0),
+                formant_spread=duet.get("formant_spread", 0.12),
+                reverb_amount=duet.get("reverb_amount", 0.16),
+                stereo_spread=duet.get("stereo_spread", 0.4),
+            ),
+            VoiceTexture.CHOIR: VoiceLayerParams(
+                num_voices=choir.get("num_voices", 7),
+                detune_spread_cents=choir.get("detune_spread_cents", 16.0),
+                timing_jitter_ms=choir.get("timing_jitter_ms", 28.0),
+                formant_spread=choir.get("formant_spread", 0.22),
+                reverb_amount=choir.get("reverb_amount", 0.34),
+                stereo_spread=choir.get("stereo_spread", 1.0),
+            ),
+        }
+
+    def get(self, texture: "VoiceTexture") -> VoiceLayerParams:
+        return self._by_texture[texture]
 
 
 class AccompanimentModeSelector:

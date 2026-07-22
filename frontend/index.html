@@ -54,7 +54,7 @@
     top: 0; left: 0; right: 0;
     z-index: 100;
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     column-gap: 16px;
     padding: 0 48px;
@@ -927,10 +927,15 @@
       height: 60px;
       gap: 10px;
     }
-    .nav-logo, .nav-status {
+    .nav-logo {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex-shrink: 1;
+    }
+    .nav-status {
+      flex-shrink: 0;
+      min-width: max-content;
     }
     .nav-status { font-size: 10px; }
     .nav-right {
@@ -1038,6 +1043,10 @@
 
 <nav>
   <div class="nav-logo" onclick="goHome()" style="cursor: pointer;" title="Home">Archer-Robot / VCS</div>
+  <div class="nav-status">
+    <div id="ws-dot" style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
+    pipeline: <span id="ws-status" style="color:var(--red);">connecting...</span>
+  </div>
   <div class="nav-right" id="nav-right">
     <div class="nav-tabs">
       <button class="nav-tab" data-page="architecture" onclick="showPage('architecture')">Architecture</button>
@@ -2270,7 +2279,6 @@
         <div class="protocol-dot"></div>
         <span class="protocol-btn-label">Sovereignty: ON</span>
       </button>
-      <br />
       <span style="font-size:12px;color:var(--muted);max-width:420px;">Turn this off and the robot stays completely silent in both panels below, no matter which mode is selected. Same kill-switch behavior as the real engine.</span>
     </div>
   </div>
@@ -2514,10 +2522,17 @@ function yinPitch(buffer, sampleRate, threshold) {
 
 // Jump-aware smoothing: absorbs the frame-to-frame jitter real vibrato
 // causes without adding lag when a genuine new note is sung. A pitch more
-// than jumpToleranceCents away from the last stable reading resets
-// immediately instead of blending in, which is what caused the pitch
-// display to visibly lag or momentarily show a wrong in-between value
-// every time a real note change happened.
+// than jumpToleranceCents away from the last stable reading is treated as
+// a CANDIDATE new note, not trusted outright — a single stray misread
+// (a harmonic-locked YIN frame, a breath transient, background noise)
+// used to be enough to instantly overwrite lastStableHz, and since nothing
+// afterward still agreed with that bad value either, the tracker could
+// keep bouncing between wrong readings for several frames before the real
+// pitch caught up on its own. Now a jump only commits once a second
+// consecutive frame lands near the same new value, confirming it's a real
+// note change rather than one bad frame. Small drift (vibrato, natural
+// wobble) never crosses the jump threshold, so it's unaffected and still
+// gets smoothed normally with no added latency.
 class SmoothedPitchTracker {
   constructor(opts) {
     opts = opts || {};
@@ -2525,16 +2540,32 @@ class SmoothedPitchTracker {
     this.jumpToleranceCents = opts.jumpToleranceCents || 80;
     this.history = [];
     this.lastStableHz = null;
+    this.pendingJumpHz = null;
   }
   push(rawHz) {
     if (rawHz == null) return null;
     if (this.lastStableHz != null && this.lastStableHz > 0) {
       const centsDiff = Math.abs(1200 * Math.log2(rawHz / this.lastStableHz));
       if (centsDiff > this.jumpToleranceCents) {
-        this.history = [rawHz];
-        this.lastStableHz = rawHz;
-        return rawHz;
+        if (this.pendingJumpHz != null) {
+          const confirmDiff = Math.abs(1200 * Math.log2(rawHz / this.pendingJumpHz));
+          if (confirmDiff <= this.jumpToleranceCents) {
+            // Two consecutive frames agree on the new pitch — commit it.
+            this.history = [this.pendingJumpHz, rawHz];
+            this.lastStableHz = rawHz;
+            this.pendingJumpHz = null;
+            return rawHz;
+          }
+        }
+        // Not confirmed yet (or contradicts a still-pending candidate).
+        // Hold the old stable pitch and wait one more frame.
+        this.pendingJumpHz = rawHz;
+        return this.lastStableHz;
+      } else {
+        this.pendingJumpHz = null;
       }
+    } else {
+      this.pendingJumpHz = null;
     }
     this.history.push(rawHz);
     if (this.history.length > this.historyLen) this.history.shift();
@@ -2546,6 +2577,7 @@ class SmoothedPitchTracker {
   reset() {
     this.history = [];
     this.lastStableHz = null;
+    this.pendingJumpHz = null;
   }
 }
 
@@ -3487,6 +3519,47 @@ uz.addEventListener('drop', e => {
   const f = e.dataTransfer.files[0];
   if (f) { document.getElementById('audio-file-input').files = e.dataTransfer.files; handleFileUpload({target:{files:[f]}}); }
 });
+
+// ============================================================
+// NAV: BACKEND CONNECTION STATUS
+// ============================================================
+// This is a real, live websocket connection to the FastAPI backend
+// (server.py's /ws route), separate from the local-mic pipeline panel that
+// was removed from the Live Demo page. It just reports whether the browser
+// has a live socket open to your server right now, with proper open/close/
+// error handling and auto-reconnect, the same as the backend expects.
+let pipelineSocket = null, pipelineReconnectTimer = null;
+
+function connectPipelineSocket() {
+  if (pipelineSocket && pipelineSocket.readyState <= 1) return;
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  pipelineSocket = new WebSocket(wsProto + '//' + location.host + '/ws');
+
+  pipelineSocket.onopen = () => {
+    setPipelineStatus(true);
+    if (pipelineReconnectTimer) { clearTimeout(pipelineReconnectTimer); pipelineReconnectTimer = null; }
+  };
+  pipelineSocket.onclose = () => {
+    setPipelineStatus(false);
+    pipelineReconnectTimer = setTimeout(connectPipelineSocket, 2000);
+  };
+  pipelineSocket.onerror = () => { try { pipelineSocket.close(); } catch (e) {} };
+  // Messages here come from server.py's broadcast_queue (e.g. a locally
+  // running main.py pipeline). There's no panel to render them into on
+  // this page anymore, so the socket just proves connectivity.
+  pipelineSocket.onmessage = () => {};
+}
+
+function setPipelineStatus(connected) {
+  const dot = document.getElementById('ws-dot');
+  const label = document.getElementById('ws-status');
+  if (!dot || !label) return;
+  dot.style.background = connected ? 'var(--green)' : 'var(--red)';
+  label.textContent = connected ? 'connected' : 'disconnected';
+  label.style.color = connected ? 'var(--green)' : 'var(--red)';
+}
+
+connectPipelineSocket();
 
 // ============================================================
 // CREE SENTIMENT DEMO

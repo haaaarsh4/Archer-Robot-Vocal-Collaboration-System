@@ -15,6 +15,9 @@ from synthesis.accompaniment_modes import (
     MusicalContext,
     ModeFunctions,
     AccompanimentModeSelector,
+    VoiceTexture,
+    TextureParams,
+    DEFAULT_TEXTURE,
 )
 import librosa
 
@@ -31,6 +34,12 @@ class HarmonyDecision:
     action     : str                # either of 'sing', 'sustain', or 'rest'
     mode       : AccompanimentMode  # which accompaniment mode produced this decision
     mode_note  : str = ""           # human-readable explanation of what the mode is doing
+    texture         : str   = "solo"  # "solo" | "duet" | "choir" — how many voices render this
+    num_voices      : int   = 1
+    detune_spread_cents: float = 0.0
+    timing_jitter_ms: float = 0.0
+    formant_spread   : float = 0.0
+    reverb_amount    : float = 0.08
 
 
 class HarmonyEngine:
@@ -76,6 +85,13 @@ class HarmonyEngine:
         self.mode_functions = ModeFunctions(cfg)
         self.ctx = MusicalContext()
         self._fusion_third_semitones = harmony_cfg.get("fusion_third_semitones", 4)
+
+        # Voice texture (solo / duet / choir) — each mode has a sensible
+        # default (see DEFAULT_TEXTURE), but it can be pinned explicitly via
+        # set_texture(), e.g. so a user can force "concert choir" on demand
+        # regardless of which accompaniment mode is currently selected.
+        self.texture_params = TextureParams(cfg)
+        self._texture_override: Optional[VoiceTexture] = None
 
         # Rolling pitch history to infer key
         self._pitch_history: collections.deque = collections.deque(maxlen=32)
@@ -177,6 +193,9 @@ class HarmonyEngine:
 
         action = self._resolve_action(proposal, target_hz)
 
+        texture = self._texture_override or DEFAULT_TEXTURE.get(mode, VoiceTexture.SOLO)
+        layer = self.texture_params.get(texture)
+
         decision = HarmonyDecision(
             target_hz=target_hz or 0.0,
             vocable=vocable,
@@ -187,6 +206,12 @@ class HarmonyEngine:
             action=action,
             mode=mode,
             mode_note=proposal.note,
+            texture=texture.value,
+            num_voices=layer.num_voices,
+            detune_spread_cents=layer.detune_spread_cents,
+            timing_jitter_ms=layer.timing_jitter_ms,
+            formant_spread=layer.formant_spread,
+            reverb_amount=layer.reverb_amount,
         )
 
         self._current_decision = decision
@@ -214,6 +239,8 @@ class HarmonyEngine:
             return fn.call_response(ctx)
         if mode == AccompanimentMode.TRIADIC:
             return fn.triadic(ctx, self._fusion_third_semitones)
+        if mode == AccompanimentMode.HUM:
+            return fn.hum(ctx)
         return fn.silent("protocol is off or the current phoneme is protocol-sensitive")
 
     def _manual_proposal(self, archer_hz: Optional[float]) -> ModeProposal:
@@ -390,6 +417,20 @@ class HarmonyEngine:
     def set_fusion_mode(self, enabled: bool):
         self.mode_selector.fusion_mode = bool(enabled)
         logger.info(f"Fusion mode {'ENABLED (triadic harmony)' if enabled else 'DISABLED'}")
+
+    # Force a specific voice texture (solo/duet/choir) regardless of which
+    # accompaniment mode is active — e.g. a "concert" button in the UI that
+    # blooms whatever's currently playing into a full choir.
+    def set_texture(self, texture_name: str):
+        try:
+            self._texture_override = VoiceTexture(texture_name)
+            logger.info(f"Voice texture pinned to: {texture_name}")
+        except ValueError:
+            logger.warning(f"Unknown texture '{texture_name}'. Options: {[t.value for t in VoiceTexture]}")
+
+    def clear_texture_override(self):
+        self._texture_override = None
+        logger.info("Voice texture back to per-mode defaults")
 
     def set_default_mode(self, mode_name: str):
         try:
