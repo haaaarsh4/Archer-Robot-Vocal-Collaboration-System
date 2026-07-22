@@ -206,10 +206,13 @@
   .phoneme-desc { font-size: 13px; color: var(--muted); flex: 1; padding: 0 12px; }
   .phoneme-vocable { font-family: var(--mono); font-size: 12px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
 
-  .demo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 40px 48px; max-width: 1100px; margin: 0 auto; }
+  .demo-layout { display: grid; grid-template-columns: 1fr; gap: 24px; padding: 40px 48px; max-width: 1100px; margin: 0 auto; }
   .demo-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 36px; }
   .demo-panel-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
   .demo-panel-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+  .demo-panel-body { display: grid; grid-template-columns: minmax(0, 360px) 1fr; gap: 44px; align-items: start; }
+  .demo-panel-col { display: flex; flex-direction: column; min-width: 0; }
+  .control-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-family: var(--mono); margin: 0 0 10px; }
   .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
   .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(124,106,247,0.04); }
   .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
@@ -259,6 +262,16 @@
   .mode-btn { padding: 8px 16px; border-radius: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
   .mode-btn:hover { border-color: var(--accent); color: var(--text); }
   .mode-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
+  .texture-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .texture-btn { padding: 6px 14px; border-radius: 999px; font-family: var(--mono); font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
+  .texture-btn:hover { border-color: var(--accent); color: var(--text); }
+  .texture-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
+  .volume-row { display: flex; align-items: center; gap: 12px; margin: 4px 0 20px; }
+  .volume-row .volume-label { font-size: 12px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+  .volume-row .volume-value { font-size: 12px; color: var(--text); font-family: var(--mono); width: 38px; text-align: right; }
+  .volume-slider { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; border-radius: 999px; background: var(--border); outline: none; cursor: pointer; }
+  .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg2); box-shadow: 0 0 0 1px var(--accent); }
+  .volume-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg2); box-shadow: 0 0 0 1px var(--accent); }
   .mode-badge { font-family: var(--mono); font-size: 9px; padding: 3px 9px; border-radius: 100px; letter-spacing: 0.08em; text-transform: uppercase; display: inline-block; }
   .mode-badge.default { background: rgba(52,211,153,0.12); color: var(--green); }
   .mode-badge.optin   { background: rgba(217,119,6,0.14); color: var(--orange); }
@@ -897,7 +910,7 @@
   }
 
   @media (max-width: 900px) {
-    .harmony-grid, .two-col, .demo-layout { grid-template-columns: 1fr; }
+    .harmony-grid, .two-col, .demo-layout, .demo-panel-body { grid-template-columns: 1fr; }
     .stat-grid { grid-template-columns: 1fr 1fr; }
     .translation-pointer { flex-direction: column; align-items: flex-start; }
     .step-flow { flex-direction: column; }
@@ -2272,7 +2285,7 @@
   <div style="padding: 48px 48px 24px; max-width: 1100px; margin: 0 auto;">
     <div class="section-label">Live Demo</div>
     <h2 class="section-title">Try the collaboration system</h2>
-    <p style="color: var(--muted); font-size: 15px; margin-bottom: 4px;">Two ways to experience the system, both running entirely in your browser: upload an MP3 to hear the robot accompany it, or sing live into your microphone. Pick any of the seven accompaniment modes from the harmony engine, same ones described on the Harmony tab, and the robot sings back using a real formant-based vocal synthesizer instead of a plain tone.</p>
+    <p style="color: var(--muted); font-size: 15px; margin-bottom: 4px;">Two ways to experience the system, both running entirely in your browser: upload an MP3 to hear the robot accompany it, or sing live into your microphone. Pick any of the eight accompaniment modes from the harmony engine, same ones described on the Harmony tab, and the robot sings back using a real formant-based vocal synthesizer instead of a plain tone. Then choose a voice texture (solo, duet, or a full concert choir) to change how many voices are actually singing that part.</p>
     <div style="display:flex;align-items:center;gap:16px;margin:16px 0 8px;">
       <span style="font-size:13px;color:var(--muted);">Sovereignty:</span>
       <button class="protocol-btn" id="live-demo-protocol-btn" onclick="toggleLiveDemoProtocol()">
@@ -2287,79 +2300,107 @@
     <div class="demo-panel">
       <div class="demo-panel-title">Upload an MP3</div>
       <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and sings a generated accompaniment voice alongside it.</div>
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" accept="audio/*" id="audio-file-input" onchange="handleFileUpload(event)">
-        <div class="upload-icon">&#127925;</div>
-        <div class="upload-text"><strong>Drop an audio file here</strong><br>or click to browse</div>
+      <div class="demo-panel-body">
+        <div class="demo-panel-col">
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" accept="audio/*" id="audio-file-input" onchange="handleFileUpload(event)">
+            <div class="upload-icon">&#127925;</div>
+            <div class="upload-text"><strong>Drop an audio file here</strong><br>or click to browse</div>
+          </div>
+          <div class="audio-player" id="audio-player">
+            <div class="audio-waveform" id="waveform-vis"></div>
+            <div class="progress-bar-outer" id="progress-outer" onclick="seekAudio(event)">
+              <div class="progress-bar-inner" id="progress-inner"></div>
+            </div>
+            <div class="audio-time">
+              <span id="time-current">0:00</span>
+              <span id="track-name" style="color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 180px;"></span>
+              <span id="time-total">0:00</span>
+            </div>
+          </div>
+          <div class="demo-controls">
+            <button class="btn btn-primary" id="play-btn" onclick="togglePlay()" disabled>&#9654; Play with Harmony</button>
+            <button class="btn btn-ghost"   id="stop-btn" onclick="stopAudio()" disabled>&#9632; Stop</button>
+          </div>
+          <div class="volume-row" style="margin-top: 24px;">
+            <span class="volume-label">ROBOT VOLUME</span>
+            <input type="range" class="volume-slider" id="demo-robot-vol" min="0" max="150" value="100" step="5" oninput="setDemoRobotVolume(this.value)">
+            <span class="volume-value" id="demo-robot-vol-value">100%</span>
+          </div>
+          <div class="volume-row">
+            <span class="volume-label">TRACK VOLUME</span>
+            <input type="range" class="volume-slider" id="demo-source-vol" min="0" max="150" value="78" step="5" oninput="setDemoSourceVolume(this.value)">
+            <span class="volume-value" id="demo-source-vol-value">78%</span>
+          </div>
+        </div>
+        <div class="demo-panel-col">
+          <div class="control-label">Accompaniment mode</div>
+          <div class="mode-picker">
+            <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
+            <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
+            <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
+            <button class="mode-btn" data-mode="delayed_response"     onclick="setDemoMode('delayed_response', this)">Delayed echo</button>
+            <button class="mode-btn" data-mode="contour_following"    onclick="setDemoMode('contour_following', this)">Contour following</button>
+            <button class="mode-btn" data-mode="drone_support"        onclick="setDemoMode('drone_support', this)">Drone support</button>
+            <button class="mode-btn" data-mode="call_and_response"    onclick="setDemoMode('call_and_response', this)">Call &amp; response</button>
+            <button class="mode-btn" data-mode="solo_humming"         onclick="setDemoMode('solo_humming', this)">Humming</button>
+          </div>
+          <div class="control-label" style="margin-top: 6px;">Voice texture</div>
+          <div class="texture-picker">
+            <button class="texture-btn active" data-texture="solo"  onclick="setDemoTexture('solo', this)">Solo</button>
+            <button class="texture-btn" data-texture="duet"  onclick="setDemoTexture('duet', this)">Duet</button>
+            <button class="texture-btn" data-texture="choir" onclick="setDemoTexture('choir', this)">Concert choir</button>
+          </div>
+          <div class="harmony-overlay-note" id="demo-live-notes">
+            <div>
+              <div class="overlay-label">Source pitch</div>
+              <div class="overlay-singer" id="demo-src-note">-</div>
+            </div>
+            <span class="overlay-arrow">&#8594;</span>
+            <div>
+              <div class="overlay-label">Robot response</div>
+              <div class="overlay-robot" id="demo-rob-note">-</div>
+            </div>
+            <div style="margin-left: auto; text-align: right;">
+              <div class="overlay-label">Confidence</div>
+              <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
+            </div>
+          </div>
+          <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
+        </div>
       </div>
-      <div class="audio-player" id="audio-player">
-        <div class="audio-waveform" id="waveform-vis"></div>
-        <div class="progress-bar-outer" id="progress-outer" onclick="seekAudio(event)">
-          <div class="progress-bar-inner" id="progress-inner"></div>
-        </div>
-        <div class="audio-time">
-          <span id="time-current">0:00</span>
-          <span id="track-name" style="color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 180px;"></span>
-          <span id="time-total">0:00</span>
-        </div>
-      </div>
-      <div class="demo-controls">
-        <button class="btn btn-primary" id="play-btn" onclick="togglePlay()" disabled>&#9654; Play with Harmony</button>
-        <button class="btn btn-ghost"   id="stop-btn" onclick="stopAudio()" disabled>&#9632; Stop</button>
-      </div>
-      <div style="margin-top: 24px;">
-        <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">ACCOMPANIMENT MODE</div>
-        <div class="mode-picker">
-          <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
-          <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
-          <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
-          <button class="mode-btn" data-mode="delayed_response"     onclick="setDemoMode('delayed_response', this)">Delayed echo</button>
-          <button class="mode-btn" data-mode="contour_following"    onclick="setDemoMode('contour_following', this)">Contour following</button>
-          <button class="mode-btn" data-mode="drone_support"        onclick="setDemoMode('drone_support', this)">Drone support</button>
-          <button class="mode-btn" data-mode="call_and_response"    onclick="setDemoMode('call_and_response', this)">Call &amp; response</button>
-        </div>
-      </div>
-      <div class="harmony-overlay-note" id="demo-live-notes">
-        <div>
-          <div class="overlay-label">Source pitch</div>
-          <div class="overlay-singer" id="demo-src-note">-</div>
-        </div>
-        <span class="overlay-arrow">&#8594;</span>
-        <div>
-          <div class="overlay-label">Robot response</div>
-          <div class="overlay-robot" id="demo-rob-note">-</div>
-        </div>
-        <div style="margin-left: auto; text-align: right;">
-          <div class="overlay-label">Confidence</div>
-          <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
-        </div>
-      </div>
-      <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
     </div>
 
     <div class="demo-panel">
       <div class="demo-panel-title">Sing live</div>
       <div class="demo-panel-sub">Use your microphone. Sing or hum and the system shows you what note it detects and what the robot would sing back in real time.</div>
-      <div class="mic-visual">
-        <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">&#127908;</button>
-        <div class="level-meter" style="width: 100%; max-width: 320px;">
-          <div class="level-fill" id="demo-level"></div>
-        </div>
-        <div style="width: 100%; max-width: 320px;">
-          <div class="live-labels">
-            <span class="live-label you">YOU</span>
-            <span class="live-label robot">ROBOT</span>
+      <div class="demo-panel-body">
+        <div class="demo-panel-col mic-visual" style="padding: 0;">
+          <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">&#127908;</button>
+          <div class="level-meter" style="width: 100%;">
+            <div class="level-fill" id="demo-level"></div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-            <div class="live-note-big" id="demo-mic-note">-</div>
-            <div style="color: var(--border); font-size: 32px;">&#8594;</div>
-            <div class="live-response-big" id="demo-mic-robot">-</div>
+          <div style="width: 100%;">
+            <div class="live-labels">
+              <span class="live-label you">YOU</span>
+              <span class="live-label robot">ROBOT</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+              <div class="live-note-big" id="demo-mic-note">-</div>
+              <div style="color: var(--border); font-size: 32px;">&#8594;</div>
+              <div class="live-response-big" id="demo-mic-robot">-</div>
+            </div>
+          </div>
+          <div class="status-text" id="demo-mic-status">Click the microphone to start</div>
+          <div class="volume-row" style="width: 100%;">
+            <span class="volume-label">ROBOT VOLUME</span>
+            <input type="range" class="volume-slider" id="mic-robot-vol" min="0" max="150" value="100" step="5" oninput="setMicRobotVolume(this.value)">
+            <span class="volume-value" id="mic-robot-vol-value">100%</span>
           </div>
         </div>
-        <div class="status-text" id="demo-mic-status">Click the microphone to start</div>
-        <div style="width: 100%; max-width: 320px;">
-          <div style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 10px;">ACCOMPANIMENT MODE</div>
-          <div class="mode-picker" style="margin: 0;">
+        <div class="demo-panel-col">
+          <div class="control-label">Accompaniment mode</div>
+          <div class="mode-picker" style="margin: 0 0 20px;">
             <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setMicMode('unison_shadowing', this)">Unison shadowing</button>
             <button class="mode-btn" data-mode="octave_reinforcement" onclick="setMicMode('octave_reinforcement', this)">Octave below</button>
             <button class="mode-btn" data-mode="timbral_thickening"   onclick="setMicMode('timbral_thickening', this)">Timbral thickening</button>
@@ -2367,10 +2408,17 @@
             <button class="mode-btn" data-mode="contour_following"    onclick="setMicMode('contour_following', this)">Contour following</button>
             <button class="mode-btn" data-mode="drone_support"        onclick="setMicMode('drone_support', this)">Drone support</button>
             <button class="mode-btn" data-mode="call_and_response"    onclick="setMicMode('call_and_response', this)">Call &amp; response</button>
+            <button class="mode-btn" data-mode="solo_humming"         onclick="setMicMode('solo_humming', this)">Humming</button>
           </div>
-        </div>
-        <div class="note-explanation" id="demo-mic-explanation" style="max-width: 320px; width: 100%;">
-          Matching your pitch exactly, doubling your voice like someone singing along beside you.
+          <div class="control-label">Voice texture</div>
+          <div class="texture-picker">
+            <button class="texture-btn active" data-texture="solo"  onclick="setMicTexture('solo', this)">Solo</button>
+            <button class="texture-btn" data-texture="duet"  onclick="setMicTexture('duet', this)">Duet</button>
+            <button class="texture-btn" data-texture="choir" onclick="setMicTexture('choir', this)">Concert choir</button>
+          </div>
+          <div class="note-explanation" id="demo-mic-explanation" style="width: 100%;">
+            Matching your pitch exactly, doubling your voice like someone singing along beside you.
+          </div>
         </div>
       </div>
     </div>
@@ -2669,13 +2717,15 @@ const LIVE_MODE_DESCRIPTIONS = {
   delayed_response:     'Echoing what was sung about a beat ago, always trailing slightly behind rather than singing in the moment.',
   contour_following:    'Tracking the shape of the melody rather than exact notes, moving up when it rises and down when it falls.',
   drone_support:        'Holding a low, sustained root note under the phrase, drawn from the key it infers from recent pitch history.',
-  call_and_response:    'Waiting for a phrase to finish, then answering after the pause. It never sings over the source.',
+  call_and_response:    'Waiting for a phrase to finish, then answering by resolving toward the inferred tonic, completing the thought instead of just echoing it.',
+  solo_humming:         'A single closed-mouth hum on the same pitch, no vowel or consonant, just a soft warm tone sitting quietly beside it.',
 };
 const LIVE_MODE_BEAT_S = 0.55;    // fixed 'beat' duration used for the delayed_response echo
 const LIVE_PHRASE_END_S = 0.9;    // seconds of silence before a phrase counts as 'ended'
 const LIVE_VOCABLE_BY_MODE = {
   unison_shadowing: 'aah', octave_reinforcement: 'ooo', timbral_thickening: 'mmm',
   delayed_response: 'hey', contour_following: 'aah', drone_support: 'mmm', call_and_response: 'hey',
+  solo_humming: 'mmm',
 };
 
 function createAccompanimentEngine() {
@@ -2759,8 +2809,22 @@ function createAccompanimentEngine() {
           if (!this.phraseFinals.length) {
             return { hz: null, action: 'rest', text: 'Waiting for a full phrase to finish. This mode only answers after a pause, never sings over the source.' };
           }
-          return { hz: snapToScale(this.phraseFinals[this.phraseFinals.length - 1], key), action: 'sing', text };
+          const lastPitch = this.phraseFinals[this.phraseFinals.length - 1];
+          // "Completing" the phrase rather than echoing it: find the
+          // nearest tonic to his last note and resolve most of the way
+          // toward it, keeping a little of his contour. A phrase that
+          // ends away from the root reads as a question; landing near
+          // the root reads as an actual answer.
+          const refMidi = hzToMidi(lastPitch);
+          const rootGuessHz = midiToHz(Math.floor(refMidi / 12) * 12 + key.root);
+          const octaveShift = Math.round(Math.log2(lastPitch / rootGuessHz));
+          const resolvedRoot = rootGuessHz * Math.pow(2, octaveShift);
+          const target = lastPitch * 0.35 + resolvedRoot * 0.65;
+          return { hz: target, action: 'sing', text };
         }
+        case 'solo_humming':
+          if (!singerHz) return { hz: null, action: 'rest', text };
+          return { hz: snapToScale(singerHz, key), action: 'sustain', text };
         default:
           return { hz: null, action: 'rest', text: '' };
       }
@@ -2786,8 +2850,12 @@ const VOICE_FORMANTS = {
 };
 
 class RobotVoice {
-  constructor(ctx) {
+  constructor(ctx, opts = {}) {
     this.ctx = ctx;
+    this.glideTime = opts.glideTime ?? 0.035;
+    this.vibratoRateOffset = opts.vibratoRateOffset ?? 0;
+    this.vibratoDepthScale = opts.vibratoDepthScale ?? 1;
+
     this.osc = ctx.createOscillator();
     this.osc.type = 'sawtooth';
     this.osc.frequency.value = 220;
@@ -2798,14 +2866,21 @@ class RobotVoice {
 
     this.pre = ctx.createBiquadFilter();
     this.pre.type = 'lowpass';
-    this.pre.frequency.value = 4200;
-    this.pre.Q.value = 0.4;
+    this.pre.frequency.value = 3600;
+    this.pre.Q.value = 0.3;
     this.osc.connect(this.pre);
 
     this.master = ctx.createGain();
     this.master.gain.value = 0;
 
-    const freqs = VOICE_FORMANTS.aah, weights = [0.9, 0.55, 0.22], qs = [9, 11, 14];
+    // Formant resonances. Q was previously high enough (9-14) to carve out
+    // very narrow, thin, nasal-sounding peaks that also threw away most of
+    // the source's energy — a big part of both "too quiet" and "sounds
+    // fake." Wider (lower-Q) resonances pass more signal through and read
+    // as a rounder, more natural vowel shape; higher weights compensate
+    // for the inherent insertion loss of bandpass filtering so the voice
+    // is actually loud enough to hear next to a full mix.
+    const freqs = VOICE_FORMANTS.aah, weights = [1.7, 1.05, 0.55], qs = [5.5, 6.5, 8];
     this.formants = freqs.map((f, i) => {
       const filt = ctx.createBiquadFilter();
       filt.type = 'bandpass';
@@ -2819,14 +2894,53 @@ class RobotVoice {
       return { filt, gain };
     });
 
+    // "Body": a bit of the raw, unfiltered source blended straight into
+    // the master, bypassing the narrow formant peaks entirely. This is
+    // exactly what the Python engine does (`audio += source * 0.12`) and
+    // is a large part of why the Python voice sounds grounded/vocal
+    // instead of hollow — pure formant resonances with nothing under them
+    // sound like a whistle, not a chest.
+    this.bodyGain = ctx.createGain();
+    this.bodyGain.gain.value = 0.5;
+    this.pre.connect(this.bodyGain);
+    this.bodyGain.connect(this.master);
+
     this.subGain = ctx.createGain();
-    this.subGain.gain.value = 0.22;
+    this.subGain.gain.value = 0.3;
     this.sub.connect(this.subGain);
     this.subGain.connect(this.master);
 
+    // Breath noise: looped filtered white noise, shaped by the same two
+    // lower formants, mixed in quietly. This is the single biggest cue
+    // that separates "synthesizer tone" from "someone singing" — a
+    // perfectly clean harmonic buzz reads as electronic no matter how the
+    // formants are tuned, but even a little air moving through a vocal
+    // tract reads as human.
+    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    this.noise = ctx.createBufferSource();
+    this.noise.buffer = noiseBuf;
+    this.noise.loop = true;
+    this.breathFilter1 = ctx.createBiquadFilter();
+    this.breathFilter1.type = 'bandpass';
+    this.breathFilter1.frequency.value = freqs[0];
+    this.breathFilter1.Q.value = 2.5;
+    this.breathFilter2 = ctx.createBiquadFilter();
+    this.breathFilter2.type = 'bandpass';
+    this.breathFilter2.frequency.value = freqs[1];
+    this.breathFilter2.Q.value = 3.5;
+    this.breathGain = ctx.createGain();
+    this.breathGain.gain.value = 0.16;
+    this.noise.connect(this.breathFilter1);
+    this.noise.connect(this.breathFilter2);
+    this.breathFilter1.connect(this.breathGain);
+    this.breathFilter2.connect(this.breathGain);
+    this.breathGain.connect(this.master);
+
     this.vibrato = ctx.createOscillator();
     this.vibrato.type = 'sine';
-    this.vibrato.frequency.value = 5.3;
+    this.vibrato.frequency.value = 5.3 + this.vibratoRateOffset;
     this.vibratoGain = ctx.createGain();
     this.vibratoGain.gain.value = 0;
     this.vibrato.connect(this.vibratoGain);
@@ -2835,6 +2949,7 @@ class RobotVoice {
 
     this.osc.start();
     this.sub.start();
+    this.noise.start();
     this.vibrato.start();
     this._vocable = 'aah';
     this._started = false;
@@ -2848,14 +2963,16 @@ class RobotVoice {
     this._vocable = name;
     const now = this.ctx.currentTime;
     this.formants.forEach((f, i) => f.filt.frequency.setTargetAtTime(F[i], now, 0.08));
+    this.breathFilter1.frequency.setTargetAtTime(F[0], now, 0.08);
+    this.breathFilter2.frequency.setTargetAtTime(F[1], now, 0.08);
   }
 
   setFrequency(hz) {
     if (!hz || hz <= 0) return;
     const now = this.ctx.currentTime;
-    this.osc.frequency.setTargetAtTime(hz, now, 0.035);
-    this.sub.frequency.setTargetAtTime(hz / 2, now, 0.035);
-    this.vibratoGain.gain.setTargetAtTime(hz * 0.006, now, 0.15);
+    this.osc.frequency.setTargetAtTime(hz, now, this.glideTime);
+    this.sub.frequency.setTargetAtTime(hz / 2, now, this.glideTime);
+    this.vibratoGain.gain.setTargetAtTime(hz * 0.006 * this.vibratoDepthScale, now, 0.15);
   }
 
   setGain(g) {
@@ -2863,7 +2980,185 @@ class RobotVoice {
   }
 
   stop() {
-    try { this.osc.stop(); this.sub.stop(); this.vibrato.stop(); } catch (e) {}
+    try { this.osc.stop(); this.sub.stop(); this.vibrato.stop(); this.noise.stop(); } catch (e) {}
+  }
+}
+
+// ============================================================
+// LIVE DEMO: VOICE TEXTURE (SOLO / DUET / CHOIR)
+// ============================================================
+// This is what turns "one robot voice" into "a concert full of people
+// singing the same line": a handful of independent RobotVoice instances,
+// each with its own small pitch detune, its own glide speed (so a pitch
+// change ripples through the group instead of landing everywhere at
+// once), and its own vibrato rate — plus a shared reverb send so the
+// whole group sits in the same simulated room. This mirrors the ensemble
+// rendering added to the Python synthesizer (VocableSynthesizer._render_ensemble
+// in synthesis/vocable_synthesizer.py) — same idea, ported to Web Audio's
+// continuously-running oscillators instead of one-shot rendered buffers.
+const TEXTURE_PRESETS = {
+  solo:  { voices: 1, detuneSpreadCents: 0,    glideJitter: 0,     wet: 0.06 },
+  duet:  { voices: 2, detuneSpreadCents: 9,     glideJitter: 0.015, wet: 0.14 },
+  choir: { voices: 6, detuneSpreadCents: 16,    glideJitter: 0.035, wet: 0.32 },
+};
+
+// Generates a synthetic "room" impulse response: exponentially-decaying
+// noise per channel. Cheap, no audio file to load, and is the standard
+// trick for a convincing algorithmic reverb in Web Audio.
+function createReverbImpulse(ctx, seconds = 2.2, decay = 3.0) {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * seconds);
+  const impulse = ctx.createBuffer(2, length, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  return impulse;
+}
+
+// Gentle tanh-style soft-clip curve for a WaveShaperNode — takes the edge
+// off peaks instead of hard-clipping them, which also adds a touch of
+// harmonic saturation that reads as warmth rather than digital harshness.
+function makeSoftClipCurve(amount = 1.6) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(amount * x) / Math.tanh(amount);
+  }
+  return curve;
+}
+
+class VoiceEnsemble {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.dryGain = ctx.createGain();
+    this.dryGain.gain.value = 1;
+    this.wetSend = ctx.createGain();
+    this.wetSend.gain.value = 0;
+    this.convolver = ctx.createConvolver();
+    this.convolver.buffer = createReverbImpulse(ctx);
+    this.wetSend.connect(this.convolver);
+
+    // Output stage: sum dry + reverb, apply makeup gain (compensates for
+    // the insertion loss of narrow formant filtering upstream — without
+    // this the whole ensemble reads as quiet no matter how the mix gains
+    // are set), then a gentle soft-clip for warmth, then a compressor so
+    // a 6-voice choir doesn't just get progressively louder and harsher
+    // than a solo voice — it glues into one consistent, audible sound.
+    this.sumBus = ctx.createGain();
+    this.sumBus.gain.value = 1;
+    this.dryGain.connect(this.sumBus);
+    this.convolver.connect(this.sumBus);
+
+    this.makeup = ctx.createGain();
+    this.makeup.gain.value = 2.4;
+
+    this.shaper = ctx.createWaveShaper();
+    this.shaper.curve = makeSoftClipCurve(1.6);
+    this.shaper.oversample = '4x';
+
+    this.compressor = ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = -20;
+    this.compressor.knee.value = 22;
+    this.compressor.ratio.value = 3.5;
+    this.compressor.attack.value = 0.006;
+    this.compressor.release.value = 0.18;
+
+    this.sumBus.connect(this.makeup);
+    this.makeup.connect(this.shaper);
+    this.shaper.connect(this.compressor);
+
+    this.texture = 'solo';
+    this.voices = [];
+    this.detunes = [0];
+    this._lastHz = null;
+    this._lastVocable = 'aah';
+    this._lastGain = 0;
+
+    this._buildVoices('solo');
+  }
+
+  // Same usage pattern as RobotVoice.connect() — call once after
+  // construction to route the fully-processed signal to a destination.
+  connect(dest) {
+    this.compressor.connect(dest);
+    return this;
+  }
+
+  _buildVoices(texture) {
+    this.voices.forEach(v => v.stop());
+    this.voices = [];
+
+    const preset = TEXTURE_PRESETS[texture];
+    const n = preset.voices;
+    let detunes;
+    if (n === 1) {
+      detunes = [0];
+    } else {
+      detunes = [];
+      for (let i = 0; i < n; i++) {
+        const t = (i / (n - 1)) * 2 - 1; // -1..1, spread evenly
+        const cents = t * preset.detuneSpreadCents + (Math.random() - 0.5) * preset.detuneSpreadCents * 0.25;
+        detunes.push(cents);
+      }
+      detunes[0] = 0; // one voice stays dead-center as the "lead"
+    }
+    this.detunes = detunes;
+
+    for (let i = 0; i < n; i++) {
+      const glideJitter = i === 0 ? 0 : (Math.random() - 0.5) * 2 * preset.glideJitter;
+      const rv = new RobotVoice(this.ctx, {
+        glideTime: Math.max(0.01, 0.035 + glideJitter),
+        vibratoRateOffset: i === 0 ? 0 : ((i * 0.37) % 1.2) - 0.6,
+        vibratoDepthScale: i === 0 ? 1 : 0.85,
+      });
+      rv.master.connect(this.dryGain);
+      rv.master.connect(this.wetSend);
+      this.voices.push(rv);
+    }
+
+    this.texture = texture;
+    this.wetSend.gain.setTargetAtTime(preset.wet, this.ctx.currentTime, 0.3);
+
+    // Re-apply whatever the ensemble was already doing to the freshly
+    // built voices, so switching texture mid-note doesn't cut the sound.
+    if (this._lastHz) this.setFrequency(this._lastHz);
+    this.setVocable(this._lastVocable);
+    this.setGain(this._lastGain);
+  }
+
+  setTexture(texture) {
+    if (texture === this.texture || !TEXTURE_PRESETS[texture]) return;
+    this._buildVoices(texture);
+  }
+
+  setFrequency(hz) {
+    this._lastHz = hz;
+    if (!hz) return;
+    this.voices.forEach((v, i) => v.setFrequency(hz * Math.pow(2, this.detunes[i] / 1200)));
+  }
+
+  setVocable(name) {
+    this._lastVocable = name;
+    this.voices.forEach(v => v.setVocable(name));
+  }
+
+  setGain(g) {
+    this._lastGain = g;
+    const maxSpread = TEXTURE_PRESETS[this.texture].detuneSpreadCents || 1;
+    this.voices.forEach((v, i) => {
+      // Voices further from true pitch sit a touch quieter, the way a
+      // real choir's blend favors the singers closest to true pitch.
+      const weight = 1 / (1 + 0.5 * Math.abs(this.detunes[i]) / maxSpread);
+      v.setGain(g * weight);
+    });
+  }
+
+  stop() {
+    this.voices.forEach(v => v.stop());
   }
 }
 
@@ -3250,11 +3545,29 @@ function renderHarmonyResult(singerNote, singerHz, result) {
 // ============================================================
 // DEMO PAGE: MP3
 // ============================================================
-let demoAudioCtx = null, demoSource = null, demoAnalyser = null;
+let demoAudioCtx = null, demoSource = null, demoAnalyser = null, demoSourceGain = null;
+let demoRobotVolume = 1.0;   // 0..1.5 multiplier, from the ROBOT VOLUME slider
+let demoSourceVolume = 0.78; // 0..1.5, backing-track gain, from the TRACK VOLUME slider
+
+function setDemoRobotVolume(val) {
+  demoRobotVolume = val / 100;
+  const el = document.getElementById('demo-robot-vol-value');
+  if (el) el.textContent = val + '%';
+}
+
+function setDemoSourceVolume(val) {
+  demoSourceVolume = val / 100;
+  const el = document.getElementById('demo-source-vol-value');
+  if (el) el.textContent = val + '%';
+  if (demoSourceGain && demoAudioCtx) {
+    demoSourceGain.gain.setTargetAtTime(demoSourceVolume, demoAudioCtx.currentTime, 0.05);
+  }
+}
 let demoAudioBuffer = null;
 let demoIsPlaying = false, demoStartTime = 0, demoOffset = 0;
 let demoPitchBuf = null;
 let demoMode = 'unison_shadowing', demoAnimId = null;
+let demoTexture = 'solo';
 let demoVoice = null;
 let demoEngine = createAccompanimentEngine();
 let demoTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
@@ -3265,6 +3578,13 @@ function setDemoMode(mode, btn) {
   btn.classList.add('active');
   const explEl = document.getElementById('demo-mode-explanation');
   if (explEl) explEl.textContent = LIVE_MODE_DESCRIPTIONS[mode] || '';
+}
+
+function setDemoTexture(texture, btn) {
+  demoTexture = texture;
+  btn.closest('.demo-panel').querySelectorAll('.texture-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (demoVoice) demoVoice.setTexture(texture);
 }
 
 function handleFileUpload(e) {
@@ -3312,10 +3632,17 @@ function playAudio() {
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
-  if (!demoVoice) demoVoice = new RobotVoice(demoAudioCtx).connect(demoAudioCtx.destination);
+  if (!demoVoice) { demoVoice = new VoiceEnsemble(demoAudioCtx).connect(demoAudioCtx.destination); demoVoice.setTexture(demoTexture); }
   demoVoice.setGain(0);
+  // Duck the source track a little by default (the TRACK VOLUME slider
+  // controls this from here on) so the robot's voice has headroom to
+  // actually be heard next to it instead of getting buried under the
+  // full source mix.
+  if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
+  demoSourceGain.gain.value = demoSourceVolume;
   demoSource.connect(demoAnalyser);
-  demoSource.connect(demoAudioCtx.destination);
+  demoSource.connect(demoSourceGain);
+  demoSourceGain.connect(demoAudioCtx.destination);
   demoSource.start(0, demoOffset);
   demoStartTime = demoAudioCtx.currentTime - demoOffset;
   demoIsPlaying = true;
@@ -3392,7 +3719,7 @@ function demoProgressLoop() {
     if (result.hz && result.action !== 'rest') {
       demoVoice.setVocable(LIVE_VOCABLE_BY_MODE[demoMode] || 'aah');
       demoVoice.setFrequency(result.hz);
-      demoVoice.setGain(Math.min(0.32, Math.max(rms, 0.05) * 0.55));
+      demoVoice.setGain(Math.min(0.85, Math.max(rms, 0.08) * 1.4) * demoRobotVolume);
     } else {
       demoVoice.setGain(0);
     }
@@ -3403,11 +3730,19 @@ function demoProgressLoop() {
 // DEMO PAGE: MIC
 // ============================================================
 let micAudioCtx = null, micStream = null, micAnalyser = null;
+let micRobotVolume = 1.0;   // 0..1.5 multiplier, from the ROBOT VOLUME slider
+
+function setMicRobotVolume(val) {
+  micRobotVolume = val / 100;
+  const el = document.getElementById('mic-robot-vol-value');
+  if (el) el.textContent = val + '%';
+}
 let micBuffer = null, micAnimId = null;
 let micMode = 'unison_shadowing';
 let micTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
 let micIsRunning = false, micStartTime = 0;
 let micVoice = null;
+let micTexture = 'solo';
 let micEngine = createAccompanimentEngine();
 
 function setMicMode(mode, btn) {
@@ -3416,6 +3751,13 @@ function setMicMode(mode, btn) {
   btn.classList.add('active');
   const explEl = document.getElementById('demo-mic-explanation');
   if (explEl) explEl.textContent = LIVE_MODE_DESCRIPTIONS[mode] || '';
+}
+
+function setMicTexture(texture, btn) {
+  micTexture = texture;
+  btn.closest('.demo-panel').querySelectorAll('.texture-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (micVoice) micVoice.setTexture(texture);
 }
 
 async function toggleDemoMic() {
@@ -3429,7 +3771,8 @@ async function toggleDemoMic() {
     micAnalyser.fftSize = 2048;
     source.connect(micAnalyser);
     micBuffer = new Float32Array(micAnalyser.fftSize);
-    micVoice = new RobotVoice(micAudioCtx).connect(micAudioCtx.destination);
+    micVoice = new VoiceEnsemble(micAudioCtx).connect(micAudioCtx.destination);
+    micVoice.setTexture(micTexture);
     micVoice.setGain(0);
     micEngine = createAccompanimentEngine();
     micTracker.reset();
@@ -3499,7 +3842,7 @@ function micLoop() {
     if (result.hz && result.action !== 'rest') {
       micVoice.setVocable(LIVE_VOCABLE_BY_MODE[micMode] || 'aah');
       micVoice.setFrequency(result.hz);
-      micVoice.setGain(Math.min(0.3, Math.max(rms, 0.04) * 1.1));
+      micVoice.setGain(Math.min(0.85, Math.max(rms, 0.06) * 1.8) * micRobotVolume);
     } else {
       micVoice.setGain(0);
     }
