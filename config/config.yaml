@@ -11,10 +11,12 @@ preprocessing:
   normalize_target_rms: 0.1
 
 pitch:
-  engine: aubio_yin
+  method: yin                      
   confidence_threshold: 0.3
-  min_frequency: 80
+  min_frequency: 65               
   max_frequency: 1200
+  tolerance: 0.15                  
+  jump_tolerance_cents: 80.0       # how far a reading can drift before it's treated as a new note rather than smoothed in
 
 rhythm:
   onset_threshold: 0.1
@@ -26,6 +28,9 @@ harmony:
   detune_cents: 0
   scale_lock: true
   default_mode: unison_shadowing        # which mode plays when no special condition applies
+                                          # options: unison_shadowing, octave_reinforcement,
+                                          # delayed_response, timbral_thickening, contour_following,
+                                          # drone_support, call_and_response, solo_humming
   fusion_mode: false                     # triadic harmony is opt-in only — never the default
   fast_tempo_threshold_bpm: 120          # above this tempo, prefer contour-following
   sustain_frames_for_timbral: 30         # notes held this many frames shift to timbral thickening
@@ -62,6 +67,30 @@ synthesis:
   breathiness: 0.045                     # 0.0-0.2ish; amount of formant-shaped breath noise mixed in
   vibrato_rate_hz: 5.3                   # sung-vibrato rate on notes held longer than ~0.6s
   vibrato_depth_cents: 12                # sung-vibrato depth in cents
+
+  # Voice texture — how many "people" render a given accompaniment mode.
+  # unison_shadowing defaults to choir (the concert feel), call_and_response
+  # and solo_humming default to solo (see DEFAULT_TEXTURE in
+  # accompaniment_modes.py). Can be pinned regardless of mode via
+  # HarmonyEngine.set_texture("solo" | "duet" | "choir") — e.g. a "concert
+  # mode" button in the UI.
+  texture:
+    solo:
+      reverb_amount: 0.08                # a touch of room, close-mic'd feel
+    duet:
+      num_voices: 2
+      detune_spread_cents: 9.0
+      timing_jitter_ms: 12.0
+      formant_spread: 0.12               # 0-1, per-voice vocal-tract size variance
+      reverb_amount: 0.16
+      stereo_spread: 0.4
+    choir:
+      num_voices: 7                      # more voices = fuller, but costs CPU per note
+      detune_spread_cents: 16.0          # how far the choir spreads in pitch around true pitch
+      timing_jitter_ms: 28.0             # how loosely the choir's onsets scatter
+      formant_spread: 0.22               # bigger = more "different people" character
+      reverb_amount: 0.34                # concert-hall amount of wash
+      stereo_spread: 1.0
 
 timing:
   response_delay_ms: 70

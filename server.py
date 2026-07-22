@@ -160,6 +160,28 @@ def set_fusion_mode(req: FusionModeRequest):
     return {"ok": True, "fusion_mode": req.enabled}
 
 
+class TextureRequest(BaseModel):
+    texture: str  # "solo" | "duet" | "choir"
+
+
+@app.post("/harmony/texture")
+def set_texture(req: TextureRequest):
+    """Pin a voice texture regardless of accompaniment mode — e.g. a
+    'concert mode' UI button that blooms whatever's playing into a choir."""
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    harmony_engine.set_texture(req.texture)
+    return {"ok": True, "texture": req.texture}
+
+
+@app.post("/harmony/texture/clear")
+def clear_texture():
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    harmony_engine.clear_texture_override()
+    return {"ok": True}
+
+
 @app.get("/pipeline/status")
 def pipeline_status():
     return {"running": pipeline_running, "audio_available": AUDIO_AVAILABLE}
@@ -256,7 +278,7 @@ async def ws_mic(ws: WebSocket):
 
             if is_voiced:
                 hz, conf = pitch.detect(clean_frame)
-                if hz and conf >= conf_thresh and pitch.min_freq < hz < pitch.max_freq:
+                if hz and conf >= conf_thresh and pitch.min_freq <= hz <= pitch.max_freq:
                     archer_hz = hz
                 phoneme_profile = cree.analyze(clean_frame)
             else:
@@ -285,6 +307,8 @@ async def ws_mic(ws: WebSocket):
                 "action":          decision.action,
                 "mode":            decision.mode.value,
                 "mode_note":       decision.mode_note,
+                "texture":         decision.texture,
+                "num_voices":      decision.num_voices,
                 "protocol_enabled": harmony.protocol.enabled,
                 "tempo_bpm":       round(rhythm.current_tempo, 1),
                 "phrase_state":    phrase,
@@ -340,7 +364,7 @@ def run_local_pipeline(stop_event, input_device: int):
             archer_hz = None
             if is_voiced:
                 hz, conf = pitch.detect(clean)
-                if hz and conf >= conf_thresh and pitch.min_freq < hz < pitch.max_freq:
+                if hz and conf >= conf_thresh and pitch.min_freq <= hz <= pitch.max_freq:
                     archer_hz = hz
                 cree.analyze(clean)
             else:
@@ -379,6 +403,8 @@ def run_local_pipeline(stop_event, input_device: int):
                     "action":       decision.action,
                     "mode":         decision.mode.value,
                     "mode_note":    decision.mode_note,
+                    "texture":      decision.texture,
+                    "num_voices":   decision.num_voices,
                     "protocol_enabled": harmony.protocol.enabled,
                     "tempo_bpm":    round(rhythm.current_tempo, 1),
                     "phrase_state": phrase,

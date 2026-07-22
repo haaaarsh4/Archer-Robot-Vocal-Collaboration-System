@@ -90,7 +90,7 @@ class Pipeline:
                 archer_hz, confidence = self.pitch.detect(clean_frame)
                 if (archer_hz is not None
                         and confidence >= self._confidence_threshold
-                        and self.pitch.min_freq < archer_hz < self.pitch.max_freq):
+                        and self.pitch.min_freq <= archer_hz <= self.pitch.max_freq):
                     note = self.pitch.hz_to_note_name(archer_hz)
                     logger.debug(
                         f"[{self._elapsed:.2f}s] Archer: {archer_hz:.1f} Hz ({note}), "
