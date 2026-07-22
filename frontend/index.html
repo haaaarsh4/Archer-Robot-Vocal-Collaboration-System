@@ -207,6 +207,7 @@
   .phoneme-vocable { font-family: var(--mono); font-size: 12px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
 
   .demo-layout { display: grid; grid-template-columns: 1fr; gap: 24px; padding: 40px 48px; max-width: 1100px; margin: 0 auto; }
+  .demo-intro { padding: 48px 48px 24px; max-width: 1100px; margin: 0 auto; }
   .demo-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 36px; }
   .demo-panel-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
   .demo-panel-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
@@ -984,7 +985,13 @@
     .note-display  { font-size: 36px; }
     .note-box      { padding: 20px 12px; }
     .demo-layout   { padding: 16px; gap: 16px; }
+    .demo-intro    { padding: 32px 16px 16px; }
     .demo-panel    { padding: 20px; }
+    .demo-panel-body { gap: 28px; }
+    .volume-row    { flex-wrap: wrap; row-gap: 6px; }
+    .volume-row .volume-label { flex: 1 1 100%; }
+    .volume-row .volume-slider { flex: 1 1 auto; }
+    .harmony-overlay-note { flex-wrap: wrap; row-gap: 10px; }
     .live-note-big     { font-size: 52px; }
     .live-response-big { font-size: 36px; }
     .big-mic-btn   { width: 72px; height: 72px; font-size: 28px; }
@@ -1048,7 +1055,13 @@
     .note-pill { font-size: 12px; padding: 4px 10px; white-space: nowrap; }
     .mode-picker { gap: 6px; }
     .mode-btn { padding: 6px 10px; font-size: 10.5px; }
+    .texture-picker { gap: 6px; }
+    .texture-btn { padding: 5px 12px; font-size: 10.5px; }
     .protocol-btn { padding: 8px 16px; font-size: 12px; }
+    .big-mic-btn { width: 64px; height: 64px; font-size: 24px; }
+    .live-note-big     { font-size: 40px; }
+    .live-response-big { font-size: 30px; }
+    .demo-panel-title { font-size: 16px; }
   }
 </style>
 </head>
@@ -2282,17 +2295,19 @@
 
 <!-- ===================== DEMO PAGE ===================== -->
 <div id="page-demo" class="page">
-  <div style="padding: 48px 48px 24px; max-width: 1100px; margin: 0 auto;">
+  <div class="demo-intro">
     <div class="section-label">Live Demo</div>
     <h2 class="section-title">Try the collaboration system</h2>
     <p style="color: var(--muted); font-size: 15px; margin-bottom: 4px;">Two ways to experience the system, both running entirely in your browser: upload an MP3 to hear the robot accompany it, or sing live into your microphone. Pick any of the eight accompaniment modes from the harmony engine, same ones described on the Harmony tab, and the robot sings back using a real formant-based vocal synthesizer instead of a plain tone. Then choose a voice texture (solo, duet, or a full concert choir) to change how many voices are actually singing that part.</p>
-    <div style="display:flex;align-items:center;gap:16px;margin:16px 0 8px;">
-      <span style="font-size:13px;color:var(--muted);">Sovereignty:</span>
-      <button class="protocol-btn" id="live-demo-protocol-btn" onclick="toggleLiveDemoProtocol()">
-        <div class="protocol-dot"></div>
-        <span class="protocol-btn-label">Sovereignty: ON</span>
-      </button>
-      <span style="font-size:12px;color:var(--muted);max-width:420px;">Turn this off and the robot stays completely silent in both panels below, no matter which mode is selected. Same kill-switch behavior as the real engine.</span>
+    <div style="margin: 20px 0 8px;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:var(--muted);">Sovereignty:</span>
+        <button class="protocol-btn" id="live-demo-protocol-btn" onclick="toggleLiveDemoProtocol()">
+          <div class="protocol-dot"></div>
+          <span class="protocol-btn-label">Sovereignty: ON</span>
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);max-width:560px;margin:10px 0 0;line-height:1.6;">Turn this off and the robot stays completely silent in both panels below, no matter which mode is selected. Same kill-switch behavior as the real engine.</p>
     </div>
   </div>
 
