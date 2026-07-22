@@ -1,13 +1,3 @@
-"""
-Reports how much of your PlainsCree dataset actually made it into the
-training corpus, broken down by source subfolder - so you can verify
-build_translation_corpus.py used everything (Bible, Dictionary,
-ChildrenBooks, etc), not just one folder.
-
-Usage:
-    python -m translation.corpus_stats --data-dir data/PlainsCree \
-        --corpus data/processed/parallel_cr_en.jsonl
-"""
 import argparse
 import json
 from collections import Counter

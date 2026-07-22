@@ -79,8 +79,6 @@ class NeuralTranslator:
                 for lp, idx in zip(topk_log_probs.tolist(), topk_ids.tolist()):
                     candidates.append((seq + [idx], score + lp))
 
-            # length-normalized score so beam search doesn't just prefer
-            # short outputs
             candidates.sort(key=lambda c: c[1] / len(c[0]), reverse=True)
             beams = candidates[:beam_size]
 

@@ -38,8 +38,6 @@ class Pipeline:
 
         logger.info("Pipeline initialized, all modules ready!")
 
-    # ------------------------------------------------------------------ #
-
     def start(self):
         self._running    = True
         self._start_time = time.perf_counter()
@@ -67,8 +65,6 @@ class Pipeline:
             f"{self._frame_count} frames processed"
         )
 
-    # ------------------------------------------------------------------ #
-
     def _processing_loop(self):
         self._currently_singing = False
 
@@ -86,7 +82,6 @@ class Pipeline:
             phoneme_profile = self.cree._neutral_profile
 
             if is_voiced:
-                # FIX (BUG 4): use config-driven confidence threshold.
                 archer_hz, confidence = self.pitch.detect(clean_frame)
                 if (archer_hz is not None
                         and confidence >= self._confidence_threshold
@@ -100,8 +95,6 @@ class Pipeline:
                     archer_hz = None
                 phoneme_profile = self.cree.analyze(clean_frame)
 
-            # When Archer stops singing, reset the pitch accumulation buffer
-            # so old audio is not mixed with the next phrase.
             if not is_voiced:
                 self.pitch.reset()
 

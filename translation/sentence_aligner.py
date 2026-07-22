@@ -4,8 +4,6 @@ from typing import List, Tuple
 
 from loguru import logger
 
-# (source_lines_consumed, target_lines_consumed, prior_probability)
-# Priors from Gale & Church 1993, Table 2 (approximate empirical values)
 ALIGNMENT_TYPES = [
     (1, 1, 0.89),
     (1, 0, 0.01),
@@ -18,7 +16,6 @@ S2 = 6.8  # variance parameter, standard value from the original paper
 
 
 def _norm_tail_prob(z: float) -> float:
-    """Two-sided tail probability of the standard normal at |z|."""
     return 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
 
 

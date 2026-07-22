@@ -1,16 +1,3 @@
-"""
-Combines the sentence-level EdTeKLA corpus with the word-level Watkins
-dictionary pairs into one training file for the neural transformer -
-capped at a ratio so single-word "sentences" don't dominate training and
-bias the model toward short, single-word outputs.
-
-Usage:
-    python -m translation.combine_corpora \
-        --sentences data/processed/parallel_cr_en.jsonl \
-        --dictionary data/processed/watkins_dictionary_pairs.jsonl \
-        --out data/processed/parallel_cr_en_combined.jsonl \
-        --max-dictionary-ratio 0.3
-"""
 import argparse
 import json
 import random

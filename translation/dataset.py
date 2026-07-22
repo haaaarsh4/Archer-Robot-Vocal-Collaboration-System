@@ -10,12 +10,6 @@ PAD_ID, UNK_ID, BOS_ID, EOS_ID = 0, 1, 2, 3
 
 
 class TranslationDataset(Dataset):
-    """Loads parallel_cr_en.jsonl and subword-encodes both sides with the
-    shared SentencePiece model trained by tokenizer.py. Auto-detects
-    whether that tokenizer was trained with Morfessor pre-segmentation
-    (via the _config.json written alongside the .model file) and applies
-    the same preprocessing here, so training and inference never
-    silently mismatch."""
 
     def __init__(self, jsonl_path: Path, spm_model_path: str, max_len: int = 128):
         self.sp = spm.SentencePieceProcessor(model_file=spm_model_path)

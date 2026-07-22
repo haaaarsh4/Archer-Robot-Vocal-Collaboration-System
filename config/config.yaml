@@ -28,9 +28,6 @@ harmony:
   detune_cents: 0
   scale_lock: true
   default_mode: unison_shadowing        # which mode plays when no special condition applies
-                                          # options: unison_shadowing, octave_reinforcement,
-                                          # delayed_response, timbral_thickening, contour_following,
-                                          # drone_support, call_and_response, solo_humming
   fusion_mode: false                     # triadic harmony is opt-in only — never the default
   fast_tempo_threshold_bpm: 120          # above this tempo, prefer contour-following
   sustain_frames_for_timbral: 30         # notes held this many frames shift to timbral thickening
@@ -68,12 +65,6 @@ synthesis:
   vibrato_rate_hz: 5.3                   # sung-vibrato rate on notes held longer than ~0.6s
   vibrato_depth_cents: 12                # sung-vibrato depth in cents
 
-  # Voice texture — how many "people" render a given accompaniment mode.
-  # unison_shadowing defaults to choir (the concert feel), call_and_response
-  # and solo_humming default to solo (see DEFAULT_TEXTURE in
-  # accompaniment_modes.py). Can be pinned regardless of mode via
-  # HarmonyEngine.set_texture("solo" | "duet" | "choir") — e.g. a "concert
-  # mode" button in the UI.
   texture:
     solo:
       reverb_amount: 0.08                # a touch of room, close-mic'd feel

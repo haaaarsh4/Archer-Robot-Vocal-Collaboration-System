@@ -72,7 +72,6 @@ class TimingSync:
 
         return target
 
-    # Runs in its own thread. Waits until play_at, then outputs audio
     def _playback_loop(self):
         while self._running:
             try:
@@ -80,13 +79,11 @@ class TimingSync:
             except queue.Empty:
                 continue
 
-            # Wait until the scheduled time
             now = time.perf_counter()
             wait = play_at - now
             if wait > 0:
                 time.sleep(wait)
 
-            # Safety: skip if audio is stale (more than max_hold_ms old)
             staleness = time.perf_counter() - play_at
             if staleness > (self.max_hold_ms / 1000.0):
                 logger.debug(f"Skipping stale audio ({staleness*1000:.0f}ms old)")

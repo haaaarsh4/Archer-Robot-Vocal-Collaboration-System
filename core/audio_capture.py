@@ -4,9 +4,6 @@ import pyaudio
 from loguru import logger
 from config.config_loader import get_config
 
-# Maps the dtype string in config.yaml to the matching pyaudio format
-# constant, instead of hardcoding paFloat32 and silently ignoring whatever
-# audio.dtype is actually set to.
 _DTYPE_TO_PYAUDIO_FORMAT = {
     "float32": pyaudio.paFloat32,
     "int16":   pyaudio.paInt16,
@@ -31,12 +28,6 @@ class AudioCapture:
         self._pa_format   = _DTYPE_TO_PYAUDIO_FORMAT.get(self.dtype_name, pyaudio.paFloat32)
         self._np_dtype    = _DTYPE_TO_NUMPY.get(self.dtype_name, np.float32)
 
-        # Bounded, not unbounded. If whatever's reading this queue falls
-        # behind (a slow frame, a GC pause, anything), an unbounded queue
-        # just keeps growing and the audio you eventually process is
-        # further and further behind real time. Dropping the oldest frame
-        # once the queue is full keeps latency bounded instead, which
-        # matters a lot more than never losing a frame for a live pipeline.
         self._queue_maxsize = int(cfg["audio"].get("queue_maxsize", 64))
         self.queue: queue.Queue = queue.Queue(maxsize=self._queue_maxsize)
 
@@ -45,8 +36,6 @@ class AudioCapture:
         self._running = False
 
     def list_devices(self):
-        # Reuses self._p instead of spinning up a second, separate
-        # PyAudio/PortAudio session just to list devices.
         owns_instance = self._p is None
         p = self._p or pyaudio.PyAudio()
         try:
@@ -61,9 +50,6 @@ class AudioCapture:
         try:
             self.queue.put_nowait(samples)
         except queue.Full:
-            # Drop the oldest queued frame to make room, rather than
-            # blocking the audio callback thread (which must never block)
-            # or growing the queue without limit.
             try:
                 self.queue.get_nowait()
             except queue.Empty:
@@ -79,10 +65,6 @@ class AudioCapture:
             logger.warning("AudioCapture.start() called while already running, ignoring")
             return
 
-        # PyAudio.terminate() shuts down the underlying PortAudio session
-        # for good, a PyAudio instance can't be reused to open a new stream
-        # after that. Re-creating it here means start() -> stop() -> start()
-        # actually works, instead of failing the second time.
         self._p = pyaudio.PyAudio()
 
         logger.info(f"Opening audio stream: device={self.input_device}, rate={self.sample_rate}Hz, "

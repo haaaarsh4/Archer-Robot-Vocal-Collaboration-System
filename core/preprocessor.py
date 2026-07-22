@@ -29,10 +29,6 @@ class Preprocessor:
             pct = 100 * self._voiced_count / self._frame_count
             logger.debug(f"[mic] {db:+6.1f} dBFS  threshold={self.silence_db} dBFS  → "
                          f"{'VOICED' if is_voiced else 'SILENT'}  (voiced last {self.LOG_EVERY_N} frames: {pct:.0f}%)")
-            # Reset after each report so this stays a rolling recent-window
-            # percentage rather than a lifetime average. On a long-running
-            # session a lifetime average stops reflecting what's actually
-            # happening right now, an hour in, one bad minute barely moves it.
             self._frame_count, self._voiced_count = 0, 0
 
         if not is_voiced:

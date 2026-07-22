@@ -11,16 +11,6 @@ from scipy.signal import lfilter, butter, iirnotch, iirpeak
 
 # Generates a numpy audio array for the robot to sing based on the decision from HarmonyDecision
 class VocableSynthesizer:
-    # Vowel formant frequencies (F1, F2, F3 in Hz) for standard vocables, plus
-    # a bandwidth per formant. These are approximate sung-voice formant
-    # centers (roughly midway between typical male/female values) for each
-    # vocable's "bright" and "dark" endpoint, blended by vowel_color.
-    #
-    # Real formants for sung vowels sit close together — the previous table
-    # used gaps so wide (e.g. F1/F2 nearly 400-1000Hz apart with harmonics
-    # weighted by raw Gaussian distance) that the resulting spectrum had no
-    # continuous formant "resonance," just isolated spikes, which is a big
-    # part of why the old engine sounded synthetic/alien rather than vocal.
     FORMANTS = {
         # (F1, F2, F3) at the bright end, then the dark end
         "aah": {"bright": (730, 1400, 2600), "dark": (680, 1100, 2450)},   # "ah" as in father
@@ -51,11 +41,6 @@ class VocableSynthesizer:
         self._crossfade_samples = int(self.crossfade_ms * self.sample_rate / 1000)
         self._prev_audio: np.ndarray | None = None  # for crossfading
 
-        # One vibrato phase per potential voice layer (index 0 is always the
-        # "lead" voice), so a choir's individual singers keep independent,
-        # continuous vibrato across notes instead of all wobbling in lockstep
-        # (which is what made early multi-voice tests sound like a chorus
-        # *effect* pedal rather than actual people).
         self._max_voice_layers = 12
         self._vibrato_phases = [0.0] * self._max_voice_layers
 
@@ -126,12 +111,6 @@ class VocableSynthesizer:
         # Apply Cree phoneme timbre shaping
         audio = self._apply_phoneme_shaping(audio, decision)
 
-        # Room ambience — a touch on a solo voice, a real hall on a choir.
-        # This is a per-note "room" simulation (early reflections + short
-        # decay within the note's own buffer), not a continuous cross-note
-        # hall tail. A persistent tail across notes would need to live in
-        # the output/mixing stage (TimingSync or beyond), since synthesize()
-        # only ever sees one note's buffer at a time.
         reverb_amount = float(getattr(decision, "reverb_amount", 0.08))
         if reverb_amount > 0:
             audio = self._apply_reverb(audio, reverb_amount)
@@ -145,28 +124,12 @@ class VocableSynthesizer:
         self._prev_audio = audio
         return audio.astype(np.float32)
 
-    # ------------------------------------------------------------------ #
-    # Ensemble rendering — the "concert" texture
-    # ------------------------------------------------------------------ #
-    #
-    # A real choir isn't N copies of one voice at full volume — it's N
-    # people who are each slightly out of tune with each other, each start
-    # the note a few milliseconds apart, and each have a differently-sized
-    # vocal tract (different formant centers). All three are what your ear
-    # actually uses to tell "one loud singer" from "a room full of people."
-    # We fake all three, then sum and renormalize so the ensemble doesn't
-    # just come out louder than a solo voice, it comes out *wider*.
     def _render_ensemble(self, decision, n_samples: int, num_voices: int) -> np.ndarray:
         detune_spread = float(getattr(decision, "detune_spread_cents", 10.0))
         jitter_ms = float(getattr(decision, "timing_jitter_ms", 15.0))
         formant_spread = float(getattr(decision, "formant_spread", 0.1))
         max_jitter_samples = int(jitter_ms * self.sample_rate / 1000)
 
-        # Evenly spread detune across voices (not fully random) so the
-        # ensemble spreads symmetrically around true pitch rather than
-        # risking every voice randomly landing sharp or flat together.
-        # Small random jitter added on top keeps it from sounding
-        # mechanically even.
         if num_voices == 1:
             detune_offsets = [0.0]
         else:
@@ -183,25 +146,15 @@ class VocableSynthesizer:
             voice = self._render_voice(decision, n_samples, voice_index=i,
                                         f0_hz=f0, formant_scale=f_scale)
 
-            # Timing jitter: shift each voice a few ms early/late by
-            # trimming and zero-padding rather than resampling, so pitch
-            # is untouched — just the onset moves.
             if max_jitter_samples > 0 and i > 0:
                 shift = int(self._rng.integers(-max_jitter_samples, max_jitter_samples + 1))
                 voice = self._shift_samples(voice, shift)
 
-            # Voices further from center sit slightly quieter, the way a
-            # real choir's blend favors the voices closest to true pitch.
             gain = 1.0 / (1.0 + 0.12 * abs(cents) / max(detune_spread, 1.0))
             mix += voice * gain
 
         peak = np.max(np.abs(mix))
         if peak > 0:
-            # A choir should feel fuller/louder than a solo voice, but
-            # summed independent sources don't add linearly in a real room
-            # (they add roughly by sqrt(N) in perceived loudness) — so we
-            # normalize toward a target peak that grows gently with voice
-            # count instead of just clamping everything to the same 1.0.
             target_peak = min(0.98, 0.82 + 0.025 * num_voices)
             mix = mix / peak * target_peak
 
@@ -217,9 +170,6 @@ class VocableSynthesizer:
             out[:shift] = audio[-shift:]
         return out
 
-    # Renders a single voice layer. voice_index selects which vibrato-phase
-    # slot to use so parallel voices don't wobble in lockstep; formant_scale
-    # simulates a different-sized vocal tract for that particular voice.
     def _render_voice(self, decision, n_samples: int, voice_index: int,
                        f0_hz: float, formant_scale: float) -> np.ndarray:
         if self.engine == "wavetable":
@@ -227,19 +177,6 @@ class VocableSynthesizer:
         return self._synthesize_sinusoidal(decision, n_samples, voice_index=voice_index,
                                             f0_override=f0_hz, formant_scale=formant_scale)
 
-    # ------------------------------------------------------------------ #
-    # Source-filter vowel synthesis
-    # ------------------------------------------------------------------ #
-    #
-    # This models a singing voice the way a real one works: a bright,
-    # buzzy glottal source rich in harmonics (the vocal folds), shaped by a
-    # handful of resonant formant filters (the vocal tract) that boost
-    # specific frequency bands depending on vowel shape. The previous
-    # version instead weighted each harmonic individually by its Gaussian
-    # distance from F1/F2 — mathematically similar in spirit, but it
-    # produced a sparse, comb-like spectrum with no continuous resonance,
-    # which reads to the ear as synthetic/metallic rather than vocal.
-    # Adding a touch of vibrato and breath noise closes the rest of the gap.
     def _synthesize_sinusoidal(self, decision, n_samples, voice_index: int = 0,
                                 f0_override: float | None = None, formant_scale: float = 1.0):
         t = np.arange(n_samples) / self.sample_rate
@@ -248,16 +185,9 @@ class VocableSynthesizer:
         if decision.mode == AccompanimentMode.TIMBRAL and f0_override is None:
             f0 *= 2 ** (self.timbral_detune_cents / 1200.0)
 
-        # Humming (solo_humming mode): softer, rounder tone with vibrato
-        # damped down — closer to a contented hum than a full sung vowel.
         is_humming = getattr(decision, "mode", None) == AccompanimentMode.HUM
         vibrato_ceiling = 0.5 if is_humming else 1.0
 
-        # Vibrato: subtle pitch wobble, more present on longer held notes so
-        # short call-and-response style hits stay clean and percussive.
-        # Each voice layer gets its own vibrato phase slot (and a tiny
-        # per-voice rate offset) so a choir's singers don't wobble in
-        # lockstep — real ensembles never do.
         slot = voice_index % self._max_voice_layers
         rate_offset = 0.0 if voice_index == 0 else (voice_index * 0.13) % 0.6 - 0.3
         vib_rate = max(0.5, self.vibrato_rate_hz + rate_offset)
@@ -270,10 +200,6 @@ class VocableSynthesizer:
         instantaneous_f0 = f0 * (2 ** (vibrato_cents / 1200.0))
         phase = 2 * np.pi * np.cumsum(instantaneous_f0) / self.sample_rate
 
-        # Glottal-style harmonic source: natural voices roll off roughly
-        # -12 dB/octave, so 1/k^1.6 reads as noticeably more "breath and
-        # body" than a flat 1/k saw while still keeping plenty of brightness
-        # for the formant filters to shape.
         max_harmonic = int(self.sample_rate / 2 / f0)
         source = np.zeros(n_samples, dtype=np.float64)
         for k in range(1, min(max_harmonic + 1, 40)):
@@ -284,11 +210,6 @@ class VocableSynthesizer:
         if peak > 0:
             source /= peak
 
-        # Formant filtering: three resonant bandpass filters, blended
-        # between each vocable's bright/dark formant endpoints by vowel_color.
-        # A humming voice is always the closed "mmm" shape regardless of
-        # whatever the Cree phoneme profile picked, since a hum has no
-        # open vowel — the mouth stays shut.
         vocable = "mmm" if is_humming else decision.vocable
         vc = decision.vowel_color
         table = self.FORMANTS.get(vocable, self.FORMANTS["aah"])
@@ -304,15 +225,8 @@ class VocableSynthesizer:
             brightness_boost = 1.0 + brightness * 0.4
             audio += resonated * weight * brightness_boost
 
-        # A little of the raw (unfiltered) source underneath gives the tone
-        # a fundamental "body" that pure formant resonances can lack.
         audio += source * 0.12
 
-        # Breath noise: filtered through the same formants at low level so
-        # it reads as air moving through a vocal tract, not static. Humming
-        # carries almost no breath noise (lips closed, air has nowhere to
-        # hiss through) — cutting this is a big part of what makes a hum
-        # actually read as a hum instead of a quiet "mmm" vowel.
         breathiness = self.breathiness * (0.2 if is_humming else 1.0)
         if breathiness > 0:
             noise = self._rng.normal(0, 1, n_samples)
@@ -374,7 +288,6 @@ class VocableSynthesizer:
             logger.error(f"Wavetable synthesis error: {e} — using sinusoidal fallback")
             return self._synthesize_sinusoidal(decision, n_samples)
 
-    # Prevents clicks at note boundaries by fading in and out
     def _apply_envelope(self, audio):
         attack_samples = min(int(0.01 * self.sample_rate), len(audio) // 4)
         release_samples = min(int(0.03 * self.sample_rate), len(audio) // 4)
@@ -385,23 +298,12 @@ class VocableSynthesizer:
 
         return audio * envelope
 
-    # Applies filters based on the Cree phoneme profile to shape the frequency content.
-    # Uses standard, numerically-stable biquad designs (shelf + notch) instead
-    # of hand-rolled coefficients, which previously risked instability/artifacts
-    # at higher brightness/nasality values.
     def _apply_phoneme_shaping(self, audio, decision):
         try:
-            # Spectral tilt based on brightness: a proper high-shelf boost
-            # rather than a 2-tap differencer (which cuts everything below
-            # its corner, not just adds highs, and was a large contributor
-            # to the thin/harsh "alien" quality at high brightness values).
             if decision.brightness > 0.55:
                 gain_db = (decision.brightness - 0.55) * 10.0  # up to ~4.5 dB
                 audio = self._high_shelf(audio, corner_hz=3200.0, gain_db=gain_db)
 
-            # Nasal anti-formant: notch around 1kHz when nasality is high,
-            # via scipy's iirnotch (guaranteed-stable) instead of a manual
-            # biquad with an unusual, unverified pole formula.
             if decision.nasality > 0.3:
                 notch_freq = 1000.0
                 q = 4.0
@@ -410,8 +312,6 @@ class VocableSynthesizer:
                 notched = lfilter(b_notch, a_notch, audio)
                 audio = audio * (1 - depth) + notched * depth
 
-                # Nasal formant boost around 250Hz gives the notch somewhere
-                # to "put" the nasal quality instead of just sounding hollow.
                 b_peak, a_peak = iirpeak(250.0, 2.0, fs=self.sample_rate)
                 nasal_boost = lfilter(b_peak, a_peak, audio)
                 audio = audio * (1 - depth * 0.3) + nasal_boost * (depth * 0.3)
@@ -427,8 +327,6 @@ class VocableSynthesizer:
             logger.error(f"Phoneme shaping error: {e}")
             return audio
 
-    # RBJ-cookbook high-shelf biquad — boosts everything above corner_hz by
-    # roughly gain_db, smoothly, without touching the low end.
     def _high_shelf(self, audio: np.ndarray, corner_hz: float, gain_db: float) -> np.ndarray:
         if gain_db <= 0:
             return audio
@@ -453,18 +351,6 @@ class VocableSynthesizer:
             logger.error(f"High-shelf filter error: {e}")
             return audio
 
-    # ------------------------------------------------------------------ #
-    # Room ambience
-    # ------------------------------------------------------------------ #
-    #
-    # Classic Schroeder/Moorer topology: four parallel comb filters (each a
-    # simple feedback delay, y[n] = x[n] + g*y[n-d]) feeding into two series
-    # allpass filters (which diffuse the sound without coloring its tone).
-    # It's a cheap, decades-old design, but it's exactly the right tool
-    # here — it's fast (all four combs + both allpasses run through
-    # scipy's compiled lfilter, no Python-level sample loop) and it's what
-    # gives a choir voice the sense of standing in a room with other
-    # singers instead of being pasted on top of a dry mix.
     _COMB_DELAYS_MS   = (29.7, 37.1, 41.4, 43.7)
     _COMB_FEEDBACK    = (0.805, 0.827, 0.783, 0.764)
     _ALLPASS_DELAYS_MS = (5.0, 1.7)
