@@ -43,14 +43,6 @@ class HarmonyDecision:
 
 
 class HarmonyEngine:
-    # Legacy fixed-interval semitone offsets, kept only for the CLI
-    # `--interval` flag / `set_interval()` so existing scripts and tests that
-    # ask for a specific fixed interval keep working. The primary, default
-    # behaviour of the engine is now driven entirely by the accompaniment
-    # mode system below (AccompanimentModeSelector + ModeFunctions), which is
-    # what actually decides *how* the robot accompanies Archer from moment to
-    # moment (shadow him, echo him, drone under him, answer him, etc.)
-    # instead of always applying one static interval.
     INTERVALS = {
         "unison": 0,
         "third":  4,
@@ -70,26 +62,13 @@ class HarmonyEngine:
         self.scale_lock = harmony_cfg["scale_lock"]
         self.sample_rate = cfg["audio"]["sample_rate"]
 
-        # Sovereignty / protocol guard — this is checked before any mode
-        # logic runs. When the protocol is disabled, or the current phoneme
-        # is flagged as protocol-sensitive, the robot goes fully silent no
-        # matter what mode is selected.
         self.protocol = ProtocolGuard(cfg)
 
-        # Accompaniment mode machinery — decides *which* musical behaviour
-        # (unison, octave, delayed echo, timbral thickening, contour
-        # following, drone, call-and-response, or fusion-only triadic
-        # harmony) the robot uses at any given moment, and computes the
-        # actual proposed pitch/action for that behaviour.
         self.mode_selector = AccompanimentModeSelector(cfg)
         self.mode_functions = ModeFunctions(cfg)
         self.ctx = MusicalContext()
         self._fusion_third_semitones = harmony_cfg.get("fusion_third_semitones", 4)
 
-        # Voice texture (solo / duet / choir) — each mode has a sensible
-        # default (see DEFAULT_TEXTURE), but it can be pinned explicitly via
-        # set_texture(), e.g. so a user can force "concert choir" on demand
-        # regardless of which accompaniment mode is currently selected.
         self.texture_params = TextureParams(cfg)
         self._texture_override: Optional[VoiceTexture] = None
 
@@ -118,7 +97,6 @@ class HarmonyEngine:
             f"protocol_enabled={self.protocol.enabled}, fusion_mode={self.mode_selector.fusion_mode}"
         )
 
-    # Given the current state of Archer's singing, decide what the robot does
     def decide(
         self,
         archer_hz: float | None,
@@ -130,12 +108,6 @@ class HarmonyEngine:
         beat_duration_s = (60.0 / tempo_bpm) if tempo_bpm > 0 else 0.5
         phrase_just_ended = phrase_state == "phrase_end"
 
-        # Update pitch history / key inference only while Archer is actually
-        # singing a detected pitch. This intentionally happens *before* the
-        # mode is chosen, and regardless of phrase_state, so that modes like
-        # call_and_response and drone_support — which specifically care about
-        # what happens once Archer goes quiet — still have pitch history and
-        # a key to work with.
         if archer_hz:
             self._pitch_history.append(archer_hz)
             self._key_infer_counter += 1
@@ -153,10 +125,6 @@ class HarmonyEngine:
             phrase_just_ended=phrase_just_ended,
         )
 
-        # Sovereignty check + mode selection happen for every frame, even
-        # silent ones — this is what lets drone_support and
-        # call_and_response actually trigger once Archer stops singing,
-        # instead of the engine going straight to a hardcoded rest.
         is_protocol_sensitive = (
             phoneme_profile is not None
             and phoneme_profile.detected_class in self.protocol.sensitive_phoneme_classes
@@ -217,10 +185,6 @@ class HarmonyEngine:
         self._current_decision = decision
         return decision
 
-    # ------------------------------------------------------------------ #
-    # Mode dispatch
-    # ------------------------------------------------------------------ #
-
     def _invoke_mode(self, mode: AccompanimentMode, ctx: MusicalContext) -> ModeProposal:
         fn = self.mode_functions
         if mode == AccompanimentMode.UNISON:
@@ -252,30 +216,18 @@ class HarmonyEngine:
         return ModeProposal(AccompanimentMode.UNISON, target, "sing",
                              note=f"manual interval override ({self._current_interval})")
 
-    # ------------------------------------------------------------------ #
-    # Pitch finalization: scale-lock + global detune
-    # ------------------------------------------------------------------ #
-
     def _finalize_pitch(self, proposal: ModeProposal, mode: AccompanimentMode) -> Optional[float]:
         target_hz = proposal.target_hz
         if target_hz is None or target_hz <= 0:
             return target_hz
 
-        # Drone support intentionally sits outside the melodic scale (it's a
-        # grounding root, not a harmony note), so it skips scale-lock.
         if self.scale_lock and mode != AccompanimentMode.DRONE:
             target_hz = self._snap_to_scale(target_hz)
 
-        # Unison should match Archer's pitch exactly rather than being
-        # nudged by a chorus-style detune.
         if self.detune_cents and mode not in (AccompanimentMode.UNISON, AccompanimentMode.DRONE):
             target_hz *= 2 ** (self.detune_cents / 1200.0)
 
         return target_hz
-
-    # ------------------------------------------------------------------ #
-    # Sing / sustain / rest resolution
-    # ------------------------------------------------------------------ #
 
     def _resolve_action(self, proposal: ModeProposal, target_hz: Optional[float]) -> str:
         if proposal.action == "rest" or target_hz is None or target_hz <= 0:
@@ -296,11 +248,6 @@ class HarmonyEngine:
         self._frames_on_current_note += 1
         return "sustain"
 
-    # ------------------------------------------------------------------ #
-    # Scale / key helpers
-    # ------------------------------------------------------------------ #
-
-    # Snaps a frequency to the nearest note in the currently detected scale
     def _snap_to_scale(self, freq_hz: float) -> float:
         try:
             midi = librosa.hz_to_midi(freq_hz)
@@ -319,8 +266,6 @@ class HarmonyEngine:
             logger.error(f"Scale snap error: {e}")
             return freq_hz
 
-    # Converts the inferred key root (a 0-11 pitch class) into an actual
-    # Hz value near Archer's current register, for use as a drone root.
     def _key_root_hz(self) -> Optional[float]:
         if not self._pitch_history:
             return None
@@ -333,7 +278,6 @@ class HarmonyEngine:
             logger.error(f"Key-root Hz conversion error: {e}")
             return None
 
-    # Figures out what key Archer is singing in — runs at most once per second
     def _infer_key(self):
         if len(self._pitch_history) < 8:
             return
@@ -377,7 +321,6 @@ class HarmonyEngine:
         except Exception as e:
             logger.error(f"Key inference error: {e}")
 
-    # Picks which vowel shape the robot should use based on the Cree phoneme profile
     def _choose_vocable(self, profile: PhonemeProfile) -> str:
         if profile is None or profile.influence < 0.1:
             defaults = ["aah", "ooo", "mmm", "hey"]
@@ -393,12 +336,6 @@ class HarmonyEngine:
         else:
             return "mmm"
 
-    # ------------------------------------------------------------------ #
-    # External controls (used by server.py / main.py)
-    # ------------------------------------------------------------------ #
-
-    # Legacy: force a fixed interval instead of mode-driven behaviour.
-    # Mostly here for the CLI (`main.py --interval fifth`) and old tests.
     def set_interval(self, interval: str):
         if interval in self.INTERVALS:
             self._current_interval = interval
@@ -413,14 +350,10 @@ class HarmonyEngine:
         self._manual_override = False
         logger.info("Manual interval override cleared — back to mode-driven accompaniment")
 
-    # Explicit opt-in for triadic harmony (contemporary/fusion only — never the default)
     def set_fusion_mode(self, enabled: bool):
         self.mode_selector.fusion_mode = bool(enabled)
         logger.info(f"Fusion mode {'ENABLED (triadic harmony)' if enabled else 'DISABLED'}")
 
-    # Force a specific voice texture (solo/duet/choir) regardless of which
-    # accompaniment mode is active — e.g. a "concert" button in the UI that
-    # blooms whatever's currently playing into a full choir.
     def set_texture(self, texture_name: str):
         try:
             self._texture_override = VoiceTexture(texture_name)

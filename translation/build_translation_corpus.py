@@ -1,14 +1,3 @@
-"""
-Walks a PlainsCree dataset directory looking for parallel file pairs
-(e.g. CreeLanguageBeautiful_cr.txt / CreeLanguageBeautiful_en.txt), reads
-them, and writes one aligned JSONL record per sentence/line to
-data/processed/parallel_cr_en.jsonl, which train_translator.py expects.
-
-Usage:
-    python -m translation.build_translation_corpus \
-        --data-dir data/PlainsCree \
-        --out data/processed/parallel_cr_en.jsonl
-"""
 import argparse
 import json
 from pathlib import Path
@@ -46,14 +35,6 @@ def read_lines(path: Path) -> List[str]:
 
 
 def extract_sentence_pairs(cr_path: Path, en_path: Path) -> List[Tuple[str, str]]:
-    """
-    Turn one Cree/English file pair into aligned (cree, english) sentence
-    pairs. When line counts match exactly, trusts the direct line-by-line
-    correspondence (cheap and reliable). When they don't match, runs a
-    length-based sentence aligner (sentence_aligner.py) to recover real
-    sentence-level pairs instead of bundling the whole file into one
-    unusable blob.
-    """
     cr_lines = read_lines(cr_path)
     en_lines = read_lines(en_path)
 

@@ -16,29 +16,17 @@ class AccompanimentMode(str, Enum):
     CONTOUR       = "contour_following"
     DRONE         = "drone_support"
     CALL_RESPONSE = "call_and_response"
-    TRIADIC       = "triadic_harmony"      # fusion-only — never selected by default
+    TRIADIC       = "triadic_harmony"      # fusion-only: never selected by default
     HUM           = "solo_humming"         # one voice, closed-mouth, barely-there
     SILENT        = "protocol_silence"
 
 
 class VoiceTexture(str, Enum):
-    """
-    How many singers render a given AccompanimentMode, and how they're
-    spread out in pitch/time/space. This is orthogonal to *what* is being
-    sung (that's the AccompanimentMode's job) — it's the production layer
-    on top: one breathy voice right next to the mic, versus a wall of
-    people singing the same line in a hall.
-    """
     SOLO   = "solo"     # a single voice
     DUET   = "duet"     # two voices, small detune/timing spread
     CHOIR  = "choir"    # many voices — the "concert" feel
 
 
-# Every mode has a natural default texture. UNISON is the one place a real
-# choir makes sense — everyone singing exactly what Archer sings, together.
-# CALL_RESPONSE and HUM are intentionally solo: one voice that's clearly
-# "listening" and answering, not a crowd. Everything else defaults to a
-# light duet so it reads as "accompanied" without swallowing Archer's voice.
 DEFAULT_TEXTURE = {
     AccompanimentMode.UNISON:        VoiceTexture.CHOIR,
     AccompanimentMode.OCTAVE:        VoiceTexture.DUET,
@@ -81,9 +69,6 @@ class MusicalContext:
         if archer_hz:
             self._timed_pitches.append((now_s, archer_hz))
             self._last_voiced_hz = archer_hz
-        # phrase_just_ended fires on the frame Archer goes silent, so
-        # archer_hz is typically None right here — use the last pitch he
-        # was actually singing, not the (empty) current one.
         if phrase_just_ended and self._last_voiced_hz is not None:
             self._phrase_final_pitches.append(self._last_voiced_hz)
 
@@ -169,18 +154,11 @@ class ModeFunctions:
             return ModeProposal(AccompanimentMode.CALL_RESPONSE, None, "rest",
                                  note="no completed phrase to respond to yet")
 
-        # "Completing" him, not just echoing him: if we know the key, answer
-        # by resolving toward the tonic rather than always sitting on a
-        # fixed interval above his last note. A phrase that ends away from
-        # the root reads as a question; landing the response on (or a step
-        # from) the root reads as a real cadence/answer instead of a copy.
         if ctx.key_root_hz:
             root = ctx.key_root_hz
             ratio = last_pitch / root
             octave_shift = round(np.log2(max(ratio, 1e-6)))
             resolved_root = root * (2 ** octave_shift)
-            # blend toward the root rather than snapping dead onto it —
-            # keeps some of his contour, still reads as resolution
             target = last_pitch * 0.35 + resolved_root * 0.65
             note = "answering Archer's phrase by resolving toward the tonic — completing the thought"
         else:
@@ -196,10 +174,6 @@ class ModeFunctions:
                              note="fusion-mode triadic harmony (explicit opt-in only)")
 
     def hum(self, ctx: MusicalContext) -> ModeProposal:
-        # Same pitch as Archer, but rendered later as a closed-mouth "mmm" —
-        # a single voice sitting quietly under/beside him rather than
-        # singing the vowel he's singing. Softer hold than unison so it
-        # breathes between his phrases instead of locking on note-for-note.
         return ModeProposal(AccompanimentMode.HUM, ctx.archer_hz, "sing",
                              hold_beats=1.5,
                              note="one voice humming quietly alongside him")
@@ -210,7 +184,6 @@ class ModeFunctions:
 
 @dataclass
 class VoiceLayerParams:
-    """Production settings the synthesizer uses to render N voices for a texture."""
     num_voices: int
     detune_spread_cents: float   # max +/- random detune per voice
     timing_jitter_ms: float      # max +/- onset offset per voice (humanizes ensemble)
@@ -220,7 +193,6 @@ class VoiceLayerParams:
 
 
 class TextureParams:
-    """Reads synthesis.texture config and hands out VoiceLayerParams per VoiceTexture."""
 
     def __init__(self, cfg: dict):
         tcfg = cfg.get("synthesis", {}).get("texture", {})

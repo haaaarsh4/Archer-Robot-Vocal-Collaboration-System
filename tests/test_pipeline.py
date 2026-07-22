@@ -108,7 +108,7 @@ class TestHarmonyEngine:
 
     def setup_method(self):
         from synthesis.harmony_engine import HarmonyEngine
-        from analysis.cree_tokenizer import PhonemeProfile
+        from analysis.phonetic_analysis import PhonemeProfile
         self.engine = HarmonyEngine()
         self.neutral_profile = PhonemeProfile()
 
@@ -223,7 +223,7 @@ class TestVocableSynthesizer:
 class TestCreeTokenizer:
 
     def setup_method(self):
-        from analysis.cree_tokenizer import CreeTokenizer
+        from analysis.phonetic_analysis import CreeTokenizer
         self.tok = CreeTokenizer()
 
     def test_disabled_returns_neutral(self):

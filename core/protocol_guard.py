@@ -6,13 +6,6 @@ from typing import Optional
 
 from loguru import logger
 
-# gpiozero is only present on Raspberry Pi-style hardware and is deliberately
-# NOT in requirements.txt, since it isn't installable/usable on a cloud host
-# like Render. Importing it unconditionally used to mean ANY import of this
-# module would throw on a cloud deploy, which is why HarmonyEngine avoided
-# wiring ProtocolGuard in at all. Guard it instead, so physical-button support
-# is simply unavailable (physical_cue_gpio_pin is ignored) everywhere except
-# real Pi hardware, and everything else still works.
 try:
     from gpiozero import Button
 except Exception:

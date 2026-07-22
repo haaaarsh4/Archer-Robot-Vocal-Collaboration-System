@@ -1,16 +1,3 @@
-"""
-Trains a single shared SentencePiece BPE tokenizer over both the Cree and
-English sides of the corpus.
-
-Why shared + subword (not per-word, like the statistical pipeline uses):
-Cree is polysynthetic - a single word can carry what English expresses as
-a whole phrase - so whole-word vocabularies blow up and most words are
-seen only once or twice, which is fatal for a small corpus. Subword units
-let the model compose meaning from morpheme-sized pieces it *has* seen
-enough times to learn something about, and a shared vocabulary lets the
-model reuse embeddings across languages instead of learning two separate,
-undertrained sets of embeddings.
-"""
 import json
 import re
 from pathlib import Path
@@ -21,8 +8,7 @@ from loguru import logger
 CORPUS_PATH = Path("data/processed/parallel_cr_en.jsonl")
 SPM_INPUT_PATH = Path("data/processed/spm_train_input.txt")
 SPM_MODEL_PREFIX = "data/models/spm"
-VOCAB_SIZE = 4000  # lower this (e.g. 2000) if training fails on a very small corpus
-
+VOCAB_SIZE = 4000  
 
 def write_spm_training_text(corpus_path: Path, out_path: Path, use_morfessor: bool = False) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,12 +61,6 @@ def train_tokenizer(vocab_size: int = VOCAB_SIZE, use_morfessor: bool = False):
 
 
 def _train_with_fallback(vocab_size: int, attempts_left: int = 5):
-    """
-    SentencePiece errors out (rather than clamping automatically) if
-    vocab_size is larger than the number of distinct subword pieces a small
-    corpus actually contains. Rather than making you guess the right number,
-    retry with the size SentencePiece itself reports as the max.
-    """
     try:
         spm.SentencePieceTrainer.train(
             input=str(SPM_INPUT_PATH),

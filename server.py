@@ -229,7 +229,6 @@ async def ws_broadcast(ws: WebSocket):
 
 @app.websocket("/ws/mic")
 async def ws_mic(ws: WebSocket):
-    """Browser streams float32 PCM -> Python runs aubio YIN -> sends back note JSON."""
     await ws.accept()
     if harmony_engine is None:
         await ws.send_text(json.dumps({"type": "error", "message": f"HarmonyEngine not loaded: {harmony_load_error}"}))
@@ -258,19 +257,7 @@ async def ws_mic(ws: WebSocket):
             if len(frame) == 0:
                 continue
 
-            # Same preprocessing path the local pipeline uses: one silence
-            # check, plus RMS normalization so quiet browser-mic input
-            # actually reaches the pitch detector at a usable level instead
-            # of being fed in raw. Previously this handler recomputed its
-            # own silence check inline and skipped normalization entirely,
-            # so the web demo and the local pipeline were quietly running
-            # on two different signal paths.
             clean_frame, is_voiced = preproc.process(frame)
-            # This call was missing entirely. Without it, rhythm.phrase_state
-            # never leaves its starting value and rhythm.current_tempo never
-            # leaves 0.0, which meant call_and_response and the tempo-based
-            # switch to contour_following could never actually trigger on
-            # this path, only in the local pipeline, which does call this.
             rhythm.push_frame(clean_frame, is_voiced)
 
             archer_hz       = None

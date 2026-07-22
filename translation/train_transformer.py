@@ -41,10 +41,6 @@ def train(epochs: int = 60, batch_size: int = 32, lr: float = 3e-4,
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_batch)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_batch)
 
-    # A smaller/more-regularized model for corpora under a few thousand
-    # pairs - a bigger model just memorizes faster, it doesn't generalize
-    # better. Tune these down further (e.g. d_model=128, layers=2) if val_ppl
-    # still climbs early.
     model = TransformerMT(
         vocab_size=dataset.sp.get_piece_size(), d_model=192, nhead=4,
         num_encoder_layers=2, num_decoder_layers=2, dim_feedforward=384, dropout=0.3,
@@ -53,8 +49,6 @@ def train(epochs: int = 60, batch_size: int = 32, lr: float = 3e-4,
         model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=weight_decay
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
-    # label_smoothing keeps the model from becoming overconfident on a
-    # small, repetitive corpus
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID, label_smoothing=0.1)
 
     best_val_loss = float("inf")
