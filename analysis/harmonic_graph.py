@@ -230,6 +230,9 @@ def main():
                 "reference_hz": round(t.reference_hz, 2),
                 "role": "drone_root" if t is drone_tone else "",
                 "protocol_sensitive": False,
+                "occurrence_count": t.occurrence_count,
+                "total_duration_s": round(t.total_duration_s, 2),
+                "max_single_hold_s": round(t.max_single_hold_s, 2),
             }
             for t in tones
         ],

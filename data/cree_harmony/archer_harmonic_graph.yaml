@@ -15,130 +15,226 @@ tones:
   reference_hz: 65.0
   role: ''
   protocol_sensitive: false
+  occurrence_count: 8
+  total_duration_s: 4.71
+  max_single_hold_s: 1.9
 - id: tone_02
   reference_hz: 67.49
   role: ''
   protocol_sensitive: false
+  occurrence_count: 13
+  total_duration_s: 2.15
+  max_single_hold_s: 0.24
 - id: tone_03
   reference_hz: 74.24
   role: ''
   protocol_sensitive: false
+  occurrence_count: 38
+  total_duration_s: 6.18
+  max_single_hold_s: 0.27
 - id: tone_04
   reference_hz: 76.85
   role: ''
   protocol_sensitive: false
+  occurrence_count: 42
+  total_duration_s: 9.98
+  max_single_hold_s: 0.75
 - id: tone_05
   reference_hz: 80.02
   role: ''
   protocol_sensitive: false
+  occurrence_count: 66
+  total_duration_s: 13.84
+  max_single_hold_s: 0.35
 - id: tone_06
   reference_hz: 83.81
   role: ''
   protocol_sensitive: false
+  occurrence_count: 22
+  total_duration_s: 4.17
+  max_single_hold_s: 0.37
 - id: tone_07
   reference_hz: 89.44
   role: ''
   protocol_sensitive: false
+  occurrence_count: 46
+  total_duration_s: 11.8
+  max_single_hold_s: 0.39
 - id: tone_08
   reference_hz: 94.34
   role: ''
   protocol_sensitive: false
+  occurrence_count: 7
+  total_duration_s: 1.73
+  max_single_hold_s: 0.34
 - id: tone_09
   reference_hz: 106.82
   role: ''
   protocol_sensitive: false
+  occurrence_count: 73
+  total_duration_s: 15.36
+  max_single_hold_s: 0.55
 - id: tone_10
   reference_hz: 116.49
   role: ''
   protocol_sensitive: false
+  occurrence_count: 86
+  total_duration_s: 21.39
+  max_single_hold_s: 0.49
 - id: drone_root
   reference_hz: 124.13
   role: drone_root
   protocol_sensitive: false
+  occurrence_count: 239
+  total_duration_s: 66.3
+  max_single_hold_s: 0.65
 - id: tone_12
   reference_hz: 138.53
   role: ''
   protocol_sensitive: false
+  occurrence_count: 266
+  total_duration_s: 62.75
+  max_single_hold_s: 1.35
 - id: tone_13
   reference_hz: 142.59
   role: ''
   protocol_sensitive: false
+  occurrence_count: 43
+  total_duration_s: 12.95
+  max_single_hold_s: 1.38
 - id: tone_14
   reference_hz: 148.69
   role: ''
   protocol_sensitive: false
+  occurrence_count: 4
+  total_duration_s: 0.74
+  max_single_hold_s: 0.27
 - id: tone_15
   reference_hz: 159.13
   role: ''
   protocol_sensitive: false
+  occurrence_count: 22
+  total_duration_s: 6.16
+  max_single_hold_s: 0.7
 - id: tone_16
   reference_hz: 214.57
   role: ''
   protocol_sensitive: false
+  occurrence_count: 10
+  total_duration_s: 2.66
+  max_single_hold_s: 0.39
 - id: tone_17
   reference_hz: 223.74
   role: ''
   protocol_sensitive: false
+  occurrence_count: 1
+  total_duration_s: 0.2
+  max_single_hold_s: 0.2
 - id: tone_18
   reference_hz: 261.51
   role: ''
   protocol_sensitive: false
+  occurrence_count: 3
+  total_duration_s: 0.72
+  max_single_hold_s: 0.31
 - id: tone_19
   reference_hz: 290.16
   role: ''
   protocol_sensitive: false
+  occurrence_count: 9
+  total_duration_s: 2.36
+  max_single_hold_s: 0.45
 - id: tone_20
   reference_hz: 319.18
   role: ''
   protocol_sensitive: false
+  occurrence_count: 23
+  total_duration_s: 7.07
+  max_single_hold_s: 1.16
 - id: tone_21
   reference_hz: 336.69
   role: ''
   protocol_sensitive: false
+  occurrence_count: 26
+  total_duration_s: 6.25
+  max_single_hold_s: 0.99
 - id: tone_22
   reference_hz: 349.07
   role: ''
   protocol_sensitive: false
+  occurrence_count: 5
+  total_duration_s: 0.95
+  max_single_hold_s: 0.28
 - id: tone_23
   reference_hz: 369.85
   role: ''
   protocol_sensitive: false
+  occurrence_count: 2
+  total_duration_s: 0.3
+  max_single_hold_s: 0.16
 - id: tone_24
   reference_hz: 412.72
   role: ''
   protocol_sensitive: false
+  occurrence_count: 5
+  total_duration_s: 1.27
+  max_single_hold_s: 0.33
 - id: tone_25
   reference_hz: 442.35
   role: ''
   protocol_sensitive: false
+  occurrence_count: 10
+  total_duration_s: 2.96
+  max_single_hold_s: 0.56
 - id: tone_26
   reference_hz: 460.6
   role: ''
   protocol_sensitive: false
+  occurrence_count: 1
+  total_duration_s: 0.13
+  max_single_hold_s: 0.13
 - id: tone_27
   reference_hz: 533.7
   role: ''
   protocol_sensitive: false
+  occurrence_count: 4
+  total_duration_s: 0.88
+  max_single_hold_s: 0.33
 - id: tone_28
   reference_hz: 567.89
   role: ''
   protocol_sensitive: false
+  occurrence_count: 28
+  total_duration_s: 6.26
+  max_single_hold_s: 0.51
 - id: tone_29
   reference_hz: 585.37
   role: ''
   protocol_sensitive: false
+  occurrence_count: 1
+  total_duration_s: 0.21
+  max_single_hold_s: 0.21
 - id: tone_30
   reference_hz: 614.83
   role: ''
   protocol_sensitive: false
+  occurrence_count: 1
+  total_duration_s: 0.31
+  max_single_hold_s: 0.31
 - id: tone_31
   reference_hz: 642.05
   role: ''
   protocol_sensitive: false
+  occurrence_count: 2
+  total_duration_s: 0.66
+  max_single_hold_s: 0.35
 - id: tone_32
   reference_hz: 667.58
   role: ''
   protocol_sensitive: false
+  occurrence_count: 2
+  total_duration_s: 0.66
+  max_single_hold_s: 0.52
 relations:
 - from_tone: drone_root
   to_tone: tone_12

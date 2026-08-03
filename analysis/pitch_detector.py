@@ -4,6 +4,80 @@ from loguru import logger
 from config.config_loader import get_config
 import librosa
 
+try:
+    import soxr  # noqa: F401 -- if present, librosa.resample can use the higher-quality soxr backend
+    _HAS_SOXR = True
+except ImportError:
+    _HAS_SOXR = False
+
+
+_RMVPE_MODEL_CACHE: dict = {}
+
+
+class _RMVPEStream:
+    TARGET_SR = 16000
+    HOP_SAMPLES_16K = 160   # RMVPE's native 10ms hop at 16kHz
+    MIN_CONTEXT_HOPS = 32   # DeepUnet's 2**5 time-downsampling needs >= this many hops of context
+
+    def __init__(self, model, source_sample_rate: int, context_seconds: float = 1.0,
+                 voicing_threshold: float = 0.03, infer_stride_hops: int = 1):
+        self._model = model
+        self._voicing_threshold = voicing_threshold
+        self._context_seconds = context_seconds
+        self._infer_stride_hops = max(1, int(infer_stride_hops))
+        self._pushes_since_infer = 0
+        self._raw_buffer = np.zeros(0, dtype=np.float32)
+        self._last_hz: float | None = None
+        self._last_conf: float = 0.0
+        self.set_source_sample_rate(source_sample_rate)
+
+    def set_source_sample_rate(self, source_sample_rate: int):
+        self._source_sr = int(source_sample_rate)
+        self._context_samples_raw = max(
+            int(self._context_seconds * self._source_sr),
+            int(self.MIN_CONTEXT_HOPS * self.HOP_SAMPLES_16K / self.TARGET_SR * self._source_sr),
+        )
+        self._min_raw_needed = int(self.HOP_SAMPLES_16K * 4 / self.TARGET_SR * self._source_sr)
+        self.reset()
+
+    def reset(self):
+        self._raw_buffer = np.zeros(0, dtype=np.float32)
+        self._pushes_since_infer = 0
+        self._last_hz = None
+        self._last_conf = 0.0
+
+    def push(self, frame: np.ndarray) -> tuple:
+        self._raw_buffer = np.concatenate([self._raw_buffer, frame.astype(np.float32)])
+        if len(self._raw_buffer) > self._context_samples_raw:
+            self._raw_buffer = self._raw_buffer[-self._context_samples_raw:]
+
+        if len(self._raw_buffer) < self._min_raw_needed:
+            return None, 0.0  # not enough audio yet for a meaningful window
+
+        self._pushes_since_infer += 1
+        if self._pushes_since_infer < self._infer_stride_hops and self._last_hz is not None:
+            return self._last_hz, self._last_conf
+        self._pushes_since_infer = 0
+
+        if self._source_sr != self.TARGET_SR:
+            audio_16k = librosa.resample(
+                self._raw_buffer,
+                orig_sr=self._source_sr, target_sr=self.TARGET_SR,
+                res_type="soxr_hq" if _HAS_SOXR else "kaiser_best",
+            )
+        else:
+            audio_16k = self._raw_buffer
+
+        f0_hops, conf_hops = self._model.infer(audio_16k, voicing_threshold=self._voicing_threshold)
+        if len(f0_hops) == 0:
+            return None, 0.0
+
+        hz = float(f0_hops[-1])
+        conf = float(conf_hops[-1])
+        self._last_hz = hz if hz > 0 else None
+        self._last_conf = conf
+        return self._last_hz, conf
+
 
 class PitchDetector:
 
@@ -17,54 +91,125 @@ class PitchDetector:
         self.min_freq             = float(cfg["pitch"]["min_frequency"])
         self.max_freq             = float(cfg["pitch"]["max_frequency"])
 
-        # "yin" is the classic time-domain method already in use here.
-        # "yinfft" is a spectral variant aubio also ships, and tends to hold
-        # up better on real-world, non-isolated audio (background noise,
-        # room tone) at a small extra CPU cost. Configurable rather than
-        # picked for you, since which one performs better depends on your
-        # actual input signal, not something to assume from a synthetic test.
         self._pitch_method = cfg["pitch"].get("method", "yin")
-        # Stored so reset() can rebuild an identical aubio object. See the
-        # note in reset() for why that rebuild exists.
         self._silence_threshold_db = cfg["preprocessing"]["silence_threshold_db"]
         self._tolerance = cfg["pitch"].get("tolerance", 0.15)
 
         self._pitch_o = self._build_pitch_object()
 
+        self._rmvpe_cfg = cfg["pitch"].get("rmvpe", {}) or {}
+        self._rmvpe_stream: _RMVPEStream | None = None
+        if self._pitch_method == "rmvpe":
+            self._load_rmvpe()
+
         self._leftovers   = np.array([], dtype=np.float32)
         self._history     = []
         self._HISTORY_LEN = 3
 
-        # How far a new pitch can drift from the last stable one, in cents,
-        # before it's treated as a genuinely new note rather than smoothed
-        # in with recent history. Without this, a real jump between two
-        # different notes gets briefly averaged into a pitch that matches
-        # neither, right at the moment it matters most.
         self._jump_tolerance_cents = cfg["pitch"].get("jump_tolerance_cents", 80.0)
         self._last_stable_hz: float | None = None
 
-        # A single frame landing far from the last stable pitch could be a
-        # real note change, or it could be one bad reading (see reset()'s
-        # docstring for where those come from). Rather than trusting it
-        # instantly, it's held as "pending" and only promoted to the new
-        # stable pitch once a second consecutive frame lands near it too.
-        # A lone bad frame in between just gets ignored, with the old
-        # stable pitch returned unchanged for that one frame.
         self._pending_jump_hz: float | None = None
 
         logger.info(
-            f"Pitch engine: aubio {self._pitch_method} (hop={self.HOP_SIZE}, buf={self.BUF_SIZE}, "
-            f"sr={self.sample_rate}, fmin={self.min_freq:.0f} Hz, fmax={self.max_freq:.0f} Hz)"
+            f"Pitch engine: {self._pitch_method} "
+            f"(hop={self.HOP_SIZE}, buf={self.BUF_SIZE}, sr={self.sample_rate}, "
+            f"fmin={self.min_freq:.0f} Hz, fmax={self.max_freq:.0f} Hz)"
         )
 
     def _build_pitch_object(self):
-        pitch_o = aubio.pitch(self._pitch_method, self.BUF_SIZE, self.HOP_SIZE, self.sample_rate)
+        aubio_method = self._pitch_method if self._pitch_method in ("yin", "yinfft") else "yin"
+        pitch_o = aubio.pitch(aubio_method, self.BUF_SIZE, self.HOP_SIZE, self.sample_rate)
         pitch_o.set_unit("Hz")
         pitch_o.set_silence(self._silence_threshold_db)
         pitch_o.set_tolerance(self._tolerance)
         return pitch_o
 
+    def _load_rmvpe(self):
+        if self._rmvpe_stream is not None:
+            return
+        from analysis.rmvpe_detector import RMVPEModel  # heavy import (torch) -- kept lazy
+
+        model_path = self._rmvpe_cfg.get("model_path", "assets/rmvpe/rmvpe.pt")
+        device = self._rmvpe_cfg.get("device", "cpu")
+        is_half = bool(self._rmvpe_cfg.get("is_half", False))
+        context_seconds = float(self._rmvpe_cfg.get("context_seconds", 1.0))
+        voicing_threshold = float(self._rmvpe_cfg.get("voicing_threshold", 0.03))
+        infer_stride_hops = int(self._rmvpe_cfg.get("infer_stride_hops", 1))
+        self._rmvpe_confidence_threshold = float(self._rmvpe_cfg.get("confidence_threshold", 0.15))
+        self._rmvpe_debug_counter = 0
+
+        cache_key = (model_path, device, is_half)
+        model = _RMVPE_MODEL_CACHE.get(cache_key)
+        if model is not None:
+            logger.info(f"RMVPE: reusing already-loaded model for '{model_path}' on {device} (warm)")
+        else:
+            try:
+                model = RMVPEModel(model_path, device=device, is_half=is_half)
+            except FileNotFoundError:
+                logger.error(
+                    f"RMVPE checkpoint not found at '{model_path}'. Download it from "
+                    "https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.pt "
+                    "and set pitch.rmvpe.model_path in config.yaml, or place it at the default "
+                    "path above. Staying on YIN for this session."
+                )
+                self._pitch_method = "yin"
+                return
+            except Exception as e:
+                logger.error(f"Failed to load RMVPE ({e}). Staying on YIN for this session.")
+                self._pitch_method = "yin"
+                return
+            _RMVPE_MODEL_CACHE[cache_key] = model
+            logger.info(f"RMVPE loaded (cold, first time) from '{model_path}' on {device} (half={is_half})")
+
+        self._rmvpe_stream = _RMVPEStream(
+            model=model, source_sample_rate=self.sample_rate,
+            context_seconds=context_seconds, voicing_threshold=voicing_threshold,
+            infer_stride_hops=infer_stride_hops,
+        )
+
+    def set_source_sample_rate(self, sample_rate: int):
+        sample_rate = int(sample_rate)
+        if sample_rate == self.sample_rate:
+            return
+        logger.info(f"Pitch detector source sample rate: {self.sample_rate} -> {sample_rate}")
+        self.sample_rate = sample_rate
+        self._pitch_o = self._build_pitch_object()
+        if self._rmvpe_stream is not None:
+            self._rmvpe_stream.set_source_sample_rate(sample_rate)
+        self.reset()
+
+    def set_method(self, method: str) -> str:
+        method = (method or "").lower()
+        if method not in ("yin", "yinfft", "rmvpe"):
+            raise ValueError(f"Unknown pitch method: {method!r} (expected yin/yinfft/rmvpe)")
+        if method == self._pitch_method:
+            return self._pitch_method
+
+        previous = self._pitch_method
+        if method == "rmvpe":
+            self._load_rmvpe()  # sets self._pitch_method itself; falls back to "yin" on failure
+            if self._rmvpe_stream is not None:
+                self._pitch_method = "rmvpe"
+        else:
+            self._pitch_method = method
+            self._pitch_o = self._build_pitch_object()
+
+        if self._pitch_method != previous:
+            logger.info(f"Pitch method switched: {previous} -> {self._pitch_method}")
+        self.reset()
+        return self._pitch_method
+
+    @property
+    def method(self) -> str:
+        return self._pitch_method
+
     def detect(self, frame: np.ndarray) -> tuple:
+        if self._pitch_method == "rmvpe" and self._rmvpe_stream is not None:
+            return self._detect_rmvpe(frame)
+        return self._detect_aubio(frame)
+
+    def _detect_aubio(self, frame: np.ndarray) -> tuple:
         samples = np.concatenate([self._leftovers, frame.astype(np.float32)])
 
         candidates: list[tuple[float, float]] = []  # (hz, confidence) for every in-range hop this call
@@ -88,28 +233,23 @@ class PitchDetector:
         smoothed_hz = self._smooth(best_hz)
         return smoothed_hz, best_conf
 
+    def _detect_rmvpe(self, frame: np.ndarray) -> tuple:
+        hz, conf = self._rmvpe_stream.push(frame)
+
+        self._rmvpe_debug_counter += 1
+        if self._rmvpe_debug_counter % 20 == 0:  # ~4x/sec at 512-sample hops @44.1kHz -- enough to see real numbers, not enough to flood the log
+            logger.debug(
+                f"[rmvpe raw] hz={hz if hz else 0:.1f} conf={conf:.3f} "
+                f"(gate: conf>={self._rmvpe_confidence_threshold}, hz in [{self.min_freq:.0f},{self.max_freq:.0f}])"
+            )
+
+        if hz is None or conf < self._rmvpe_confidence_threshold or not (self.min_freq <= hz <= self.max_freq):
+            return None, conf
+
+        smoothed_hz = self._smooth(hz)
+        return smoothed_hz, conf
+
     def _smooth(self, hz: float) -> float:
-        """
-        Median-of-recent smoothing, but aware of real jumps. A new pitch
-        more than _jump_tolerance_cents away from the last stable reading
-        is treated as a candidate new note rather than blended into recent
-        history, which is what caused a couple of frames of wrong,
-        in-between output right at the start of every real pitch change.
-
-        That candidate isn't trusted on a single frame, though. It's held
-        as pending and only promoted to the new stable pitch once a second
-        consecutive frame confirms it by landing near the same value. A
-        single stray misread (see reset()'s docstring for where those come
-        from) gets ignored instead of instantly yanking the whole tracker
-        to a wrong note, which is what was happening before: one bad frame
-        was enough to overwrite _last_stable_hz outright, and because nothing
-        after that point still agreed with it, the tracker could bounce
-        between wrong anchors for several frames in a row before the real
-        pitch caught back up on its own.
-
-        Small drift (vibrato, natural pitch wobble) still gets smoothed
-        normally, since it never crosses the jump threshold at all.
-        """
         if self._last_stable_hz is not None and self._last_stable_hz > 0:
             cents_diff = abs(1200.0 * np.log2(hz / self._last_stable_hz))
             if cents_diff > self._jump_tolerance_cents:
@@ -139,43 +279,13 @@ class PitchDetector:
         return result
 
     def reset(self):
-        """
-        Called every time the caller sees an unvoiced frame (server.py calls
-        this on every single silent frame, not just once per phrase — so
-        this runs constantly during any pause between notes).
-
-        Clearing the Python-side smoothing state here was already happening,
-        but the underlying aubio pitch object was left untouched. aubio's
-        YIN implementation keeps its own internal ring buffer of BUF_SIZE
-        (2048) samples spanning several hops of history, maintained inside
-        the C object across calls, on the assumption that it's being fed a
-        continuous audio stream. Silence still gets fed through detect() up
-        until the caller stops calling it, so the aubio object's internal
-        buffer doesn't go empty during a pause — it just sits there full of
-        stale pre-silence audio.
-
-        When singing resumes, the first several calls mix that stale
-        leftover audio with the new audio inside aubio's own window before
-        it's fully flushed out (up to BUF_SIZE / HOP_SIZE = 4 hops), which
-        can produce a handful of genuinely garbage pitch readings right at
-        the start of a new note — not just occasional jitter, but readings
-        confident enough to pass the confidence threshold. Since this reset
-        happens after every note (any brief gap between notes triggers it),
-        the effect compounds over a session: it's not that pitch detection
-        degrades on its own, it's that every new note after the first one
-        starts from a slightly corrupted analysis window.
-
-        The fix is to rebuild the aubio object itself on a real reset, so
-        it starts the next note with a clean internal buffer instead of one
-        full of the previous note's tail end. Guarded so it only rebuilds
-        once per silence, not on every one of the ~40 silent frames a second
-        that server.py's continuous reset() calls would otherwise trigger.
-        """
+        rmvpe_dirty = self._rmvpe_stream is not None and len(self._rmvpe_stream._raw_buffer) > 0
         already_clean = (
             not self._history
             and self._last_stable_hz is None
             and self._pending_jump_hz is None
             and len(self._leftovers) == 0
+            and not rmvpe_dirty
         )
         if already_clean:
             return
@@ -185,6 +295,8 @@ class PitchDetector:
         self._last_stable_hz = None
         self._pending_jump_hz = None
         self._pitch_o = self._build_pitch_object()
+        if self._rmvpe_stream is not None:
+            self._rmvpe_stream.reset()
 
     @staticmethod
     def hz_to_note_name(freq_hz: float) -> str:

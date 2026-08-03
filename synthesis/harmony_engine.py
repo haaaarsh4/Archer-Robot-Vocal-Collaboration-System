@@ -90,6 +90,16 @@ class HarmonyEngine:
         self._manual_override = False
         self._current_interval: str = "fifth"
 
+        # Forces a specific AccompanimentMode on every frame instead of
+        # letting AccompanimentModeSelector auto-pick one -- used by the
+        # offline whole-track render so a mode explicitly chosen in the
+        # UI (e.g. "Octave reinforcement") is actually what gets sung,
+        # instead of the selector silently overriding it based on tempo/
+        # sustain heuristics. The protocol/sovereignty guard below is
+        # NOT bypassed by this -- silence-when-sensitive always wins
+        # regardless of what mode was forced.
+        self._forced_mode: AccompanimentMode | None = None
+
         self._t0 = time.monotonic()
 
         logger.info(
@@ -133,6 +143,18 @@ class HarmonyEngine:
         if self._manual_override:
             proposal = self._manual_proposal(archer_hz)
             mode = AccompanimentMode.UNISON
+        elif self._forced_mode is not None:
+            # Sovereignty guard still applies even with a forced mode --
+            # protocol-off or a protocol-sensitive phoneme always wins
+            # and forces silence, no matter what was explicitly chosen.
+            if not self.protocol.enabled or is_protocol_sensitive:
+                mode = AccompanimentMode.SILENT
+                proposal = self.mode_functions.silent(
+                    "protocol is off or the current phoneme is protocol-sensitive"
+                )
+            else:
+                mode = self._forced_mode
+                proposal = self._invoke_mode(mode, self.ctx)
         else:
             mode = self.mode_selector.select(
                 protocol_enabled=self.protocol.enabled,
@@ -364,6 +386,18 @@ class HarmonyEngine:
     def clear_texture_override(self):
         self._texture_override = None
         logger.info("Voice texture back to per-mode defaults")
+
+    def set_forced_mode(self, mode_name: str | None):
+        if mode_name is None:
+            self._forced_mode = None
+            logger.info("Forced accompaniment mode cleared — back to automatic selection")
+            return
+        try:
+            self._forced_mode = AccompanimentMode(mode_name)
+            logger.info(f"Accompaniment mode forced to: {mode_name} "
+                        f"(auto-selection bypassed; protocol/silence guard still applies)")
+        except ValueError:
+            logger.warning(f"Unknown accompaniment mode '{mode_name}' — ignoring forced-mode request")
 
     def set_default_mode(self, mode_name: str):
         try:
