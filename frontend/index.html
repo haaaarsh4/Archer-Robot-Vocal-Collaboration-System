@@ -154,6 +154,12 @@
   .node-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
   .node-tech { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
   .node-pill { font-family: var(--mono); font-size: 10px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
+  .cree-lang-btn { font-size: 12px; padding: 8px 14px; border-radius: 8px; }
+  .cree-lang-btn.active { background: var(--accent, #6366f1); border-color: var(--accent, #6366f1); color: #fff; }
+  .cree-word-chip { display: inline-block; padding: 1px 6px; border-radius: 5px; margin: 0 3px 3px 0; border: 1px solid var(--border); cursor: default; }
+  .cree-word-chip.recognized { background: rgba(5,150,105,0.12); border-color: rgba(5,150,105,0.4); color: var(--green, #059669); }
+  .cree-word-chip.variant { background: rgba(217,119,6,0.12); border-color: rgba(217,119,6,0.4); color: #d97706; }
+  .cree-word-chip.unrecognized { background: rgba(220,38,38,0.08); border-color: rgba(220,38,38,0.3); color: #dc2626; text-decoration: underline dotted; }
 
   .harmony-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .harmony-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
@@ -263,6 +269,8 @@
   .mode-btn { padding: 8px 16px; border-radius: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
   .mode-btn:hover { border-color: var(--accent); color: var(--text); }
   .mode-btn.active { border-color: var(--accent); background: rgba(124,106,247,0.15); color: var(--accent2); }
+  .mode-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .mode-btn:disabled:hover { border-color: var(--border); color: var(--muted); }
   .texture-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .texture-btn { padding: 6px 14px; border-radius: 999px; font-family: var(--mono); font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; }
   .texture-btn:hover { border-color: var(--accent); color: var(--text); }
@@ -1077,6 +1085,7 @@
     <div class="nav-tabs">
       <button class="nav-tab" data-page="architecture" onclick="showPage('architecture')">Architecture</button>
       <button class="nav-tab" data-page="harmony" onclick="showPage('harmony')">Harmony</button>
+      <button class="nav-tab" data-page="synthesis" onclick="showPage('synthesis')">Synthesis</button>
       <button class="nav-tab" data-page="translation" onclick="showPage('translation')">Sentiment</button>
       <button class="nav-tab" data-page="demo" onclick="showPage('demo')">Live Demo</button>
     </div>
@@ -1108,10 +1117,11 @@
     <h1 class="hero-title">A robot that listens, then <span>sings back</span></h1>
     <p class="hero-sub">Real-time pitch detection, harmony generation, and vocal synthesis built to create a musical dialogue between a human singer and a machine.</p>
     <div class="hero-badges">
-      <span class="badge highlight">aubio YIN pitch detection</span>
+      <span class="badge highlight">aubio YIN + RMVPE pitch detection</span>
       <span class="badge">Cree vocal phonetics</span>
       <span class="badge">Key inference via Krumhansl profiles</span>
       <span class="badge">Sinusoidal vocable synthesis</span>
+      <span class="badge">Optional neural voice timbre (RVC)</span>
       <span class="badge">44100 Hz / real-time</span>
     </div>
     <div class="waveform" id="hero-waveform"></div>
@@ -1124,7 +1134,7 @@
   <section class="section">
     <div class="section-label">System Pipeline</div>
     <h2 class="section-title">From microphone to harmony, in under 100ms</h2>
-    <p class="section-body">Every frame of audio moves through nine stages before the robot makes a sound. The pipeline runs continuously at 44100 Hz, chewing through 1024-sample blocks roughly every 23 milliseconds. What follows is a full walkthrough of what actually happens, in order, from the moment sound enters the microphone to the moment the robot's voice comes out the other side.</p>
+    <p class="section-body">Every frame of audio moves through this chain before the robot makes a sound. The pipeline runs continuously at 44100 Hz, chewing through 1024-sample blocks roughly every 23 milliseconds. What follows is a full walkthrough of what actually happens, in order, from the moment sound enters the microphone to the moment the robot's voice comes out the other side.</p>
 
     <div class="prose-pipeline">
 
@@ -1176,14 +1186,14 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">analysis/pitch_detector.py</div>
           <h3 class="prose-stage-title">Pitch detection</h3>
-          <p class="prose-stage-body">This is where the system figures out what note is being sung. The 1024-sample frame gets split into two 512-sample hops, and each hop is fed through <code>aubio.pitch("yin")</code>. YIN is a time-domain autocorrelation algorithm developed specifically for monophonic pitch detection. Unlike FFT-based approaches, YIN looks at the periodicity of the waveform directly rather than its frequency components, which makes it far more robust against harmonics and overtones. A singing voice produces a rich harmonic series, and a naive FFT detector will often latch onto one of those overtones instead of the fundamental frequency. YIN avoids this by construction.</p>
-          <p class="prose-stage-body" style="margin-top: 12px;">Each hop returns two values: a frequency in Hz and a confidence score between 0 and 1. Only results in the 80 to 1200 Hz range with confidence above 0.3 are accepted. The best result from the two hops is passed through a 3-frame median smoother, which eliminates single-frame glitches without introducing noticeable lag.</p>
+          <p class="prose-stage-body">This is where the system figures out what note is being sung. There are now two ways it can do that, and you can switch between them live. The default is still fast and cheap: the 1024-sample frame is split into two 512-sample hops, and each hop is fed through <code>aubio.pitch("yin")</code>. YIN is a time-domain autocorrelation algorithm built specifically for monophonic pitch detection. Unlike FFT-based approaches, YIN looks at the periodicity of the waveform directly rather than its frequency components, which makes it far more robust against harmonics and overtones. A singing voice produces a rich harmonic series, and a naive FFT detector will often latch onto one of those overtones instead of the fundamental frequency. YIN avoids this by construction. Each hop returns a frequency and a confidence score, and only results between 65 and 1200 Hz with confidence above 0.3 are kept.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">The second option is RMVPE, a small neural network (a convolutional "DeepUnet" feeding a bidirectional GRU) that predicts pitch directly from a mel spectrogram. It is noticeably more accurate on breathy or quiet singing where YIN tends to struggle, but it is also far more expensive to run. On a CPU it can take longer than a single audio frame's real-time budget, so rather than running it on every hop, the system feeds it a rolling one-second window and only runs a fresh prediction every few hops, reusing the last result in between. This trade keeps the pipeline in real time at the cost of RMVPE's readings updating slightly less often than YIN's. Whichever method is active, the result still passes through the same jump-aware smoother: small drifts are median-smoothed over three frames, but a big jump has to be confirmed by two frames in a row before it is trusted, which stops single bad readings from producing a stray note while still letting real, fast pitch changes through immediately.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">aubio YIN</span>
+            <span class="node-pill">RMVPE (DeepUnet + BiGRU)</span>
             <span class="node-pill">512 hop size</span>
-            <span class="node-pill">2048 buf size</span>
-            <span class="node-pill">80 to 1200 Hz range</span>
-            <span class="node-pill">3-frame median smoother</span>
+            <span class="node-pill">65 to 1200 Hz range</span>
+            <span class="node-pill">jump-confirm smoothing</span>
           </div>
         </div>
       </div>
@@ -1306,12 +1316,14 @@
           <div class="prose-stage-line"></div>
         </div>
         <div class="prose-stage-content">
-          <div class="prose-stage-file">planned</div>
+          <div class="prose-stage-file">server.py: score_sentiment()</div>
           <h3 class="prose-stage-title">Reading the emotion in the English translation</h3>
-          <p class="prose-stage-body">This is the next piece being built. Once a phrase is translated, a sentiment model will read the English output and score it on two axes: valence (how negative or positive it is) and arousal (how calm or intense it is). That score becomes the SentimentProfile that the harmony engine and synthesizer use below, so a grief-laden phrase and a joyful one lead the robot to genuinely different musical choices rather than the same response regardless of meaning. The sentiment-to-sound mapping is already designed and demoed on the Translation tab, running on preview data while the live model gets connected.</p>
+          <p class="prose-stage-body">Once a phrase is translated, it gets scored on two axes: valence (how negative or positive it is) and arousal (how calm or intense it is). Valence is real, not a stand-in: it comes from VADER, a published, lexicon-based English sentiment tool. Arousal is more honest to call a first pass. There is no free, general-purpose model for "how emotionally intense is this text," so arousal is a hand-built heuristic that combines how much of the sentence VADER scored as emotionally charged at all, intensifier words like "very" or "never," exclamation marks and ALL-CAPS emphasis, and sentence length, since short, punchy lines tend to read as more intense than long ones.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Right now that valence and arousal pair drives the standalone preview on the Sentiment tab, which interval, oscillator shape, and LED color each emotion produces, so a grief-laden phrase and a joyful one clearly sound and look different there. It does not yet feed into the live harmony engine or synthesizer covered below, <code>HarmonyEngine.decide()</code> currently only takes the detected pitch, phrase state, tempo, and Cree phoneme profile. Connecting sentiment into what the robot actually sings, not just the preview, is the natural next step here.</p>
           <div class="node-tech" style="margin-top: 16px;">
-            <span class="node-pill">valence / arousal scoring</span>
-            <span class="node-pill">in progress</span>
+            <span class="node-pill">VADER valence (real)</span>
+            <span class="node-pill">heuristic arousal (v1)</span>
+            <span class="node-pill">/api/sentiment</span>
           </div>
         </div>
       </div>
@@ -1347,13 +1359,18 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">synthesis/vocable_synthesizer.py + output/timing_sync.py</div>
           <h3 class="prose-stage-title">Synthesis and playback</h3>
-          <p class="prose-stage-body">When the harmony engine issues a sing action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. The SentimentProfile from stage 4c also shapes the output: a grief state darkens the formants and adds a slow vibrato, a joyful state brightens them and opens the vowel toward a wider shape. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries.</p>
-          <p class="prose-stage-body" style="margin-top: 12px;">The synthesized audio is handed to TimingSync, which schedules playback 70 milliseconds after the note was detected. That delay is intentional. It gives the robot the feel of a real performer responding with a slight human lag, rather than an instantaneous echo that would feel mechanical. The audio is played back through sounddevice on the configured output device.</p>
+          <p class="prose-stage-body">When the harmony engine issues a sing action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries. Correction from an earlier version of this page: the sentiment reading from stage 4c does not yet feed into this live synthesis path. Right now it drives the standalone preview on the <a href="#" onclick="showPage('translation'); return false;" style="color: var(--accent2);">Sentiment tab</a>, LED color, interval, oscillator shape, only, not the formants of the robot's actual sung voice. Wiring sentiment into the live vowel shaping is a real next step, not something already happening quietly in the background.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">For duet and choir textures, the synthesizer doesn't just render one voice louder. It renders several separate layers, each with its own small pitch detune, timing offset, and formant scaling, then mixes them together, which is what actually produces the "several people singing together" feeling rather than a single voice with reverb slapped on. A small algorithmic reverb, built from a handful of comb and allpass filters, is layered on top, with more wash for a choir than a solo voice.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">This DSP voice can optionally be reskinned into a real trained singing voice before it reaches the speakers. That neural stage is entirely optional, off by default, and gets its own writeup on the new <a href="#" onclick="showPage('synthesis'); return false;" style="color: var(--accent2);">Synthesis tab</a>, since it involves a separate model, a separate process, and a real trade-off between quality and speed.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Whichever voice comes out, the synthesized audio is handed to TimingSync, which by default schedules playback 70 milliseconds after the note was detected, then nudges that further to land on the nearest upcoming beat once a tempo has been established, so the robot's entrances feel musically placed rather than just delayed. That base delay is intentional either way. It gives the robot the feel of a real performer responding with a slight human lag, rather than an instantaneous echo that would feel mechanical. The audio is played back through sounddevice on the configured output device.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">additive synthesis</span>
             <span class="node-pill">F1 / F2 formants</span>
+            <span class="node-pill">multi-voice ensemble rendering</span>
+            <span class="node-pill">algorithmic reverb</span>
             <span class="node-pill">30ms crossfade</span>
-            <span class="node-pill">70ms response delay</span>
+            <span class="node-pill">optional neural reskin</span>
+            <span class="node-pill">70ms + beat-snapped delay</span>
             <span class="node-pill">sounddevice</span>
           </div>
         </div>
@@ -1378,6 +1395,8 @@
           Start microphone
         </button>
       </div>
+
+      <div id="arch-pitch-engine" style="display: flex; align-items: center; margin-bottom: 16px;"></div>
 
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
         <span style="font-size: 13px; color: var(--muted);">Harmony interval:</span>
@@ -1628,7 +1647,7 @@
 
       <div class="harmony-card" style="grid-column: 1 / -1;">
         <div class="harmony-name">Call and response</div>
-        <div class="harmony-desc">The robot stays completely silent while Archer is actively singing a phrase. Once he pauses, it answers with the last note of what he just sang. This is the one mode built entirely around turn-taking rather than simultaneous sound, and it never sings over him.</div>
+        <div class="harmony-desc">The robot stays completely silent while Archer is actively singing a phrase. Once he pauses, it answers, resolving toward the tonic of the current key rather than just repeating his last note, so the answer feels like it completes the phrase instead of parroting it. Before a key has been worked out, it falls back to echoing the last note directly. This is the one mode built entirely around turn-taking rather than simultaneous sound, and it never sings over him.</div>
         <div class="harmony-example">
           <div>
             <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Archer finishes a phrase on</div>
@@ -1636,8 +1655,8 @@
           </div>
           <span class="note-arrow">&#8594;</span>
           <div>
-            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot answers, after he stops</div>
-            <span class="note-pill robot">E4 / 330 Hz</span>
+            <div class="overlay-label" style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">Robot answers, resolving toward C major's tonic</div>
+            <span class="note-pill robot">C4 / 261 Hz</span>
           </div>
         </div>
       </div>
@@ -1699,7 +1718,7 @@
           <div class="prose-stage-file">synthesis/accompaniment_modes.py</div>
           <h3 class="prose-stage-title">Did Archer just finish a phrase</h3>
           <p class="prose-stage-body">The engine tracks <code>phrase_state</code> as singing, phrase_end, or silence, and the selector watches for the specific transition from singing to phrase_end. When that transition just happened, meaning Archer was singing a moment ago and has now gone quiet, the selector treats it differently from ordinary silence. It returns CALL_RESPONSE.</p>
-          <p class="prose-stage-body" style="margin-top: 12px;">That mode reaches back into the pitch history, finds the last note from the phrase that just ended, and answers with it. It's the one branch in the whole priority chain built around timing rather than restraint, waiting for exactly the moment Archer stops before it responds, instead of either staying silent through the pause or trying to sing along while he's still going.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">That mode reaches back into the pitch history and takes the last note from the phrase that just ended, but it doesn't simply echo it back. If a key has been established, the response resolves toward that key's tonic instead, a blend weighted 65% toward the resolved tonic and 35% toward the exact last note, so the answer feels like it's completing the musical thought rather than just repeating it. Only when no key has been inferred yet does it fall back to a plain echo of the last note. It's the one branch in the whole priority chain built around timing rather than restraint, waiting for exactly the moment Archer stops before it responds, instead of either staying silent through the pause or trying to sing along while he's still going.</p>
         </div>
       </div>
 
@@ -1816,6 +1835,8 @@
         </button>
       </div>
 
+      <div id="harmony-pitch-engine" style="display: flex; align-items: center; margin-bottom: 16px;"></div>
+
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
         <span style="font-size: 13px; color: var(--muted);">Accompaniment mode:</span>
         <div class="mode-picker" style="margin: 0;">
@@ -1878,6 +1899,157 @@
     <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
   </footer>
 </div>
+
+<!-- ===================== SYNTHESIS / NEURAL VOICE PAGE ===================== -->
+<div id="page-synthesis" class="page">
+
+  <section class="hero">
+    <div class="hero-eyebrow">Voice Synthesis</div>
+    <h1 class="hero-title">From a generated hum to a <span>real trained voice</span></h1>
+    <p class="hero-sub">Every note the robot sings starts life the same way: a plain, generated vocable, aah, ooo, mmm, or hey, built by the DSP synthesizer. What happens after that is now a choice. It can stay that generated voice, or it can be reskinned through a real trained singing voice using RVC-style voice conversion, running on a separate process so the heavy model never gets in the way of keeping time with a live singer.</p>
+    <div class="hero-badges">
+      <span class="badge highlight">RVC-style voice conversion</span>
+      <span class="badge">HuBERT content features</span>
+      <span class="badge">RMVPE pitch extraction</span>
+      <span class="badge">FAISS index retrieval blending</span>
+      <span class="badge">Runs as a separate sidecar process</span>
+    </div>
+    <div class="waveform" id="synthesis-hero-waveform"></div>
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">synthesis/vocable_synthesizer.py + neural_env/rvc_server.py + synthesis/neural_timbre.py</div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Why two stages -->
+  <section class="section">
+    <div class="section-label">Two Voices, Not One</div>
+    <h2 class="section-title">The generated voice always exists. The trained voice is optional on top of it.</h2>
+    <p class="section-body">The DSP synthesizer is the foundation and it never goes away. It models each vocable with two formant peaks, F1 and F2, the resonant frequencies that give a vowel its character, and shifts them in real time using the Cree phoneme profile and the sentiment reading covered on the other tabs. This is fast, it's cheap to run, and it's what keeps the robot able to respond to a live singer with no perceptible lag.</p>
+    <p class="section-body" style="margin-top: 12px;">The neural stage sits after it, not instead of it. It takes whatever the DSP synthesizer produced and runs it through a trained voice conversion model, so the pitch and timing still come from the DSP layer and the harmony engine, but the actual timbre, the thing that makes a voice sound like a specific person, comes from a real trained model. It is switched off by default. If it's off, not installed, or its model files are missing, the pipeline behaves exactly as it did before this stage existed: pure DSP output, nothing silently degraded.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- How the neural stage works -->
+  <section class="section">
+    <div class="section-label">How The Neural Stage Works</div>
+    <h2 class="section-title">A separate process, on purpose</h2>
+    <p class="section-body">The neural voice model is heavy. Running it in the same process as the real-time pipeline would mean one slow inference call could stall every other connection on the server while it runs. So it lives in its own FastAPI process, a sidecar, started separately and talked to over HTTP. The main pipeline sends it audio and gets converted audio back. If the sidecar isn't running, or hasn't finished loading, the main app just keeps singing in the plain DSP voice.</p>
+
+    <div class="prose-pipeline">
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">1</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">neural_env/infer/hubert.py</div>
+          <h3 class="prose-stage-title">Extracting what was actually said</h3>
+          <p class="prose-stage-body">The DSP audio first goes through HuBERT, a speech model that turns raw audio into a sequence of features describing its phonetic content, independent of who's voicing it. This is the part of voice conversion that carries the "words," or in this case the vocable shapes and their timing, forward into the new voice.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">HuBERT (fairseq base, RVC v1/v2 layers)</span>
+            <span class="node-pill">shared across all loaded voices</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">2</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">analysis/rmvpe_detector.py</div>
+          <h3 class="prose-stage-title">Extracting the pitch, again, separately</h3>
+          <p class="prose-stage-body">The neural voice model needs its own accurate read on pitch to reconstruct the melody correctly. This uses the same RMVPE network described on the Architecture tab, run again here specifically for the conversion step, since the target voice's pitch has to line up exactly with what the HuBERT features are carrying.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">RMVPE</span>
+            <span class="node-pill">shared model cache</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">neural_env/rvc_pipeline.py</div>
+          <h3 class="prose-stage-title">Blending in the trained voice's own character</h3>
+          <p class="prose-stage-body">Each trained voice comes with a FAISS index built from that voice's own training data. The extracted content features are partially replaced with their nearest neighbors in that index, controlled by an index rate (0.66 by default), which is what actually pulls the output toward sounding like the specific trained voice rather than a generic conversion. A separate protect setting (0.33 by default) shields unvoiced consonants and breath sounds from being overwritten by this blend, since those sounds carry very little pitch information and are the easiest part of a voice conversion to damage.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">FAISS nearest-neighbor index</span>
+            <span class="node-pill">index_rate 0.66</span>
+            <span class="node-pill">protect 0.33</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose-stage" style="--line-display: none;">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">4</div>
+          <div class="prose-stage-line" style="display: none;"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">neural_env/rvc_pipeline.py: RVCOfflineVoice</div>
+          <h3 class="prose-stage-title">Generating the final audio</h3>
+          <p class="prose-stage-body">The blended features and the extracted pitch go into the trained voice's own generator network, which produces the final waveform in that voice's timbre and target sample rate. The result is what gets sent back to the main pipeline, resampled and mixed in place of the plain DSP audio.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">trained generator (.pth)</span>
+            <span class="node-pill">per-voice target sample rate</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Where it's actually used -->
+  <section class="section">
+    <div class="section-label">Where This Shows Up</div>
+    <h2 class="section-title">Three different ways to reach the neural voice</h2>
+    <p class="section-body">Because the neural stage is genuinely slow on a CPU, often 50 to 500 milliseconds per call, it can't just be dropped into the live microphone path the same way YIN or the DSP synthesizer are. Instead there are three separate ways to reach it, each trading speed for something else.</p>
+
+    <div class="cree-grid">
+      <div class="cree-card">
+        <div class="node-tag" style="margin-bottom: 16px;">Live mic and demo pages</div>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 12px;"><strong style="color: var(--text);">One note at a time, instant then swapped.</strong> When the neural stage is on, the browser plays its own instant local oscillator the moment a note is detected, exactly as it always has, and separately asks the backend to render that same note through the real DSP synthesizer and the neural voice. When that response comes back a fraction of a second later, it quietly swaps in for the note that's already sounding. The robot never goes silent waiting on the network.</p>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 12px;">There's an honest limit here worth stating plainly. The sidecar can only actually convert one note at a time. If a new note arrives while the previous one is still converting, that new note is skipped entirely rather than queued, and just plays in the plain DSP voice. On a CPU with no GPU, that trade keeps the robot from ever falling further and further behind a live singer. It does mean that during a fast, busy phrase, not every single note will carry the trained voice's timbre, some will fall back to the generated one.</p>
+        <div class="node-tech"><span class="node-pill">POST /api/neural/render</span><span class="node-pill">single-flight, skips rather than queues</span></div>
+      </div>
+      <div class="cree-card">
+        <div class="node-tag" style="margin-bottom: 16px;">Upload MP3, Neural mode</div>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 12px;"><strong style="color: var(--text);">The whole track, rendered once.</strong> Instead of trying to keep up live, the entire uploaded track is analyzed and accompanied by the DSP synthesizer first, start to finish, and only then is the full resulting robot part sent through the neural sidecar in one single call. Nothing plays until that one call finishes, which is the same trade-off as bouncing a track in a DAW instead of monitoring a plugin live.</p>
+        <div class="node-tech"><span class="node-pill">POST /api/neural/render-track</span></div>
+      </div>
+      <div class="cree-card" style="grid-column: 1 / -1;">
+        <div class="node-tag" style="margin-bottom: 16px;">Upload MP3, direct conversion</div>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 12px;"><strong style="color: var(--text);">Re-voicing the track itself, not a generated accompaniment.</strong> This skips the harmony engine and the DSP synthesizer entirely and sends the uploaded audio's own real content straight through the trained voice, the same idea as the model inference tab in the original RVC tools. The output is the uploaded track, re-sung in the trained voice, rather than a second part layered next to it. It works best on an isolated vocal stem; if the uploaded file has instrumentals mixed in, those get converted too. This endpoint exists on the backend, but its toggle in the Upload MP3 panel is currently switched off in the interface while it gets more testing.</p>
+        <div class="node-tech"><span class="node-pill">POST /api/neural/convert-track</span><span class="node-pill">backend ready, UI toggle currently disabled</span></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Config + honest limitations -->
+  <section class="section">
+    <div class="section-label">Setup And Current Limits</div>
+    <h2 class="section-title">What it takes to run, and what it doesn't do yet</h2>
+    <p class="section-body">The neural stage needs a trained voice model (a .pth file) and, ideally, its matching FAISS index, both pointed to from <code>synthesis.neural.model_paths</code> and <code>index_paths</code> in config.yaml, plus the RMVPE checkpoint used for pitch extraction. The sidecar is started separately from the main server and needs to be reachable at the URL set in <code>synthesis.neural.sidecar_url</code> before <code>synthesis.neural.enabled</code> does anything. <code>GET /neural/status</code> reports whether it's loaded, enabled, and actually reachable, and the sidecar's own <code>GET /health</code> reports which specific voices loaded successfully.</p>
+    <p class="section-body" style="margin-top: 12px;">There's no GPU attached right now, so the sidecar runs on CPU, which is the reason the live path renders one note at a time instead of streaming continuously, and the reason the whole-track modes exist at all. Multiple trained voices can be configured at once, and a voice index picks between them per request. One current honest limitation: when a concert choir texture is layered into several DSP voices before the neural stage runs, the whole mixed choir currently gets reskinned through a single trained voice rather than each layer getting its own distinct timbre. Giving each choir layer its own trained voice is a real next step, not something this page is pretending already works.</p>
+  </section>
+
+  <footer>
+    <span>Archer-Robot Vocal Collaboration System</span>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
+  </footer>
+</div>
+
 <!-- ===================== TRANSLATION PAGE ===================== -->
 <div id="page-translation" class="page">
 
@@ -2087,7 +2259,8 @@
       <div class="cree-demo-layout">
         <div class="cree-demo-col">
           <div class="cree-demo-col-label">Input</div>
-          <textarea class="cree-syllabics-input" id="mt-text-input" rows="3" placeholder="tanisi  or  nehiyawewin katawasisin..."></textarea>
+          <textarea class="cree-syllabics-input" id="mt-text-input" rows="3" placeholder="tanisi  or  nehiyawewin katawasisin..." oninput="onMtTextInput()"></textarea>
+          <div id="mt-word-validation" style="margin-top: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.8;"></div>
           <button class="cree-mic-trigger" style="align-self: flex-start; background: rgba(124,106,247,0.12);" onclick="runTranslationDemo()">
             <div class="cmt-dot"></div>
             Translate
@@ -2112,53 +2285,43 @@
     <h2 class="section-title">The robot that understands what you're singing about</h2>
     <p class="section-body">Pitch and rhythm tell the robot what notes to sing. This layer tells it how to feel about it. With the translation layer above turning the sung nêhiyawêwin into English, this stage reads the emotional tone of that translation, scoring it for valence (how negative or positive) and arousal (how calm or intense). That score is what actually flows back into how the robot sings and how its LED eyes light up.</p>
 
+    <p class="section-body" style="margin-top: -8px;">Right now the mapping is intentionally simple: three states, chosen by valence alone, with arousal fine-tuning just one of them. That's a deliberate first version, not the ceiling. More emotional nuance (longing, intensity as its own axis, and so on) is a natural next step once there's a trained sentiment model to drive it instead of a lexicon and a heuristic.</p>
+
     <div class="sentiment-output-grid">
 
       <div class="sentiment-output-card">
-        <div class="soc-tag">Joy / Celebration</div>
-        <div class="soc-value" style="color: var(--green);">+1.0</div>
+        <div class="soc-tag">Valence &gt; 0.15</div>
+        <div class="soc-value" style="color: var(--green);">joy</div>
         <div class="soc-name">Joyful</div>
-        <div class="soc-desc">Harmony shifts to a major third or octave. Waveform becomes a bright sawtooth. Formant brightness peaks and vowels open towards a bright "hey" shape. LED eyes pulse steady green at full brightness. Gain multiplier is at maximum.</div>
+        <div class="soc-desc">Harmony picks a major third if arousal is high, or a perfect fifth if it's calmer. Waveform is a triangle. Vibrato is off. LED eyes glow green with the pupil at its widest.</div>
         <div class="node-tech" style="margin-top: 14px;">
-          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">+4 or +12 semitones</span>
-          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">sawtooth</span>
-          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">LED: full green</span>
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">+4 (arousal &gt; 0.5) or +7</span>
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">triangle</span>
+          <span class="node-pill" style="color: var(--green); border-color: rgba(5,150,105,0.3);">LED: green, wide pupil</span>
         </div>
       </div>
 
       <div class="sentiment-output-card">
-        <div class="soc-tag">Grief / Sorrow</div>
-        <div class="soc-value" style="color: #818cf8;">-0.7</div>
+        <div class="soc-tag">Valence &lt; -0.15</div>
+        <div class="soc-value" style="color: #818cf8;">grief</div>
         <div class="soc-name">Grief</div>
-        <div class="soc-desc">Harmony drops to a minor third. Waveform becomes a pure sine with minimal harmonics. Formants darken towards "ooo" and "mmm" vowel shapes. Vibrato is added at 3.5 Hz. Gain drops to 75% for a softer, more interior sound. LED eyes breathe slowly in indigo.</div>
+        <div class="soc-desc">Harmony drops to a minor third. Waveform is a plain sine. A 3.5 Hz vibrato is added, the only state that gets one. LED eyes dim to indigo with the pupil at its narrowest.</div>
         <div class="node-tech" style="margin-top: 14px;">
           <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">+3 semitones</span>
-          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">sine + vibrato</span>
-          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">LED: indigo breath</span>
+          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">sine, 3.5 Hz vibrato</span>
+          <span class="node-pill" style="color: #818cf8; border-color: rgba(129,140,248,0.3);">LED: indigo, narrow pupil</span>
         </div>
       </div>
 
       <div class="sentiment-output-card">
-        <div class="soc-tag">Longing / Yearning</div>
-        <div class="soc-value" style="color: var(--accent2);">-0.2</div>
-        <div class="soc-name">Longing</div>
-        <div class="soc-desc">Harmony stays on the perfect fifth but with slow vibrato added. Crossfades between notes are extended to 60 milliseconds for a more legato feel. LED eyes dim to half brightness in a blue-violet with a gentle swell pattern, evoking distance and reaching.</div>
+        <div class="soc-tag">-0.15 to 0.15</div>
+        <div class="soc-value" style="color: var(--muted);">neutral</div>
+        <div class="soc-name">Neutral</div>
+        <div class="soc-desc">No strong positive or negative tone was detected. Harmony holds a perfect fifth, the same interval joy falls back to at low arousal. Waveform is a plain sine, vibrato is off. LED eyes stay a muted, resting color.</div>
         <div class="node-tech" style="margin-top: 14px;">
           <span class="node-pill">+7 semitones</span>
-          <span class="node-pill">60ms crossfade</span>
-          <span class="node-pill">LED: violet swell</span>
-        </div>
-      </div>
-
-      <div class="sentiment-output-card">
-        <div class="soc-tag">Intensity / Power</div>
-        <div class="soc-value" style="color: var(--orange);">+0.6 arousal</div>
-        <div class="soc-name">Intense</div>
-        <div class="soc-desc">Arousal drives waveform richness from triangle at medium to sawtooth at peak. Harmony pushes to an octave for maximum spaciousness. Tempo multiplier increases up to 1.4x. LED eyes shift to warm amber with a rapid strobe pulse that tracks the detected tempo.</div>
-        <div class="node-tech" style="margin-top: 14px;">
-          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">+12 semitones</span>
-          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">sawtooth 1.4x tempo</span>
-          <span class="node-pill" style="color: var(--orange); border-color: rgba(217,119,6,0.3);">LED: amber strobe</span>
+          <span class="node-pill">sine, no vibrato</span>
+          <span class="node-pill">LED: muted / resting</span>
         </div>
       </div>
 
@@ -2168,7 +2331,8 @@
     <div style="margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border);">
       <div class="section-label">Interactive Demo</div>
       <h3 class="section-title" style="font-size: clamp(24px, 2.5vw, 36px);">See the sentiment layer respond</h3>
-      <p class="section-body" style="margin-bottom: 0;">Pick an example phrase or use the microphone. This part is a preview built on known example phrases, since the sentiment model itself isn't trained yet, unlike the translation demo above. The microphone path simulates the full pipeline, since live speech transcription (stage 4a on the Architecture tab) isn't trained yet either.</p>
+      <p class="section-body" style="margin-bottom: 0;">Sing or speak into the mic (English words -- there's still no free speech recognizer for nêhiyawêwin, so the transcript step is English-only). Transcription runs on this server via Whisper, not your browser's built-in speech recognition -- that only works in official Chrome/Edge (it silently depends on a private Google API key), so this project records your phrase and sends the audio here instead, which works the same in every browser. A phrase gets processed once you pause speaking, not word-by-word live. Sentiment comes from two real signals blended together: valence and a first pass at arousal from the words themselves (a trained sentiment model plus an intensity heuristic), and a second arousal signal from the actual vocal delivery -- pitch range from this project's own RMVPE/YIN pitch engine, plus loudness and dynamics from the raw waveform. Say the same sentence flat and quiet vs. loud with a wide melodic range, and arousal moves accordingly, even though the words didn't change. Valence stays word-based only -- there's no reliable way to read positive-vs-negative purely from pitch and loudness without a harmonic/key reference, so this doesn't pretend otherwise.</p>
+
     </div>
 
     <div class="cree-mic-demo">
@@ -2190,18 +2354,18 @@
         <!-- INPUT COLUMN -->
         <div class="cree-demo-col">
           <div class="cree-demo-col-label">Input</div>
-          
+
           <button class="cree-mic-trigger" id="cree-mic-btn" onclick="toggleCreeMic()">
             <div class="cmt-dot"></div>
             Start microphone
           </button>
-          
+
           <div class="cree-waveform" id="cree-waveform">
             <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">waiting for audio...</div>
           </div>
-          
+
           <div class="cree-output-box">
-            <div class="cree-output-box-label">Detected syllabics</div>
+            <div class="cree-output-box-label">Transcript (appears after each phrase, once you pause)</div>
             <div class="cree-output-text placeholder" id="cree-syllabics-out">waiting for voiced phrase</div>
           </div>
 
@@ -2248,6 +2412,12 @@
             <div class="cree-emotion-row">
               <span class="cree-emotion-badge neutral" id="cree-emotion-badge">neutral</span>
               <span class="cree-emotion-desc" id="cree-emotion-desc">waiting for translation</span>
+            </div>
+
+            <div id="cree-vocal-tone-block" style="display:none; margin-top: 14px; font-family: var(--mono); font-size: 11px; color: var(--muted);">
+              <div style="color: var(--accent2, #7c6af7); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Vocal tone (from the recorded audio)</div>
+              <div id="cree-vocal-tone-detail">--</div>
+              <div style="margin-top: 4px; opacity: 0.8;">Arousal above blends word-level tone (<span id="cree-arousal-text-part">--</span>) with vocal energy (<span id="cree-arousal-audio-part">--</span>), 50/50. Valence stays word-based only -- pitch/loudness alone can't reliably signal positive vs. negative.</div>
             </div>
 
             <div class="cree-pipeline-divider"></div>
@@ -2314,7 +2484,24 @@
   <div class="demo-layout">
     <div class="demo-panel">
       <div class="demo-panel-title">Upload an MP3</div>
-      <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and sings a generated accompaniment voice alongside it.</div>
+      <div class="demo-panel-sub">Upload any audio file. The system detects pitches in real time and sings a generated accompaniment voice alongside it. Neural mode trades real-time playback for a one-time backend render in the trained voice.</div>
+      <div id="demo-upload-pitch-engine" style="display: flex; align-items: center; margin-bottom: 16px;"></div>
+      <div id="demo-voice-engine-toggle" style="display: flex; align-items: center; margin-bottom: 16px;">
+        <span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Robot voice:</span>
+        <div class="interval-picker" style="margin: 0; display: inline-flex;">
+          <button class="interval-btn active" data-engine="dsp" onclick="setDemoVoiceEngine('dsp', this)">DSP (real-time)</button>
+          <button class="interval-btn" data-engine="neural" onclick="setDemoVoiceEngine('neural', this)">Neural (offline render)</button>
+        </div>
+        <span id="demo-voice-engine-status" style="font-size: 11px; color: var(--muted); margin-left: 8px;"></span>
+      </div>
+      <div id="demo-neural-mode-toggle" style="display: flex; align-items: center; margin-bottom: 16px;">
+        <span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Neural mode:</span>
+        <div class="interval-picker" style="margin: 0; display: inline-flex;">
+          <button class="interval-btn active" data-neuralmode="live" onclick="setDemoNeuralMode('live', this)">&#9889; Live (starts immediately)</button>
+          <button class="interval-btn" data-neuralmode="full" onclick="setDemoNeuralMode('full', this)">&#127919; Full render (analyze, then play)</button>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); margin-left: 8px;">(Neural engine only)</span>
+      </div>
       <div class="demo-panel-body">
         <div class="demo-panel-col">
           <div class="upload-zone" id="upload-zone">
@@ -2350,7 +2537,8 @@
         </div>
         <div class="demo-panel-col">
           <div class="control-label">Accompaniment mode</div>
-          <div class="mode-picker">
+          <div id="demo-mode-lock-note" style="display:none;font-size:11px;color:var(--accent2);margin-bottom:8px;">&#9208; Pause playback to change the mode or texture.</div>
+          <div class="mode-picker" id="demo-mode-picker">
             <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
             <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
             <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
@@ -2361,7 +2549,7 @@
             <button class="mode-btn" data-mode="solo_humming"         onclick="setDemoMode('solo_humming', this)">Humming</button>
           </div>
           <div class="control-label" style="margin-top: 6px;">Voice texture</div>
-          <div class="texture-picker">
+          <div class="texture-picker" id="demo-texture-picker">
             <button class="texture-btn active" data-texture="solo"  onclick="setDemoTexture('solo', this)">Solo</button>
             <button class="texture-btn" data-texture="duet"  onclick="setDemoTexture('duet', this)">Duet</button>
             <button class="texture-btn" data-texture="choir" onclick="setDemoTexture('choir', this)">Concert choir</button>
@@ -2389,6 +2577,7 @@
     <div class="demo-panel">
       <div class="demo-panel-title">Sing live</div>
       <div class="demo-panel-sub">Use your microphone. Sing or hum and the system shows you what note it detects and what the robot would sing back in real time.</div>
+      <div id="demo-mic-pitch-engine" style="display: flex; align-items: center; margin: 0 0 16px 0;"></div>
       <div class="demo-panel-body">
         <div class="demo-panel-col mic-visual" style="padding: 0;">
           <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">&#127908;</button>
@@ -2441,7 +2630,7 @@
 
   <footer>
     <span>Archer-Robot Vocal Collaboration System</span>
-    <a href="https://github.com/cyanbx/Prompt-Singer" target="_blank">GitHub</a>
+    <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank">GitHub</a>
   </footer>
 </div>
 
@@ -2462,8 +2651,8 @@ if (localStorage.getItem('theme') === 'dark') {
 // ============================================================
 // PAGE SWITCHING + ROUTING
 // ============================================================
-const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', harmony: '/harmony', translation: '/sentiment', demo: '/live-demo' };
-const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'harmony': 'harmony', 'sentiment': 'translation', 'live-demo': 'demo' };
+const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', harmony: '/harmony', synthesis: '/synthesis', translation: '/sentiment', demo: '/live-demo' };
+const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'harmony': 'harmony', 'synthesis': 'synthesis', 'sentiment': 'translation', 'live-demo': 'demo' };
 
 function showPage(name, updateUrl = true) {
   if (!document.getElementById('page-' + name)) name = 'home';
@@ -2538,6 +2727,18 @@ function closeMobileNav() {
 })();
 (function() {
   const container = document.getElementById('translation-hero-waveform');
+  if (!container) return;
+  const N = 32;
+  for (let i = 0; i < N; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'waveform-bar';
+    bar.style.animationDelay = (i * 1.4 / N) + 's';
+    bar.style.height = (4 + Math.random() * 20) + 'px';
+    container.appendChild(bar);
+  }
+})();
+(function() {
+  const container = document.getElementById('synthesis-hero-waveform');
   if (!container) return;
   const N = 32;
   for (let i = 0; i < N; i++) {
@@ -2642,6 +2843,287 @@ class SmoothedPitchTracker {
     this.lastStableHz = null;
     this.pendingJumpHz = null;
   }
+}
+
+// ============================================================
+// RMVPE (server-side neural pitch tracker) — remote client
+// ============================================================
+// yinPitch() above runs entirely client-side — a few dozen lines of
+// autocorrelation. RMVPE is a trained CNN + BiGRU network (ported from
+// RVC-Project's rmvpe.py into analysis/rmvpe_detector.py) and isn't
+// something to reimplement in the browser.
+//
+// For a LIVE mic (the "Sing live" panels below), there's no way around
+// streaming audio to the backend's /ws/pitch endpoint frame-by-frame and
+// getting estimates back in real time — the audio doesn't exist yet
+// until the person sings it, so it can't be pre-analyzed.
+//
+// For the Upload-MP3 demo panel, though, the whole track already exists
+// up front the moment it's uploaded. Streaming it to /ws/pitch the same
+// way a live mic would is exactly what caused the neural-voice latency
+// bug fixed earlier: CPU inference on RMVPE routinely takes longer than
+// one audio frame's real-time budget, so the backend falls behind, and
+// what it reports drifts further from what's actually playing the
+// longer the track runs. Since the track is already fully known, RMVPE
+// pitch for the upload panel is analyzed ONCE, offline, over the whole
+// file (see ensureDemoPitchTimeline()/pollOfflinePitchAtTime() below),
+// and playback just looks up "what was the pitch at time t" instead of
+// streaming anything live. YIN is untouched either way — it's cheap
+// enough to run in real time and doesn't have this problem.
+//
+// This does mean RMVPE needs server.py running with a loaded rmvpe.pt —
+// unlike YIN, which works even with index.html served as a static file
+// with no backend at all. Each panel's toggle reports connection/
+// analysis state for exactly this reason.
+class RemotePitchClient {
+  constructor() {
+    this.ws = null;
+    this.latest = null;    // { hz, note, confidence, method } | null (null = silence/no data yet)
+    this.status = 'idle';  // 'idle' | 'connecting' | 'open' | 'error'
+    this._onStatus = null;
+  }
+
+  connect(method, sampleRate) {
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) return;
+    this.status = 'connecting';
+    this._emitStatus();
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const q = 'method=' + encodeURIComponent(method) + '&sample_rate=' + encodeURIComponent(sampleRate || 44100);
+    this.ws = new WebSocket(wsProto + '//' + location.host + '/ws/pitch?' + q);
+    this.ws.onopen  = () => { this.status = 'open'; this._emitStatus(); };
+    this.ws.onclose = () => { this.status = 'idle'; this.latest = null; this._emitStatus(); };
+    this.ws.onerror = () => { this.status = 'error'; this._emitStatus(); };
+    this.ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch (e) { return; }
+      if (msg.type === 'pitch') {
+        this.latest = { hz: msg.hz, note: msg.note, confidence: msg.confidence, method: msg.method };
+      } else if (msg.type === 'silence') {
+        this.latest = null;
+      } else if (msg.type === 'pitch_method_changed' && this._onMethodChanged) {
+        this._onMethodChanged(msg.method, msg.requested);
+      }
+    };
+  }
+
+  onStatusChange(fn) { this._onStatus = fn; }
+  onMethodChanged(fn) { this._onMethodChanged = fn; }
+  _emitStatus() { if (this._onStatus) this._onStatus(this.status); }
+
+  setMethod(method) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'set_pitch_method', method }));
+    }
+  }
+
+  sendFrame(float32Chunk) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(float32Chunk.buffer);
+    }
+  }
+
+  close() {
+    if (this.ws) { try { this.ws.close(); } catch (e) {} this.ws = null; }
+    this.latest = null;
+    this.status = 'idle';
+  }
+}
+
+// Streams raw mic audio to a RemotePitchClient. Kept separate from the
+// AnalyserNode each panel already uses for RMS/waveform display, because
+// AnalyserNode's getFloatTimeDomainData() re-reads a rolling, overlapping
+// window on every animation-frame tick (fine for a visualizer, but it'd
+// send heavily duplicated audio to the server). A ScriptProcessorNode's
+// onaudioprocess delivers each chunk of samples exactly once.
+//
+// Only used by the three LIVE-mic panels (Architecture / Harmony / Sing
+// live) below — the Upload-MP3 demo panel uses the offline whole-track
+// analysis path instead (ensureDemoPitchTimeline), since its audio isn't
+// live and doesn't need streaming.
+function attachRemotePitchSender(audioCtx, sourceNode, remoteClient) {
+  const proc = audioCtx.createScriptProcessor(2048, 1, 1);
+  const silentGain = audioCtx.createGain();
+  silentGain.gain.value = 0; // ScriptProcessorNode only fires once it reaches a destination;
+                              // route through a silent gain so it never audibly loops the mic back.
+  proc.onaudioprocess = (e) => {
+    remoteClient.sendFrame(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  sourceNode.connect(proc);
+  proc.connect(silentGain);
+  silentGain.connect(audioCtx.destination);
+  return { proc, silentGain, disconnect() {
+    try { sourceNode.disconnect(proc); } catch (e) {}
+    try { proc.disconnect(silentGain); } catch (e) {}
+    try { silentGain.disconnect(audioCtx.destination); } catch (e) {}
+  }};
+}
+
+// Renders a small YIN/RMVPE toggle + connection-status label into a
+// container, and returns { setMode(m), setStatus(s) } so callers can keep
+// it in sync without re-rendering. Shared markup/behavior across all four
+// panels below (three live-mic panels + the upload demo panel).
+// RMVPE's confidence is genuinely noisy frame-to-frame -- a real, sustained
+// note can still produce one low-confidence reading between two strong
+// ones (0.88 -> 0.04 -> 0.69 half a second apart is normal, not a glitch).
+// Wiping the smoothing tracker's whole history on every single dip below
+// the gate meant the display could never hold 2-3 consecutive good
+// readings long enough to stabilize -- it just kept getting reset,
+// producing "blank most of the time, then a couple of unstable flashes."
+// This requires several consecutive misses (a real gap, e.g. an actual
+// pause or the mode really did stop) before treating it as silence,
+// mirroring the same not-trusting-a-single-frame philosophy already used
+// elsewhere in this pipeline (pitch_detector.py's pending-jump
+// confirmation, RhythmAnalyzer's phrase_end_frames).
+function createRemotePitchHold(holdFrames = 15) {
+  return { missCount: 0, holdFrames, lastConfidence: 0 };
+}
+
+function pollRemoteRmvpePitch(remoteClient, tracker, hold) {
+  const remote = remoteClient.latest;
+  if (remote && remote.hz) {
+    hold.missCount = 0;
+    hold.lastConfidence = typeof remote.confidence === 'number' ? remote.confidence : hold.lastConfidence;
+    return tracker.push(remote.hz);
+  }
+  hold.missCount++;
+  if (hold.missCount >= hold.holdFrames) {
+    tracker.reset();
+    hold.lastConfidence = 0;
+    return null;
+  }
+  // Still within the grace period -- keep reporting the last stable pitch
+  // instead of blanking the display over what's likely just normal
+  // confidence jitter, not an actual gap in the singing.
+  return tracker.lastStableHz;
+}
+
+// ------------------------------------------------------------
+// Offline RMVPE pitch analysis for the Upload-MP3 demo panel.
+//
+// One POST to /api/pitch/analyze-track runs the whole uploaded file
+// through PitchDetector once, up front, and gets back a fixed-hop
+// timeline (server frame_size, currently 1024 samples ~= 23ms at
+// 44.1kHz) covering the entire track. Playback then just looks up the
+// nearest analyzed frame for the current time -- no live model calls,
+// no falling behind, no drift building up the longer the track plays.
+// ------------------------------------------------------------
+let demoPitchTimeline = null;           // { frameTimeS, hz: [...], confidence: [...] } | null
+let demoPitchTimelineSignature = null;  // identifies which (file, method) it covers
+let demoPitchAnalysisInFlight = false;
+let demoPitchAnalysisAbort = null;      // AbortController for the in-flight fetch
+
+function _pitchAnalysisSignature() {
+  if (!demoUploadedFile) return null;
+  return [demoUploadedFile.name, demoUploadedFile.size, 'rmvpe'].join('|');
+}
+
+// Kicks off (or reuses) the offline analysis for the currently uploaded
+// file. Safe to call repeatedly -- it no-ops if a matching timeline is
+// already cached or a matching analysis is already in flight.
+async function ensureDemoPitchTimeline() {
+  if (!demoUploadedFile) return;
+  const sig = _pitchAnalysisSignature();
+  if (demoPitchTimeline && demoPitchTimelineSignature === sig) {
+    demoPitchToggle.setStatus('ready');
+    return;
+  }
+  if (demoPitchAnalysisInFlight) return;
+
+  demoPitchAnalysisInFlight = true;
+  demoPitchToggle.setStatus('analyzing');
+  demoPitchAnalysisAbort = new AbortController();
+  try {
+    const form = new FormData();
+    form.append('file', demoUploadedFile);
+    form.append('pitch_method', 'rmvpe');
+
+    const resp = await fetch('/api/pitch/analyze-track', {
+      method: 'POST',
+      body: form,
+      signal: demoPitchAnalysisAbort.signal,
+    });
+
+    if (!resp.ok) {
+      try {
+        const j = await resp.json();
+        console.error('[pitch analyze]', j && j.error ? j.error : resp.status);
+      } catch (e) {}
+      demoPitchToggle.setStatus('error');
+      return;
+    }
+
+    const data = await resp.json();
+    demoPitchTimeline = { frameTimeS: data.frame_time_s, hz: data.hz, confidence: data.confidence };
+    demoPitchTimelineSignature = sig;
+    demoPitchToggle.setStatus('ready');
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      demoPitchToggle.setStatus('idle');
+    } else {
+      console.error('[pitch analyze] failed:', e);
+      demoPitchToggle.setStatus('error');
+    }
+  } finally {
+    demoPitchAnalysisInFlight = false;
+    demoPitchAnalysisAbort = null;
+  }
+}
+
+// Same hold/smoothing behavior as pollRemoteRmvpePitch above, just fed
+// from the precomputed timeline (looked up by elapsed playback time)
+// instead of a live RemotePitchClient's latest reading.
+function pollOfflinePitchAtTime(timeline, elapsedS, tracker, hold) {
+  if (!timeline) return null; // still analyzing (or analysis failed) -- report silence, not a guess
+  const idx = Math.round(elapsedS / timeline.frameTimeS);
+  const hz = (idx >= 0 && idx < timeline.hz.length) ? timeline.hz[idx] : null;
+  const conf = (idx >= 0 && idx < timeline.confidence.length) ? timeline.confidence[idx] : 0;
+  if (hz) {
+    hold.missCount = 0;
+    hold.lastConfidence = typeof conf === 'number' ? conf : hold.lastConfidence;
+    return tracker.push(hz);
+  }
+  hold.missCount++;
+  if (hold.missCount >= hold.holdFrames) {
+    tracker.reset();
+    hold.lastConfidence = 0;
+    return null;
+  }
+  return tracker.lastStableHz;
+}
+
+function renderPitchEngineToggle(containerId, onChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return { setMode() {}, setStatus() {} };
+  el.innerHTML =
+    '<span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Pitch engine:</span>' +
+    '<div class="interval-picker" style="margin: 0; display: inline-flex;">' +
+      '<button class="interval-btn active" data-mode="yin">YIN (local)</button>' +
+      '<button class="interval-btn" data-mode="rmvpe">RMVPE (neural)</button>' +
+    '</div>' +
+    '<span class="pitch-engine-status" style="font-size: 11px; color: var(--muted); margin-left: 8px;"></span>';
+  const buttons = el.querySelectorAll('.interval-btn');
+  const statusEl = el.querySelector('.pitch-engine-status');
+  buttons.forEach(b => {
+    b.addEventListener('click', () => {
+      buttons.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      onChange(b.dataset.mode);
+    });
+  });
+  return {
+    setMode(mode) {
+      buttons.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    },
+    setStatus(status) {
+      const labels = {
+        idle: '', connecting: 'connecting…', open: 'connected',
+        error: 'backend unreachable — is server.py running?',
+        analyzing: 'analyzing full track…', ready: 'analysis ready',
+      };
+      statusEl.textContent = labels[status] || '';
+      statusEl.style.color = status === 'error' ? 'var(--red)' : 'var(--muted)';
+    },
+  };
 }
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -2785,10 +3267,21 @@ function createAccompanimentEngine() {
           return { hz: snapToScale(singerHz, key), action: 'sing', text };
         case 'octave_reinforcement':
           if (!singerHz) return { hz: null, action: 'rest', text };
-          return { hz: snapToScale(singerHz / 2, key), action: 'sing', text };
-        case 'timbral_thickening':
+          return { hz: snapToScale(foldIntoRange(singerHz / 2, 82, 1050), key), action: 'sing', text };
+        case 'timbral_thickening': {
           if (!singerHz) return { hz: null, action: 'rest', text };
-          return { hz: snapToScale(singerHz, key) * Math.pow(2, 6 / 1200), action: 'sing', text };
+          // A FIXED +6 cent offset doesn't read as "chorus" -- it reads
+          // as "slightly sharp," because nothing about it moves. Real
+          // chorus/thickening comes from a detuning that drifts slowly
+          // over time (this is literally how a chorus audio effect and
+          // how two real singers doubling a part both work -- neither
+          // one holds a perfectly static offset from the other). A slow
+          // +/-5 cent sine drift gives that same living, blended texture
+          // instead of a static mistuning.
+          const base = snapToScale(singerHz, key);
+          const driftCents = Math.sin(now * 2 * Math.PI * 0.18) * 5;
+          return { hz: base * Math.pow(2, driftCents / 1200), action: 'sing', text };
+        }
         case 'delayed_response': {
           if (this.timedHistory.length < 3) {
             return { hz: null, action: 'rest', text: 'Not enough singing has happened yet to echo. Keep going and the echo will start trailing about a beat behind.' };
@@ -2818,24 +3311,41 @@ function createAccompanimentEngine() {
           const refHz = singerHz || this.pitchHistory[this.pitchHistory.length - 1];
           const refMidi = Math.round(hzToMidi(refHz));
           const rootHz = midiToHz(Math.floor(refMidi / 12) * 12 + key.root);
-          return { hz: rootHz / 2, action: 'sustain', text };
+          // Drone is deliberately low and grounding -- the range floor is
+          // lower than a singable note on purpose -- but it's still
+          // folded rather than left to fall wherever refHz/2 happens to
+          // land, so it can't wander into pure sub-bass inaudibility for
+          // a singer already in a low register.
+          return { hz: foldIntoRange(rootHz / 2, 55, 300), action: 'sustain', text };
         }
         case 'call_and_response': {
           if (!this.phraseFinals.length) {
             return { hz: null, action: 'rest', text: 'Waiting for a full phrase to finish. This mode only answers after a pause, never sings over the source.' };
           }
           const lastPitch = this.phraseFinals[this.phraseFinals.length - 1];
-          // "Completing" the phrase rather than echoing it: find the
-          // nearest tonic to his last note and resolve most of the way
-          // toward it, keeping a little of his contour. A phrase that
-          // ends away from the root reads as a question; landing near
-          // the root reads as an actual answer.
+          // "Completing" the phrase rather than echoing it: resolve
+          // mostly toward the nearest tonic to his last note, keeping a
+          // little of his contour. A phrase that ends away from the root
+          // reads as a question; landing near the root reads as an answer.
+          //
+          // This used to average lastPitch and the tonic directly in Hz
+          // (`lastPitch*0.35 + resolvedRoot*0.65`) and skip scale-snapping
+          // entirely -- both real bugs. Averaging in Hz is not the same
+          // as averaging pitch: it skews sharp toward whichever of the
+          // two frequencies is higher and very often lands on a note
+          // that isn't in the key at all, which reads as a wrong,
+          // dissonant answer rather than a resolved one. Interpolating in
+          // MIDI/semitone space (log-frequency) is the musically correct
+          // way to blend two pitches, and snapping the result to the
+          // inferred key afterward guarantees it's actually a note in
+          // the song, not just close to one.
           const refMidi = hzToMidi(lastPitch);
-          const rootGuessHz = midiToHz(Math.floor(refMidi / 12) * 12 + key.root);
-          const octaveShift = Math.round(Math.log2(lastPitch / rootGuessHz));
-          const resolvedRoot = rootGuessHz * Math.pow(2, octaveShift);
-          const target = lastPitch * 0.35 + resolvedRoot * 0.65;
-          return { hz: target, action: 'sing', text };
+          let rootMidi = Math.floor(refMidi / 12) * 12 + key.root;
+          while (rootMidi - refMidi > 6) rootMidi -= 12;
+          while (refMidi - rootMidi > 6) rootMidi += 12;
+          const resolvedMidi = refMidi * 0.35 + rootMidi * 0.65;
+          const target = midiToHz(resolvedMidi);
+          return { hz: snapToScale(foldIntoRange(target, 82, 1050), key), action: 'sing', text };
         }
         case 'solo_humming':
           if (!singerHz) return { hz: null, action: 'rest', text };
@@ -2863,6 +3373,23 @@ const VOICE_FORMANTS = {
   mmm: [280, 900,  2200],
   hey: [550, 1900, 2600],
 };
+
+function clampRange(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+function clamp01(x) { return clampRange(x, 0, 1); }
+
+// Keeps any computed target pitch inside a range that actually sounds
+// like a sung note by folding it up/down whole octaves (never touches
+// which pitch class it is, just which octave) instead of clamping it
+// flat against a wall. This is what stops Octave reinforcement and
+// Drone support from being able to land somewhere sub-audible/monstrous
+// in the first place, upstream of the RobotVoice fix below.
+function foldIntoRange(hz, lo, hi) {
+  if (!hz || hz <= 0) return hz;
+  let out = hz;
+  while (out < lo) out *= 2;
+  while (out > hi) out /= 2;
+  return out;
+}
 
 class RobotVoice {
   constructor(ctx, opts = {}) {
@@ -2977,17 +3504,58 @@ class RobotVoice {
     if (this._vocable === name) return;
     this._vocable = name;
     const now = this.ctx.currentTime;
-    this.formants.forEach((f, i) => f.filt.frequency.setTargetAtTime(F[i], now, 0.08));
-    this.breathFilter1.frequency.setTargetAtTime(F[0], now, 0.08);
-    this.breathFilter2.frequency.setTargetAtTime(F[1], now, 0.08);
+    const scale = this._formantScale || 1;
+    this.formants.forEach((f, i) => f.filt.frequency.setTargetAtTime(F[i] * scale, now, 0.08));
+    this.breathFilter1.frequency.setTargetAtTime(F[0] * scale, now, 0.08);
+    this.breathFilter2.frequency.setTargetAtTime(F[1] * scale, now, 0.08);
   }
 
+  // Two fixes live here, both aimed at the same complaint: modes that
+  // shift pitch down (Octave reinforcement especially) sounding like a
+  // monster/demon rather than a deeper voice.
+  //
+  // 1) The sub-oscillator below used to sit at a constant hz/2 with a
+  //    constant gain no matter what hz was. For a normal note that's a
+  //    nice bit of low-end body. But Octave reinforcement's target hz is
+  //    ALREADY an octave below the singer -- adding another octave-down
+  //    sub on top of that put the audible fundamental two full octaves
+  //    under the singer for anyone in a normal low register (e.g. a 140Hz
+  //    singer -> 70Hz robot note -> 35Hz sub), which is sub-bass rumble
+  //    territory, not a voice. `subTaper` now fades that sub out as its
+  //    own frequency drops below a real low-voice floor, so it reinforces
+  //    a genuinely low note without ever compounding a second octave-down.
+  //
+  // 2) Formants (the resonant peaks that make a vowel sound like a vowel)
+  //    used to stay pinned at fixed frequencies regardless of pitch. Real
+  //    voices don't work that way -- a bass singer's vocal tract, and so
+  //    their formants, sit measurably lower than a tenor's. Fixed formants
+  //    under a heavily pitch-shifted note is the exact mechanism behind
+  //    the classic horror-movie "pitch it down and it sounds demonic"
+  //    trick. Letting formants track a fraction (not all) of the pitch
+  //    shift keeps a low note reading as "a deeper singer" instead of
+  //    "the same singer, monstrously pitched down."
   setFrequency(hz) {
     if (!hz || hz <= 0) return;
     const now = this.ctx.currentTime;
     this.osc.frequency.setTargetAtTime(hz, now, this.glideTime);
-    this.sub.frequency.setTargetAtTime(hz / 2, now, this.glideTime);
+
+    const subHz = hz / 2;
+    this.sub.frequency.setTargetAtTime(subHz, now, this.glideTime);
+    const subTaper = clamp01((subHz - 42) / 38); // silent by ~42Hz, full strength by ~80Hz
+    this.subGain.gain.setTargetAtTime(0.3 * subTaper, now, 0.09);
+
     this.vibratoGain.gain.setTargetAtTime(hz * 0.006 * this.vibratoDepthScale, now, 0.15);
+
+    const REGISTER_REF_HZ = 220; // A3 -- comfortable mid-register reference
+    const TRACKING_AMOUNT = 0.32; // 0 = monster (fixed formants), 1 = different-person register shift
+    const formantScale = clampRange(Math.pow(hz / REGISTER_REF_HZ, TRACKING_AMOUNT), 0.74, 1.16);
+    if (formantScale !== this._formantScale) {
+      this._formantScale = formantScale;
+      const F = VOICE_FORMANTS[this._vocable] || VOICE_FORMANTS.aah;
+      this.formants.forEach((f, i) => f.filt.frequency.setTargetAtTime(F[i] * formantScale, now, 0.1));
+      this.breathFilter1.frequency.setTargetAtTime(F[0] * formantScale, now, 0.1);
+      this.breathFilter2.frequency.setTargetAtTime(F[1] * formantScale, now, 0.1);
+    }
   }
 
   setGain(g) {
@@ -3222,6 +3790,10 @@ async function toggleArchMic() {
     archBuffer = new Float32Array(archAnalyser.fftSize);
     btn.classList.add('active');
     btn.innerHTML = '<div class="mic-dot"></div>Stop microphone';
+    if (archPitchMode === 'rmvpe') {
+      archRemotePitch.connect('rmvpe', archAudioCtx.sampleRate);
+      archRemoteSender = attachRemotePitchSender(archAudioCtx, archMediaSource, archRemotePitch);
+    }
     archDetectLoop();
   } catch (e) {
     document.getElementById('arch-explanation').textContent = 'Microphone access denied. Please allow microphone access in your browser and try again.';
@@ -3231,6 +3803,9 @@ async function toggleArchMic() {
 function stopArchMic() {
   if (archMicStream) { archMicStream.getTracks().forEach(t => t.stop()); archMicStream = null; }
   if (archAnimId) { cancelAnimationFrame(archAnimId); archAnimId = null; }
+  if (archRemoteSender) { archRemoteSender.disconnect(); archRemoteSender = null; }
+  archRemotePitch.close();
+  archPitchToggle.setStatus('idle');
   if (archAudioCtx) { archAudioCtx.close(); archAudioCtx = null; }
   const btn = document.getElementById('arch-mic-btn');
   btn.classList.remove('active');
@@ -3246,26 +3821,68 @@ function stopArchMic() {
 }
 
 let archTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
+let archRmvpeHold = createRemotePitchHold();
+let archPitchMode = 'yin';
+let archRemotePitch = new RemotePitchClient();
+let archRemoteSender = null;
+const archPitchToggle = renderPitchEngineToggle('arch-pitch-engine', (mode) => {
+  archPitchMode = mode;
+  archTracker.reset();
+  if (mode === 'rmvpe') {
+    // Connect right away, whether or not the mic is running yet -- this
+    // panel always forces a 44100 AudioContext (see toggleArchMic below),
+    // so we don't need one to exist yet to know the right sample rate.
+    // Getting the handshake done now, instead of waiting for the next
+    // mic Start, is what actually fixes "why does it only connect after
+    // I've already started singing."
+    archRemotePitch.connect('rmvpe', archAudioCtx ? archAudioCtx.sampleRate : 44100);
+    if (archAudioCtx && archMediaSource) {
+      archRemoteSender = attachRemotePitchSender(archAudioCtx, archMediaSource, archRemotePitch);
+    }
+  } else {
+    if (archRemoteSender) { archRemoteSender.disconnect(); archRemoteSender = null; }
+    archRemotePitch.close();
+    archPitchToggle.setStatus('idle');
+  }
+});
+archRemotePitch.onStatusChange((s) => archPitchToggle.setStatus(s));
+
 function archDetectLoop() {
   archAnimId = requestAnimationFrame(archDetectLoop);
   if (!archAnalyser) return;
   archAnalyser.getFloatTimeDomainData(archBuffer);
   const rms = Math.sqrt(archBuffer.reduce((s,v) => s+v*v, 0) / archBuffer.length);
-  if (rms < 0.005) {
-    document.getElementById('arch-singer-note').textContent = '-';
-    document.getElementById('arch-singer-freq').textContent = '';
-    document.getElementById('arch-robot-note').textContent = '-';
-    document.getElementById('arch-robot-freq').textContent = '';
-    document.getElementById('arch-singer-box').className = 'note-box';
-    document.getElementById('arch-robot-box').className = 'note-box';
-    document.getElementById('arch-explanation').textContent = 'Listening... sing or hum into your microphone.';
-    drawPiano(null, null);
-    archTracker.reset();
-    return;
+
+  if (archPitchMode === 'rmvpe') {
+    var hz = pollRemoteRmvpePitch(archRemotePitch, archTracker, archRmvpeHold);
+    if (!hz) {
+      document.getElementById('arch-singer-note').textContent = '-';
+      document.getElementById('arch-singer-freq').textContent = '';
+      document.getElementById('arch-robot-note').textContent = '-';
+      document.getElementById('arch-robot-freq').textContent = '';
+      document.getElementById('arch-singer-box').className = 'note-box';
+      document.getElementById('arch-robot-box').className = 'note-box';
+      document.getElementById('arch-explanation').textContent = 'Listening... sing or hum into your microphone.';
+      drawPiano(null, null);
+      return;
+    }
+  } else {
+    if (rms < 0.005) {
+      document.getElementById('arch-singer-note').textContent = '-';
+      document.getElementById('arch-singer-freq').textContent = '';
+      document.getElementById('arch-robot-note').textContent = '-';
+      document.getElementById('arch-robot-freq').textContent = '';
+      document.getElementById('arch-singer-box').className = 'note-box';
+      document.getElementById('arch-robot-box').className = 'note-box';
+      document.getElementById('arch-explanation').textContent = 'Listening... sing or hum into your microphone.';
+      drawPiano(null, null);
+      archTracker.reset();
+      return;
+    }
+    var hz = yinPitch(archBuffer, archAudioCtx.sampleRate, 0.15);
   }
-  const hz = yinPitch(archBuffer, archAudioCtx.sampleRate, 0.15);
   if (!hz || hz < 65 || hz > 1200) return;
-  const smoothHz = archTracker.push(hz);
+  const smoothHz = archPitchMode === 'rmvpe' ? hz : archTracker.push(hz);
   archPitchHistory.push(smoothHz);
   if (archPitchHistory.length > 32) archPitchHistory.shift();
   const singerNote = hzToNote(smoothHz);
@@ -3348,6 +3965,7 @@ let harmonyProtocolEnabled = true;
 let harmonyAudioCtx = null, harmonyAnalyser = null, harmonyBuffer = null;
 let harmonyMicStream = null, harmonyAnimId = null, harmonyMediaSource = null;
 let harmonyTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
+let harmonyRmvpeHold = createRemotePitchHold();
 let harmonyPitchHistory = [];      // plain hz values, for key inference
 let harmonyTimedHistory = [];      // { t, hz } pairs, for delay + contour
 let harmonyPhraseFinals = [];      // last pitch of each finished phrase
@@ -3368,6 +3986,25 @@ function toggleHarmonyProtocol() {
   btn.querySelector('.protocol-btn-label').textContent = harmonyProtocolEnabled ? 'Sovereignty: ON' : 'Sovereignty: OFF';
 }
 
+let harmonyPitchMode = 'yin';
+let harmonyRemotePitch = new RemotePitchClient();
+let harmonyRemoteSender = null;
+const harmonyPitchToggle = renderPitchEngineToggle('harmony-pitch-engine', (mode) => {
+  harmonyPitchMode = mode;
+  harmonyTracker.reset();
+  if (mode === 'rmvpe') {
+    harmonyRemotePitch.connect('rmvpe', harmonyAudioCtx ? harmonyAudioCtx.sampleRate : 44100);
+    if (harmonyAudioCtx && harmonyMediaSource) {
+      harmonyRemoteSender = attachRemotePitchSender(harmonyAudioCtx, harmonyMediaSource, harmonyRemotePitch);
+    }
+  } else {
+    if (harmonyRemoteSender) { harmonyRemoteSender.disconnect(); harmonyRemoteSender = null; }
+    harmonyRemotePitch.close();
+    harmonyPitchToggle.setStatus('idle');
+  }
+});
+harmonyRemotePitch.onStatusChange((s) => harmonyPitchToggle.setStatus(s));
+
 async function toggleHarmonyMic() {
   const btn = document.getElementById('harmony-mic-btn');
   if (harmonyMicStream) { stopHarmonyMic(); return; }
@@ -3382,6 +4019,10 @@ async function toggleHarmonyMic() {
     harmonyBuffer = new Float32Array(harmonyAnalyser.fftSize);
     btn.classList.add('active');
     btn.innerHTML = '<div class="mic-dot"></div>Stop microphone';
+    if (harmonyPitchMode === 'rmvpe') {
+      harmonyRemotePitch.connect('rmvpe', harmonyAudioCtx.sampleRate);
+      harmonyRemoteSender = attachRemotePitchSender(harmonyAudioCtx, harmonyMediaSource, harmonyRemotePitch);
+    }
     harmonyDetectLoop();
   } catch (e) {
     document.getElementById('harmony-explanation').textContent = 'Microphone access denied. Please allow microphone access in your browser and try again.';
@@ -3391,6 +4032,9 @@ async function toggleHarmonyMic() {
 function stopHarmonyMic() {
   if (harmonyMicStream) { harmonyMicStream.getTracks().forEach(t => t.stop()); harmonyMicStream = null; }
   if (harmonyAnimId) { cancelAnimationFrame(harmonyAnimId); harmonyAnimId = null; }
+  if (harmonyRemoteSender) { harmonyRemoteSender.disconnect(); harmonyRemoteSender = null; }
+  harmonyRemotePitch.close();
+  harmonyPitchToggle.setStatus('idle');
   if (harmonyAudioCtx) { harmonyAudioCtx.close(); harmonyAudioCtx = null; }
   const btn = document.getElementById('harmony-mic-btn');
   btn.classList.remove('active');
@@ -3422,7 +4066,9 @@ function harmonyDetectLoop() {
   const now = performance.now() / 1000;
 
   let smoothHz = null;
-  if (rms >= 0.005) {
+  if (harmonyPitchMode === 'rmvpe') {
+    smoothHz = pollRemoteRmvpePitch(harmonyRemotePitch, harmonyTracker, harmonyRmvpeHold);
+  } else if (rms >= 0.005) {
     const hz = yinPitch(harmonyBuffer, harmonyAudioCtx.sampleRate, 0.15);
     if (hz && hz >= 65 && hz <= 1200) {
       smoothHz = harmonyTracker.push(hz);
@@ -3463,7 +4109,7 @@ function computeHarmonyMode(mode, singerHz, now) {
     }
     case 'octave_reinforcement': {
       if (!singerHz) return { hz: null, action: 'rest', text: 'Sing or hum something and the robot will answer an octave below.' };
-      return { hz: snapToScale(singerHz / 2, key), action: 'sing', text: 'Singing the same note as you, one octave below. Same harmonic content, wider register.' };
+      return { hz: snapToScale(foldIntoRange(singerHz / 2, 82, 1050), key), action: 'sing', text: 'Singing the same note as you, one octave below. Same harmonic content, wider register.' };
     }
     case 'delayed_response': {
       if (harmonyTimedHistory.length < 3) {
@@ -3502,7 +4148,7 @@ function computeHarmonyMode(mode, singerHz, now) {
       const refMidi = Math.round(hzToMidi(refHz));
       const refOctave = Math.floor(refMidi / 12);
       const rootHz = midiToHz(refOctave * 12 + key.root);
-      return { hz: rootHz / 2, action: 'sustain', text: 'Holding a low, sustained root note under your phrase, drawn from the key the robot has inferred from your recent singing. It grounds the sound rather than following your melody.' };
+      return { hz: foldIntoRange(rootHz / 2, 55, 300), action: 'sustain', text: 'Holding a low, sustained root note under your phrase, drawn from the key the robot has inferred from your recent singing. It grounds the sound rather than following your melody.' };
     }
     case 'call_and_response': {
       if (!harmonyPhraseFinals.length) {
@@ -3561,13 +4207,94 @@ function renderHarmonyResult(singerNote, singerHz, result) {
 // DEMO PAGE: MP3
 // ============================================================
 let demoAudioCtx = null, demoSource = null, demoAnalyser = null, demoSourceGain = null;
+let demoSourceDuckGain = null; // dynamic duck on top of demoSourceGain, see playAudio()/demoProgressLoop
 let demoRobotVolume = 1.0;   // 0..1.5 multiplier, from the ROBOT VOLUME slider
 let demoSourceVolume = 0.78; // 0..1.5, backing-track gain, from the TRACK VOLUME slider
+let demoDuckGain = null;     // sits between demoVoice and the speakers so NeuralNoteBridge can duck the local oscillator while a real trained-voice note plays
+let demoNeuralBridge = null; // bridges detected note onsets to /api/neural/render (see class below)
+
+// ------------------------------------------------------------
+// Neural (offline render) voice engine -- see playAudioNeural() below.
+// This is a SEPARATE path from demoNeuralBridge above: the bridge does
+// real-time per-note swaps against /api/neural/render and never really
+// keeps up live on CPU. This path instead sends the whole uploaded
+// track to /api/neural/render-track once, waits for the backend to run
+// the full analysis+synthesis+neural pipeline over the entire thing,
+// and only starts playback once that single WAV comes back.
+// ------------------------------------------------------------
+let demoVoiceEngine = 'dsp';          // 'dsp' | 'neural'
+let demoUploadedFile = null;          // the raw File, kept so it can be re-POSTed for a neural render
+let demoNeuralRenderedBuffer = null;  // decoded AudioBuffer of the last successful render
+let demoNeuralRenderSignature = null; // identifies which (file, texture, pitch method) it was rendered for
+let demoNeuralRenderInFlight = false;
+let demoNeuralRenderAbort = null;     // AbortController for the in-flight fetch, so Stop can cancel a render
+let demoNeuralSource = null;          // BufferSourceNode playing the rendered track (first layer, kept for back-compat checks)
+let demoNeuralSources = [];           // all active layers when Voice Texture is duet/choir in direct mode
+let demoNeuralGain = null;            // gain node for demoNeuralSource, driven by the ROBOT VOLUME slider
+
+function setDemoVoiceEngine(engine, btn) {
+  if (demoIsPlaying) stopAudio();  // switching engines mid-playback would leave two contradicting robot voices
+  demoVoiceEngine = engine;
+  btn.closest('#demo-voice-engine-toggle').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('demo-voice-engine-status').textContent = '';
+  // Live/Full-render only means anything on the neural path -- DSP has
+  // no trained voice model to convert real audio through at all, it
+  // always sings the generated accompaniment part regardless of this.
+  // Disabled, not hidden, same convention as every other engine-gated
+  // control on this page -- so it's never a mystery where it went.
+  document.querySelectorAll('#demo-neural-mode-toggle .interval-btn').forEach(b => {
+    b.disabled = (engine === 'dsp');
+  });
+}
+
+// 'generated' = harmony engine + VocableSynthesizer sings a new wordless
+// aah/ooo/mmm/hey part, which is what /api/neural/render-track converts.
+// 'direct'    = the uploaded track's OWN audio is sent straight through
+// RVC via /api/neural/convert-track -- no harmony engine, no vocable
+// synthesis, so whatever real content (words) is in the file survives.
+// Only meaningful with demoVoiceEngine === 'neural'; DSP mode has no
+// concept of "direct" since there's no trained voice model in that path.
+// The Voice content toggle that used to switch this is gone -- Neural
+// engine always does real words now. This is deliberately a constant,
+// not a `let`: nothing sets it anymore, so nothing should be able to.
+const demoVoiceContent = 'direct';
+
+// 'live' = converts and starts playing in short streamed chunks almost
+//          immediately (see _playDemoNeuralLive below). Fastest to hear
+//          something, but the converted-voice-only chunks don't go
+//          through _startNeuralPlayback's Accompaniment mode / Voice
+//          texture / dual-volume layering -- that layering needs one
+//          complete buffer to apply detune/delay/filtering/panning to,
+//          which a chunk-at-a-time stream doesn't have.
+// 'full' = exactly the original behavior: one blocking request for the
+//          whole track, then full mode/texture/volume layered playback.
+let demoNeuralMode = 'live';
+
+function setDemoNeuralMode(mode, btn) {
+  if (demoIsPlaying) stopAudio();
+  demoNeuralMode = mode;
+  btn.closest('#demo-neural-mode-toggle').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  demoNeuralRenderedBuffer = null;
+  demoNeuralRenderSignature = null;
+}
+
+function _neuralRenderSignature() {
+  if (!demoUploadedFile) return null;
+  if (demoVoiceContent === 'direct') {
+    return [demoUploadedFile.name, demoUploadedFile.size, 'direct'].join('|');
+  }
+  return [demoUploadedFile.name, demoUploadedFile.size, demoTexture, demoPitchMode, demoMode].join('|');
+}
 
 function setDemoRobotVolume(val) {
   demoRobotVolume = val / 100;
   const el = document.getElementById('demo-robot-vol-value');
   if (el) el.textContent = val + '%';
+  if (demoNeuralGain && demoAudioCtx) {
+    demoNeuralGain.gain.setTargetAtTime(demoRobotVolume, demoAudioCtx.currentTime, 0.05);
+  }
 }
 
 function setDemoSourceVolume(val) {
@@ -3586,8 +4313,35 @@ let demoTexture = 'solo';
 let demoVoice = null;
 let demoEngine = createAccompanimentEngine();
 let demoTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
+let demoRmvpeHold = createRemotePitchHold();
+let demoPitchMode = 'yin';
+const demoPitchToggle = renderPitchEngineToggle('demo-upload-pitch-engine', (mode) => {
+  demoPitchMode = mode;
+  demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
+  if (mode === 'rmvpe') {
+    // No live websocket here -- see the big comment above
+    // ensureDemoPitchTimeline(). The whole track already exists, so
+    // this kicks off (or reuses) one offline analysis pass instead of
+    // streaming audio frame-by-frame the way a live mic has to.
+    ensureDemoPitchTimeline();
+  } else {
+    if (demoPitchAnalysisAbort) { demoPitchAnalysisAbort.abort(); demoPitchAnalysisAbort = null; }
+    demoPitchToggle.setStatus('idle');
+  }
+});
 
+
+// Mode/texture can only be changed while paused/stopped -- switching the
+// pitch target or formant set out from under a live-rendered buffer mid-
+// playback would leave the audio and the picker's "active" state out of
+// sync, and for Neural engine it would abandon a render that's still
+// paying for itself. The picker is genuinely disabled (real `disabled`
+// attribute, see _setModeTextureControlsLocked) while something is
+// playing -- but unlike before, WHY is now visible: a caption under the
+// picker (id=demo-mode-lock-note) explains it instead of just going grey
+// with no explanation.
 function setDemoMode(mode, btn) {
+  if (demoIsPlaying) return; // must pause first -- switching mid-playback left mode and audio out of sync
   demoMode = mode;
   btn.closest('.demo-panel').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -3596,15 +4350,40 @@ function setDemoMode(mode, btn) {
 }
 
 function setDemoTexture(texture, btn) {
+  if (demoIsPlaying) return; // must pause first -- same reasoning as setDemoMode
   demoTexture = texture;
   btn.closest('.demo-panel').querySelectorAll('.texture-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   if (demoVoice) demoVoice.setTexture(texture);
 }
 
+// Accompaniment Mode / Voice Texture buttons are locked while a render is
+// playing (see setDemoMode/setDemoTexture guards above). The `title`
+// tooltip and the caption text under the picker (set here) are what were
+// missing before -- the disabled state itself is intentional, the
+// silence about *why* was the actual bug.
+function _setModeTextureControlsLocked(locked) {
+  document.querySelectorAll('#demo-mode-picker .mode-btn').forEach(b => {
+    b.disabled = locked;
+    b.title = locked ? 'Pause playback to change modes' : '';
+  });
+  document.querySelectorAll('#demo-texture-picker .texture-btn').forEach(b => {
+    b.disabled = locked;
+    b.title = locked ? 'Pause playback to change modes' : '';
+  });
+  const note = document.getElementById('demo-mode-lock-note');
+  if (note) note.style.display = locked ? '' : 'none';
+}
+
 function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
+  demoUploadedFile = file;              // kept around so a Neural render can re-POST the raw bytes later
+  demoNeuralRenderedBuffer = null;      // any previous render belonged to a different file -- invalidate it
+  demoNeuralRenderSignature = null;
+  demoPitchTimeline = null;             // same for any previously analyzed pitch timeline
+  demoPitchTimelineSignature = null;
+  if (demoPitchAnalysisAbort) { demoPitchAnalysisAbort.abort(); demoPitchAnalysisAbort = null; }
   const reader = new FileReader();
   reader.onload = async (ev) => {
     if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -3617,7 +4396,12 @@ function handleFileUpload(e) {
     drawWaveformVis(demoAudioBuffer);
     // fresh pitch/phrase history for the new track
     demoEngine = createAccompanimentEngine();
-    demoTracker.reset();
+    demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
+    // If RMVPE is already the selected pitch engine, get the offline
+    // analysis started right away in the background so it's likely
+    // already done by the time the person hits Play, instead of only
+    // starting it at that point.
+    if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
   };
   reader.readAsArrayBuffer(file);
 }
@@ -3637,7 +4421,11 @@ function drawWaveformVis(ab) {
   }
 }
 
-function togglePlay() { if (demoIsPlaying) pauseAudio(); else playAudio(); }
+function togglePlay() {
+  if (demoIsPlaying) { pauseAudio(); return; }
+  if (demoVoiceEngine === 'neural') playAudioNeural();
+  else playAudio();
+}
 
 function playAudio() {
   if (!demoAudioBuffer) return;
@@ -3647,7 +4435,14 @@ function playAudio() {
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
-  if (!demoVoice) { demoVoice = new VoiceEnsemble(demoAudioCtx).connect(demoAudioCtx.destination); demoVoice.setTexture(demoTexture); }
+  if (!demoVoice) {
+    demoDuckGain = demoAudioCtx.createGain();
+    demoDuckGain.gain.value = 1;
+    demoDuckGain.connect(demoAudioCtx.destination);
+    demoVoice = new VoiceEnsemble(demoAudioCtx).connect(demoDuckGain);
+    demoVoice.setTexture(demoTexture);
+    demoNeuralBridge = new NeuralNoteBridge(demoAudioCtx, demoDuckGain);
+  }
   demoVoice.setGain(0);
   // Duck the source track a little by default (the TRACK VOLUME slider
   // controls this from here on) so the robot's voice has headroom to
@@ -3655,38 +4450,579 @@ function playAudio() {
   // full source mix.
   if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
   demoSourceGain.gain.value = demoSourceVolume;
+  // A SECOND, separate duck stage on top of the fixed TRACK VOLUME level
+  // above -- this one moves dynamically, dipping the source a little
+  // further only in the instants the robot is actually singing (see
+  // demoProgressLoop), then releasing back to full when it rests. Two
+  // voices that never make room for each other is a big part of why the
+  // mix reads as "clashing" rather than "collaborating" -- real singers
+  // do this instinctively, backing off slightly under a harmony part.
+  if (!demoSourceDuckGain) demoSourceDuckGain = demoAudioCtx.createGain();
+  demoSourceDuckGain.gain.value = 1;
   demoSource.connect(demoAnalyser);
   demoSource.connect(demoSourceGain);
-  demoSourceGain.connect(demoAudioCtx.destination);
+  demoSourceGain.connect(demoSourceDuckGain);
+  demoSourceDuckGain.connect(demoAudioCtx.destination);
   demoSource.start(0, demoOffset);
   demoStartTime = demoAudioCtx.currentTime - demoOffset;
   demoIsPlaying = true;
   document.getElementById('play-btn').textContent = '\u23F8 Pause';
+  _setModeTextureControlsLocked(true);
+  demoSource.onended = () => { if (demoIsPlaying) stopAudio(); };
+  // No live RMVPE websocket connect here anymore -- if demoPitchMode is
+  // 'rmvpe', ensureDemoPitchTimeline() already analyzed (or is analyzing)
+  // the whole track offline, and demoProgressLoop looks pitch up from
+  // that timeline by elapsed time instead.
+  if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
+  demoProgressLoop();
+}
+
+// ------------------------------------------------------------
+// Neural (offline render) playback path.
+//
+// NeuralNoteBridge (below) fires one /api/neural/render HTTP call per
+// detected note onset and tries to swap the result in live -- on CPU
+// that single call is "multiple seconds" per neural_timbre.py's own
+// comments, while notes arrive every 100-200ms, so it was never going
+// to keep up in real time no matter how it was tuned. This path
+// sidesteps the real-time requirement entirely: the whole uploaded
+// track is sent to /api/neural/render-track ONCE, the backend runs the
+// full analysis -> harmony -> DSP synthesis -> one whole-track neural
+// conversion pipeline (no single-flight drops, no real-time budget),
+// and playback only starts once the finished WAV is back -- a batch
+// render, then a normal play, exactly as asked for.
+// ------------------------------------------------------------
+// ------------------------------------------------------------
+// Live mode: converts the uploaded track in short sequential chunks and
+// plays each one back the moment it's ready, instead of waiting for one
+// blocking request over the whole file. Same backend endpoint as Full
+// render (/api/neural/convert-track), just called once per chunk. See
+// the comment on demoNeuralMode above for what this does and doesn't
+// carry over from Full render (no Accompaniment mode/Voice texture/
+// dual-volume layering -- converted voice only).
+// ------------------------------------------------------------
+function _encodeWavBlob(float32, sampleRate) {
+  const numSamples = float32.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+  let off = 44;
+  for (let i = 0; i < numSamples; i++, off += 2) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([view], { type: 'audio/wav' });
+}
+
+let demoLiveStreamer = null; // active only while Live mode is playing -- stopped alongside pauseAudio/stopAudio
+const DEMO_LIVE_CHUNK_S = 2.5;
+
+function _checkDemoLiveComplete(streamer) {
+  if (streamer._stopped) return;
+  if (streamer.chunksDone >= streamer.total && !streamer._queue.length &&
+      !streamer._busy && streamer._activeNodes.length === 0) {
+    // Every chunk has been attempted, nothing left queued or in flight,
+    // and nothing is still audibly playing -- this IS the end, whether
+    // every chunk succeeded or some failed and got skipped.
+    if (demoIsPlaying && demoLiveStreamer === streamer) stopAudio();
+  }
+}
+
+function _playDemoNeuralLive() {
+  const statusEl = document.getElementById('demo-voice-engine-status');
+  const playBtn = document.getElementById('play-btn');
+  const data = demoAudioBuffer.getChannelData(0);
+  const sr = demoAudioBuffer.sampleRate;
+  const chunkLen = Math.floor(DEMO_LIVE_CHUNK_S * sr);
+  const startSample = Math.floor(demoOffset * sr);
+  const total = Math.max(1, Math.ceil((data.length - startSample) / chunkLen));
+
+  if (!demoNeuralGain) demoNeuralGain = demoAudioCtx.createGain();
+  demoNeuralGain.gain.value = demoRobotVolume;
+  demoNeuralGain.connect(demoAudioCtx.destination);
+
+  const streamer = {
+    _stopped: false, _busy: false, _queue: [], _playHead: 0, _activeNodes: [],
+    total, chunksDone: 0, chunksPlayed: 0,
+    totalDurationS: (data.length - startSample) / sr,
+  };
+  demoLiveStreamer = streamer;
+
+  // Chunks are chained back-to-back in the order they finish converting,
+  // NOT pinned to "chunk N starts at N*chunkLength seconds" against a
+  // simultaneously-playing original track. CPU-side conversion of a
+  // whole chunk routinely takes longer than the chunk's own duration, so
+  // pinning it to its original timestamp would mean most chunks arrive
+  // already late relative to a real-time clock and get dropped or play
+  // out of order. Chaining guarantees every chunk is eventually heard,
+  // in the right order, at the cost of the overall playback taking
+  // longer than the source track's own runtime when conversion is slow
+  // -- which on CPU, it usually is. This is why Live mode doesn't also
+  // play the dry source at the same time: there is no real-time clock
+  // here to stay in sync with.
+  const pump = async () => {
+    if (streamer._busy || streamer._stopped || !streamer._queue.length) return;
+    streamer._busy = true;
+    const { float32 } = streamer._queue.shift();
+    const chunkNum = ++streamer.chunksDone;
+    statusEl.textContent = `Converting chunk ${chunkNum}/${total}\u2026`;
+    try {
+      const blob = _encodeWavBlob(float32, sr);
+      const form = new FormData();
+      form.append('file', blob, 'chunk.wav');
+      form.append('voice_index', '0');
+      const resp = await fetch('/api/neural/convert-track', { method: 'POST', body: form });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const arrBuf = await resp.arrayBuffer();
+      if (streamer._stopped) return;
+      const audioBuf = await demoAudioCtx.decodeAudioData(arrBuf);
+      const src = demoAudioCtx.createBufferSource();
+      src.buffer = audioBuf;
+      const g = demoAudioCtx.createGain();
+      src.connect(g); g.connect(demoNeuralGain);
+      const now = demoAudioCtx.currentTime;
+      const fade = Math.min(0.05, audioBuf.duration / 2);
+      const startAt = Math.max(now + 0.04, streamer._playHead - 0.05);
+      g.gain.setValueAtTime(0, startAt);
+      g.gain.linearRampToValueAtTime(1, startAt + fade);
+      g.gain.setValueAtTime(1, Math.max(startAt + fade, startAt + audioBuf.duration - fade));
+      g.gain.linearRampToValueAtTime(0, startAt + audioBuf.duration);
+      src.start(startAt);
+      streamer._playHead = startAt + audioBuf.duration;
+      streamer._activeNodes.push(src);
+      streamer.chunksPlayed++;
+      statusEl.textContent = `Playing chunk ${chunkNum}/${total}`;
+      src.onended = () => {
+        streamer._activeNodes = streamer._activeNodes.filter(n => n !== src);
+        _checkDemoLiveComplete(streamer);
+      };
+    } catch (e) {
+      console.error('[demo live chunk]', e);
+      statusEl.textContent = `Chunk ${chunkNum}/${total} failed \u2014 skipped`;
+    } finally {
+      streamer._busy = false;
+      if (!streamer._stopped) {
+        if (streamer._queue.length) pump();
+        else _checkDemoLiveComplete(streamer);
+      }
+    }
+  };
+  streamer.pump = pump;
+
+  for (let i = 0; i < total; i++) {
+    const s = startSample + i * chunkLen;
+    const e = Math.min(s + chunkLen, data.length);
+    if (s >= e) break;
+    streamer._queue.push({ float32: data.slice(s, e) });
+  }
+
+  demoStartTime = demoAudioCtx.currentTime;
+  demoIsPlaying = true;
+  document.getElementById('play-btn').textContent = '\u23F8 Pause';
+  _setModeTextureControlsLocked(true);
+  playBtn.disabled = false;
+
+  pump();
+  _demoLiveProgressLoop(streamer);
+}
+
+// Separate from the shared demoProgressLoop() -- that one assumes a
+// demoSource/demoAnalyser playing in real time to read pitch off of,
+// none of which exists here (see the comment on the pump() function
+// above for why Live mode doesn't play a simultaneous dry source).
+// Progress here is just "how many of the chunks have actually played."
+function _demoLiveProgressLoop(streamer) {
+  if (!demoIsPlaying || demoLiveStreamer !== streamer) return;
+  const pct = streamer.total > 0 ? clamp01(streamer.chunksPlayed / streamer.total) * 100 : 0;
+  document.getElementById('progress-inner').style.width = pct + '%';
+  const elapsedApprox = (streamer.chunksPlayed / streamer.total) * streamer.totalDurationS;
+  document.getElementById('time-current').textContent = fmtTime(Math.min(elapsedApprox, streamer.totalDurationS));
+  demoAnimId = requestAnimationFrame(() => _demoLiveProgressLoop(streamer));
+}
+
+function _stopDemoLiveStreamer() {
+  if (!demoLiveStreamer) return;
+  demoLiveStreamer._stopped = true;
+  demoLiveStreamer._queue = [];
+  demoLiveStreamer._activeNodes.forEach(s => { try { s.stop(); } catch (e) {} });
+  demoLiveStreamer = null;
+}
+
+async function playAudioNeural() {
+  if (!demoAudioBuffer || !demoUploadedFile) return;
+  if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  if (demoNeuralMode === 'live') {
+    _playDemoNeuralLive();
+    return;
+  }
+
+  const sig = _neuralRenderSignature();
+  if (demoNeuralRenderedBuffer && demoNeuralRenderSignature === sig) {
+    _startNeuralPlayback();
+    return;
+  }
+  if (demoNeuralRenderInFlight) return; // a render is already running -- don't fire a second one
+
+  demoNeuralRenderInFlight = true;
+  const statusEl = document.getElementById('demo-voice-engine-status');
+  const playBtn  = document.getElementById('play-btn');
+  playBtn.disabled = true;
+  statusEl.textContent = demoVoiceContent === 'direct'
+    ? 'Converting your track through the trained voice\u2026 this can take a while for a full track.'
+    : 'Rendering neural voice\u2026 this can take a while for a full track.';
+
+  demoNeuralRenderAbort = new AbortController();
+  try {
+    const form = new FormData();
+    form.append('file', demoUploadedFile);
+    form.append('voice_index', '0');
+
+    let endpoint = '/api/neural/render-track';
+    if (demoVoiceContent === 'direct') {
+      endpoint = '/api/neural/convert-track';
+    } else {
+      form.append('texture', demoTexture);
+      form.append('pitch_method', demoPitchMode === 'rmvpe' ? 'rmvpe' : 'yin');
+      form.append('mode', demoMode);
+    }
+
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      body: form,
+      signal: demoNeuralRenderAbort.signal,
+    });
+
+    if (!resp.ok) {
+      let msg = 'Neural render failed.';
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (e) {}
+      statusEl.textContent = msg;
+      return;
+    }
+
+    const arrayBuf = await resp.arrayBuffer();
+    const decoded = await demoAudioCtx.decodeAudioData(arrayBuf);
+    demoNeuralRenderedBuffer = decoded;
+    demoNeuralRenderSignature = sig;
+    statusEl.textContent = 'Render complete.';
+    _startNeuralPlayback();
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      statusEl.textContent = 'Render cancelled.';
+    } else {
+      console.error('[neural track render] failed:', e);
+      statusEl.textContent = 'Neural render failed -- check the server logs.';
+    }
+  } finally {
+    demoNeuralRenderInFlight = false;
+    demoNeuralRenderAbort = null;
+    playBtn.disabled = false;
+  }
+}
+
+// Actually starts playback once a rendered buffer exists for the
+// current (file, texture, pitch method) combination -- used both right
+// after a fresh render and on replay/seek, where the buffer is reused
+// instead of re-rendering.
+function _startNeuralPlayback() {
+  if (!demoAudioBuffer || !demoNeuralRenderedBuffer) return;
+
+  demoSource = demoAudioCtx.createBufferSource();
+  demoSource.buffer = demoAudioBuffer;
+  demoAnalyser = demoAudioCtx.createAnalyser();
+  demoAnalyser.fftSize = 2048;
+  demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
+  demoSource.connect(demoAnalyser); // keeps the source-pitch overlay working in both modes
+
+  if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
+  demoSourceGain.gain.value = demoSourceVolume;
+  demoSource.connect(demoSourceGain);
+  demoSourceGain.connect(demoAudioCtx.destination);
+
+  // The pre-rendered robot track plays through its own gain bus; ROBOT
+  // VOLUME still works live, same slider as the DSP path.
+  demoNeuralGain = demoAudioCtx.createGain();
+  demoNeuralGain.gain.value = demoRobotVolume;
+  demoNeuralGain.connect(demoAudioCtx.destination);
+  demoNeuralSources = [];
+
+  const isDirect = (demoVoiceContent === 'direct');
+  // In 'direct' mode there's only ONE backend RVC conversion (re-running
+  // it per voice would be far too slow for a real choir), so both Voice
+  // Texture AND Accompaniment Mode are applied client-side, on top of
+  // that single converted buffer:
+  //  - Voice Texture layers N detuned+panned+reverbed copies (the choir
+  //    effect -- see _textureLayersFor).
+  //  - Accompaniment Mode applies a pitch/timing/filter transform to
+  //    ALL of those layers together (see _modeParamsFor) -- e.g. Octave
+  //    reinforcement drops the whole converted voice an octave, Call &
+  //    response gates it to only play during gaps in the source.
+  // 'Generated' content already gets both baked in server-side (the
+  // harmony engine + forced accompaniment mode run per-frame before
+  // conversion), so none of this client-side layering applies there --
+  // exactly one voice plays, matching what the server rendered.
+  const texLayers = isDirect ? _textureLayersFor(demoTexture) : [{ detuneCents: 0, delayS: 0, gain: 1, pan: 0 }];
+  const modeParams = isDirect ? _modeParamsFor(demoMode) : { detuneCents: 0, delayS: 0, lowpassHz: null, gate: false };
+  const reverbAmount = isDirect ? _reverbAmountFor(demoTexture) : 0;
+  const reverbBus = (reverbAmount > 0) ? _getReverbSend(demoAudioCtx, demoNeuralGain, reverbAmount) : null;
+
+  const playStartTime = demoAudioCtx.currentTime;
+  for (const layer of texLayers) {
+    const src = demoAudioCtx.createBufferSource();
+    src.buffer = demoNeuralRenderedBuffer;
+    src.detune.value = layer.detuneCents + modeParams.detuneCents;
+
+    let chainEnd = src;
+    if (modeParams.lowpassHz) {
+      const lp = demoAudioCtx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = modeParams.lowpassHz;
+      chainEnd.connect(lp);
+      chainEnd = lp;
+    }
+
+    const voiceGain = demoAudioCtx.createGain();
+    voiceGain.gain.value = layer.gain;
+    chainEnd.connect(voiceGain);
+
+    if (typeof layer.pan === 'number' && layer.pan !== 0 && demoAudioCtx.createStereoPanner) {
+      const panner = demoAudioCtx.createStereoPanner();
+      panner.pan.value = layer.pan;
+      voiceGain.connect(panner);
+      panner.connect(demoNeuralGain);
+      if (reverbBus) panner.connect(reverbBus);
+    } else {
+      voiceGain.connect(demoNeuralGain);
+      if (reverbBus) voiceGain.connect(reverbBus);
+    }
+
+    const startAt = playStartTime + Math.max(0, layer.delayS + modeParams.delayS);
+    src.start(startAt, demoOffset);
+    demoNeuralSources.push(src);
+  }
+  demoNeuralSource = demoNeuralSources[0] || null;
+
+  if (isDirect && modeParams.gate) {
+    // Call & response: duck the converted voice to silent while the
+    // source track is actively sounding, bring it back during gaps.
+    if (!demoCallResponseEnvelope || demoCallResponseEnvelopeBuffer !== demoAudioBuffer) {
+      demoCallResponseEnvelope = _computeCallResponseGate(demoAudioBuffer);
+      demoCallResponseEnvelopeBuffer = demoAudioBuffer;
+    }
+    _applyCallResponseGate(demoNeuralGain, demoCallResponseEnvelope, playStartTime, demoOffset, demoRobotVolume);
+  }
+
+  demoSource.start(0, demoOffset);
+  demoStartTime = demoAudioCtx.currentTime - demoOffset;
+  demoIsPlaying = true;
+  document.getElementById('play-btn').textContent = '\u23F8 Pause';
+  _setModeTextureControlsLocked(true);
   demoSource.onended = () => { if (demoIsPlaying) stopAudio(); };
   demoProgressLoop();
 }
 
+// Per-mode transform applied only in 'direct' content mode (see comment
+// above) -- 'Generated' content already gets the real per-frame harmony
+// engine behavior baked in server-side (now that render-track receives
+// `mode`), these are deliberately simpler approximations suited to
+// reshaping a SINGLE already-fixed recording rather than generating new
+// notes:
+//  - unison_shadowing / contour_following: no change. Direct mode's
+//    output already follows the source's exact melodic contour (it IS
+//    the source's melody, re-voiced) -- there's no separate generated
+//    part whose contour needs tracking, so these two are intentionally
+//    identical here.
+//  - octave_reinforcement: whole voice shifted down an octave.
+//  - timbral_thickening: a few cents of detune, chorus-like.
+//  - delayed_response: the converted voice starts audibly behind the
+//    source track instead of in sync with it.
+//  - drone_support: pitched well down and low-passed for a floor tone.
+//  - call_and_response: gated silent while the source track is playing,
+//    audible only in the gaps (see _computeCallResponseGate below).
+function _modeParamsFor(mode) {
+  switch (mode) {
+    case 'octave_reinforcement': return { detuneCents: -1200, delayS: 0,   lowpassHz: null, gate: false };
+    case 'timbral_thickening':   return { detuneCents: 9,     delayS: 0,   lowpassHz: null, gate: false };
+    case 'delayed_response':     return { detuneCents: 0,     delayS: 0.6, lowpassHz: null, gate: false };
+    case 'drone_support':        return { detuneCents: -1900, delayS: 0,   lowpassHz: 380,  gate: false };
+    case 'call_and_response':    return { detuneCents: 0,     delayS: 0,   lowpassHz: null, gate: true  };
+    default: /* unison_shadowing, contour_following */
+      return { detuneCents: 0, delayS: 0, lowpassHz: null, gate: false };
+  }
+}
+
+// Coarse RMS envelope of the source track (100ms windows + hysteresis),
+// used by Call & response to know when Archer/the source is actively
+// sounding vs. paused.
+let demoCallResponseEnvelope = null;
+let demoCallResponseEnvelopeBuffer = null;
+
+function _computeCallResponseGate(buffer) {
+  const data = buffer.getChannelData(0);
+  const sr = buffer.sampleRate;
+  const windowSize = Math.max(1, Math.floor(sr * 0.1));
+  const numWindows = Math.ceil(data.length / windowSize);
+  const rms = new Float32Array(numWindows);
+  let peak = 0;
+  for (let w = 0; w < numWindows; w++) {
+    let sum = 0;
+    const start = w * windowSize, end = Math.min(start + windowSize, data.length);
+    for (let i = start; i < end; i++) sum += data[i] * data[i];
+    rms[w] = Math.sqrt(sum / Math.max(1, end - start));
+    if (rms[w] > peak) peak = rms[w];
+  }
+  const threshold = peak * 0.12;
+  const singing = new Uint8Array(numWindows);
+  let state = 0;
+  for (let w = 0; w < numWindows; w++) {
+    if (state === 0 && rms[w] > threshold) state = 1;
+    else if (state === 1 && rms[w] < threshold * 0.6) state = 0;
+    singing[w] = state;
+  }
+  return { singing, windowSize, sr, numWindows };
+}
+
+function _applyCallResponseGate(gainNode, envelope, playStartTime, offsetS, fullValue) {
+  const { singing, windowSize, sr, numWindows } = envelope;
+  const winS = windowSize / sr;
+  const rampS = 0.08;
+  const startWin = Math.max(0, Math.floor(offsetS / winS));
+  gainNode.gain.cancelScheduledValues(playStartTime);
+  gainNode.gain.setValueAtTime(singing[startWin] ? 0.0 : fullValue, playStartTime);
+  for (let w = startWin; w < numWindows; w++) {
+    const tAudio = w * winS - offsetS;
+    if (tAudio < 0) continue;
+    const target = singing[w] ? 0.0 : fullValue;
+    gainNode.gain.linearRampToValueAtTime(target, playStartTime + tAudio + rampS);
+  }
+}
+
+// One shared algorithmic reverb (synthesized decaying noise impulse, no
+// external IR file) so the choir reads as voices in a shared room rather
+// than just several dry copies stacked on top of each other -- that
+// "several dry detuned copies" is exactly why choir vs duet was hard to
+// tell apart before. Wet amount scales with texture: solo gets almost
+// none, choir gets noticeably more room/blend.
+let _demoReverbConvolver = null;
+function _getReverbConvolver(ctx) {
+  if (_demoReverbConvolver && _demoReverbConvolver.context === ctx) return _demoReverbConvolver;
+  const duration = 2.4, decay = 3.0, sr = ctx.sampleRate;
+  const length = Math.floor(sr * duration);
+  const impulse = ctx.createBuffer(2, length, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+  }
+  const conv = ctx.createConvolver();
+  conv.buffer = impulse;
+  _demoReverbConvolver = conv;
+  return conv;
+}
+function _reverbAmountFor(texture) {
+  return { solo: 0.05, duet: 0.14, choir: 0.32 }[texture] ?? 0.05;
+}
+function _getReverbSend(ctx, dryDestination, wetAmount) {
+  const send = ctx.createGain();
+  send.gain.value = wetAmount;
+  const conv = _getReverbConvolver(ctx);
+  send.connect(conv);
+  conv.connect(dryDestination);
+  return send;
+}
+
+function _textureLayersFor(texture) {
+  const cfg = {
+    solo:  { numVoices: 1,  detuneSpreadCents: 0,    jitterMs: 0,    panSpread: 0    },
+    duet:  { numVoices: 2,  detuneSpreadCents: 12.0, jitterMs: 15.0, panSpread: 0.35 },
+    choir: { numVoices: 14, detuneSpreadCents: 22.0, jitterMs: 45.0, panSpread: 0.9  },
+  }[texture] || { numVoices: 1, detuneSpreadCents: 0, jitterMs: 0, panSpread: 0 };
+
+  const n = cfg.numVoices;
+  // Spread voices evenly across +/- the detune range AND the stereo
+  // field (with a little randomness on top) rather than fully random,
+  // so a duet reliably lands one voice left/sharp and one right/flat,
+  // and a choir actually spreads out into a wide, surrounding group
+  // instead of clustering near center like a bigger duet.
+  const perVoiceGain = (n === 1) ? 1 : (1 / Math.sqrt(n)) * 1.15;
+  const layers = [];
+  for (let i = 0; i < n; i++) {
+    const frac = (n === 1) ? 0 : (i / (n - 1)) * 2 - 1; // -1..1
+    const detuneCents = frac * cfg.detuneSpreadCents + (Math.random() - 0.5) * cfg.detuneSpreadCents * 0.15;
+    const delayS = (Math.random() * cfg.jitterMs) / 1000; // 0..jitter, staggered onsets rather than starting early
+    const pan = frac * cfg.panSpread + (Math.random() - 0.5) * cfg.panSpread * 0.2;
+    layers.push({ detuneCents, delayS, gain: perVoiceGain, pan });
+  }
+  return layers;
+}
+
 function pauseAudio() {
-  demoOffset = demoAudioCtx.currentTime - demoStartTime;
-  if (demoSource) demoSource.stop();
+  // Live mode has no simultaneously-playing demoSource to measure an
+  // offset from (see _playDemoNeuralLive) -- pausing it just stops
+  // everything and resets to the start, since resuming partway through
+  // a chunked one-shot conversion isn't something to reconstruct.
+  demoOffset = demoLiveStreamer ? 0 : (demoAudioCtx.currentTime - demoStartTime);
+  if (demoSource) { try { demoSource.stop(); } catch (e) {} }
+  demoNeuralSources.forEach(s => { try { s.stop(); } catch (e) {} });
+  demoNeuralSources = [];
+  demoNeuralSource = null;
+  _stopDemoLiveStreamer();
   if (demoVoice) demoVoice.setGain(0);
+  if (demoSourceDuckGain) demoSourceDuckGain.gain.setTargetAtTime(1, demoAudioCtx.currentTime, 0.05);
+  if (demoNeuralBridge) demoNeuralBridge.reset();
   demoIsPlaying = false;
   document.getElementById('play-btn').textContent = '\u25B6 Play with Robot Accompaniment';
   if (demoAnimId) cancelAnimationFrame(demoAnimId);
+  _setModeTextureControlsLocked(false);
 }
 
 function stopAudio() {
+  // Cancel an in-flight render (e.g. user hits Stop while it's still
+  // rendering) instead of letting it finish and try to play into a
+  // demo that's since been stopped/reset.
+  if (demoNeuralRenderAbort) { demoNeuralRenderAbort.abort(); demoNeuralRenderAbort = null; }
   if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
+  demoNeuralSources.forEach(s => { try { s.stop(); } catch(e){} });
+  demoNeuralSources = [];
+  demoNeuralSource = null;
+  _stopDemoLiveStreamer();
   if (demoVoice) demoVoice.setGain(0);
+  if (demoSourceDuckGain && demoAudioCtx) demoSourceDuckGain.gain.setTargetAtTime(1, demoAudioCtx.currentTime, 0.05);
+  if (demoNeuralBridge) demoNeuralBridge.reset();
   demoIsPlaying = false; demoOffset = 0;
   document.getElementById('play-btn').textContent = '\u25B6 Play with Robot Accompaniment';
+  document.getElementById('demo-voice-engine-status').textContent = '';
   document.getElementById('progress-inner').style.width = '0%';
   document.getElementById('time-current').textContent = '0:00';
   document.getElementById('demo-src-note').textContent = '-';
   document.getElementById('demo-rob-note').textContent = '-';
   document.getElementById('demo-conf').textContent = '-';
   if (demoAnimId) cancelAnimationFrame(demoAnimId);
-  demoTracker.reset();
+  _setModeTextureControlsLocked(false);
+  // Refresh the pitch-toggle status rather than forcing it back to
+  // 'idle' -- if RMVPE already has a valid cached timeline for this
+  // file, that's still true after Stop and the label should keep
+  // saying so instead of implying the analysis was lost.
+  if (demoPitchMode === 'rmvpe') {
+    demoPitchToggle.setStatus(
+      demoPitchTimeline && demoPitchTimelineSignature === _pitchAnalysisSignature() ? 'ready' : 'analyzing'
+    );
+  } else {
+    demoPitchToggle.setStatus('idle');
+  }
+  demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
 }
 
 function seekAudio(e) {
@@ -3695,9 +5031,143 @@ function seekAudio(e) {
   const pct = (e.clientX - rect.left) / rect.width;
   demoOffset = pct * demoAudioBuffer.duration;
   demoEngine = createAccompanimentEngine();
-  demoTracker.reset();
-  if (demoIsPlaying) { pauseAudio(); playAudio(); }
-  else document.getElementById('progress-inner').style.width = (pct*100) + '%';
+  demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
+  if (demoIsPlaying) {
+    pauseAudio();
+    // Neural mode replays the already-rendered buffer at the new offset
+    // rather than re-rendering the whole track just to seek.
+    if (demoVoiceEngine === 'neural' && demoNeuralRenderedBuffer) _startNeuralPlayback();
+    else if (demoVoiceEngine === 'neural') playAudioNeural();
+    else playAudio();
+  } else {
+    document.getElementById('progress-inner').style.width = (pct*100) + '%';
+  }
+}
+
+// ============================================================
+// LIVE DEMO: NEURAL VOICE BRIDGE (RVC via /api/neural/render)
+// ============================================================
+// RobotVoice/VoiceEnsemble above are a from-scratch JS reimplementation
+// of the synthesizer and have no path to a trained RVC model -- they
+// never talk to server.py. This bridge watches for the start of each
+// new sung note, asks the real Python pipeline (VocableSynthesizer ->
+// NeuralTimbreConverter, see /api/neural/render in server.py) to render
+// that note in the trained voice, and swaps the result in once it's
+// back.
+//
+// Design choice, deliberate: the local oscillator always plays first,
+// instantly, exactly as it did before this existed. This bridge only
+// ever layers a delayed, better-sounding version on top -- it never
+// goes silent to wait on the network, because a gap while the neural
+// call is in flight (typically 50-500ms; see sidecar_timeout_s /
+// max_latency_warn_s in config.yaml) would sound like a dropout, not an
+// upgrade. If the sidecar is down or disabled, /api/neural/render
+// returns 503, the bridge backs off for a while, and the demo behaves
+// exactly as it always did on pure DSP oscillators.
+//
+// duration_s is a rough per-note estimate, not a real lookahead value
+// (the browser can't know how long a note will be held until it ends,
+// same as any live pipeline) -- 0.45s matches a typical short vocal
+// note. Wire this to your tempo estimate later if you want note length
+// to track the song's actual rhythm.
+class NeuralNoteBridge {
+  constructor(audioCtx, duckGainNode) {
+    this.ctx = audioCtx;
+    this.duckGain = duckGainNode;
+    this.enabled = true;
+    this._lastActive = false;
+    this._lastHz = null;
+    this._lastOnsetAt = -Infinity;
+    this._token = 0;
+    this._cooldownUntil = 0;      // after a failure, stop hammering /api/neural/render for a while
+    this._minOnsetGapS = 0.12;    // ignore re-triggers closer together than this (pitch jitter near the threshold)
+    this._noteJumpCents = 60;     // an hz change bigger than this counts as a new note, not a glide within one
+  }
+
+  reset() {
+    this._lastActive = false;
+    this._lastHz = null;
+    this._token++; // invalidates any in-flight fetch/decode from the previous play-through
+  }
+
+  // Call once per animation frame with the current decision.
+  update(result, elapsedS, mode, texture) {
+    if (!this.enabled) return;
+    const active = !!(result.hz && result.action && result.action !== 'rest');
+    if (!active) { this._lastActive = false; return; }
+
+    const isNewOnset = !this._lastActive ||
+      (this._lastHz && Math.abs(1200 * Math.log2(result.hz / this._lastHz)) > this._noteJumpCents);
+
+    this._lastActive = true;
+    this._lastHz = result.hz;
+
+    if (!isNewOnset) return;
+    if (elapsedS - this._lastOnsetAt < this._minOnsetGapS) return;
+    if (this.ctx.currentTime < this._cooldownUntil) return;
+
+    this._lastOnsetAt = elapsedS;
+    this._fireRender(result.hz, LIVE_VOCABLE_BY_MODE[mode] || 'aah', mode, texture);
+  }
+
+  async _fireRender(targetHz, vocable, mode, texture) {
+    const myToken = ++this._token;
+    try {
+      const resp = await fetch('/api/neural/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_hz: targetHz,
+          vocable,
+          duration_s: 0.45,
+          mode,
+          texture,
+        }),
+      });
+      if (!resp.ok) {
+        // 503 means the sidecar isn't up / neural stage is disabled --
+        // back off for a while instead of firing a failing request on
+        // every single note onset.
+        if (resp.status === 503) this._cooldownUntil = this.ctx.currentTime + 15;
+        return;
+      }
+      const arrayBuf = await resp.arrayBuffer();
+      if (myToken !== this._token) return; // a newer onset already superseded this note -- drop it
+      const decoded = await this.ctx.decodeAudioData(arrayBuf);
+      if (myToken !== this._token) return; // re-check: onset could have moved on during decode
+
+      this._playSwap(decoded, demoRobotVolume);
+    } catch (e) {
+      this._cooldownUntil = this.ctx.currentTime + 5;
+      console.warn('[neural bridge] render failed, staying on the local voice:', e);
+    }
+  }
+
+  _playSwap(buffer, robotVolume) {
+    const now = this.ctx.currentTime;
+    const peak = Math.max(0, Math.min(1.5, robotVolume));
+    const fadeStart = Math.max(now + 0.02, now + buffer.duration - 0.03);
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(peak, now + 0.02);
+    gain.gain.setValueAtTime(peak, fadeStart);
+    gain.gain.linearRampToValueAtTime(0, fadeStart + 0.03);
+    src.connect(gain);
+    gain.connect(this.ctx.destination);
+    src.start(now);
+    src.stop(now + buffer.duration + 0.05);
+
+    // Duck the local oscillator so the two voices don't layer/phase
+    // against each other, then bring it back once the real voice ends.
+    this.duckGain.gain.cancelScheduledValues(now);
+    this.duckGain.gain.setValueAtTime(this.duckGain.gain.value, now);
+    this.duckGain.gain.linearRampToValueAtTime(0.12, now + 0.02);
+    this.duckGain.gain.setValueAtTime(0.12, fadeStart);
+    this.duckGain.gain.linearRampToValueAtTime(1, fadeStart + 0.08);
+  }
 }
 
 function demoProgressLoop() {
@@ -3712,21 +5182,29 @@ function demoProgressLoop() {
   demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
   const rms = Math.sqrt(demoPitchBuf.reduce((s,v) => s+v*v, 0) / demoPitchBuf.length);
   let hz = null;
-  if (rms > 0.003) {
+  if (demoPitchMode === 'rmvpe') {
+    hz = pollOfflinePitchAtTime(demoPitchTimeline, elapsed, demoTracker, demoRmvpeHold);
+  } else if (rms > 0.003) {
     const detected = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
     if (detected && detected >= 65 && detected < 1200) hz = demoTracker.push(detected);
   } else {
-    demoTracker.reset();
+    demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
   }
 
   demoEngine.pushPitch(hz, elapsed);
   const result = demoEngine.compute(demoMode, hz, elapsed, liveDemoProtocolEnabled);
+  // Only relevant in DSP mode -- Neural mode already has its one
+  // whole-track render playing via demoNeuralSource, so the old
+  // per-note bridge must stay silent here or it'll layer a second,
+  // uncoordinated set of real-time neural calls on top of it.
+  if (demoVoiceEngine === 'dsp' && demoNeuralBridge) demoNeuralBridge.update(result, elapsed, demoMode, demoTexture);
 
   const sNote = hz ? hzToNote(hz) : null;
   const rNote = (result.hz && result.action !== 'rest') ? hzToNote(result.hz) : null;
   document.getElementById('demo-src-note').textContent = sNote ? sNote.name : '-';
   document.getElementById('demo-rob-note').textContent = rNote ? rNote.name : '-';
-  document.getElementById('demo-conf').textContent = hz ? (rms * 100).toFixed(0) + '%' : '-';
+  const confPct = demoPitchMode === 'rmvpe' ? demoRmvpeHold.lastConfidence : rms;
+  document.getElementById('demo-conf').textContent = hz ? (confPct * 100).toFixed(0) + '%' : '-';
   const explEl = document.getElementById('demo-mode-explanation');
   if (explEl && result.text) explEl.textContent = result.text;
 
@@ -3734,9 +5212,19 @@ function demoProgressLoop() {
     if (result.hz && result.action !== 'rest') {
       demoVoice.setVocable(LIVE_VOCABLE_BY_MODE[demoMode] || 'aah');
       demoVoice.setFrequency(result.hz);
-      demoVoice.setGain(Math.min(0.85, Math.max(rms, 0.08) * 1.4) * demoRobotVolume);
+      const robotGain = Math.min(0.85, Math.max(rms, 0.08) * 1.4) * demoRobotVolume;
+      demoVoice.setGain(robotGain);
+      // Dynamic duck: the harder the robot is singing, the more the
+      // source track backs off underneath it (capped at a modest -3.5dB
+      // / ~33% so it never disappears) -- makes room instead of the two
+      // signals just piling on top of each other at full strength.
+      if (demoSourceDuckGain) {
+        const duckAmount = clamp01(robotGain / 0.85) * 0.33;
+        demoSourceDuckGain.gain.setTargetAtTime(1 - duckAmount, demoAudioCtx.currentTime, 0.15);
+      }
     } else {
       demoVoice.setGain(0);
+      if (demoSourceDuckGain) demoSourceDuckGain.gain.setTargetAtTime(1, demoAudioCtx.currentTime, 0.25);
     }
   }
 }
@@ -3755,10 +5243,30 @@ function setMicRobotVolume(val) {
 let micBuffer = null, micAnimId = null;
 let micMode = 'unison_shadowing';
 let micTracker = new SmoothedPitchTracker({ historyLen: 5, jumpToleranceCents: 80 });
+let micRmvpeHold = createRemotePitchHold();
 let micIsRunning = false, micStartTime = 0;
 let micVoice = null;
 let micTexture = 'solo';
 let micEngine = createAccompanimentEngine();
+let micPitchMode = 'yin';
+let micRemotePitch = new RemotePitchClient();
+let micRemoteSender = null;
+let micMediaSource = null;
+const micPitchToggle = renderPitchEngineToggle('demo-mic-pitch-engine', (mode) => {
+  micPitchMode = mode;
+  micTracker.reset();
+  if (mode === 'rmvpe') {
+    micRemotePitch.connect('rmvpe', micAudioCtx ? micAudioCtx.sampleRate : 44100);
+    if (micAudioCtx && micMediaSource) {
+      micRemoteSender = attachRemotePitchSender(micAudioCtx, micMediaSource, micRemotePitch);
+    }
+  } else {
+    if (micRemoteSender) { micRemoteSender.disconnect(); micRemoteSender = null; }
+    micRemotePitch.close();
+    micPitchToggle.setStatus('idle');
+  }
+});
+micRemotePitch.onStatusChange((s) => micPitchToggle.setStatus(s));
 
 function setMicMode(mode, btn) {
   micMode = mode;
@@ -3782,6 +5290,7 @@ async function toggleDemoMic() {
     micStream = stream;
     micAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
     const source = micAudioCtx.createMediaStreamSource(stream);
+    micMediaSource = source;
     micAnalyser = micAudioCtx.createAnalyser();
     micAnalyser.fftSize = 2048;
     source.connect(micAnalyser);
@@ -3796,6 +5305,10 @@ async function toggleDemoMic() {
     document.getElementById('demo-mic-btn').classList.add('recording');
     document.getElementById('demo-mic-btn').textContent = '\u23F9';
     document.getElementById('demo-mic-status').textContent = 'Listening... sing or hum into your microphone';
+    if (micPitchMode === 'rmvpe') {
+      micRemotePitch.connect('rmvpe', micAudioCtx.sampleRate);
+      micRemoteSender = attachRemotePitchSender(micAudioCtx, micMediaSource, micRemotePitch);
+    }
     micLoop();
   } catch(e) {
     document.getElementById('demo-mic-status').textContent = 'Microphone access denied. Allow it in your browser settings.';
@@ -3807,6 +5320,10 @@ function stopDemoMic() {
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (micAnimId) { cancelAnimationFrame(micAnimId); micAnimId = null; }
   if (micVoice) { micVoice.stop(); micVoice = null; }
+  if (micRemoteSender) { micRemoteSender.disconnect(); micRemoteSender = null; }
+  micRemotePitch.close();
+  micPitchToggle.setStatus('idle');
+  micMediaSource = null;
   if (micAudioCtx) { micAudioCtx.close(); micAudioCtx = null; }
   document.getElementById('demo-mic-btn').classList.remove('recording');
   document.getElementById('demo-mic-btn').textContent = '\uD83C\uDF99';
@@ -3827,7 +5344,9 @@ function micLoop() {
   const now = micAudioCtx.currentTime - micStartTime;
 
   let smoothHz = null;
-  if (rms >= 0.005) {
+  if (micPitchMode === 'rmvpe') {
+    smoothHz = pollRemoteRmvpePitch(micRemotePitch, micTracker, micRmvpeHold);
+  } else if (rms >= 0.005) {
     const hz = yinPitch(micBuffer, micAudioCtx.sampleRate, 0.15);
     if (hz && hz >= 65 && hz <= 1200) {
       smoothHz = micTracker.push(hz);
@@ -3963,6 +5482,29 @@ const CREE_EXAMPLES = [
 
 // --- Machine Translation demo (real, calls the FastAPI backend) ---
 
+let mtValidationTimer = null;
+function onMtTextInput() {
+  clearTimeout(mtValidationTimer);
+  mtValidationTimer = setTimeout(validateMtText, 350);
+}
+
+async function validateMtText() {
+  const text = document.getElementById('mt-text-input').value;
+  const out = document.getElementById('mt-word-validation');
+  if (!text.trim()) { out.innerHTML = ''; return; }
+  try {
+    const res = await fetch('/api/cree/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, deep_suggestions: false }),
+    });
+    const data = await res.json();
+    renderCreeValidation(out, data.words || [], 'mt-text-input');
+  } catch (err) {
+    out.innerHTML = '<span style="color: var(--muted);">Cree validator unavailable</span>';
+  }
+}
+
 async function runTranslationDemo() {
   const typed = (document.getElementById('mt-text-input').value || '').trim();
   const outEl = document.getElementById('mt-translation-out');
@@ -3970,6 +5512,105 @@ async function runTranslationDemo() {
   const statusText = document.getElementById('mt-status-text');
 
   if (!typed) return;
+
+  // Word-validity check runs for ANY input now, not just single words --
+  // it used to only fire on a lone word, so a multi-word gibberish phrase
+  // slipped straight through to the translation model, which (like any
+  // neural MT model) always emits *something*, even for nonsense input.
+  // deep_suggestions stays true here since this only runs on a button
+  // click, not per keystroke.
+  outEl.textContent = 'checking words...';
+  outEl.classList.remove('placeholder');
+  let words = null;
+  try {
+    const res = await fetch('/api/cree/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: typed, deep_suggestions: true }),
+    });
+    const data = await res.json();
+    words = data.words || [];
+  } catch (err) {
+    words = null; // validator unreachable -- fall through to translating normally
+  }
+
+  if (words && words.length) {
+    if (words.some(w => w.recognized === null)) {
+      // The analyzer isn't loaded on this server at all -- say so loudly
+      // instead of silently skipping validation and translating anyway.
+      outEl.innerHTML = '';
+      const warn = document.createElement('div');
+      warn.style.color = '#dc2626';
+      warn.textContent = 'Cree word validator isn\'t loaded on this server (hfst missing, or the .hfstol files aren\'t at data/models/). Check /api/cree/health. Translating without validation:';
+      outEl.appendChild(warn);
+      outEl.classList.add('placeholder');
+      await translateNow(typed);
+      return;
+    }
+
+    const unrecognized = words.filter(w => w.recognized === false);
+    if (unrecognized.length === words.length) {
+      // Every single word failed validation -- don't quietly translate
+      // gibberish into something that reads as a real answer.
+      outEl.innerHTML = '';
+      const msg = document.createElement('div');
+      const list = unrecognized.map(w => '"' + w.word + '"').join(', ');
+      msg.textContent = (unrecognized.length === 1 ? list + ' isn\'t a recognized' : list + ' aren\'t recognized') +
+        ' nêhiyawêwin word' + (unrecognized.length === 1 ? '' : 's') + ' in the ~16,500-stem analyzer.';
+      outEl.appendChild(msg);
+
+      const anySuggestions = unrecognized.some(w => w.suggestions && w.suggestions.length);
+      if (anySuggestions) {
+        unrecognized.forEach(w => {
+          if (!w.suggestions || !w.suggestions.length) return;
+          const sugMsg = document.createElement('div');
+          sugMsg.style.marginTop = '8px';
+          sugMsg.textContent = 'Did you mean (for "' + w.word + '"): ';
+          w.suggestions.forEach(s => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cree-word-chip recognized';
+            btn.style.cssText = 'cursor:pointer;border:none;font-size:13px;';
+            btn.title = s.pos ? s.lemma + ' (' + s.pos + ')' : s.lemma;
+            btn.textContent = s.surface;
+            btn.onclick = () => {
+              const ta = document.getElementById('mt-text-input');
+              ta.value = ta.value.replace(new RegExp('\\b' + w.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b'), s.surface);
+              ta.dispatchEvent(new Event('input'));
+            };
+            sugMsg.appendChild(btn);
+            sugMsg.appendChild(document.createTextNode(' '));
+          });
+          outEl.appendChild(sugMsg);
+        });
+      } else {
+        const none = document.createElement('div');
+        none.style.marginTop = '8px';
+        none.style.color = 'var(--muted);';
+        none.textContent = 'No close matches found in the analyzer for ' + (unrecognized.length === 1 ? 'this word' : 'these words') + '.';
+        outEl.appendChild(none);
+      }
+
+      const anyway = document.createElement('button');
+      anyway.type = 'button';
+      anyway.className = 'cree-mic-trigger';
+      anyway.style.cssText = 'margin-top:10px; font-size:12px; padding:6px 12px;';
+      anyway.textContent = 'Translate anyway';
+      anyway.onclick = () => translateNow(typed);
+      outEl.appendChild(anyway);
+      outEl.classList.add('placeholder');
+      statusText.textContent = 'translation: word(s) not recognized';
+      return;
+    }
+  }
+
+  await translateNow(typed);
+}
+
+async function translateNow(typed) {
+  const outEl = document.getElementById('mt-translation-out');
+  const statusDot = document.getElementById('mt-status-dot');
+  const statusText = document.getElementById('mt-status-text');
 
   outEl.textContent = 'translating...';
   outEl.classList.remove('placeholder');
@@ -4003,7 +5644,7 @@ async function runTranslationDemo() {
   }
 }
 
-// --- Sentiment demo (example-based preview) ---
+// --- Sentiment demo (real: live English ASR / typed Cree -> /api/analyze) ---
 
 function normalizeCreeText(text) {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z\s]/g, '').trim();
@@ -4020,16 +5661,17 @@ function normalizeCreeText(text) {
     pill.style.background = 'var(--bg3)';
     pill.textContent = ex.latin[0];
     pill.onclick = () => {
+      if (creeMicRunning) stopCreeMic();
       const sylEl = document.getElementById('cree-syllabics-out');
-      sylEl.textContent = ex.latin[0];
+      sylEl.textContent = ex.syllabics;
       sylEl.classList.remove('placeholder');
-      renderCreeResult(ex);
+      runCreePipeline(ex.latin[0], /* alreadyEnglish */ false, /* vocal */ null);
     };
     wrap.appendChild(pill);
   });
 })();
 
-let creeExIdx = 0, creeMicRunning = false, creeMicStream = null, creeAnimId = null, creeWvBars = null;
+let creeMicRunning = false, creeMicStream = null, creeAnimId = null, creeWvBars = null;
 
 (function buildCreePlaceholderWaveform() {
   const wf = document.getElementById('cree-waveform');
@@ -4044,8 +5686,56 @@ let creeExIdx = 0, creeMicRunning = false, creeMicStream = null, creeAnimId = nu
 
 function toggleCreeMic() { if (creeMicRunning) stopCreeMic(); else startCreeMic(); }
 
+// Picks a MediaRecorder mime type the browser actually supports, since
+// support varies (Chrome/Firefox: webm/opus, Safari: mp4/aac, ...).
+function pickRecorderMimeType() {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+  for (const t of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+// Simple energy-based voice activity detection: a phrase is "done" once
+// loudness has been above SPEECH_RMS_THRESHOLD for at least MIN_SPEECH_MS,
+// then drops back below it for SILENCE_HANG_MS straight. Runs off the same
+// per-frame RMS values already being collected for the loudness/arousal
+// feature -- no separate analysis needed.
+// This used to be a fixed 0.02. That number silently assumed the browser's
+// autoGainControl was boosting quiet mic input -- but startCreeMic()
+// deliberately turns autoGainControl off (see comment there) to keep the
+// raw signal clean for pitch/loudness analysis. Without AGC, a lot of
+// mics/rooms never produce RMS values anywhere near 0.02 at normal
+// speaking volume, so vadIsSpeaking never flips true, endPhrase() never
+// fires, and the transcript box just sits empty forever even though the
+// waveform is visibly moving -- which is exactly this failure mode.
+// Fix: calibrate a per-session floor from the mic's own ambient noise
+// right after getUserMedia resolves, then set the speech threshold
+// relative to that floor instead of a hardcoded guess.
+const VAD_CALIBRATION_MS = 600;
+const VAD_MIN_THRESHOLD = 0.004; // hard floor so a silent-room calibration doesn't produce an unusably tiny threshold
+const VAD_MAX_THRESHOLD = 0.08; // hard ceiling -- last version's calibration produced 1.217 (above the max possible RMS of 1.0), which is why speech could never cross it no matter how loud you spoke
+let VAD_SPEECH_RMS_THRESHOLD = 0.02; // placeholder until calibration finishes just below
+const VAD_MIN_SPEECH_MS = 400;
+const VAD_SILENCE_HANG_MS = 800;
+
+let creeSegmentRecorder = null, creeSegmentChunks = [], creeRmsSamples = [];
+
 function startCreeMic() {
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+  // Previous version explicitly disabled echoCancellation/noiseSuppression/
+  // autoGainControl here, reasoning that raw audio would serve Whisper and
+  // the pitch engine better. In practice that backfired: on your setup it
+  // produced a loud, nearly-constant noise floor (~0.29) that barely moved
+  // whether you were talking or silent -- see the two debug screenshots,
+  // 0.290 vs 0.285. AGC/noise-suppression are exactly what "normalizes"
+  // a mic signal, and every other mic-driven panel in this file (the live
+  // demo at toggleDemoMic(), the Harmony tab, the Archer collaboration
+  // panel) all call getUserMedia with plain `{ audio: true }` and work
+  // fine specifically because they get that normalization. Matching that
+  // here fixes the VAD; the tradeoff is the loudness-based arousal signal
+  // downstream now sees AGC-smoothed levels instead of raw ones, same as
+  // those other panels already do.
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
     creeMicStream = stream;
     creeMicRunning = true;
     const btn = document.getElementById('cree-mic-btn');
@@ -4053,6 +5743,14 @@ function startCreeMic() {
     btn.innerHTML = '<div class="cmt-dot"></div>Stop microphone';
     document.getElementById('cree-status-dot').classList.add('listening');
     document.getElementById('cree-status-text').textContent = 'listening...';
+
+    const sylEl = document.getElementById('cree-syllabics-out');
+    sylEl.textContent = ''; sylEl.classList.remove('placeholder');
+
+    // Waveform bars + real RMS loudness tracking, both from the same
+    // AnalyserNode. creeRmsSamples doubles as: (a) the loudness signal
+    // that feeds arousal (see finishCreeSegment), and (b) the input to
+    // the VAD phrase-boundary detection right below.
     const wf = document.getElementById('cree-waveform');
     wf.innerHTML = '';
     creeWvBars = [];
@@ -4064,28 +5762,199 @@ function startCreeMic() {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const src = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 128;
+    analyser.fftSize = 1024;
     src.connect(analyser);
-    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const freqBuf = new Uint8Array(analyser.frequencyBinCount);
+    const timeBuf = new Float32Array(analyser.fftSize);
+    creeRmsSamples = [];
+
+    const mimeType = pickRecorderMimeType();
+    function startSegmentRecorder() {
+      creeSegmentChunks = [];
+      try {
+        creeSegmentRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      } catch (e) {
+        creeSegmentRecorder = null; // MediaRecorder unsupported on this browser -- mic just won't transcribe
+        return;
+      }
+      creeSegmentRecorder.ondataavailable = (e) => { if (e.data && e.data.size) creeSegmentChunks.push(e.data); };
+      creeSegmentRecorder.start();
+    }
+    startSegmentRecorder();
+
+    let vadIsSpeaking = false, vadSpeechStart = 0, vadLastLoud = 0;
+    let vadCalibrating = true, vadCalibrationStart = performance.now(), vadCalibrationSamples = [];
+    document.getElementById('cree-status-text').textContent = 'calibrating mic level...';
+    let lastDebugPaint = 0;
+
+    function endPhrase() {
+      vadIsSpeaking = false;
+      document.getElementById('cree-status-text').textContent = 'phrase detected, processing...';
+      const rmsForSegment = creeRmsSamples;
+      creeRmsSamples = [];
+      if (creeSegmentRecorder && creeSegmentRecorder.state === 'recording') {
+        const type = mimeType || 'audio/webm';
+        creeSegmentRecorder.onstop = () => {
+          const blob = new Blob(creeSegmentChunks, { type });
+          finishCreeSegment(rmsForSegment, blob);
+          if (creeMicRunning) startSegmentRecorder();
+        };
+        creeSegmentRecorder.stop();
+      }
+    }
+
     function animWv() {
       creeAnimId = requestAnimationFrame(animWv);
-      analyser.getByteFrequencyData(buf);
+      analyser.getByteFrequencyData(freqBuf);
       creeWvBars.forEach((bar, i) => {
-        const v = buf[Math.floor(i * buf.length / creeWvBars.length)] / 255;
+        const v = freqBuf[Math.floor(i * freqBuf.length / creeWvBars.length)] / 255;
         bar.style.height = Math.max(3, v * 44) + 'px';
         bar.style.opacity = 0.4 + v * 0.6;
       });
+      analyser.getFloatTimeDomainData(timeBuf);
+      let sumSq = 0;
+      for (let i = 0; i < timeBuf.length; i++) sumSq += timeBuf[i] * timeBuf[i];
+      const rms = Math.sqrt(sumSq / timeBuf.length);
+      creeRmsSamples.push(rms);
+
+      const now = performance.now();
+
+      if (vadCalibrating) {
+        vadCalibrationSamples.push(rms);
+        if (now - vadCalibrationStart >= VAD_CALIBRATION_MS) {
+          const floor = vadCalibrationSamples.reduce((a, b) => a + b, 0) / vadCalibrationSamples.length;
+          // Speech should sit well above ambient noise -- 4x the measured
+          // floor, with a hard minimum so a dead-silent room doesn't
+          // calibrate down to something noise alone can trip.
+          VAD_SPEECH_RMS_THRESHOLD = Math.min(VAD_MAX_THRESHOLD, Math.max(VAD_MIN_THRESHOLD, floor * 4));
+          if (floor * 4 > VAD_MAX_THRESHOLD) {
+            console.warn(`VAD: measured noise floor (${floor.toFixed(4)}) is unusually high -- threshold clamped to ${VAD_MAX_THRESHOLD}. If speech still isn't detected, check for another app using the mic or background noise.`);
+          }
+          vadCalibrating = false;
+          document.getElementById('cree-status-text').textContent = 'listening...';
+          console.info(`VAD calibrated: noise floor=${floor.toFixed(4)}, threshold=${VAD_SPEECH_RMS_THRESHOLD.toFixed(4)}`);
+        }
+        return;
+      }
+
+      // Live readout so it's obvious at a glance whether the mic is even
+      // registering above threshold, instead of a black box when nothing
+      // seems to happen.
+      if (!vadIsSpeaking && now - lastDebugPaint > 150) {
+        lastDebugPaint = now;
+        document.getElementById('cree-status-text').textContent =
+          `listening... (level ${rms.toFixed(3)} / threshold ${VAD_SPEECH_RMS_THRESHOLD.toFixed(3)})`;
+      }
+
+      if (rms > VAD_SPEECH_RMS_THRESHOLD) {
+        if (!vadIsSpeaking) {
+          vadIsSpeaking = true; vadSpeechStart = now;
+          document.getElementById('cree-status-text').textContent = 'hearing speech...';
+        }
+        vadLastLoud = now;
+      } else if (vadIsSpeaking
+                 && (now - vadLastLoud) > VAD_SILENCE_HANG_MS
+                 && (vadLastLoud - vadSpeechStart) > VAD_MIN_SPEECH_MS) {
+        endPhrase();
+      }
     }
     animWv();
-    setTimeout(() => { if (creeMicRunning) { document.getElementById('cree-status-text').textContent = 'phrase detected'; showCreePlaceholderOutput(); } }, 3000);
   }).catch(() => {
-    document.getElementById('cree-status-text').textContent = 'mic unavailable — showing simulation';
-    showCreePlaceholderOutput();
+    document.getElementById('cree-status-text').textContent = 'microphone permission denied or unavailable';
   });
+}
+
+// Runs after each detected phrase: sends the recorded audio to
+// /api/transcribe (Whisper, server-side -- see WHISPER_MODEL_DIR in
+// server.py for why this replaced the browser's built-in speech
+// recognition) for the words, and to /api/pitch/analyze-track (this
+// project's own RMVPE/YIN pitch engine) for a real pitch-range reading,
+// plus real loudness mean/variance from the RMS samples collected during
+// the segment. All three then feed the sentiment pipeline together.
+async function finishCreeSegment(rmsSamples, blob) {
+  const sylEl = document.getElementById('cree-syllabics-out');
+
+  if (!blob || blob.size === 0) {
+    document.getElementById('cree-status-text').textContent = 'no audio captured for that phrase';
+    return;
+  }
+
+  let transcript = '';
+  let data = null;
+  try {
+    const form = new FormData();
+    form.append('file', blob, 'segment.webm');
+    const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+    data = await res.json();
+    if (data.error) {
+      sylEl.textContent = 'Transcription unavailable: ' + data.error;
+      sylEl.classList.add('placeholder');
+      document.getElementById('cree-status-text').textContent = 'transcription unavailable';
+      return;
+    }
+    transcript = (data.text || '').trim();
+  } catch (err) {
+    sylEl.textContent = 'Transcription server not reachable.';
+    sylEl.classList.add('placeholder');
+    document.getElementById('cree-status-text').textContent = 'server unavailable';
+    console.warn('Transcribe request failed:', err);
+    return;
+  }
+
+  if (!transcript) {
+    const probs = data.no_speech_probs || [];
+    const maxProb = probs.length ? Math.max(...probs) : null;
+    const hint = maxProb !== null
+      ? ` (Whisper's no-speech confidence: ${(maxProb * 100).toFixed(0)}% -- high means it heard mostly silence/noise, not recognizable speech)`
+      : ' (received 0 bytes -- check mic permissions)';
+    document.getElementById('cree-status-text').textContent = 'no speech detected in that phrase, listening...';
+    console.info('Empty transcript diagnostics:' + hint, data);
+    return;
+  }
+  sylEl.textContent = transcript;
+  sylEl.classList.remove('placeholder');
+
+  const mean = rmsSamples.length ? rmsSamples.reduce((a, b) => a + b, 0) / rmsSamples.length : 0;
+  const variance = rmsSamples.length
+    ? rmsSamples.reduce((a, b) => a + (b - mean) * (b - mean), 0) / rmsSamples.length
+    : 0;
+  // Raw RMS on a [-1,1] waveform is usually well under 1.0 even for loud
+  // speech -- scale up so typical speaking/singing levels land near the
+  // middle of the 0-1 range score_sentiment() expects.
+  const rms_mean = Math.min(1, mean * 6);
+  const rms_variance = Math.min(1, variance * 40);
+
+  let pitch_range_semitones = 0;
+  try {
+    const form = new FormData();
+    form.append('file', blob, 'segment.webm');
+    form.append('pitch_method', 'yin'); // fast enough for a live demo turnaround; RMVPE is more accurate but far slower per-frame
+    const res = await fetch('/api/pitch/analyze-track', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.hz) {
+      const voiced = data.hz
+        .map((hz, i) => ({ hz, conf: (data.confidence && data.confidence[i]) || 0 }))
+        .filter(p => p.hz && p.conf > 0.5);
+      if (voiced.length >= 2) {
+        const hzVals = voiced.map(p => p.hz);
+        const maxHz = Math.max(...hzVals), minHz = Math.min(...hzVals);
+        if (minHz > 0) pitch_range_semitones = 12 * Math.log2(maxHz / minHz);
+      }
+    }
+  } catch (err) {
+    console.warn('Pitch analysis unavailable, continuing on loudness alone:', err);
+  }
+
+  runCreePipeline(transcript, /* alreadyEnglish */ true, { pitch_range_semitones, rms_mean, rms_variance });
 }
 
 function stopCreeMic() {
   creeMicRunning = false;
+  if (creeSegmentRecorder && creeSegmentRecorder.state === 'recording') {
+    creeSegmentRecorder.onstop = null;
+    try { creeSegmentRecorder.stop(); } catch (e) {}
+  }
+  creeSegmentRecorder = null;
   if (creeMicStream) { creeMicStream.getTracks().forEach(t => t.stop()); creeMicStream = null; }
   if (creeAnimId) { cancelAnimationFrame(creeAnimId); creeAnimId = null; }
   const btn = document.getElementById('cree-mic-btn');
@@ -4101,40 +5970,160 @@ function stopCreeMic() {
   }
 }
 
-function showCreePlaceholderOutput() {
-  const ex = CREE_EXAMPLES[creeExIdx % CREE_EXAMPLES.length];
-  creeExIdx++;
-  const sylEl = document.getElementById('cree-syllabics-out');
-  if (sylEl.classList.contains('placeholder')) { sylEl.textContent = ex.syllabics; sylEl.classList.remove('placeholder'); }
-  renderCreeResult(ex);
+// Real-time Cree word validation as you type, using ALTLab's open-source
+// morphological FST via /api/cree/analyze. This is NOT speech recognition
+// -- it validates typed words against ~16,500 real nêhiyawêwin stems and
+// shows the dictionary lemma + part of speech for each recognized word.
+// (Live word validation now only runs on the translation demo's typed
+// box below -- the sentiment demo above is mic-only.)
+
+// Shared renderer: word chips + a "did you mean" line under any
+// unrecognized word that has suggestions. Clicking a suggestion replaces
+// that word (first match) in the given textarea and re-validates.
+function renderCreeValidation(container, words, textareaId) {
+  container.innerHTML = '';
+
+  if (words.length && words.every(w => w.recognized === null)) {
+    const warn = document.createElement('div');
+    warn.style.color = '#dc2626';
+    warn.textContent = 'Cree word validator isn\'t loaded on this server (check /api/cree/health).';
+    container.appendChild(warn);
+    return;
+  }
+
+  const chipRow = document.createElement('div');
+  const suggestRows = [];
+
+
+  words.forEach(w => {
+    const chip = document.createElement('span');
+    if (w.recognized === null) {
+      chip.className = 'cree-word-chip';
+      chip.title = 'Cree analyzer not loaded on the server';
+    } else if (!w.recognized) {
+      chip.className = 'cree-word-chip unrecognized';
+      chip.title = 'Not found in the ~16,500-stem analyzer (may still be valid Cree not yet in this dataset)';
+      if (w.suggestions && w.suggestions.length) {
+        const row = document.createElement('div');
+        row.style.marginTop = '2px';
+        const label = document.createElement('span');
+        label.style.color = 'var(--muted)';
+        label.textContent = '"' + w.word + '" not recognized -- did you mean: ';
+        row.appendChild(label);
+        w.suggestions.forEach((s, i) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'cree-word-chip recognized';
+          btn.style.cursor = 'pointer';
+          btn.style.border = 'none';
+          btn.title = s.pos ? s.lemma + ' (' + s.pos + ')' : s.lemma;
+          btn.textContent = s.surface + (i < w.suggestions.length - 1 ? '' : '');
+          btn.onclick = () => {
+            const ta = document.getElementById(textareaId);
+            ta.value = ta.value.replace(new RegExp('\\b' + w.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b'), s.surface);
+            ta.dispatchEvent(new Event('input'));
+          };
+          row.appendChild(btn);
+          if (i < w.suggestions.length - 1) row.appendChild(document.createTextNode(' '));
+        });
+        suggestRows.push(row);
+      }
+    } else {
+      const variant = w.analyses.some(a => a.is_orthographic_variant);
+      chip.className = 'cree-word-chip ' + (variant ? 'variant' : 'recognized');
+      const a = w.analyses[0];
+      chip.title = 'Lemma: ' + a.lemma + (a.pos ? ' (' + a.pos + ')' : '') +
+        (variant ? ' -- informal spelling, macrons/length not marked' : '');
+    }
+    chip.textContent = w.word;
+    chipRow.appendChild(chip);
+  });
+
+  container.appendChild(chipRow);
+  suggestRows.forEach(r => container.appendChild(r));
 }
 
-function renderCreeResult(ex) {
+// Real backend call -- translation (if needed) + sentiment, optionally
+// blended with real vocal-tone features from the mic. Replaces the old
+// canned CREE_EXAMPLES lookup entirely.
+async function runCreePipeline(text, alreadyEnglish, vocal) {
   const transEl = document.getElementById('cree-translation-out');
-  transEl.textContent = '...'; transEl.classList.remove('placeholder');
-  setTimeout(() => {
-    transEl.textContent = ex.english;
-    const valPct = ((ex.valence + 1) / 2) * 100;
-    document.getElementById('cree-val-fill').style.width = valPct + '%';
-    document.getElementById('cree-val-fill').style.background = ex.valence >= 0 ? 'var(--green)' : '#818cf8';
-    document.getElementById('cree-aro-fill').style.width = (ex.arousal * 100) + '%';
-    const badge = document.getElementById('cree-emotion-badge');
-    badge.textContent = ex.emotion; badge.className = 'cree-emotion-badge ' + ex.emotion;
-    document.getElementById('cree-emotion-desc').textContent = ex.desc;
-    document.getElementById('chip-interval').textContent = ex.interval;
-    document.getElementById('chip-osc').textContent      = ex.osc;
-    document.getElementById('chip-vibrato').textContent  = ex.vibrato;
-    ['led-left','led-right'].forEach(id => {
-      const el = document.getElementById(id);
-      el.style.borderColor = ex.ledBorder; el.style.background = ex.ledBg;
+  transEl.textContent = alreadyEnglish ? text : '...';
+  transEl.classList.remove('placeholder');
+  document.getElementById('cree-status-text').textContent = 'analyzing...';
+
+  try {
+    const body = { text, already_english: alreadyEnglish };
+    if (vocal) body.vocal = vocal;
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-    ['led-left-pupil','led-right-pupil'].forEach(id => {
-      const el = document.getElementById(id);
-      el.style.width = ex.ledPupilSize; el.style.height = ex.ledPupilSize;
-      el.style.background = ex.ledColor; el.style.opacity = '0.9';
-    });
-    document.getElementById('led-desc').textContent = ex.emotion.charAt(0).toUpperCase() + ex.emotion.slice(1) + ': ' + ex.desc;
-  }, 600);
+    const data = await res.json();
+
+    if (data.error === 'empty_translation') {
+      transEl.textContent = data.message;
+      transEl.classList.add('placeholder');
+      document.getElementById('cree-status-text').textContent = 'translation: empty result';
+      return;
+    }
+    if (data.error) throw new Error(data.error);
+
+    renderCreeResult(data, vocal);
+    document.getElementById('cree-status-text').textContent = 'done';
+  } catch (err) {
+    transEl.textContent = 'Sentiment/translation server not reachable. Run: uvicorn server:app --port 8000';
+    transEl.classList.add('placeholder');
+    document.getElementById('cree-status-text').textContent = 'server unavailable';
+    console.warn('Analyze request failed:', err);
+  }
+}
+
+function renderCreeResult(data, vocal) {
+  const transEl = document.getElementById('cree-translation-out');
+  transEl.textContent = data.translation || data.text;
+
+  const valPct = ((data.valence + 1) / 2) * 100;
+  document.getElementById('cree-val-fill').style.width = valPct + '%';
+  document.getElementById('cree-val-fill').style.background = data.valence >= 0 ? 'var(--green)' : '#818cf8';
+  document.getElementById('cree-aro-fill').style.width = (data.arousal * 100) + '%';
+
+  const badge = document.getElementById('cree-emotion-badge');
+  badge.textContent = data.emotion; badge.className = 'cree-emotion-badge ' + data.emotion;
+  document.getElementById('cree-emotion-desc').textContent = data.description;
+
+  document.getElementById('chip-interval').textContent = data.interval;
+  document.getElementById('chip-osc').textContent      = data.osc;
+  document.getElementById('chip-vibrato').textContent  = data.vibrato;
+
+  const vtBlock = document.getElementById('cree-vocal-tone-block');
+  if (data.audio_arousal !== null && data.audio_arousal !== undefined) {
+    vtBlock.style.display = '';
+    const detail = document.getElementById('cree-vocal-tone-detail');
+    const parts = [];
+    if (vocal && vocal.pitch_range_semitones) parts.push('pitch range ' + vocal.pitch_range_semitones.toFixed(1) + ' semitones');
+    if (vocal) parts.push('loudness ' + (vocal.rms_mean * 100).toFixed(0) + '%');
+    if (vocal) parts.push('dynamics ' + (vocal.rms_variance * 100).toFixed(0) + '%');
+    detail.textContent = parts.length ? parts.join(' · ') : 'no reliable pitch/loudness reading for this phrase';
+    document.getElementById('cree-arousal-text-part').textContent = data.text_arousal.toFixed(2);
+    document.getElementById('cree-arousal-audio-part').textContent = data.audio_arousal.toFixed(2);
+  } else {
+    vtBlock.style.display = 'none';
+  }
+
+  ['led-left','led-right'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.borderColor = data.led.border; el.style.background = data.led.bg;
+  });
+  ['led-left-pupil','led-right-pupil'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.width = data.led.pupil; el.style.height = data.led.pupil;
+    el.style.background = data.led.color; el.style.opacity = '0.9';
+  });
+  document.getElementById('led-desc').textContent =
+    data.emotion.charAt(0).toUpperCase() + data.emotion.slice(1) + ': ' + data.description +
+    ' (valence ' + data.valence.toFixed(2) + ', arousal ' + data.arousal.toFixed(2) + ')';
 }
 </script>
 </body>

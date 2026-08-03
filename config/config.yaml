@@ -11,12 +11,25 @@ preprocessing:
   normalize_target_rms: 0.1
 
 pitch:
-  method: yin                      
+  method: yin                      # "yin" | "yinfft" | "rmvpe" 
   confidence_threshold: 0.3
   min_frequency: 65               
   max_frequency: 1200
   tolerance: 0.15                  
   jump_tolerance_cents: 80.0       # how far a reading can drift before it's treated as a new note rather than smoothed in
+  rmvpe:
+    model_path: "assets/rmvpe/rmvpe.pt"   
+    prewarm: true                    
+    device: cpu                     
+    is_half: false                  
+    context_seconds: 1.0            
+    infer_stride_hops: 4             # was 1 (infer every single hop) -- on CPU, running the
+                                     # full CNN+BiGRU that often can't keep up with real-time
+                                     # audio, which is what caused the growing backlog/lag
+                                     # (backend still reporting pitch well after playback ends).
+                                     # Raise this further (e.g. 6-8) if it's still falling behind.
+    voicing_threshold: 0.03         
+    confidence_threshold: 0.15      
 
 rhythm:
   onset_threshold: 0.1
@@ -27,29 +40,29 @@ rhythm:
 harmony:
   detune_cents: 0
   scale_lock: true
-  default_mode: unison_shadowing        # which mode plays when no special condition applies
-  fusion_mode: false                     # triadic harmony is opt-in only — never the default
-  fast_tempo_threshold_bpm: 120          # above this tempo, prefer contour-following
-  sustain_frames_for_timbral: 30         # notes held this many frames shift to timbral thickening
-  silence_when_no_singer: false          # true = go silent (not drone) when Archer stops
+  default_mode: unison_shadowing        
+  fusion_mode: false                     
+  fast_tempo_threshold_bpm: 120          
+  sustain_frames_for_timbral: 30         
+  silence_when_no_singer: false          
 
 modes:
-  octave_direction: -1                   # -1 = octave below, +1 = octave above
-  delay_beats: 1.0                       # how many beats behind for delayed_response
-  drone_divisor: 2                       # 2 = sub-octave drone, 4 = two octaves down
-  contour_window: 6                      # frames of pitch history for contour direction
-  contour_step_semitones: 2              # step size when following melodic contour
-  call_response_semitones: 0             # interval offset for the response phrase
+  octave_direction: -1                   
+  delay_beats: 1.0                       
+  drone_divisor: 2                       
+  contour_window: 6                      
+  contour_step_semitones: 2              
+  call_response_semitones: 0             
 
 protocol:
   start_enabled: true
-  sensitive_phoneme_classes: []          # fill in as Archer identifies protocol-sensitive vocables
+  sensitive_phoneme_classes: []          
   sound_cue_enabled: true
-  sound_cue_hz_range: [80, 140]          # low-register range for the toggle gesture
-  sound_cue_repetitions: 3               # number of hits required to trigger toggle
-  sound_cue_max_gap_s: 0.6               # max time between hits to count as one gesture
-  sound_cue_cooldown_s: 2.0              # debounce window after a toggle
-  physical_cue_gpio_pin: null            # e.g. 17 on a Raspberry Pi; null = no hardware button
+  sound_cue_hz_range: [80, 140]          
+  sound_cue_repetitions: 3               
+  sound_cue_max_gap_s: 0.6               
+  sound_cue_cooldown_s: 2.0              
+  physical_cue_gpio_pin: null            
 
 synthesis:
   engine: sinusoidal
@@ -64,6 +77,26 @@ synthesis:
   breathiness: 0.045                     # 0.0-0.2ish; amount of formant-shaped breath noise mixed in
   vibrato_rate_hz: 5.3                   # sung-vibrato rate on notes held longer than ~0.6s
   vibrato_depth_cents: 12                # sung-vibrato depth in cents
+
+  neural:
+    enabled: true               # flipped on -- was false, which is why nothing changed before. Requires neural_env/rvc_server.py sidecar running (GET /neural/status to confirm reachable:true)
+    sidecar_url: "http://127.0.0.1:8801"
+    sidecar_timeout_s: 5.0
+    device: cpu                  # no GPU available -- switched from cuda:0. See note below: CPU inference is slow, budget for it.
+    pitch_algo: rmvpe            # RVC's pitch tracker; rmvpe is the current best general choice
+    index_rate: 0.66             # RVC retrieval-blend amount
+    protect: 0.33                # protects unvoiced consonants/breath from being over-converted
+    transpose_semitones: 0       # leave at 0 — our DSP source is already at the correct pitch
+    max_latency_warn_s: 0.5      # log a warning if a single conversion call exceeds this
+    model_paths:                 # one entry per choir "singer" — was pointing at a placeholder path, updated to the actual trained model from the screenshot
+      - "assets/synthesis_models/mi-test.pth"
+    index_paths:                 # parallel to model_paths — updated to match
+      - "assets/synthesis_models/mi-test_added_IVF1003_Flat_nprobe_1_mi-test_v2.index"
+    offline_render_timeout_s: 900  # max wait for the ONE whole-track sidecar call used by
+                                    # the Upload-MP3 panel's Neural (offline render) mode --
+                                    # this isn't a real-time budget, just a safety ceiling so
+                                    # a stuck sidecar can't hang the request forever. Raise it
+                                    # for longer tracks / slower CPUs.
 
   texture:
     solo:

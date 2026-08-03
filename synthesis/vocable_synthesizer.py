@@ -9,18 +9,15 @@ import librosa
 from scipy.signal import lfilter, butter, iirnotch, iirpeak
 
 
-# Generates a numpy audio array for the robot to sing based on the decision from HarmonyDecision
 class VocableSynthesizer:
     FORMANTS = {
-        # (F1, F2, F3) at the bright end, then the dark end
-        "aah": {"bright": (730, 1400, 2600), "dark": (680, 1100, 2450)},   # "ah" as in father
-        "ooo": {"bright": (400, 900,  2300), "dark": (320, 700,  2200)},   # "oo" as in boot
-        "mmm": {"bright": (280, 950,  2100), "dark": (250, 850,  2000)},   # closed/nasal hum
-        "hey": {"bright": (600, 2100, 2700), "dark": (500, 1750, 2600)},   # "eh" as in bed
+        "aah": {"bright": (730, 1400, 2600, 3300), "dark": (680, 1100, 2450, 3200)},   # "ah" as in father
+        "ooo": {"bright": (400, 900,  2300, 3000), "dark": (320, 700,  2200, 2900)},   # "oo" as in boot
+        "mmm": {"bright": (280, 950,  2100, 2900), "dark": (250, 850,  2000, 2800)},   # closed/nasal hum
+        "hey": {"bright": (600, 2100, 2700, 3300), "dark": (500, 1750, 2600, 3200)},   # "eh" as in bed
     }
-    # Relative amplitude weight and bandwidth (Q) for each formant.
-    FORMANT_WEIGHTS = (1.0, 0.55, 0.22)
-    FORMANT_Q = (10.0, 12.0, 14.0)
+    FORMANT_WEIGHTS    = (1.0, 0.6, 0.28, 0.14)
+    FORMANT_BANDWIDTH_HZ = (80.0, 90.0, 130.0, 220.0)
 
     def __init__(self):
         cfg = get_config()
@@ -118,6 +115,8 @@ class VocableSynthesizer:
         # Volume
         audio = audio * self.volume
 
+        audio = np.tanh(audio * 1.15) / np.tanh(1.15)
+
         # Crossfade with previous output for smooth transitions
         audio = self._crossfade(audio)
 
@@ -197,13 +196,15 @@ class VocableSynthesizer:
         vib_phase = self._vibrato_phases[slot] + np.arange(n_samples) * phase_inc
         self._vibrato_phases[slot] = float((vib_phase[-1] + phase_inc) % (2 * np.pi)) if n_samples else self._vibrato_phases[slot]
         vibrato_cents = self.vibrato_depth_cents * vibrato_amount * np.sin(vib_phase)
-        instantaneous_f0 = f0 * (2 ** (vibrato_cents / 1200.0))
+
+        jitter = self._smoothed_noise(n_samples, std=0.0035, cutoff_hz=12.0)
+        instantaneous_f0 = f0 * (2 ** (vibrato_cents / 1200.0)) * (1.0 + jitter)
         phase = 2 * np.pi * np.cumsum(instantaneous_f0) / self.sample_rate
 
         max_harmonic = int(self.sample_rate / 2 / f0)
         source = np.zeros(n_samples, dtype=np.float64)
-        for k in range(1, min(max_harmonic + 1, 40)):
-            amp = 1.0 / (k ** 1.6)
+        for k in range(1, min(max_harmonic + 1, 32)):
+            amp = 1.0 / (k ** 1.75)
             source += amp * np.sin(k * phase)
 
         peak = np.max(np.abs(source))
@@ -219,9 +220,9 @@ class VocableSynthesizer:
         audio = np.zeros(n_samples, dtype=np.float64)
         nyquist = self.sample_rate / 2.0
         brightness = decision.brightness * (0.5 if is_humming else 1.0)
-        for freq, weight, q in zip(formant_freqs, self.FORMANT_WEIGHTS, self.FORMANT_Q):
+        for freq, weight, bw in zip(formant_freqs, self.FORMANT_WEIGHTS, self.FORMANT_BANDWIDTH_HZ):
             freq = float(np.clip(freq, 40.0, nyquist * 0.98))
-            resonated = self._bandpass(source, freq, q)
+            resonated = self._bandpass(source, freq, bw)
             brightness_boost = 1.0 + brightness * 0.4
             audio += resonated * weight * brightness_boost
 
@@ -230,21 +231,40 @@ class VocableSynthesizer:
         breathiness = self.breathiness * (0.2 if is_humming else 1.0)
         if breathiness > 0:
             noise = self._rng.normal(0, 1, n_samples)
-            breath = self._bandpass(noise, formant_freqs[0], 3.0) * 0.6
-            breath += self._bandpass(noise, formant_freqs[1], 4.0) * 0.4
+            breath = self._bandpass(noise, formant_freqs[0], 220.0) * 0.6
+            breath += self._bandpass(noise, formant_freqs[1], 260.0) * 0.4
             audio += breath * breathiness
 
         peak = np.max(np.abs(audio))
         if peak > 0:
-            audio /= peak
+            audio = audio / peak * 0.92
+
+        shimmer = self._smoothed_noise(n_samples, std=0.035, cutoff_hz=9.0)
+        audio = audio * (1.0 + shimmer)
 
         return audio.astype(np.float32)
 
-    def _bandpass(self, signal: np.ndarray, center_hz: float, q: float) -> np.ndarray:
+    def _smoothed_noise(self, n_samples: int, std: float, cutoff_hz: float) -> np.ndarray:
+        if n_samples < 4:
+            return np.zeros(n_samples)
+        try:
+            noise = self._rng.normal(0, 1, n_samples)
+            nyquist = self.sample_rate / 2.0
+            wn = min(cutoff_hz / nyquist, 0.99)
+            b, a = butter(2, wn, btype="low")
+            smoothed = lfilter(b, a, noise)
+            rms = np.sqrt(np.mean(smoothed ** 2))
+            if rms > 0:
+                smoothed = smoothed / rms * std
+            return smoothed
+        except Exception:
+            return np.zeros(n_samples)
+
+    def _bandpass(self, signal: np.ndarray, center_hz: float, bandwidth_hz: float) -> np.ndarray:
         nyquist = self.sample_rate / 2.0
-        bandwidth = max(center_hz / q, 10.0)
-        low = max((center_hz - bandwidth / 2) / nyquist, 1e-4)
-        high = min((center_hz + bandwidth / 2) / nyquist, 0.999)
+        bandwidth_hz = max(bandwidth_hz, 10.0)
+        low = max((center_hz - bandwidth_hz / 2) / nyquist, 1e-4)
+        high = min((center_hz + bandwidth_hz / 2) / nyquist, 0.999)
         if low >= high:
             return signal
         try:
@@ -288,6 +308,7 @@ class VocableSynthesizer:
             logger.error(f"Wavetable synthesis error: {e} — using sinusoidal fallback")
             return self._synthesize_sinusoidal(decision, n_samples)
 
+    # Prevents clicks at note boundaries by fading in and out
     def _apply_envelope(self, audio):
         attack_samples = min(int(0.01 * self.sample_rate), len(audio) // 4)
         release_samples = min(int(0.03 * self.sample_rate), len(audio) // 4)

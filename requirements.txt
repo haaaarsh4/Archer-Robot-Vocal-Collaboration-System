@@ -17,3 +17,13 @@ python-multipart>=0.0.9
 torch
 sentencepiece>=0.1.99
 morfessor>=2.0.6
+
+requests>=2.31.0
+soundfile>=0.12.1
+
+hfst
+
+transformers>=4.40.0
+vaderSentiment>=3.3.2
+
+openai-whisper

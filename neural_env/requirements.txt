@@ -1,0 +1,12 @@
+torch>=2.1
+numpy
+scipy
+librosa
+soundfile
+transformers>=4.30    # infer/hubert.py: AutoFeatureExtractor + HubertModel
+faiss-cpu             # feature-index retrieval (rvc_pipeline.py); omit and index_rate is just ignored
+fastapi
+uvicorn
+pyyaml
+onnxruntime
+python-multipart
