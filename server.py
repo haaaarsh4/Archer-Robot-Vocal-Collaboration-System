@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from typing import Optional
@@ -322,25 +323,133 @@ def score_sentiment(text: str, vocal: dict = None) -> dict:
 # Transcribing on our own server instead means the browser's only job is
 # "record audio, send it here" -- works identically everywhere.
 WHISPER_MODEL_DIR = "data/models/whisper"
-whisper_model = None
-whisper_load_error = None
 
-_whisper_checkpoint = os.path.join(WHISPER_MODEL_DIR, "base.en.pt")
-if not os.path.isfile(_whisper_checkpoint):
-    whisper_load_error = (
-        f"{_whisper_checkpoint} not found. Run 'python download_whisper_model.py' once first "
-        "(needs internet access, one-time only) to populate it. server.py itself never "
-        "downloads this model or makes any network call for it."
+# Two separate faster-whisper configs, not one: a live mic phrase and an
+# uploaded full track have fundamentally different latency budgets. An
+# earlier version of this file used large-v3-turbo everywhere on the
+# theory that turbo is "fast enough" -- and on a GPU or a strong modern
+# CPU it usually is, but on modest CPU-only hardware (no GPU here, per
+# this project's ALSA/JACK startup warnings), an 809M-parameter model
+# doing beam_size=5 decoding can genuinely take minutes for a single
+# short phrase. That's fine for a one-time track upload where a minute
+# of wait is acceptable; it's not fine for a live conversation where
+# every single phrase pays that cost. So:
+#   - MIC_MODEL_SIZE stays small and fast -- every phrase in the live
+#     Sentiment-tab pipeline goes through this one.
+#   - TRACK_MODEL_SIZE stays large and accurate -- only the Live Demo's
+#     "Upload an MP3" whole-track analysis pays its slower per-request
+#     cost, and that's a single request per upload, not one per phrase.
+# If your hardware turns out to handle large-v3-turbo quickly (a decent
+# modern CPU with AVX512-VNNI, or any GPU), you can point MIC_MODEL_SIZE
+# at it too -- this split is a default informed by "3-4 minutes per
+# phrase" being reported, not a hard technical ceiling.
+MIC_WHISPER_MODEL_SIZE = "small.en"
+MIC_WHISPER_MODEL_DIR = "data/models/faster-whisper-small.en"
+TRACK_WHISPER_MODEL_SIZE = "large-v3-turbo"
+TRACK_WHISPER_MODEL_DIR = "data/models/faster-whisper-large-v3-turbo"
+
+
+def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpoint: str):
+    """Loads one faster-whisper config, falling back to the legacy
+    openai-whisper checkpoint if faster-whisper isn't set up. Returns
+    (model, backend_kind, load_error) -- backend_kind is "faster",
+    "openai", or None if nothing loaded. Called twice at startup (once
+    per model tier above) so both configs are fully loaded and warm
+    before the server accepts its first request -- no model ever loads
+    lazily inside a request handler, which is what caused the multi-
+    minute stall the mic-path PANNs loader used to have (see below)."""
+    if os.path.isdir(model_dir):
+        try:
+            from faster_whisper import WhisperModel
+            model = WhisperModel(model_size, device="cpu", compute_type="int8",
+                                  download_root=model_dir, local_files_only=True)
+            print(f"faster-whisper ({model_size}, int8, CPU) loaded from local files at {model_dir}.")
+            return model, "faster", None
+        except Exception as e:
+            print(f"faster-whisper ({model_size}) failed to load ({e}); trying legacy openai-whisper.")
+
+    if os.path.isfile(legacy_checkpoint):
+        try:
+            import whisper as _whisper
+            model = _whisper.load_model(legacy_checkpoint)
+            print(f"[legacy backend] openai-whisper loaded from local files at {legacy_checkpoint}.")
+            return model, "openai", None
+        except Exception as e:
+            return None, None, str(e)
+
+    error = (
+        f"Neither faster-whisper ({model_dir}) nor the legacy checkpoint ({legacy_checkpoint}) "
+        f"were found. Run 'python download_faster_whisper_model.py' once (needs internet, one-time "
+        f"only) or 'python download_whisper_model.py' for the older backend."
     )
-    print(f"Whisper transcription model not loaded: {whisper_load_error}")
-else:
+    print(f"Whisper model not loaded ({model_size}): {error}")
+    return None, None, error
+
+
+_legacy_whisper_checkpoint = os.path.join(WHISPER_MODEL_DIR, "base.en.pt")
+
+whisper_model_mic, whisper_backend_mic, whisper_load_error_mic = _load_faster_whisper_backend(
+    MIC_WHISPER_MODEL_SIZE, MIC_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint
+)
+whisper_model_track, whisper_backend_track, whisper_load_error_track = _load_faster_whisper_backend(
+    TRACK_WHISPER_MODEL_SIZE, TRACK_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint
+)
+# If the accurate track model isn't set up yet, fall back to whatever
+# the mic model is rather than leaving track uploads broken entirely.
+if whisper_model_track is None and whisper_model_mic is not None:
+    print("Track-upload model not available; falling back to the mic model for /api/transcribe/annotated too "
+          "(less accurate than large-v3-turbo would be -- run download_faster_whisper_model.py to fix this).")
+    whisper_model_track, whisper_backend_track = whisper_model_mic, whisper_backend_mic
+
+# Kept for anything (health checks, older code paths) that still wants
+# a single "is Whisper loaded at all" signal.
+whisper_model = whisper_model_mic or whisper_model_track
+whisper_backend = whisper_backend_mic or whisper_backend_track
+whisper_load_error = whisper_load_error_mic or whisper_load_error_track
+
+
+# Vosk: a real local, real-time streaming ASR engine (Kaldi-based),
+# separate from Whisper entirely. Whisper -- either backend above -- can
+# only transcribe a complete audio clip you hand it; it has no notion of
+# "partial result while still listening", which is why the mic pipeline
+# has always had to wait for a pause (VAD) before calling it. The
+# earlier attempt at instant captions used the browser's own
+# SpeechRecognition API instead, which genuinely can stream -- but it
+# works by sending your audio to Google's speech servers over the
+# network, and Brave (and some other privacy-focused browsers) blocks
+# that specific traffic by default, which is almost certainly why no
+# live captions ever appeared. Vosk needs no network call at all: it
+# runs the whole recognizer locally and emits partial results within a
+# couple hundred milliseconds of audio arriving, which is what makes
+# genuine word-by-word captions possible. See download_vosk_model.py.
+# VOSK_MODEL_DIR = "data/models/vosk-model-en-us-0.22" -- the larger,
+# more accurate Vosk model (~1.8GB vs ~40MB for the small one).
+# Independent evaluation puts its WER roughly 20% lower than the small
+# model's, and it's the model used directly in Vosk's own real-time
+# streaming examples -- still designed for live use, just a bigger
+# acoustic/language model under the hood. This is the "don't care if
+# it's bigger, want the best accuracy that's still real-time" pick;
+# vosk-model-small-en-us-0.15 remains the fallback for constrained
+# hardware (loads in a fraction of the time, far less RAM).
+VOSK_MODEL_DIR = "data/models/vosk-model-en-us-0.22"
+vosk_model = None
+vosk_load_error = None
+if os.path.isdir(VOSK_MODEL_DIR):
     try:
-        import whisper as _whisper
-        whisper_model = _whisper.load_model(_whisper_checkpoint)
-        print(f"Whisper transcription model loaded from local files at {_whisper_checkpoint}.")
+        from vosk import Model as VoskModel, SetLogLevel as _vosk_set_log_level
+        _vosk_set_log_level(-1)  # Vosk/Kaldi logs straight to stderr by default and is very chatty; -1 silences it
+        vosk_model = VoskModel(VOSK_MODEL_DIR)
+        print(f"Vosk streaming model loaded from local files at {VOSK_MODEL_DIR} (instant local live captions enabled).")
     except Exception as e:
-        whisper_load_error = str(e)
-        print(f"Whisper transcription model failed to load: {whisper_load_error}")
+        vosk_load_error = str(e)
+        print(f"Vosk failed to load: {vosk_load_error}")
+else:
+    vosk_load_error = (
+        f"{VOSK_MODEL_DIR} not found. Run 'python download_vosk_model.py' once (needs internet, "
+        "one-time only) to enable instant local live captions. Optional -- everything else in this "
+        "file works without it."
+    )
+    print(f"Vosk not loaded: {vosk_load_error}")
 
 
 harmony_engine = None
@@ -1127,6 +1236,42 @@ async def convert_neural_track(
         return JSONResponse({"error": f"Conversion failed: {e}"}, status_code=500)
 
 
+def _decode_audio_via_ffmpeg(raw_audio_bytes: bytes, target_sr: int) -> np.ndarray:
+    """Decode arbitrary-container audio (webm/opus in particular) to mono
+    float32 PCM at target_sr, using ffmpeg directly instead of
+    soundfile/libsndfile.
+
+    This is the fix for the "[pitch analyze error] ... Format not
+    recognised" line that's been in this project's logs on essentially
+    every mic-recorded segment: libsndfile (what `soundfile` wraps) has
+    no WebM/Opus decoder at all -- it only handles WAV/FLAC/OGG-Vorbis/
+    AIFF/etc. The old code called sf.read() directly on the raw webm
+    bytes, which was guaranteed to fail for browser-recorded audio; the
+    failure was just swallowed by the surrounding try/except and
+    pitch_range_semitones silently defaulted to 0. ffmpeg is already a
+    hard dependency here (Whisper's own loader shells out to it), so
+    this doesn't add anything new to the environment -- it just uses it
+    somewhere that actually needed it.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp_in:
+        tmp_in.write(raw_audio_bytes)
+        tmp_in_path = tmp_in.name
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", tmp_in_path,
+             "-f", "f32le", "-ac", "1", "-ar", str(target_sr), "-"],
+            capture_output=True, check=True,
+        )
+        return np.frombuffer(proc.stdout, dtype=np.float32).copy()
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"ffmpeg failed to decode audio: {e.stderr.decode(errors='replace')[:300]}")
+    finally:
+        try:
+            os.unlink(tmp_in_path)
+        except OSError:
+            pass
+
+
 def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
     """
     Runs in a worker thread (see asyncio.to_thread in analyze_pitch_track
@@ -1147,18 +1292,13 @@ def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
     from analysis.pitch_detector import PitchDetector
-    import librosa
 
     cfg = get_config()
     sample_rate = cfg["audio"]["sample_rate"]
     frame_size = cfg["audio"]["frame_size"]
     frame_time_s = frame_size / sample_rate
 
-    audio, in_sr = sf.read(io.BytesIO(raw_audio_bytes), dtype="float32", always_2d=False)
-    if audio.ndim > 1:
-        audio = audio.mean(axis=1)
-    if in_sr != sample_rate:
-        audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
+    audio = _decode_audio_via_ffmpeg(raw_audio_bytes, sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
     preproc = Preprocessor()
@@ -1213,28 +1353,425 @@ async def analyze_pitch_track(
         return JSONResponse({"error": f"Pitch analysis failed: {e}"}, status_code=500)
 
 
-def _transcribe_audio_blob(raw: bytes) -> dict:
+# OpenAI's own Whisper CLI ships these exact thresholds to flag a
+# segment as likely garbage/hallucinated rather than real speech (see
+# openai-whisper's transcribe.py default arguments -- compression_ratio_
+# threshold, logprob_threshold, no_speech_threshold). faster-whisper
+# exposes the same three numbers per segment, so the same check applies
+# to either backend. This is what catches things like Whisper
+# fabricating "Honor Song for Dr. Suzanne Kite." over audio that's
+# actually wordless vocables: no real transcription happened there, but
+# Whisper is a language model as much as an acoustic one, and it's
+# forced to output *something* -- on non-speech/chant/music audio it
+# will confidently invent a plausible-sounding sentence instead of
+# admitting it doesn't know. Flagging on these thresholds means we stop
+# trusting that fabricated text instead of displaying it as if it were
+# a real transcription.
+WHISPER_LOGPROB_THRESHOLD = -1.0
+WHISPER_COMPRESSION_RATIO_THRESHOLD = 2.4
+WHISPER_NO_SPEECH_THRESHOLD = 0.6
+
+
+def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) -> list:
+    """
+    Shared backend call used by both the mic-phrase path
+    (_transcribe_audio_blob) and the whole-track path
+    (_transcribe_track_annotated) -- this is the ONE place that talks to
+    faster-whisper/openai-whisper directly. Having both paths call the
+    same function is what keeps them from drifting apart. `model`/
+    `backend` are passed in explicitly rather than read from a single
+    global pair, since the mic and track paths now use two different
+    model tiers (see MIC_WHISPER_MODEL_SIZE / TRACK_WHISPER_MODEL_SIZE
+    above) -- a fast one for live phrases, a larger accurate one for
+    uploaded tracks where waiting longer is acceptable.
+
+    Returns a list of raw segment dicts with word-level timestamps
+    (start/end per word, not just per segment) and the three confidence
+    fields _classify_segments needs.
+    """
+    if backend == "faster":
+        def _run(lang, want_words):
+            segments_iter, _info = model.transcribe(
+                tmp_path, language=lang, beam_size=5, vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=400), word_timestamps=want_words,
+            )
+            return list(segments_iter)
+
+        try:
+            segments = _run(language, True)
+        except Exception as e:
+            if language is None:
+                # language=None makes Whisper run its own language-ID
+                # decode pass before transcribing, and that pass is
+                # numerically unstable on short/quiet/ambiguous clips --
+                # it can emit NaN logits and blow up entirely. Retry once
+                # forcing English rather than losing the phrase outright.
+                print(f"[transcribe] auto-detect decode failed ({e}); retrying with language='en'")
+                language = "en"
+            try:
+                segments = _run(language, True)
+            except Exception as e2:
+                # Same word-timestamp alignment fragility as the legacy
+                # backend can hit on short/quiet clips -- retry once more
+                # without word timestamps rather than losing the phrase.
+                print(f"[transcribe] word-timestamp alignment failed ({e2}); retrying without word timestamps")
+                segments = _run(language, False)
+        return [
+            {"start": s.start, "end": s.end, "text": s.text.strip(),
+             "avg_logprob": s.avg_logprob, "no_speech_prob": s.no_speech_prob,
+             "compression_ratio": s.compression_ratio,
+             "words": [{"word": w.word.strip(), "start": w.start, "end": w.end} for w in (s.words or [])]}
+            for s in segments
+        ]
+
+    if backend == "openai":
+        def _run(lang, want_words):
+            return model.transcribe(tmp_path, language=lang, fp16=False, word_timestamps=want_words)
+
+        try:
+            result = _run(language, True)
+        except Exception as e:
+            if language is None:
+                print(f"[transcribe] auto-detect decode failed ({e}); retrying with language='en'")
+                language = "en"
+            try:
+                result = _run(language, True)
+            except Exception as e2:
+                # word_timestamps=True runs openai-whisper's DTW/cross-
+                # attention word-alignment step, which is fragile on
+                # short or quiet clips -- this is what produced the
+                # "Linear(in_features=512, out_features=512, bias=True)"
+                # and "cannot reshape tensor of 0 elements" errors (the
+                # str() of some of its internal failures is a raw
+                # PyTorch module repr, not a readable message). Retry
+                # once more with word_timestamps off entirely: this
+                # loses the per-word breakdown for this one phrase, but
+                # the phrase itself still gets transcribed instead of
+                # failing outright.
+                print(f"[transcribe] word-timestamp alignment failed ({e2}); retrying without word timestamps")
+                result = _run(language, False)
+        return [
+            {"start": s["start"], "end": s["end"], "text": s["text"].strip(),
+             "avg_logprob": s.get("avg_logprob", 0), "no_speech_prob": s.get("no_speech_prob", 0),
+             "compression_ratio": s.get("compression_ratio", 0),
+             "words": [{"word": w["word"].strip(), "start": w["start"], "end": w["end"]}
+                       for w in s.get("words", [])]}
+            for s in result.get("segments", [])
+        ]
+
+    return []
+
+
+def _classify_segments(raw_segments: list) -> list:
+    """
+    Applies the hallucination-filtering thresholds to each raw segment
+    and attaches word-level timestamps to the ones that pass. Shared by
+    both transcription paths -- see _whisper_transcribe_raw_segments.
+    """
+    annotated = []
+    for s in raw_segments:
+        likely_hallucinated = (
+            s["no_speech_prob"] > WHISPER_NO_SPEECH_THRESHOLD
+            or s["avg_logprob"] < WHISPER_LOGPROB_THRESHOLD
+            or s["compression_ratio"] > WHISPER_COMPRESSION_RATIO_THRESHOLD
+            or not s["text"]
+        )
+        seg = {
+            "start": round(s["start"], 2),
+            "end": round(s["end"], 2),
+            "label": s["text"] if not likely_hallucinated else "[non-lexical vocals]",
+            "confident": not likely_hallucinated,
+        }
+        # Word-level timestamps only make sense to hand back for
+        # segments that weren't flagged as hallucinated -- if the whole
+        # sentence was fabricated, the "words" inside it are just as
+        # fake, so there's nothing real to break down.
+        if not likely_hallucinated and s.get("words"):
+            seg["words"] = [{"word": w["word"], "start": round(w["start"], 2), "end": round(w["end"], 2)}
+                             for w in s["words"] if w["word"]]
+        annotated.append(seg)
+    return annotated
+
+
+# AudioSet classes worth surfacing as instrument tags -- filtered down
+# from AudioSet's 527 classes to actual instruments, skipping broad
+# umbrella tags ("Music", "Sound effect") that add nothing beyond what
+# the fallback rhythm detector already implies, and skipping non-
+# instrument classes (Speech, Silence, etc.) that PANNs also scores on
+# the same audio but that aren't instrument labels.
+_PANNS_INSTRUMENT_CLASSES = {
+    "Violin, fiddle", "Viola", "Cello", "Double bass",
+    "Flute", "Clarinet", "Oboe", "Bassoon", "Saxophone",
+    "Trumpet", "Trombone", "French horn", "Brass instrument",
+    "Guitar", "Electric guitar", "Bass guitar", "Banjo", "Mandolin", "Ukulele",
+    "Piano", "Electric piano", "Organ", "Harpsichord",
+    "Drum", "Drum kit", "Bass drum", "Snare drum", "Hi-hat", "Cymbal",
+    "Tambourine", "Rattle (instrument)", "Maraca", "Wood block",
+    "Marimba, xylophone", "Glockenspiel", "Chime", "Bell",
+    "Harp", "Accordion", "Bagpipes", "Didgeridoo", "Shofar",
+    "Sitar", "Steel guitar, slide guitar",
+}
+
+# PANNs (Pretrained Audio Neural Networks, trained on AudioSet) for real
+# instrument tagging -- violin, flute, drum, guitar, etc. as actual
+# distinct labels, not one generic '[instrumental / percussion]' bucket.
+# Optional dependency, same graceful-fallback pattern as the Whisper
+# backends above: a server that hasn't run `pip install panns-inference
+# torchlibrosa` still works fine, just with the coarser rhythm-only
+# fallback in _detect_instrument_spans instead of real per-instrument
+# labels.
+#
+# This used to load lazily -- only on the first actual call, deep inside
+# a request handler -- which is almost certainly what caused the
+# reported multi-minute stall after clicking stop: PANNs downloads and
+# caches a ~300MB checkpoint from Zenodo on first use if it isn't
+# already cached, and that download+load was happening silently inside
+# whatever phrase happened to be transcribed first, not at server
+# startup where a slow one-time cost belongs and is visible in the log.
+# Loading it eagerly here, in the same place as Whisper and Vosk, fixes
+# that -- any request now, including the very first one, uses an
+# already-warm model.
+panns_model = None
+panns_labels = None
+try:
+    from panns_inference import AudioTagging, labels as _panns_labels_list
+    panns_model = AudioTagging(checkpoint_path=None, device="cpu")
+    panns_labels = _panns_labels_list
+    print("PANNs audio-tagging model loaded (per-instrument detection enabled).")
+except Exception as e:
+    print(f"PANNs not available ({e}) -- instrument spans will use the generic rhythm-only "
+          f"fallback ('[instrumental / percussion]' instead of a named instrument). Run "
+          f"'pip install panns-inference torchlibrosa' and restart the server to enable real "
+          f"per-instrument labels (violin, flute, drum, guitar, ...).")
+    panns_model, panns_labels = None, None
+
+
+def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
+    """
+    Tags spans of audio with actual instrument names using PANNs where
+    available. The earlier rhythm-density detector can only say "steady
+    pulse detected" -- it has no way to name what's making the pulse,
+    and it can't see a sustained melodic instrument (violin, flute) at
+    all, since those don't necessarily produce the sharp rhythmic
+    onsets that detector looks for. PANNs is a real trained sound-event
+    classifier and can actually distinguish these.
+    """
+    model, labels = panns_model, panns_labels
+
+    if model is None:
+        fallback_sr = 22050
+        fb_audio = _decode_audio_via_ffmpeg(raw_bytes, fallback_sr)
+        duration = len(fb_audio) / fallback_sr
+        window_s = min(2.0, max(0.5, duration))
+        spans = _detect_percussive_spans(fb_audio, fallback_sr, window_s=window_s, min_duration_s=min_duration_s)
+        return [{"start": s, "end": e, "label": "[instrumental / percussion]", "confident": False} for s, e in spans]
+
+    panns_sr = 32000  # PANNs' expected input sample rate
+    audio = _decode_audio_via_ffmpeg(raw_bytes, panns_sr)
+    duration = len(audio) / panns_sr
+
+    win_samples = int(2.0 * panns_sr)
+    hop_samples = int(1.0 * panns_sr)
+    raw_spans = []
+    i = 0
+    while i < len(audio):
+        chunk = audio[i:i + win_samples]
+        if len(chunk) < panns_sr * 0.5:  # too short a tail to classify meaningfully
+            break
+        clipwise_output, _ = model.inference(chunk[None, :])
+        top_idx = np.argsort(clipwise_output[0])[::-1][:5]
+        for idx in top_idx:
+            label = labels[idx]
+            score = float(clipwise_output[0][idx])
+            if label in _PANNS_INSTRUMENT_CLASSES and score > 0.15:
+                start_t = i / panns_sr
+                end_t = min((i + win_samples) / panns_sr, duration)
+                raw_spans.append({"start": round(start_t, 2), "end": round(end_t, 2),
+                                   "label": f"[{label.lower()}]", "confident": False})
+        i += hop_samples
+
+    # Merge adjacent/overlapping same-label windows into contiguous
+    # ranges instead of a new entry every 1s hop.
+    raw_spans.sort(key=lambda s: (s["label"], s["start"]))
+    merged = []
+    for s in raw_spans:
+        if merged and merged[-1]["label"] == s["label"] and s["start"] <= merged[-1]["end"] + 0.5:
+            merged[-1]["end"] = max(merged[-1]["end"], s["end"])
+        else:
+            merged.append(dict(s))
+    return [s for s in merged if s["end"] - s["start"] >= min_duration_s]
+
+
+def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: float) -> list:
+    """Runs instrument detection (PANNs, or the rhythm-only fallback) and
+    merges it into an existing annotated-segment list, sorted by start
+    time. Shared by both transcription paths. min_duration_s is passed
+    through so short mic phrases (a couple seconds) and full tracks
+    (tens of seconds) each use a sensible minimum instead of one fixed
+    value that's either too twitchy for a full song or unreachable for
+    a short phrase."""
+    try:
+        annotated.extend(_detect_instrument_spans(raw_bytes, min_duration_s))
+    except Exception as e:
+        print(f"[transcribe] instrument detection skipped: {e}")
+    annotated.sort(key=lambda seg: seg["start"])
+    return annotated
+
+
+def _transcribe_audio_blob(raw: bytes, language: str = "en") -> dict:
     """Runs in a worker thread (see /api/transcribe) -- writes the
     uploaded audio to a temp file (Whisper/ffmpeg need a real file path,
     not in-memory bytes) and transcribes it. Cleans up the temp file
-    either way. Returns diagnostics alongside the text -- specifically
-    Whisper's own no_speech_prob per segment, its internal confidence that
-    a stretch of audio contains no speech at all (0=confident there IS
-    speech, 1=confident there ISN'T) -- so an empty result is debuggable
-    (audio arrived but Whisper judged it silence/noise) rather than a
-    black box (was anything even received?)."""
+    either way.
+
+    This is the mic-phrase path (Sentiment tab's live listening and the
+    Cree/English toggle) -- short clips, a few seconds each. It shares
+    its actual transcription + hallucination-filtering + percussive-
+    detection logic with _transcribe_track_annotated (the Live Demo
+    upload path) via _whisper_transcribe_raw_segments/_classify_segments/
+    _add_percussive_segments, so a phrase full of sung chant or drumming
+    picked up by the mic gets the same honest [non-lexical vocals]/
+    [drums] treatment as an uploaded track does, instead of Whisper
+    inventing a fake sentence for it. `text` stays a flat string built
+    only from confident segments for backward compatibility with the
+    existing frontend flow; `segments`/`has_lexical_speech` carry the
+    richer per-word/per-label breakdown for callers that want it.
+
+    language=None lets Whisper auto-detect instead of forcing English.
+    This is used for the "Speaking Cree" mic mode: Whisper has no
+    nêhiyawêwin (Cree) language model at all -- it isn't one of the
+    languages it was trained on -- so there's no "correct" language code
+    to pass. Forcing language="en" would just mangle Cree audio into
+    English words; leaving it unset instead lets Whisper fall back to
+    whatever language its acoustic model thinks is the closest phonetic
+    match, which is still an approximation, not real Cree transcription,
+    but a less actively wrong one than force-fitting English.
+    """
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
     try:
-        result = whisper_model.transcribe(tmp_path, language="en", fp16=False)
-        segments = result.get("segments", [])
-        no_speech_probs = [round(s.get("no_speech_prob", 0), 3) for s in segments]
+        if os.path.getsize(tmp_path) < 512:
+            # Too small to possibly contain a decodable audio frame (a
+            # webm container header alone is close to this size). This is
+            # the exact condition that produced "cannot reshape tensor of
+            # 0 elements" -- Whisper's own decoder crashing on an
+            # effectively empty clip. Skip the model call entirely rather
+            # than let it throw.
+            return {"text": "", "bytes_received": len(raw), "segment_count": 0, "no_speech_probs": [],
+                    "segments": [], "has_lexical_speech": False}
+
+        raw_segments = _whisper_transcribe_raw_segments(tmp_path, language, whisper_model_mic, whisper_backend_mic)
+        annotated = _classify_segments(raw_segments)
+        # Mic phrases are short (a couple seconds after VAD trims
+        # silence), so a 2s-minimum drum span would almost never fire --
+        # use a much shorter floor here than the whole-track path does.
+        annotated = _add_percussive_segments(annotated, raw, min_duration_s=0.6)
+
+        confident_text = " ".join(s["label"] for s in annotated if s["confident"] and s["label"])
+        no_speech_probs = [round(s["no_speech_prob"], 3) for s in raw_segments]
         return {
-            "text": result["text"].strip(),
+            "text": confident_text,
             "bytes_received": len(raw),
-            "segment_count": len(segments),
+            "segment_count": len(raw_segments),
             "no_speech_probs": no_speech_probs,
+            "segments": annotated,
+            "has_lexical_speech": bool(confident_text.strip()),
+        }
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+def _detect_percussive_spans(audio: np.ndarray, sr: int, window_s: float = 2.0,
+                              density_threshold: float = 1.5, min_duration_s: float = 2.0) -> list:
+    """
+    Flags time ranges with a steady, regular rhythmic pulse -- hand
+    drums, powwow drums, rattles, clapping -- using onset detection
+    instead of harmonic-percussive source separation.
+
+    An earlier version of this function tried HPSS (splitting audio into
+    a "percussive" and "harmonic" component, flagging spans where the
+    percussive component's frame-level loudness dominated). Tested
+    directly against a real honor-song recording with continuous hand
+    drum under continuous chanting, it found nothing: the vocals are
+    loud and sustained enough that the percussive component never
+    "wins" on a frame-by-frame loudness basis, even though the drum is
+    audibly present and steady throughout. That's a real limitation of
+    HPSS on music where percussion sits under, not beside, the dominant
+    sound.
+
+    This version instead detects onset events (any sharp increase in
+    spectral energy -- a drum hit, a plucked note, a consonant) and
+    checks how *densely and regularly* they occur in sliding windows.
+    Steady drumming produces frequent, evenly spaced onsets regardless
+    of what's mixed on top of it; sparse, irregular onsets (occasional
+    word attacks with no drum) don't. Verified against the same test
+    recording: this correctly flags a continuous span covering nearly
+    the entire ~35s track, matching what's actually audible in it.
+
+    This is still a heuristic about rhythmic density, not a classifier
+    that identifies "drums" as an instrument -- a different steady
+    pulse (a shaker, a clock, rhythmic clapping) would trigger the same
+    label. The label describes "steady rhythmic pulse detected", which
+    is what it actually measures.
+    """
+    import librosa
+    onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
+    times = librosa.times_like(onset_env, sr=sr)
+    peak_idx = librosa.util.peak_pick(onset_env, pre_max=3, post_max=3, pre_avg=3, post_avg=5, delta=0.3, wait=5)
+    peak_times = times[peak_idx]
+
+    if not len(peak_times) or not len(times):
+        return []
+
+    duration = float(times[-1])
+    spans = []
+    cur_start = None
+    t = 0.0
+    while t < duration:
+        count = np.sum((peak_times >= t) & (peak_times < t + window_s))
+        density = count / window_s
+        is_pulsing = density >= density_threshold
+        if is_pulsing and cur_start is None:
+            cur_start = t
+        elif not is_pulsing and cur_start is not None:
+            if t - cur_start >= min_duration_s:
+                spans.append((round(cur_start, 2), round(t, 2)))
+            cur_start = None
+        t += window_s
+    if cur_start is not None and duration - cur_start >= min_duration_s:
+        spans.append((round(cur_start, 2), round(duration, 2)))
+    return spans
+
+
+def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
+    """
+    Whole-track transcription for uploaded audio (Live Demo's "Upload an
+    MP3" panel), meant for full songs rather than short mic phrases.
+    Shares its actual transcription/filtering/percussive-detection logic
+    with _transcribe_audio_blob (the mic path) -- see that function's
+    docstring and _whisper_transcribe_raw_segments for why. The only
+    real difference here is the percussive-detection minimum span length
+    (full tracks use a longer floor than short mic phrases do) and the
+    response shape (no legacy bytes_received/segment_count fields, since
+    nothing depends on those for this endpoint).
+    """
+    with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp:
+        tmp.write(raw)
+        tmp_path = tmp.name
+    try:
+        raw_segments = _whisper_transcribe_raw_segments(tmp_path, language, whisper_model_track, whisper_backend_track)
+        annotated = _classify_segments(raw_segments)
+        annotated = _add_percussive_segments(annotated, raw, min_duration_s=2.0)
+
+        confident_text = " ".join(s["label"] for s in annotated if s["confident"] and s["label"])
+        return {
+            "segments": annotated,
+            "text": confident_text,
+            "has_lexical_speech": bool(confident_text.strip()),
         }
     finally:
         try:
@@ -1244,21 +1781,27 @@ def _transcribe_audio_blob(raw: bytes) -> dict:
 
 
 @app.post("/api/transcribe")
-async def transcribe(file: UploadFile = File(...)):
+async def transcribe(file: UploadFile = File(...), language: str = Form("en")):
     """
-    Server-side English speech-to-text via Whisper, for the sentiment
-    demo's mic input. See the WHISPER_MODEL_DIR loading block above for
-    why this exists instead of the browser's built-in speech recognition:
-    that only works in official Chrome/Edge, this works in every browser
-    that can record audio at all.
+    Server-side speech-to-text via Whisper, for the sentiment demo's mic
+    input. See the WHISPER_MODEL_DIR loading block above for why this
+    exists instead of the browser's built-in speech recognition: that
+    only works in official Chrome/Edge, this works in every browser that
+    can record audio at all.
+
+    `language` comes from the frontend's English/Cree mic toggle:
+    "en" forces English (the original behavior). "cr" is passed through
+    as language=None to Whisper -- see _transcribe_audio_blob's docstring
+    for why there's no real "cr" option to force.
     """
-    if whisper_model is None:
-        return JSONResponse({"error": f"Whisper not loaded: {whisper_load_error}"}, status_code=503)
+    if whisper_model_mic is None:
+        return JSONResponse({"error": f"Whisper (mic model) not loaded: {whisper_load_error_mic}"}, status_code=503)
     try:
         raw = await file.read()
         if not raw:
             return JSONResponse({"error": "No audio data received"}, status_code=400)
-        diag = await asyncio.to_thread(_transcribe_audio_blob, raw)
+        whisper_language = None if language == "cr" else "en"
+        diag = await asyncio.to_thread(_transcribe_audio_blob, raw, whisper_language)
         if not diag["text"]:
             print(f"[transcribe] empty result -- {diag['bytes_received']} bytes received, "
                   f"{diag['segment_count']} segments, no_speech_probs={diag['no_speech_probs']}")
@@ -1268,9 +1811,38 @@ async def transcribe(file: UploadFile = File(...)):
         return JSONResponse({"error": f"Transcription failed: {e}"}, status_code=500)
 
 
+@app.post("/api/transcribe/annotated")
+async def transcribe_annotated(file: UploadFile = File(...), language: str = Form("en")):
+    """
+    Whole-track transcription for Live Demo's uploaded audio, with
+    timestamped segments and hallucination filtering -- see
+    _transcribe_track_annotated's docstring for why this is a separate
+    endpoint from /api/transcribe rather than a flag on it: this does
+    real per-segment confidence filtering plus a full HPSS pass for
+    percussive detection, which is unnecessary weight for the mic's
+    short per-phrase calls.
+    """
+    if whisper_model_track is None:
+        return JSONResponse({"error": f"Whisper (track model) not loaded: {whisper_load_error_track}"}, status_code=503)
+    try:
+        raw = await file.read()
+        if not raw:
+            return JSONResponse({"error": "No audio data received"}, status_code=400)
+        result = await asyncio.to_thread(_transcribe_track_annotated, raw, language)
+        return result
+    except Exception as e:
+        print(f"[transcribe annotated error] {e}")
+        return JSONResponse({"error": f"Annotated transcription failed: {e}"}, status_code=500)
+
+
 @app.get("/api/transcribe/health")
 def transcribe_health():
-    return {"status": "ok" if whisper_model else "not_loaded", "error": whisper_load_error}
+    return {
+        "mic_model": {"status": "ok" if whisper_model_mic else "not_loaded",
+                       "backend": whisper_backend_mic, "error": whisper_load_error_mic},
+        "track_model": {"status": "ok" if whisper_model_track else "not_loaded",
+                         "backend": whisper_backend_track, "error": whisper_load_error_track},
+    }
 
 
 @app.post("/pipeline/start")
@@ -1575,6 +2147,106 @@ async def ws_pitch(ws: WebSocket):
         pass
     except Exception as e:
         print(f"[ws/pitch error] {e}")
+
+
+@app.websocket("/ws/live-transcribe")
+async def ws_live_transcribe(ws: WebSocket):
+    """
+    Real-time, fully local streaming transcription via Vosk -- purely
+    for instant visual feedback while the mic pipeline's normal VAD is
+    still waiting for a pause. This does NOT replace /api/transcribe:
+    the accurate, hallucination-filtered, sentiment-integrated
+    transcript still comes from the Whisper-based pipeline once a
+    phrase ends. This endpoint just fills the gap while you're still
+    talking, at whatever accuracy a small streaming model can manage --
+    noticeably rougher than Whisper, in exchange for latency in the
+    low hundreds of milliseconds instead of "however long the phrase
+    plus a full Whisper pass takes".
+
+    Same wire convention as /ws/pitch: raw float32 PCM bytes at the
+    client's native AudioContext sample rate (passed as the
+    `sample_rate` query param), mono. Resampling to the 16kHz int16 PCM
+    Vosk actually expects happens here, not on the client, so the
+    frontend doesn't need its own resampling code beyond what it
+    already does to capture raw samples.
+
+    Vosk's recognizer calls (AcceptWaveform/Result/PartialResult) are
+    blocking C++ calls via its Python bindings, not async-native --
+    they're dispatched through asyncio.to_thread() inside the loop
+    below rather than called directly. An earlier version called them
+    directly on the event loop; since a chunk arrives every ~100-250ms
+    continuously while the mic is running, that monopolized the entire
+    single-threaded event loop on every single chunk, which starved
+    every other in-flight coroutine on the same loop -- including the
+    already-computed HTTP response for a /api/transcribe request
+    waiting for its turn to actually get sent. The accurate transcript
+    wasn't stuck computing in that case; it was fully done and just
+    couldn't get scheduled to deliver its response until this loop
+    stopped sending (i.e., until the mic was stopped) -- which is
+    exactly the "everything appears at once, only after clicking Stop"
+    bug this fixes.
+    """
+    await ws.accept()
+    if vosk_model is None:
+        await ws.send_text(json.dumps({"type": "error", "message": vosk_load_error or "Vosk not loaded"}))
+        await ws.close()
+        return
+
+    import vosk as _vosk
+    recognizer = _vosk.KaldiRecognizer(vosk_model, 16000)
+    recognizer.SetWords(False)
+
+    try:
+        source_sr = int(float(ws.query_params.get("sample_rate", "48000")))
+    except ValueError:
+        source_sr = 48000
+
+    try:
+        while True:
+            message = await ws.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if not data:
+                continue
+
+            frame = np.frombuffer(data, dtype=np.float32)
+            if len(frame) == 0:
+                continue
+
+            # Downsample to Vosk's required 16kHz and convert to int16
+            # PCM. Linear interpolation, same lightweight approach used
+            # elsewhere in this file for browser-rate audio -- this
+            # doesn't need to be broadcast-quality, just intelligible
+            # enough for a small streaming acoustic model.
+            if source_sr != 16000:
+                ratio = source_sr / 16000
+                out_len = max(1, int(len(frame) / ratio))
+                src_idx = np.arange(out_len) * ratio
+                idx_low = np.floor(src_idx).astype(np.int64)
+                idx_high = np.minimum(idx_low + 1, len(frame) - 1)
+                frac = src_idx - idx_low
+                resampled = frame[idx_low] * (1 - frac) + frame[idx_high] * frac
+            else:
+                resampled = frame
+
+            pcm16 = np.clip(resampled, -1.0, 1.0)
+            pcm16 = (pcm16 * 32767.0).astype(np.int16)
+
+            def _vosk_process_chunk(pcm_bytes: bytes):
+                # Runs in a worker thread. See the docstring above for
+                # why this can't run directly on the event loop.
+                if recognizer.AcceptWaveform(pcm_bytes):
+                    return "final", json.loads(recognizer.Result()).get("text", "")
+                return "partial", json.loads(recognizer.PartialResult()).get("partial", "")
+
+            kind, text = await asyncio.to_thread(_vosk_process_chunk, pcm16.tobytes())
+            if text:
+                await ws.send_text(json.dumps({"type": kind, "text": text}))
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"[ws/live-transcribe error] {e}")
 
 
 def _apply_neural_timbre(audio: np.ndarray, sample_rate: int, decision) -> np.ndarray:

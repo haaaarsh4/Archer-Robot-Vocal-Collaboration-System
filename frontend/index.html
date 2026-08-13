@@ -154,6 +154,12 @@
   .node-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
   .node-tech { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
   .node-pill { font-family: var(--mono); font-size: 10px; padding: 3px 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 100px; color: var(--muted); }
+
+  .cree-lang-pill.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
   .cree-lang-btn { font-size: 12px; padding: 8px 14px; border-radius: 8px; }
   .cree-lang-btn.active { background: var(--accent, #6366f1); border-color: var(--accent, #6366f1); color: #fff; }
   .cree-word-chip { display: inline-block; padding: 1px 6px; border-radius: 5px; margin: 0 3px 3px 0; border: 1px solid var(--border); cursor: default; }
@@ -536,6 +542,63 @@
     color: var(--muted); 
     font-weight: 400;
     font-style: italic;
+  }
+
+  /* Transcript log: unlike the single-shot translation box, this one
+     accumulates one entry per phrase for the whole listening session,
+     so it needs a bounded height + scroll instead of centering a single
+     line of text. */
+  .cree-transcript-log {
+    max-height: 280px;
+    overflow-y: auto;
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+
+  .cree-transcript-entry {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cree-transcript-interim {
+    opacity: 0.55;
+    font-style: italic;
+  }
+
+  .demo-transcript-word {
+    transition: background 0.1s ease, color 0.1s ease;
+    border-radius: 3px;
+    padding: 1px 2px;
+  }
+
+  .demo-transcript-word-active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .cree-transcript-entry:last-child {
+    border-bottom: none;
+  }
+
+  .cree-transcript-entry:first-child {
+    padding-top: 0;
+  }
+
+  .cree-transcript-selectable {
+    cursor: pointer;
+    padding-left: 8px;
+    margin-left: -8px;
+    border-radius: 4px;
+    transition: background 0.12s ease;
+  }
+
+  .cree-transcript-selectable:hover {
+    background: var(--bg2);
+  }
+
+  .cree-transcript-selectable.selected {
+    background: var(--bg2);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   .cree-syllabics-input { 
@@ -1071,9 +1134,337 @@
     .live-response-big { font-size: 30px; }
     .demo-panel-title { font-size: 16px; }
   }
+
+/* ============================================================
+   Archer Chat Widget
+   ============================================================ */
+#archer-chat-fab {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 9999;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+#archer-chat-fab:hover { transform: scale(1.06); box-shadow: 0 8px 26px rgba(0,0,0,0.32); }
+#archer-chat-fab:active { transform: scale(0.96); }
+#archer-chat-fab svg { width: 26px; height: 26px; }
+#archer-chat-fab .fab-dot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg);
+  display: none;
+}
+#archer-chat-fab.has-status .fab-dot { display: block; }
+
+#archer-chat-panel {
+  position: fixed;
+  bottom: 92px;
+  left: 22px;
+  z-index: 9999;
+  width: 380px;
+  min-width: 300px;
+  max-width: calc(100vw - 44px);
+  height: 560px;
+  min-height: 360px;
+  max-height: calc(100vh - 130px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  font-family: var(--sans);
+}
+#archer-chat-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+#archer-chat-panel.resizing { transition: none; }
+
+#archer-chat-panel .ac-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  z-index: 2;
+  color: var(--muted);
+  opacity: 0.55;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 2px;
+}
+#archer-chat-panel .ac-resize-handle:hover { opacity: 1; color: var(--accent); }
+#archer-chat-panel .ac-resize-handle svg { width: 11px; height: 11px; }
+
+#archer-chat-panel .ac-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000));
+  color: #fff;
+  flex-shrink: 0;
+}
+#archer-chat-panel .ac-header .ac-title { font-weight: 600; font-size: 14.5px; line-height: 1.2; }
+#archer-chat-panel .ac-header .ac-subtitle { font-size: 11px; opacity: 0.85; font-family: var(--mono); }
+#archer-chat-panel .ac-header .ac-spacer { flex: 1; }
+#archer-chat-panel .ac-header button {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease;
+}
+#archer-chat-panel .ac-header button:hover { background: rgba(255,255,255,0.28); }
+
+#archer-chat-panel .ac-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#archer-chat-panel .ac-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+#archer-chat-panel .ac-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+#archer-chat-panel .ac-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#archer-chat-panel .ac-body::-webkit-scrollbar { width: 6px; }
+#archer-chat-panel .ac-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+#archer-chat-panel .ac-msg {
+  max-width: 86%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+#archer-chat-panel .ac-msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+#archer-chat-panel .ac-msg.bot {
+  align-self: flex-start;
+  background: var(--border);
+  color: var(--text);
+  border-bottom-left-radius: 3px;
+}
+#archer-chat-panel .ac-msg.system {
+  align-self: center;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+  max-width: 100%;
+}
+#archer-chat-panel .ac-msg.error { border: 1px solid var(--red); color: var(--red); background: transparent; }
+#archer-chat-panel .ac-msg .ac-sources {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.65;
+}
+#archer-chat-panel .ac-msg audio { width: 100%; margin-top: 6px; height: 30px; }
+
+#archer-chat-panel .ac-typing { display: flex; gap: 4px; align-self: flex-start; padding: 9px 12px; }
+#archer-chat-panel .ac-typing span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+  animation: ac-bounce 1.1s infinite ease-in-out;
+}
+#archer-chat-panel .ac-typing span:nth-child(2) { animation-delay: 0.15s; }
+#archer-chat-panel .ac-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ac-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+#archer-chat-panel .ac-inputbar {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#archer-chat-panel .ac-mode-row { display: flex; align-items: center; gap: 8px; font-size: 11px; font-family: var(--mono); color: var(--muted); }
+#archer-chat-panel .ac-mode-row .ac-toggle {
+  display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
+}
+#archer-chat-panel .ac-mode-row .ac-toggle button {
+  padding: 3px 8px; font-size: 11px; font-family: var(--mono); border: none; background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+#archer-chat-panel .ac-mode-row .ac-toggle button.active { background: var(--accent); color: #fff; }
+
+#archer-chat-panel .ac-row { display: flex; align-items: flex-end; gap: 6px; }
+#archer-chat-panel .ac-row textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: var(--sans);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  max-height: 90px;
+  min-height: 36px;
+}
+#archer-chat-panel .ac-row textarea:focus { outline: none; border-color: var(--accent); }
+#archer-chat-panel .ac-iconbtn {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+#archer-chat-panel .ac-iconbtn:hover { border-color: var(--accent); color: var(--accent); }
+#archer-chat-panel .ac-iconbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#archer-chat-panel .ac-iconbtn.primary:hover { opacity: 0.9; }
+#archer-chat-panel .ac-iconbtn.recording { background: var(--red); border-color: var(--red); color: #fff; animation: ac-pulse 1s infinite; }
+@keyframes ac-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+#archer-chat-panel .ac-iconbtn svg { width: 16px; height: 16px; }
+#archer-chat-panel .ac-hint { font-size: 10.5px; color: var(--muted); font-family: var(--mono); text-align: center; }
+
+#archer-chat-panel .ac-sing-panel { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+#archer-chat-panel .ac-sing-panel p { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
+#archer-chat-panel .ac-sing-record {
+  align-self: center;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s ease;
+}
+#archer-chat-panel .ac-sing-record.recording { background: var(--red); animation: ac-pulse 1s infinite; }
+#archer-chat-panel .ac-sing-record svg { width: 26px; height: 26px; }
+#archer-chat-panel .ac-sing-status { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+@media (max-width: 520px) {
+  #archer-chat-panel { left: 12px; right: 12px; width: auto; bottom: 84px; }
+  #archer-chat-fab { right: 16px; bottom: 16px; }
+}
 </style>
 </head>
 <body>
+
+<!-- ============================================================
+     Archer Chat Widget (floating button + slide-in panel)
+     ============================================================ -->
+<button id="archer-chat-fab" onclick="toggleArcherChat()" title="Chat with Archer" aria-label="Open Archer chat">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  <span class="fab-dot"></span>
+</button>
+
+<div id="archer-chat-panel">
+  <div class="ac-resize-handle" id="ac-resize-handle" title="Drag to resize">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 3h4v4M21 3l-7 7"/></svg>
+  </div>
+  <div class="ac-header">
+    <div>
+      <div class="ac-title">Archer-Bot</div>
+      <div class="ac-subtitle" id="ac-subtitle">local · private · offline</div>
+    </div>
+    <div class="ac-spacer"></div>
+    <button onclick="toggleArcherChat()" title="Close" aria-label="Close chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div class="ac-tabs">
+    <button class="ac-tab active" id="ac-tab-ask" onclick="setArcherChatTab('ask')">Ask about songs</button>
+    <button class="ac-tab" id="ac-tab-sing" onclick="setArcherChatTab('sing')">Sing my idea</button>
+  </div>
+
+  <!-- Ask tab -->
+  <div class="ac-body" id="ac-body-ask">
+    <div class="ac-msg system">Ask about a song's meaning or backstory.</div>
+  </div>
+
+  <!-- Sing tab (hidden by default) -->
+  <div class="ac-body" id="ac-body-sing" style="display:none;">
+    <div class="ac-sing-panel">
+      <p>Hum or sing a rough version of your idea. It'll come back sung in Archer's voice (RVC voice conversion — same melody and words you gave it, re-skinned in his timbre).</p>
+      <button class="ac-sing-record" id="ac-sing-record-btn" onclick="toggleArcherSingRecording()" title="Record">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+      </button>
+      <div class="ac-sing-status" id="ac-sing-status">Tap to record</div>
+      <div id="ac-sing-result"></div>
+    </div>
+  </div>
+
+  <!-- Input bar (Ask tab only) -->
+  <div class="ac-inputbar" id="ac-inputbar-ask">
+    <div class="ac-mode-row">
+      <span>Reply as</span>
+      <div class="ac-toggle">
+        <button id="ac-mode-text" class="active" onclick="setArcherChatMode('text')">Text</button>
+        <button id="ac-mode-audio" onclick="setArcherChatMode('audio')">Spoken</button>
+      </div>
+    </div>
+    <div class="ac-row">
+      <button class="ac-iconbtn" id="ac-voice-input-btn" onclick="toggleArcherVoiceInput()" title="Ask by voice">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+      </button>
+      <textarea id="ac-input" rows="1" placeholder="Ask about a song..." onkeydown="archerChatKeydown(event)"></textarea>
+      <button class="ac-iconbtn primary" onclick="sendArcherChatMessage()" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
 
 <nav>
   <div class="nav-logo" onclick="goHome()" style="cursor: pointer;" title="Home">Archer-Robot / VCS</div>
@@ -2101,6 +2492,78 @@
 
   <hr class="divider">
 
+  <!-- Transcription -->
+  <section class="section">
+    <div class="section-label">Step One: Transcription</div>
+    <h2 class="section-title">How your voice becomes text in the first place</h2>
+    <p class="section-body">Before any translation or sentiment reading can happen, whatever you say into the mic has to become text. That is its own real problem, separate from translation, and it is the very first thing that runs. Three stages, in order.</p>
+
+    <div class="prose-pipeline">
+
+      <!-- Stage 1 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">1</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">server.py: /ws/live-transcribe, /api/transcribe</div>
+          <h3 class="prose-stage-title">Two engines, doing two different jobs</h3>
+          <p class="prose-stage-body">The moment you start talking, a small model called Vosk runs entirely on this server and streams back a rough guess of what it hears within a couple hundred milliseconds, shown in italics while you are still speaking. An earlier version leaned on the browser's own built in speech recognizer for that instant feedback, but that only works in official Chrome or Edge and quietly depends on sending your audio to a private Google service, so it was replaced with Vosk, a real model that needs nothing outside this server.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Once you pause, a second, much slower and far more careful model takes over, a local build of OpenAI's Whisper, and transcribes the whole phrase properly. The rough live guess then gets replaced, phrase by phrase, once that careful version is ready. Every finalized phrase stays clickable afterward, so you can revisit its translation and sentiment reading again without saying it twice.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">Vosk, fully local</span>
+            <span class="node-pill">partial results in ~100 to 300ms</span>
+            <span class="node-pill">Whisper for the final pass</span>
+            <span class="node-pill">replaces browser speech recognition</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 2 -->
+      <div class="prose-stage">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">2</div>
+          <div class="prose-stage-line"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">server.py: _classify_segments</div>
+          <h3 class="prose-stage-title">Catching what it doesn't actually know</h3>
+          <p class="prose-stage-body">Whisper is a language model as much as it is an audio model, and when it hears something that is not really speech, a hand drum, wordless vocables in a chant, it does not say so. It confidently invents a plausible sounding English sentence instead, because it was trained to always produce fluent text. That is a real and well documented failure mode, not a rare glitch, and left unchecked it looks exactly like a genuine transcription.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">To catch this, every stretch of audio Whisper transcribes gets checked against three numbers it already calculates about its own output: how confident it is that real speech was even present, how likely its wording is to be a real sentence rather than a guess, and how repetitive or strange the phrasing came out. These are the same three warning signs OpenAI's own Whisper documentation flags as signs of unreliable output. A segment that fails the check gets labeled honestly as unclear instead of being shown as if it were a real transcription.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">confidence, not just text, gets checked</span>
+            <span class="node-pill">OpenAI's own reliability signals</span>
+            <span class="node-pill">labeled honestly instead of guessed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 3 -->
+      <div class="prose-stage" style="--line-display: none;">
+        <div class="prose-stage-marker">
+          <div class="prose-stage-num">3</div>
+          <div class="prose-stage-line" style="display: none;"></div>
+        </div>
+        <div class="prose-stage-content">
+          <div class="prose-stage-file">server.py: _detect_instrument_spans, _detect_percussive_spans</div>
+          <h3 class="prose-stage-title">Labeling sound that was never going to be words</h3>
+          <p class="prose-stage-body">A drum hit or a violin line is not mistranscribed speech, it is not speech at all, so asking a speech model to transcribe it is the wrong tool for the job no matter how well that model is checked. Instead, a separate pass listens for a steady, regular rhythmic pulse across the audio, the kind a hand drum or shaker produces, and marks that stretch honestly as instrumental rather than leaving it blank or guessing at words.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Where a real sound classifier is installed, this goes further and names the actual instrument, violin, flute, drum, guitar, and dozens more, using a model trained on over five hundred everyday sound categories. Where it isn't installed, the system falls back to the rhythm only version rather than failing, so the page still works either way, just with a plainer label.</p>
+          <div class="node-tech" style="margin-top: 16px;">
+            <span class="node-pill">rhythm detection, always on</span>
+            <span class="node-pill">named instruments, when available</span>
+            <span class="node-pill">graceful fallback either way</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <hr class="divider">
+
   <!-- Stats -->
   <section class="section">
     <div class="section-label">The Translation Layer, By The Numbers</div>
@@ -2131,7 +2594,7 @@
 
   <!-- Detailed pipeline -->
   <section class="section">
-    <div class="section-label">Step One: Translation</div>
+    <div class="section-label">Step Two: Translation</div>
     <h2 class="section-title">How the translation layer underneath it gets built</h2>
     <p class="section-body">This is the groundwork the sentiment reading depends on. Five stages, in order, from raw source text to a working translator. The sentiment layer itself picks up right after this, further down the page.</p>
 
@@ -2236,10 +2699,6 @@
 
     </div>
 
-    <div class="info-callout">
-      <p><strong style="color: var(--text);">Where this stands today:</strong> this is genuinely early-stage work. nêhiyawêwin has vastly less digital text available than languages like English, so translations of anything the model hasn't seen something close to before can come out rough. The single biggest lever for improving this further is more real nêhiyawêwin text, more than any change to the model itself.</p>
-    </div>
-
     <!-- Machine Translation demo -->
     <div style="margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border);">
       <div class="section-label">Interactive Demo</div>
@@ -2281,7 +2740,7 @@
 
   <!-- CREE SENTIMENT LAYER -->
   <section class="section">
-    <div class="section-label">Step Two: Sentiment</div>
+    <div class="section-label">Step Three: Sentiment</div>
     <h2 class="section-title">The robot that understands what you're singing about</h2>
     <p class="section-body">Pitch and rhythm tell the robot what notes to sing. This layer tells it how to feel about it. With the translation layer above turning the sung nêhiyawêwin into English, this stage reads the emotional tone of that translation, scoring it for valence (how negative or positive) and arousal (how calm or intense). That score is what actually flows back into how the robot sings and how its LED eyes light up.</p>
 
@@ -2331,7 +2790,7 @@
     <div style="margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border);">
       <div class="section-label">Interactive Demo</div>
       <h3 class="section-title" style="font-size: clamp(24px, 2.5vw, 36px);">See the sentiment layer respond</h3>
-      <p class="section-body" style="margin-bottom: 0;">Sing or speak into the mic (English words -- there's still no free speech recognizer for nêhiyawêwin, so the transcript step is English-only). Transcription runs on this server via Whisper, not your browser's built-in speech recognition -- that only works in official Chrome/Edge (it silently depends on a private Google API key), so this project records your phrase and sends the audio here instead, which works the same in every browser. A phrase gets processed once you pause speaking, not word-by-word live. Sentiment comes from two real signals blended together: valence and a first pass at arousal from the words themselves (a trained sentiment model plus an intensity heuristic), and a second arousal signal from the actual vocal delivery -- pitch range from this project's own RMVPE/YIN pitch engine, plus loudness and dynamics from the raw waveform. Say the same sentence flat and quiet vs. loud with a wide melodic range, and arousal moves accordingly, even though the words didn't change. Valence stays word-based only -- there's no reliable way to read positive-vs-negative purely from pitch and loudness without a harmonic/key reference, so this doesn't pretend otherwise.</p>
+      <p class="section-body" style="margin-bottom: 0;">Sing or speak into the mic. Transcription works the way Step One above describes, an instant rough guess followed by a careful checked version. Sentiment comes from two real signals blended together: valence and an initial pass at arousal read from the words themselves, using a trained sentiment model plus an intensity heuristic, and a second arousal signal pulled from the actual vocal delivery, pitch range from this project's own RMVPE and YIN pitch engines, plus loudness and dynamics measured straight off the raw waveform. Say the same sentence flat and quiet versus loud with a wide melodic range, and arousal moves accordingly even though the words never changed. Valence stays word based only, since there is no reliable way to read positive versus negative purely from pitch and loudness without a harmonic or key reference to compare against, so this does not pretend otherwise.</p>
 
     </div>
 
@@ -2360,13 +2819,23 @@
             Start microphone
           </button>
 
+          <div class="cree-mic-lang-toggle" style="display:flex; gap:8px; margin:10px 0;">
+            <button type="button" class="node-pill cree-lang-pill active" id="cree-lang-en"
+                    style="cursor:pointer;" onclick="setCreeMicLanguage('en')">Speaking English</button>
+            <button type="button" class="node-pill cree-lang-pill" id="cree-lang-cr"
+                    style="cursor:pointer;" onclick="setCreeMicLanguage('cr')">Speaking Cree</button>
+          </div>
+
           <div class="cree-waveform" id="cree-waveform">
             <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">waiting for audio...</div>
           </div>
 
-          <div class="cree-output-box">
-            <div class="cree-output-box-label">Transcript (appears after each phrase, once you pause)</div>
+          <div class="cree-output-box cree-transcript-log">
+            <div class="cree-output-box-label">Transcript</div>
             <div class="cree-output-text placeholder" id="cree-syllabics-out">waiting for voiced phrase</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 6px;">
+            Click any phrase above to see its translation and sentiment again.
           </div>
 
           <div class="cree-example-block">
@@ -2502,6 +2971,20 @@
         </div>
         <span style="font-size: 11px; color: var(--muted); margin-left: 8px;">(Neural engine only)</span>
       </div>
+
+      <div class="control-label">Accompaniment mode</div>
+      <div id="demo-mode-lock-note" style="display:none;font-size:11px;color:var(--accent2);margin-bottom:8px;">&#9208; Pause playback to change the mode or texture.</div>
+      <div class="mode-picker" id="demo-mode-picker" style="margin-bottom: 20px;">
+        <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
+        <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
+        <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
+        <button class="mode-btn" data-mode="delayed_response"     onclick="setDemoMode('delayed_response', this)">Delayed echo</button>
+        <button class="mode-btn" data-mode="contour_following"    onclick="setDemoMode('contour_following', this)">Contour following</button>
+        <button class="mode-btn" data-mode="drone_support"        onclick="setDemoMode('drone_support', this)">Drone support</button>
+        <button class="mode-btn" data-mode="call_and_response"    onclick="setDemoMode('call_and_response', this)">Call &amp; response</button>
+        <button class="mode-btn" data-mode="solo_humming"         onclick="setDemoMode('solo_humming', this)">Humming</button>
+      </div>
+
       <div class="demo-panel-body">
         <div class="demo-panel-col">
           <div class="upload-zone" id="upload-zone">
@@ -2536,19 +3019,7 @@
           </div>
         </div>
         <div class="demo-panel-col">
-          <div class="control-label">Accompaniment mode</div>
-          <div id="demo-mode-lock-note" style="display:none;font-size:11px;color:var(--accent2);margin-bottom:8px;">&#9208; Pause playback to change the mode or texture.</div>
-          <div class="mode-picker" id="demo-mode-picker">
-            <button class="mode-btn active" data-mode="unison_shadowing"     onclick="setDemoMode('unison_shadowing', this)">Unison shadowing</button>
-            <button class="mode-btn" data-mode="octave_reinforcement" onclick="setDemoMode('octave_reinforcement', this)">Octave below</button>
-            <button class="mode-btn" data-mode="timbral_thickening"   onclick="setDemoMode('timbral_thickening', this)">Timbral thickening</button>
-            <button class="mode-btn" data-mode="delayed_response"     onclick="setDemoMode('delayed_response', this)">Delayed echo</button>
-            <button class="mode-btn" data-mode="contour_following"    onclick="setDemoMode('contour_following', this)">Contour following</button>
-            <button class="mode-btn" data-mode="drone_support"        onclick="setDemoMode('drone_support', this)">Drone support</button>
-            <button class="mode-btn" data-mode="call_and_response"    onclick="setDemoMode('call_and_response', this)">Call &amp; response</button>
-            <button class="mode-btn" data-mode="solo_humming"         onclick="setDemoMode('solo_humming', this)">Humming</button>
-          </div>
-          <div class="control-label" style="margin-top: 6px;">Voice texture</div>
+          <div class="control-label">Voice texture</div>
           <div class="texture-picker" id="demo-texture-picker">
             <button class="texture-btn active" data-texture="solo"  onclick="setDemoTexture('solo', this)">Solo</button>
             <button class="texture-btn" data-texture="duet"  onclick="setDemoTexture('duet', this)">Duet</button>
@@ -2570,6 +3041,47 @@
             </div>
           </div>
           <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
+
+          <div id="demo-ts-section" style="display: none;">
+            <div class="control-label" style="margin-top: 20px;">Transcript</div>
+            <div class="cree-output-box cree-transcript-log" style="max-height: 200px;">
+              <div class="cree-output-text placeholder" id="demo-transcript-out">upload a track to transcribe it</div>
+            </div>
+
+            <div class="control-label" style="margin-top: 20px;">Sentiment</div>
+            <div class="cree-pipeline-card">
+              <div class="cree-output-text placeholder" id="demo-translation-out" style="min-height: 0;">--</div>
+
+              <div class="cree-pipeline-divider"></div>
+
+              <div class="cree-axis">
+                <div class="cree-axis-label">
+                  <span>grief / dark</span>
+                  <span>Valence</span>
+                  <span>joy / bright</span>
+                </div>
+                <div class="cree-track">
+                  <div class="cree-fill valence" id="demo-val-fill" style="width: 50%;"></div>
+                </div>
+              </div>
+
+              <div class="cree-axis">
+                <div class="cree-axis-label">
+                  <span>still / calm</span>
+                  <span>Arousal</span>
+                  <span>intense</span>
+                </div>
+                <div class="cree-track">
+                  <div class="cree-fill arousal" id="demo-aro-fill" style="width: 40%;"></div>
+                </div>
+              </div>
+
+              <div class="cree-emotion-row">
+                <span class="cree-emotion-badge neutral" id="demo-emotion-badge">neutral</span>
+                <span class="cree-emotion-desc" id="demo-emotion-desc">waiting for a track</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -4235,6 +4747,11 @@ let demoNeuralGain = null;            // gain node for demoNeuralSource, driven 
 function setDemoVoiceEngine(engine, btn) {
   if (demoIsPlaying) stopAudio();  // switching engines mid-playback would leave two contradicting robot voices
   demoVoiceEngine = engine;
+  // stopAudio() already silences demoVoice, but only if we were playing.
+  // Silence it unconditionally here too so a leftover DSP oscillator
+  // from an earlier session can never carry into Neural mode even if
+  // playback wasn't active when the switch happened.
+  if (demoVoice) demoVoice.setGain(0);
   btn.closest('#demo-voice-engine-toggle').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('demo-voice-engine-status').textContent = '';
@@ -4246,6 +4763,10 @@ function setDemoVoiceEngine(engine, btn) {
   document.querySelectorAll('#demo-neural-mode-toggle .interval-btn').forEach(b => {
     b.disabled = (engine === 'dsp');
   });
+  // Switching to DSP (or to Neural while Full render is already selected)
+  // is exactly when the timeline becomes needed again, if RMVPE is
+  // selected -- get it going now instead of waiting for Play.
+  if (demoPitchMode === 'rmvpe' && _pitchTimelineNeeded()) ensureDemoPitchTimeline();
 }
 
 // 'generated' = harmony engine + VocableSynthesizer sings a new wordless
@@ -4271,6 +4792,18 @@ const demoVoiceContent = 'direct';
 //          whole track, then full mode/texture/volume layered playback.
 let demoNeuralMode = 'live';
 
+// The offline whole-track RMVPE analysis (ensureDemoPitchTimeline) is only
+// ever read by demoProgressLoop() via pollOfflinePitchAtTime() -- and that
+// loop drives DSP playback and Neural Full-render playback. Neural Live
+// mode uses its own separate, much lighter _demoLiveProgressLoop() instead,
+// which never touches this timeline at all. So kicking off (or forcing
+// Play to wait on) a full-track analysis while in Neural + Live mode was
+// pure overhead: it did nothing for that playback path except break the
+// "starts immediately" promise Live mode is supposed to keep.
+function _pitchTimelineNeeded() {
+  return !(demoVoiceEngine === 'neural' && demoNeuralMode === 'live');
+}
+
 function setDemoNeuralMode(mode, btn) {
   if (demoIsPlaying) stopAudio();
   demoNeuralMode = mode;
@@ -4278,6 +4811,10 @@ function setDemoNeuralMode(mode, btn) {
   btn.classList.add('active');
   demoNeuralRenderedBuffer = null;
   demoNeuralRenderSignature = null;
+  // Switching FROM Live TO Full render is exactly the moment the timeline
+  // starts being needed (if RMVPE is selected) -- get it going right away
+  // instead of only starting it once Play is pressed.
+  if (mode === 'full' && demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
 }
 
 function _neuralRenderSignature() {
@@ -4323,7 +4860,14 @@ const demoPitchToggle = renderPitchEngineToggle('demo-upload-pitch-engine', (mod
     // ensureDemoPitchTimeline(). The whole track already exists, so
     // this kicks off (or reuses) one offline analysis pass instead of
     // streaming audio frame-by-frame the way a live mic has to.
-    ensureDemoPitchTimeline();
+    // BUT: skip it entirely in Neural + Live mode -- that playback path
+    // never reads this timeline (see _pitchTimelineNeeded above), so
+    // analyzing here just delays "starts immediately" for no benefit.
+    if (_pitchTimelineNeeded()) {
+      ensureDemoPitchTimeline();
+    } else {
+      demoPitchToggle.setStatus('idle');
+    }
   } else {
     if (demoPitchAnalysisAbort) { demoPitchAnalysisAbort.abort(); demoPitchAnalysisAbort = null; }
     demoPitchToggle.setStatus('idle');
@@ -4400,10 +4944,169 @@ function handleFileUpload(e) {
     // If RMVPE is already the selected pitch engine, get the offline
     // analysis started right away in the background so it's likely
     // already done by the time the person hits Play, instead of only
-    // starting it at that point.
-    if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
+    // starting it at that point. Skipped for Neural + Live, which never
+    // reads this timeline (see _pitchTimelineNeeded).
+    if (demoPitchMode === 'rmvpe' && _pitchTimelineNeeded()) ensureDemoPitchTimeline();
+    runDemoTranscriptSentiment(file);
   };
   reader.readAsArrayBuffer(file);
+}
+
+function formatTimestamp(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+let demoTranscriptWordEls = []; // flat list of {start, end, el} across all confident words, for the playback-sync highlighter below
+
+function renderDemoSegments(segments) {
+  const transcriptEl = document.getElementById('demo-transcript-out');
+  transcriptEl.classList.remove('placeholder');
+  transcriptEl.replaceChildren();
+  demoTranscriptWordEls = [];
+
+  if (!segments.length) {
+    transcriptEl.textContent = 'No speech, vocals, or percussion detected in this track.';
+    transcriptEl.classList.add('placeholder');
+    return;
+  }
+
+  segments.forEach(seg => {
+    const row = document.createElement('div');
+    row.className = 'cree-transcript-entry';
+    const time = document.createElement('span');
+    time.textContent = formatTimestamp(seg.start) + '\u2013' + formatTimestamp(seg.end) + '  ';
+    time.style.cssText = 'font-family: var(--mono); font-size: 11px; color: var(--muted);';
+    row.appendChild(time);
+
+    if (seg.confident && seg.words && seg.words.length) {
+      // Word-by-word: each word is its own span with its own timing, so
+      // playback can highlight exactly which word is playing right now
+      // instead of the whole line lighting up at once.
+      seg.words.forEach((w, i) => {
+        const wordEl = document.createElement('span');
+        wordEl.className = 'demo-transcript-word';
+        wordEl.textContent = w.word + (i < seg.words.length - 1 ? ' ' : '');
+        row.appendChild(wordEl);
+        demoTranscriptWordEls.push({ start: w.start, end: w.end, el: wordEl });
+      });
+    } else {
+      const label = document.createElement('span');
+      label.textContent = seg.label;
+      if (!seg.confident) label.style.fontStyle = 'italic';
+      row.appendChild(label);
+    }
+    transcriptEl.appendChild(row);
+  });
+}
+
+function updateDemoTranscriptHighlight(elapsed) {
+  // "Live" for a pre-analyzed track means syncing to what's actually
+  // playing right now, word by word, rather than dumping the whole
+  // transcript at once -- this is what makes it feel live during
+  // playback instead of just a static list.
+  if (!demoTranscriptWordEls.length) return;
+  let activeEl = null;
+  for (const w of demoTranscriptWordEls) {
+    const isActive = elapsed >= w.start && elapsed < w.end;
+    if (isActive) {
+      w.el.classList.add('demo-transcript-word-active');
+      activeEl = w.el;
+    } else {
+      w.el.classList.remove('demo-transcript-word-active');
+    }
+  }
+  if (activeEl) {
+    const container = document.getElementById('demo-transcript-out').closest('.cree-transcript-log');
+    if (container) {
+      const rowTop = activeEl.parentElement.offsetTop;
+      if (rowTop < container.scrollTop || rowTop > container.scrollTop + container.clientHeight - 40) {
+        container.scrollTop = rowTop - container.clientHeight / 2;
+      }
+    }
+  }
+}
+
+async function runDemoTranscriptSentiment(file) {
+  const section = document.getElementById('demo-ts-section');
+  section.style.display = '';
+  const transcriptEl = document.getElementById('demo-transcript-out');
+  const translEl = document.getElementById('demo-translation-out');
+  const badge = document.getElementById('demo-emotion-badge');
+  const desc = document.getElementById('demo-emotion-desc');
+
+  transcriptEl.textContent = 'transcribing...';
+  transcriptEl.classList.add('placeholder');
+  translEl.textContent = '...';
+  translEl.classList.add('placeholder');
+  badge.textContent = 'neutral'; badge.className = 'cree-emotion-badge neutral';
+  desc.textContent = 'waiting for transcript';
+
+  try {
+    const form = new FormData();
+    form.append('file', file, file.name || 'track.mp3');
+    form.append('language', 'en');
+    const res = await fetch('/api/transcribe/annotated', { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (data.error) {
+      transcriptEl.textContent = 'Transcription unavailable: ' + data.error;
+      transcriptEl.classList.add('placeholder');
+      translEl.textContent = '--';
+      desc.textContent = 'no transcript to analyze';
+      return;
+    }
+
+    renderDemoSegments(data.segments || []);
+
+    // Sentiment only runs on segments Whisper was actually confident
+    // about being real words -- has_lexical_speech is false for tracks
+    // that are entirely chant/vocables/percussion, and in that case
+    // there is no text to honestly score. This is what replaces the old
+    // behavior of running sentiment on a hallucinated sentence like
+    // "Honor Song for Dr. Suzanne Kite." as if it meant something.
+    if (!data.has_lexical_speech) {
+      translEl.textContent = 'No lexical (word-based) speech detected -- this track is chant/vocables and/or percussion, which sentiment analysis can\u2019t score from text.';
+      translEl.classList.remove('placeholder');
+      document.getElementById('demo-val-fill').style.width = '50%';
+      document.getElementById('demo-val-fill').style.background = 'var(--muted)';
+      document.getElementById('demo-aro-fill').style.width = '0%';
+      badge.textContent = 'n/a'; badge.className = 'cree-emotion-badge neutral';
+      desc.textContent = 'no lexical text to analyze';
+      return;
+    }
+
+    const analyzeRes = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: data.text, already_english: true }),
+    });
+    const sentiment = await analyzeRes.json();
+    if (sentiment.error) throw new Error(sentiment.error);
+    renderDemoSentiment(sentiment);
+  } catch (err) {
+    transcriptEl.textContent = 'Transcription/sentiment server not reachable.';
+    transcriptEl.classList.add('placeholder');
+    translEl.textContent = '--';
+    desc.textContent = 'server unavailable';
+    console.warn('Live Demo transcript/sentiment failed:', err);
+  }
+}
+
+function renderDemoSentiment(data) {
+  const translEl = document.getElementById('demo-translation-out');
+  translEl.textContent = data.translation || data.text;
+  translEl.classList.remove('placeholder');
+
+  const valPct = ((data.valence + 1) / 2) * 100;
+  document.getElementById('demo-val-fill').style.width = valPct + '%';
+  document.getElementById('demo-val-fill').style.background = data.valence >= 0 ? 'var(--green)' : '#818cf8';
+  document.getElementById('demo-aro-fill').style.width = (data.arousal * 100) + '%';
+
+  const badge = document.getElementById('demo-emotion-badge');
+  badge.textContent = data.emotion; badge.className = 'cree-emotion-badge ' + data.emotion;
+  document.getElementById('demo-emotion-desc').textContent = data.description;
 }
 
 function drawWaveformVis(ab) {
@@ -4533,10 +5236,12 @@ const DEMO_LIVE_CHUNK_S = 2.5;
 function _checkDemoLiveComplete(streamer) {
   if (streamer._stopped) return;
   if (streamer.chunksDone >= streamer.total && !streamer._queue.length &&
-      !streamer._busy && streamer._activeNodes.length === 0) {
+      !streamer._busy && streamer._activeNodes.length === 0 && streamer._dryEnded) {
     // Every chunk has been attempted, nothing left queued or in flight,
-    // and nothing is still audibly playing -- this IS the end, whether
-    // every chunk succeeded or some failed and got skipped.
+    // nothing is still audibly playing, AND the simultaneously-playing
+    // dry source track has also finished -- this IS the end, whether
+    // every chunk succeeded or some failed and got skipped, and whether
+    // the robot voice finished before or after the source track did.
     if (demoIsPlaying && demoLiveStreamer === streamer) stopAudio();
   }
 }
@@ -4550,29 +5255,61 @@ function _playDemoNeuralLive() {
   const startSample = Math.floor(demoOffset * sr);
   const total = Math.max(1, Math.ceil((data.length - startSample) / chunkLen));
 
+  // Play the original dry track live, right alongside the converted
+  // chunks as they arrive -- same source/gain/analyser wiring used by
+  // DSP and Full-render playback, so all three modes sound and behave
+  // consistently: you hear the real input voice and the robot's
+  // converted voice together, not one after the other.
+  demoSource = demoAudioCtx.createBufferSource();
+  demoSource.buffer = demoAudioBuffer;
+  demoAnalyser = demoAudioCtx.createAnalyser();
+  demoAnalyser.fftSize = 2048;
+  demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
+  demoSource.connect(demoAnalyser);
+  if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
+  demoSourceGain.gain.value = demoSourceVolume;
+  demoSource.connect(demoSourceGain);
+  demoSourceGain.connect(demoAudioCtx.destination);
+
   if (!demoNeuralGain) demoNeuralGain = demoAudioCtx.createGain();
   demoNeuralGain.gain.value = demoRobotVolume;
   demoNeuralGain.connect(demoAudioCtx.destination);
 
+  const playStartTime = demoAudioCtx.currentTime;
+  demoSource.start(0, demoOffset);
+  demoStartTime = playStartTime - demoOffset;
+
   const streamer = {
     _stopped: false, _busy: false, _queue: [], _playHead: 0, _activeNodes: [],
+    _dryEnded: false,
     total, chunksDone: 0, chunksPlayed: 0,
     totalDurationS: (data.length - startSample) / sr,
+    playStartTime,
   };
   demoLiveStreamer = streamer;
 
+  // The dry track ending is now one of the two conditions that end the
+  // whole Live session (see _checkDemoLiveComplete) -- it does NOT stop
+  // things by itself, since robot chunks that are still converting when
+  // the source track finishes should still be allowed to finish playing
+  // rather than getting cut off.
+  demoSource.onended = () => {
+    streamer._dryEnded = true;
+    _checkDemoLiveComplete(streamer);
+  };
+
   // Chunks are chained back-to-back in the order they finish converting,
-  // NOT pinned to "chunk N starts at N*chunkLength seconds" against a
-  // simultaneously-playing original track. CPU-side conversion of a
-  // whole chunk routinely takes longer than the chunk's own duration, so
-  // pinning it to its original timestamp would mean most chunks arrive
-  // already late relative to a real-time clock and get dropped or play
-  // out of order. Chaining guarantees every chunk is eventually heard,
-  // in the right order, at the cost of the overall playback taking
-  // longer than the source track's own runtime when conversion is slow
-  // -- which on CPU, it usually is. This is why Live mode doesn't also
-  // play the dry source at the same time: there is no real-time clock
-  // here to stay in sync with.
+  // NOT strictly pinned to "chunk N starts at N*chunkLength seconds
+  // against the source track's clock". CPU-side conversion of a whole
+  // chunk routinely takes longer than the chunk's own duration, so
+  // strict pinning would mean most chunks arrive already late and would
+  // have to be dropped to stay in sync -- on slower hardware that can
+  // mean the robot voice going silent for the entire session. Chaining
+  // guarantees every chunk is eventually heard, in the right order,
+  // right alongside the dry track that's now playing in real time next
+  // to it -- at the cost of the robot voice possibly drifting a little
+  // behind the source track's own timing if conversion can't keep up.
+  // Full render still exists for guaranteed sample-accurate alignment.
   const pump = async () => {
     if (streamer._busy || streamer._stopped || !streamer._queue.length) return;
     streamer._busy = true;
@@ -4629,7 +5366,6 @@ function _playDemoNeuralLive() {
     streamer._queue.push({ float32: data.slice(s, e) });
   }
 
-  demoStartTime = demoAudioCtx.currentTime;
   demoIsPlaying = true;
   document.getElementById('play-btn').textContent = '\u23F8 Pause';
   _setModeTextureControlsLocked(true);
@@ -4646,10 +5382,16 @@ function _playDemoNeuralLive() {
 // Progress here is just "how many of the chunks have actually played."
 function _demoLiveProgressLoop(streamer) {
   if (!demoIsPlaying || demoLiveStreamer !== streamer) return;
-  const pct = streamer.total > 0 ? clamp01(streamer.chunksPlayed / streamer.total) * 100 : 0;
+  // Now that the dry source track actually plays in real time alongside
+  // the streamed chunks, its real elapsed time is a more accurate
+  // progress signal than the old chunk-count approximation (which
+  // assumed every chunk takes an equal, unknown amount of time to both
+  // convert and play).
+  const elapsed = clamp01((demoAudioCtx.currentTime - demoStartTime) / streamer.totalDurationS) * streamer.totalDurationS;
+  const pct = streamer.totalDurationS > 0 ? (elapsed / streamer.totalDurationS) * 100 : 0;
   document.getElementById('progress-inner').style.width = pct + '%';
-  const elapsedApprox = (streamer.chunksPlayed / streamer.total) * streamer.totalDurationS;
-  document.getElementById('time-current').textContent = fmtTime(Math.min(elapsedApprox, streamer.totalDurationS));
+  document.getElementById('time-current').textContent = fmtTime(elapsed);
+  updateDemoTranscriptHighlight(elapsed);
   demoAnimId = requestAnimationFrame(() => _demoLiveProgressLoop(streamer));
 }
 
@@ -4739,6 +5481,12 @@ async function playAudioNeural() {
 // instead of re-rendering.
 function _startNeuralPlayback() {
   if (!demoAudioBuffer || !demoNeuralRenderedBuffer) return;
+
+  // Full-render playback drives demoProgressLoop() same as DSP, which
+  // reads source pitch from this timeline when RMVPE is selected -- make
+  // sure it's actually been requested (pre-warm points upstream now skip
+  // this while in Live mode, so it can't be assumed to already be running).
+  if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
 
   demoSource = demoAudioCtx.createBufferSource();
   demoSource.buffer = demoAudioBuffer;
@@ -4969,10 +5717,10 @@ function _textureLayersFor(texture) {
 }
 
 function pauseAudio() {
-  // Live mode has no simultaneously-playing demoSource to measure an
-  // offset from (see _playDemoNeuralLive) -- pausing it just stops
-  // everything and resets to the start, since resuming partway through
-  // a chunked one-shot conversion isn't something to reconstruct.
+  // Live mode's demoSource plays for real now, but resuming a chunked
+  // one-shot conversion partway through isn't something worth
+  // reconstructing -- Pause still resets Live mode to the start, same
+  // as before. DSP and Full render resume from where they left off.
   demoOffset = demoLiveStreamer ? 0 : (demoAudioCtx.currentTime - demoStartTime);
   if (demoSource) { try { demoSource.stop(); } catch (e) {} }
   demoNeuralSources.forEach(s => { try { s.stop(); } catch (e) {} });
@@ -5006,6 +5754,7 @@ function stopAudio() {
   document.getElementById('demo-voice-engine-status').textContent = '';
   document.getElementById('progress-inner').style.width = '0%';
   document.getElementById('time-current').textContent = '0:00';
+  updateDemoTranscriptHighlight(-1);
   document.getElementById('demo-src-note').textContent = '-';
   document.getElementById('demo-rob-note').textContent = '-';
   document.getElementById('demo-conf').textContent = '-';
@@ -5177,6 +5926,7 @@ function demoProgressLoop() {
   const pct = Math.min(1, elapsed / demoAudioBuffer.duration);
   document.getElementById('progress-inner').style.width = (pct * 100) + '%';
   document.getElementById('time-current').textContent = fmtTime(elapsed);
+  updateDemoTranscriptHighlight(elapsed);
   if (!demoAnalyser || !demoPitchBuf) return;
 
   demoAnalyser.getFloatTimeDomainData(demoPitchBuf);
@@ -5208,7 +5958,16 @@ function demoProgressLoop() {
   const explEl = document.getElementById('demo-mode-explanation');
   if (explEl && result.text) explEl.textContent = result.text;
 
-  if (demoVoice) {
+  // Same reasoning as the demoNeuralBridge guard above: the plain
+  // oscillator voice must stay silent outside DSP mode, or it keeps
+  // singing generated aah/ooo tones over top of the Neural engine's
+  // actual RVC-converted output every frame -- which is exactly what
+  // was happening. demoVoice is created once (see playAudio()) and
+  // survives engine switches, so without this guard it kept driving
+  // audio in Neural/Full-render mode any time the demo had ever been
+  // played in DSP mode first, masking the real neural output underneath
+  // a layer of plain synth tone.
+  if (demoVoiceEngine === 'dsp' && demoVoice) {
     if (result.hz && result.action !== 'rest') {
       demoVoice.setVocable(LIVE_VOCABLE_BY_MODE[demoMode] || 'aah');
       demoVoice.setFrequency(result.hz);
@@ -5226,6 +5985,11 @@ function demoProgressLoop() {
       demoVoice.setGain(0);
       if (demoSourceDuckGain) demoSourceDuckGain.gain.setTargetAtTime(1, demoAudioCtx.currentTime, 0.25);
     }
+  } else if (demoVoice) {
+    // Belt-and-suspenders: if we're not in DSP mode, make sure any
+    // leftover oscillator from an earlier DSP play-through is actually
+    // silent, not just un-driven.
+    demoVoice.setGain(0);
   }
 }
 
@@ -5663,8 +6427,8 @@ function normalizeCreeText(text) {
     pill.onclick = () => {
       if (creeMicRunning) stopCreeMic();
       const sylEl = document.getElementById('cree-syllabics-out');
-      sylEl.textContent = ex.syllabics;
-      sylEl.classList.remove('placeholder');
+      sylEl.replaceChildren();
+      appendCreeTranscriptEntry(ex.syllabics, '[EX]', /* alreadyEnglish */ false, /* vocal */ null, /* queryText */ ex.latin[0]);
       runCreePipeline(ex.latin[0], /* alreadyEnglish */ false, /* vocal */ null);
     };
     wrap.appendChild(pill);
@@ -5672,6 +6436,147 @@ function normalizeCreeText(text) {
 })();
 
 let creeMicRunning = false, creeMicStream = null, creeAnimId = null, creeWvBars = null;
+let creeMicLanguage = 'en';
+let creeLiveAudioCtx = null, creeLiveSourceNode = null; // shared with the live-captions layer below; set once when the mic starts
+
+function setCreeMicLanguage(lang) {
+  creeMicLanguage = lang;
+  document.getElementById('cree-lang-en').classList.toggle('active', lang === 'en');
+  document.getElementById('cree-lang-cr').classList.toggle('active', lang === 'cr');
+  // Vosk's model here is English-only -- only run the live-caption layer
+  // in English mode (same fundamental gap Whisper has for Cree).
+  if (creeMicRunning) {
+    if (lang === 'en') startCreeLiveCaptions();
+    else stopCreeLiveCaptions();
+  }
+}
+
+// --- Live captions: local, real-time streaming via Vosk over WebSocket ---
+//
+// Two earlier approaches to "live" transcription didn't pan out:
+//   1. Re-sending audio to Whisper on the server every ~1.2s while a
+//      phrase was still being spoken -- reverted, because it hammered a
+//      CPU-bound batch model with overlapping requests and made
+//      everything slower, not faster. Whisper fundamentally cannot show
+//      a word the instant it's spoken; it only recognizes audio handed
+//      to it as a complete chunk.
+//   2. The browser's own SpeechRecognition API -- genuinely streaming,
+//      but it works by sending mic audio to Google's speech servers over
+//      the network, and Brave (this project's browser, confirmed from
+//      screenshots) blocks that specific traffic by default. It never
+//      had a chance to work here.
+//
+// Vosk is a real local, real-time streaming ASR engine (Kaldi-based):
+// no network call, runs entirely on the machine running server.py, and
+// emits partial results within roughly 100-300ms of audio arriving.
+// This connects to /ws/live-transcribe, streams raw mic audio over the
+// socket, and shows whatever partial/final text comes back immediately.
+// It runs ALONGSIDE the existing VAD/Whisper pipeline, not instead of
+// it -- Vosk is smaller and less accurate, so it's only used for the
+// instant "something is happening" preview; the existing pipeline still
+// produces the accurate, hallucination-filtered, sentiment-integrated
+// entry once a phrase actually ends. See download_vosk_model.py.
+let creeLiveSocket = null;
+let creeLiveProcessor = null;
+let creeLiveSilentGain = null;
+
+function startCreeLiveCaptions() {
+  if (creeMicLanguage !== 'en' || !creeLiveAudioCtx || !creeLiveSourceNode) return;
+  stopCreeLiveCaptions();
+
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const sampleRate = creeLiveAudioCtx.sampleRate;
+  creeLiveSocket = new WebSocket(`${wsProto}//${location.host}/ws/live-transcribe?sample_rate=${sampleRate}`);
+  creeLiveSocket.binaryType = 'arraybuffer';
+
+  creeLiveSocket.onmessage = (event) => {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (e) { return; }
+    if (msg.type === 'error') {
+      console.warn('Live captions unavailable:', msg.message);
+      return;
+    }
+    if ((msg.type === 'partial' || msg.type === 'final') && msg.text) {
+      showLiveCaptionPreview(msg.text);
+    }
+  };
+  creeLiveSocket.onerror = (e) => console.warn('Live caption socket error:', e);
+
+  creeLiveSocket.onopen = () => {
+    // ScriptProcessorNode is deprecated in favor of AudioWorklet, but
+    // AudioWorklet needs its own separate module file fetched over
+    // HTTP -- this project is a single self-contained HTML file, so
+    // ScriptProcessorNode (still universally supported in every browser
+    // that has getUserMedia at all) keeps that true instead of adding a
+    // second file server.py would need to serve.
+    const bufferSize = 4096;
+    creeLiveProcessor = creeLiveAudioCtx.createScriptProcessor(bufferSize, 1, 1);
+    creeLiveProcessor.onaudioprocess = (e) => {
+      if (!creeLiveSocket || creeLiveSocket.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      // Sent as raw float32 bytes -- the server resamples to Vosk's
+      // required 16kHz int16 PCM, same division of labor as /ws/pitch
+      // already uses elsewhere in this file.
+      creeLiveSocket.send(input.slice().buffer);
+    };
+    // Some browsers only fire onaudioprocess if the node is connected
+    // through to the destination -- route it through a zero-gain node
+    // so nothing is actually audible (this would otherwise be your own
+    // raw mic feeding back out of your speakers).
+    creeLiveSilentGain = creeLiveAudioCtx.createGain();
+    creeLiveSilentGain.gain.value = 0;
+    creeLiveSourceNode.connect(creeLiveProcessor);
+    creeLiveProcessor.connect(creeLiveSilentGain);
+    creeLiveSilentGain.connect(creeLiveAudioCtx.destination);
+  };
+}
+
+function stopCreeLiveCaptions() {
+  if (creeLiveProcessor) {
+    try { creeLiveProcessor.disconnect(); } catch (e) {}
+    creeLiveProcessor = null;
+  }
+  if (creeLiveSilentGain) {
+    try { creeLiveSilentGain.disconnect(); } catch (e) {}
+    creeLiveSilentGain = null;
+  }
+  if (creeLiveSocket) {
+    try { creeLiveSocket.close(); } catch (e) {}
+    creeLiveSocket = null;
+  }
+  const el = document.getElementById('cree-live-caption-line');
+  if (el) el.remove();
+}
+
+function isNearBottom(el, thresholdPx = 48) {
+  // "Near" rather than "exactly at" the bottom -- a small tolerance so
+  // a stray pixel of rounding or a fast-arriving update doesn't
+  // register as "the user scrolled away" when they didn't.
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= thresholdPx;
+}
+
+function showLiveCaptionPreview(text) {
+  const sylEl = document.getElementById('cree-syllabics-out');
+  sylEl.classList.remove('placeholder');
+  const scrollContainer = sylEl.closest('.cree-transcript-log') || sylEl;
+  const shouldAutoScroll = isNearBottom(scrollContainer);
+  let el = document.getElementById('cree-live-caption-line');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cree-live-caption-line';
+    el.className = 'cree-transcript-entry cree-transcript-interim';
+    sylEl.appendChild(el);
+  }
+  el.textContent = text;
+  // Deferred one frame: scrollHeight can occasionally be measured
+  // before the browser has finished laying out content appended this
+  // same tick (most noticeable with the word-by-word entries, which
+  // append many small spans at once) -- requestAnimationFrame guarantees
+  // this runs after layout, so the scroll position is always accurate.
+  if (shouldAutoScroll) {
+    requestAnimationFrame(() => { scrollContainer.scrollTop = scrollContainer.scrollHeight; });
+  }
+}
 
 (function buildCreePlaceholderWaveform() {
   const wf = document.getElementById('cree-waveform');
@@ -5721,6 +6626,114 @@ const VAD_SILENCE_HANG_MS = 800;
 
 let creeSegmentRecorder = null, creeSegmentChunks = [], creeRmsSamples = [];
 
+function appendCreeTranscriptEntry(text, langTag, alreadyEnglish, vocal, queryText, segments) {
+  const sylEl = document.getElementById('cree-syllabics-out');
+  sylEl.classList.remove('placeholder');
+  const scrollContainer = sylEl.closest('.cree-transcript-log') || sylEl;
+  const shouldAutoScroll = isNearBottom(scrollContainer);
+  const entry = document.createElement('div');
+  entry.className = 'cree-transcript-entry cree-transcript-selectable';
+  if (langTag) {
+    const tag = document.createElement('span');
+    tag.textContent = langTag + ' ';
+    tag.style.cssText = 'font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 600;';
+    entry.appendChild(tag);
+  }
+
+  if (segments && segments.length) {
+    // Word-by-word (for confident segments) plus honest [non-lexical
+    // vocals]/[drums] labels (for segments Whisper wasn't confident
+    // about) instead of one flat, possibly-fabricated sentence. See
+    // _classify_segments/_add_percussive_segments in server.py.
+    const revealEls = [];
+    segments.forEach(seg => {
+      if (seg.confident && seg.words && seg.words.length) {
+        seg.words.forEach((w, i) => {
+          const wordEl = document.createElement('span');
+          wordEl.className = 'demo-transcript-word';
+          wordEl.textContent = w.word + ' ';
+          wordEl.style.opacity = '0';
+          entry.appendChild(wordEl);
+          revealEls.push(wordEl);
+        });
+      } else {
+        const labelEl = document.createElement('span');
+        labelEl.textContent = seg.label + ' ';
+        labelEl.style.cssText = 'font-style: italic; color: var(--muted); opacity: 0;';
+        entry.appendChild(labelEl);
+        revealEls.push(labelEl);
+      }
+    });
+    // Quick staggered reveal so it visually "types in" -- this is
+    // revealing content that's already been transcribed, not
+    // simulating live recognition that didn't actually happen.
+    revealEls.forEach((el, i) => {
+      setTimeout(() => { el.style.transition = 'opacity 0.15s'; el.style.opacity = '1'; }, i * 55);
+    });
+  } else {
+    entry.appendChild(document.createTextNode(text));
+  }
+
+  // queryText is what actually gets sent to /api/analyze -- for mic
+  // phrases that's the same as the displayed text, but example phrases
+  // display syllabics while translation runs on the Latin-script form,
+  // so the two can differ (see the example-pill click handler).
+  entry.dataset.text = queryText !== undefined ? queryText : text;
+  entry.dataset.alreadyEnglish = alreadyEnglish ? '1' : '0';
+  if (vocal) entry.dataset.vocal = JSON.stringify(vocal);
+  entry.onclick = () => selectCreeTranscriptEntry(entry);
+
+  sylEl.appendChild(entry);
+  // The scrollbar lives on the outer .cree-transcript-log box (that's
+  // where overflow-y:auto + max-height are set), not on sylEl itself --
+  // scrolling sylEl was a no-op since it has nothing to scroll.
+  // Deferred one frame: scrollHeight can occasionally be measured
+  // before the browser has finished laying out content appended this
+  // same tick (most noticeable with the word-by-word entries, which
+  // append many small spans at once) -- requestAnimationFrame guarantees
+  // this runs after layout, so the scroll position is always accurate.
+  if (shouldAutoScroll) {
+    requestAnimationFrame(() => { scrollContainer.scrollTop = scrollContainer.scrollHeight; });
+  }
+}
+
+function selectCreeTranscriptEntry(entry) {
+  document.querySelectorAll('.cree-transcript-entry.selected').forEach(el => el.classList.remove('selected'));
+  entry.classList.add('selected');
+  const alreadyEnglish = entry.dataset.alreadyEnglish === '1';
+  let vocal = null;
+  if (entry.dataset.vocal) {
+    try { vocal = JSON.parse(entry.dataset.vocal); } catch (e) { vocal = null; }
+  }
+  runCreePipeline(entry.dataset.text, alreadyEnglish, vocal);
+}
+
+function appendCreeTranscriptError(text) {
+  // This used to be `sylEl.textContent = '...'`, which replaces the
+  // entire box -- including every earlier phrase in the session. One
+  // failed transcription (e.g. the Whisper NaN-logits crash on the
+  // Cree auto-detect path) was silently deleting the whole scrollback.
+  // Append a one-line, visually distinct error entry instead. Not
+  // clickable/selectable -- there's no successful analysis behind it.
+  const sylEl = document.getElementById('cree-syllabics-out');
+  sylEl.classList.remove('placeholder');
+  const scrollContainer = sylEl.closest('.cree-transcript-log') || sylEl;
+  const shouldAutoScroll = isNearBottom(scrollContainer);
+  const entry = document.createElement('div');
+  entry.className = 'cree-transcript-entry';
+  entry.style.cssText = 'color: #d64545; font-style: italic;';
+  entry.textContent = text;
+  sylEl.appendChild(entry);
+  // Deferred one frame: scrollHeight can occasionally be measured
+  // before the browser has finished laying out content appended this
+  // same tick (most noticeable with the word-by-word entries, which
+  // append many small spans at once) -- requestAnimationFrame guarantees
+  // this runs after layout, so the scroll position is always accurate.
+  if (shouldAutoScroll) {
+    requestAnimationFrame(() => { scrollContainer.scrollTop = scrollContainer.scrollHeight; });
+  }
+}
+
 function startCreeMic() {
   // Previous version explicitly disabled echoCancellation/noiseSuppression/
   // autoGainControl here, reasoning that raw audio would serve Whisper and
@@ -5745,7 +6758,15 @@ function startCreeMic() {
     document.getElementById('cree-status-text').textContent = 'listening...';
 
     const sylEl = document.getElementById('cree-syllabics-out');
-    sylEl.textContent = ''; sylEl.classList.remove('placeholder');
+    if (!sylEl.children.length) {
+      // Only show the placeholder on a genuinely fresh page load --
+      // restarting the mic after stopping it should NOT wipe out
+      // everything said earlier in the session. Requiring the person to
+      // keep the mic running continuously just to keep their transcript
+      // was the actual bug here, not a missing feature.
+      sylEl.textContent = 'waiting for voiced phrase';
+      sylEl.classList.add('placeholder');
+    }
 
     // Waveform bars + real RMS loudness tracking, both from the same
     // AnalyserNode. creeRmsSamples doubles as: (a) the loudness signal
@@ -5761,6 +6782,9 @@ function startCreeMic() {
     }
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const src = ctx.createMediaStreamSource(stream);
+    creeLiveAudioCtx = ctx;
+    creeLiveSourceNode = src;
+    startCreeLiveCaptions();
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
     src.connect(analyser);
@@ -5872,8 +6896,6 @@ function startCreeMic() {
 // plus real loudness mean/variance from the RMS samples collected during
 // the segment. All three then feed the sentiment pipeline together.
 async function finishCreeSegment(rmsSamples, blob) {
-  const sylEl = document.getElementById('cree-syllabics-out');
-
   if (!blob || blob.size === 0) {
     document.getElementById('cree-status-text').textContent = 'no audio captured for that phrase';
     return;
@@ -5884,18 +6906,17 @@ async function finishCreeSegment(rmsSamples, blob) {
   try {
     const form = new FormData();
     form.append('file', blob, 'segment.webm');
+    form.append('language', creeMicLanguage);
     const res = await fetch('/api/transcribe', { method: 'POST', body: form });
     data = await res.json();
     if (data.error) {
-      sylEl.textContent = 'Transcription unavailable: ' + data.error;
-      sylEl.classList.add('placeholder');
-      document.getElementById('cree-status-text').textContent = 'transcription unavailable';
+      appendCreeTranscriptError('Transcription unavailable: ' + data.error);
+      document.getElementById('cree-status-text').textContent = 'transcription unavailable, listening...';
       return;
     }
     transcript = (data.text || '').trim();
   } catch (err) {
-    sylEl.textContent = 'Transcription server not reachable.';
-    sylEl.classList.add('placeholder');
+    appendCreeTranscriptError('Transcription server not reachable.');
     document.getElementById('cree-status-text').textContent = 'server unavailable';
     console.warn('Transcribe request failed:', err);
     return;
@@ -5911,8 +6932,6 @@ async function finishCreeSegment(rmsSamples, blob) {
     console.info('Empty transcript diagnostics:' + hint, data);
     return;
   }
-  sylEl.textContent = transcript;
-  sylEl.classList.remove('placeholder');
 
   const mean = rmsSamples.length ? rmsSamples.reduce((a, b) => a + b, 0) / rmsSamples.length : 0;
   const variance = rmsSamples.length
@@ -5945,11 +6964,39 @@ async function finishCreeSegment(rmsSamples, blob) {
     console.warn('Pitch analysis unavailable, continuing on loudness alone:', err);
   }
 
-  runCreePipeline(transcript, /* alreadyEnglish */ true, { pitch_range_semitones, rms_mean, rms_variance });
+  const vocal = { pitch_range_semitones, rms_mean, rms_variance };
+  const segments = data.segments || [];
+  const liveLine = document.getElementById('cree-live-caption-line');
+  if (liveLine) liveLine.remove();
+  appendCreeTranscriptEntry(transcript, creeMicLanguage === 'en' ? '[EN]' : '[CR]', creeMicLanguage === 'en', vocal, undefined, segments);
+
+  if (!data.has_lexical_speech) {
+    // The whole phrase was chant/vocables/percussion with no words
+    // Whisper actually trusted -- e.g. your mic picked up a song
+    // instead of speech. Say so plainly instead of running sentiment
+    // analysis on fabricated text like "Honor song for Dr. Suzanne
+    // Kite." as if it meant something.
+    const transEl = document.getElementById('cree-translation-out');
+    transEl.textContent = 'No lexical (word-based) speech in that phrase -- sounds like chant/vocables and/or percussion, which sentiment analysis can\u2019t score from text.';
+    transEl.classList.remove('placeholder');
+    document.getElementById('cree-val-fill').style.width = '50%';
+    document.getElementById('cree-val-fill').style.background = 'var(--muted)';
+    document.getElementById('cree-aro-fill').style.width = '0%';
+    const badge = document.getElementById('cree-emotion-badge');
+    badge.textContent = 'n/a'; badge.className = 'cree-emotion-badge neutral';
+    document.getElementById('cree-emotion-desc').textContent = 'no lexical text to analyze';
+    document.getElementById('cree-status-text').textContent = 'non-lexical phrase, listening...';
+    return;
+  }
+
+  runCreePipeline(transcript, /* alreadyEnglish */ creeMicLanguage === 'en', vocal);
 }
 
 function stopCreeMic() {
   creeMicRunning = false;
+  stopCreeLiveCaptions();
+  creeLiveAudioCtx = null;
+  creeLiveSourceNode = null;
   if (creeSegmentRecorder && creeSegmentRecorder.state === 'recording') {
     creeSegmentRecorder.onstop = null;
     try { creeSegmentRecorder.stop(); } catch (e) {}
@@ -6125,6 +7172,293 @@ function renderCreeResult(data, vocal) {
     data.emotion.charAt(0).toUpperCase() + data.emotion.slice(1) + ': ' + data.description +
     ' (valence ' + data.valence.toFixed(2) + ', arousal ' + data.arousal.toFixed(2) + ')';
 }
+// ============================================================
+// Archer Chat Widget
+// ============================================================
+let archerChatOpen = false;
+let archerChatTab = 'ask';
+let archerChatMode = 'text';
+let archerChatHistory = [];
+
+function toggleArcherChat() {
+  archerChatOpen = !archerChatOpen;
+  document.getElementById('archer-chat-panel').classList.toggle('open', archerChatOpen);
+  if (archerChatOpen) {
+    checkArcherChatHealth();
+    document.getElementById('ac-input').focus();
+  }
+}
+
+async function checkArcherChatHealth() {
+  const fab = document.getElementById('archer-chat-fab');
+  const subtitle = document.getElementById('ac-subtitle');
+  try {
+    const resp = await fetch('/api/chat/health');
+    const data = await resp.json();
+    fab.classList.add('has-status');
+    subtitle.textContent = data.rag_ready
+      ? `local · ${data.rag_chunks_indexed} notes indexed`
+      : 'local · notes index not built yet';
+  } catch (e) {
+    fab.classList.remove('has-status');
+    subtitle.textContent = 'local · backend not reachable';
+  }
+}
+
+function setArcherChatTab(tab) {
+  archerChatTab = tab;
+  document.getElementById('ac-tab-ask').classList.toggle('active', tab === 'ask');
+  document.getElementById('ac-tab-sing').classList.toggle('active', tab === 'sing');
+  document.getElementById('ac-body-ask').style.display = tab === 'ask' ? 'flex' : 'none';
+  document.getElementById('ac-body-sing').style.display = tab === 'sing' ? 'flex' : 'none';
+  document.getElementById('ac-inputbar-ask').style.display = tab === 'ask' ? 'flex' : 'none';
+}
+
+function setArcherChatMode(mode) {
+  archerChatMode = mode;
+  document.getElementById('ac-mode-text').classList.toggle('active', mode === 'text');
+  document.getElementById('ac-mode-audio').classList.toggle('active', mode === 'audio');
+}
+
+function archerChatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendArcherChatMessage();
+  }
+}
+
+function archerAppendMessage(role, text, opts = {}) {
+  const body = document.getElementById('ac-body-ask');
+  const div = document.createElement('div');
+  div.className = `ac-msg ${role}`;
+  div.textContent = text;
+  if (opts.sources && opts.sources.length) {
+    const src = document.createElement('span');
+    src.className = 'ac-sources';
+    src.textContent = `from: ${opts.sources.join(', ')}`;
+    div.appendChild(src);
+  }
+  if (opts.audioBase64) {
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = `data:audio/wav;base64,${opts.audioBase64}`;
+    div.appendChild(audio);
+  }
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+function archerShowTyping() {
+  const body = document.getElementById('ac-body-ask');
+  const div = document.createElement('div');
+  div.className = 'ac-typing';
+  div.id = 'ac-typing-indicator';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function archerHideTyping() {
+  const el = document.getElementById('ac-typing-indicator');
+  if (el) el.remove();
+}
+
+async function sendArcherChatMessage() {
+  const input = document.getElementById('ac-input');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  archerAppendMessage('user', message);
+  archerChatHistory.push({ role: 'user', content: message });
+  archerShowTyping();
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        history: archerChatHistory.slice(0, -1),
+        mode: archerChatMode,
+      }),
+    });
+    const data = await resp.json();
+    archerHideTyping();
+
+    if (!resp.ok || data.error) {
+      archerAppendMessage('error', data.error || 'Something went wrong.');
+      return;
+    }
+
+    archerAppendMessage('bot', data.reply, {
+      sources: data.sources,
+      audioBase64: data.audio_base64,
+    });
+    archerChatHistory.push({ role: 'assistant', content: data.reply });
+
+    if (data.audio_error) {
+      archerAppendMessage('system', data.audio_error);
+    }
+  } catch (e) {
+    archerHideTyping();
+    archerAppendMessage('error', `Couldn't reach the local backend: ${e.message}`);
+  }
+}
+
+// -- voice input for the "Ask" tab: record a question, transcribe via the
+//    existing /api/transcribe endpoint, drop the text into the input box --
+let archerVoiceRecorder = null;
+let archerVoiceChunks = [];
+let archerVoiceRecording = false;
+
+async function toggleArcherVoiceInput() {
+  if (archerVoiceRecording) {
+    archerVoiceRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = pickRecorderMimeType();
+    archerVoiceRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    archerVoiceChunks = [];
+    archerVoiceRecorder.ondataavailable = (e) => { if (e.data.size > 0) archerVoiceChunks.push(e.data); };
+    archerVoiceRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      document.getElementById('ac-voice-input-btn').classList.remove('recording');
+      archerVoiceRecording = false;
+      const blob = new Blob(archerVoiceChunks, { type: mimeType || 'audio/webm' });
+      const formData = new FormData();
+      formData.append('file', blob, 'question.webm');
+      try {
+        const resp = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.text) {
+          document.getElementById('ac-input').value = data.text;
+          document.getElementById('ac-input').focus();
+        }
+      } catch (e) {
+        archerAppendMessage('error', `Transcription failed: ${e.message}`);
+      }
+    };
+    archerVoiceRecorder.start();
+    archerVoiceRecording = true;
+    document.getElementById('ac-voice-input-btn').classList.add('recording');
+  } catch (e) {
+    archerAppendMessage('error', `Microphone access failed: ${e.message}`);
+  }
+}
+
+// -- "Sing my idea" tab: record a scratch vocal, send to /api/chat/sing --
+let archerSingRecorder = null;
+let archerSingChunks = [];
+let archerSingRecording = false;
+
+async function toggleArcherSingRecording() {
+  if (archerSingRecording) {
+    archerSingRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = pickRecorderMimeType();
+    archerSingRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    archerSingChunks = [];
+    archerSingRecorder.ondataavailable = (e) => { if (e.data.size > 0) archerSingChunks.push(e.data); };
+    archerSingRecorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); archerSubmitSingRecording(mimeType); };
+    archerSingRecorder.start();
+    archerSingRecording = true;
+    document.getElementById('ac-sing-record-btn').classList.add('recording');
+    document.getElementById('ac-sing-status').textContent = 'Recording... tap to stop';
+  } catch (e) {
+    document.getElementById('ac-sing-status').textContent = `Mic error: ${e.message}`;
+  }
+}
+
+async function archerSubmitSingRecording(mimeType) {
+  archerSingRecording = false;
+  document.getElementById('ac-sing-record-btn').classList.remove('recording');
+  document.getElementById('ac-sing-status').textContent = 'Converting to Archer\'s voice...';
+  document.getElementById('ac-sing-result').innerHTML = '';
+
+  const blob = new Blob(archerSingChunks, { type: mimeType || 'audio/webm' });
+  const formData = new FormData();
+  formData.append('file', blob, 'scratch.webm');
+  formData.append('voice_index', '0');
+
+  try {
+    const resp = await fetch('/api/chat/sing', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      document.getElementById('ac-sing-status').textContent = data.error || `Conversion failed (${resp.status})`;
+      return;
+    }
+    const wavBlob = await resp.blob();
+    const url = URL.createObjectURL(wavBlob);
+    document.getElementById('ac-sing-status').textContent = 'Here it is:';
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = url;
+    audio.style.width = '100%';
+    document.getElementById('ac-sing-result').appendChild(audio);
+  } catch (e) {
+    document.getElementById('ac-sing-status').textContent = `Couldn't reach the backend: ${e.message}`;
+  }
+}
+
+// auto-grow the ask textarea
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('ac-input');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+    });
+  }
+});
+
+// -- drag-to-resize for the chat panel (grows from the top-right corner,
+//    since the panel is anchored to the bottom-left of the screen) --
+(function setupArcherChatResize() {
+  const handle = document.getElementById('ac-resize-handle');
+  const panel = document.getElementById('archer-chat-panel');
+  if (!handle || !panel) return;
+
+  let startX = 0, startY = 0, startW = 0, startH = 0, dragging = false;
+
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = startY - e.clientY;   // dragging up increases height
+    const minW = parseInt(getComputedStyle(panel).minWidth) || 300;
+    const minH = parseInt(getComputedStyle(panel).minHeight) || 360;
+    const maxW = window.innerWidth - 44;
+    const maxH = window.innerHeight - 130;
+    panel.style.width = Math.min(maxW, Math.max(minW, startW + dx)) + 'px';
+    panel.style.height = Math.min(maxH, Math.max(minH, startH + dy)) + 'px';
+  }
+
+  function onPointerUp() {
+    dragging = false;
+    panel.classList.remove('resizing');
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+  }
+
+  handle.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startW = panel.getBoundingClientRect().width;
+    startH = panel.getBoundingClientRect().height;
+    panel.classList.add('resizing');
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    e.preventDefault();
+  });
+})();
 </script>
 </body>
 </html>

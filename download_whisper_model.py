@@ -1,70 +1,55 @@
 """
-Run this once, separately, BEFORE starting server.py:
+One-time setup script for the faster-whisper transcription backends.
 
-    python download_whisper_model.py
+Run this once (needs internet access) before starting server.py:
 
-Downloads OpenAI's Whisper "base.en" speech-to-text model (~140MB) from
-openaipublic.azureedge.net and saves it to data/models/whisper/. This is
-the ONLY place in this project that downloads that model or makes a
-network call for it -- server.py only ever reads from that local
-directory, so it can never silently attempt a download of its own.
+    python download_faster_whisper_model.py
 
-Why this exists at all: the browser's built-in speech recognition
-(webkitSpeechRecognition) only works in official Google Chrome / Edge --
-not Chromium, not Brave, not Firefox, not Safari -- because it silently
-streams your audio to Google's own servers using a private API key that
-open-source Chromium builds don't have. That's a hard platform limitation,
-not something fixable from this page's JavaScript. Running transcription
-on your own server with Whisper instead removes that dependency entirely:
-it works identically in every browser, because the browser's only job
-becomes "record audio and send it here" -- no browser speech API involved
-at all.
+Downloads BOTH models this project uses and caches them locally. After
+this completes, server.py loads both with local_files_only=True and
+never touches the network again -- same "download once, run offline"
+pattern as download_whisper_model.py (legacy fallback) and
+download_vosk_model.py (live-caption layer).
 
-Needs internet access, and needs ffmpeg installed as a system binary
-(Whisper shells out to it to decode audio) -- check with `ffmpeg -version`
-before running this if you're not sure it's installed.
+Why two separate models, not one: a live mic phrase and an uploaded full
+track have very different latency budgets, so server.py uses two
+separate faster-whisper configs (see MIC_WHISPER_MODEL_SIZE /
+TRACK_WHISPER_MODEL_SIZE in server.py):
+
+  - small.en (~75M params) -- fast enough for the live Sentiment-tab
+    mic pipeline, where every single phrase pays this model's latency.
+  - large-v3-turbo (~809M params, ~99% of full large-v3's accuracy) --
+    used only for the Live Demo's "Upload an MP3" whole-track analysis,
+    where a single slower request per upload is an acceptable trade for
+    much better accuracy.
+
+An earlier version of this script only downloaded large-v3-turbo. That
+left the mic model directory empty, so server.py's mic path silently
+fell back to the older, slower, PyTorch-only openai-whisper backend
+(with word-timestamp alignment that's noticeably more crash-prone on
+short/quiet clips than faster-whisper's). If your server startup log
+ever shows "faster-whisper (small.en) failed to load ... trying legacy
+openai-whisper", that's this gap -- re-run this script to fix it.
 """
-import sys
-import shutil
-from pathlib import Path
 
-MODEL_NAME = "base.en"  # good balance of accuracy vs. speed for a live demo; "small.en" is more accurate but ~3x slower on CPU
-OUTPUT_DIR = Path("data/models/whisper")
+from faster_whisper import WhisperModel
 
-
-def main():
-    if shutil.which("ffmpeg") is None:
-        print("ffmpeg not found on PATH. Whisper needs it to decode audio at transcription time.")
-        print("Install it first (e.g. apt install ffmpeg / brew install ffmpeg), then re-run this.")
-        sys.exit(1)
-
-    try:
-        import whisper
-    except ImportError:
-        print("openai-whisper isn't installed. Run: pip install openai-whisper")
-        sys.exit(1)
-
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    print(f"Downloading Whisper '{MODEL_NAME}' -> {OUTPUT_DIR} (needs internet access, one-time only)...")
-
-    try:
-        # download_root makes whisper save (and later look for) the .pt
-        # checkpoint file directly in our own directory, instead of its
-        # default ~/.cache/whisper -- keeps this self-contained the same
-        # way the sentiment model's directory is.
-        whisper.load_model(MODEL_NAME, download_root=str(OUTPUT_DIR))
-    except Exception as e:
-        print(f"Download failed: {e}")
-        print("Check your internet connection can reach openaipublic.azureedge.net, then try again.")
-        sys.exit(1)
-
-    files = sorted(p.name for p in OUTPUT_DIR.iterdir())
-    print(f"Done. Saved to {OUTPUT_DIR}:")
-    for f in files:
-        print(f"  {f}")
-    print("\nserver.py will now load from this local directory with no network access needed.")
-
+MODELS = [
+    # (model_size, download_root) -- keep these in sync with
+    # MIC_WHISPER_MODEL_SIZE/MIC_WHISPER_MODEL_DIR and
+    # TRACK_WHISPER_MODEL_SIZE/TRACK_WHISPER_MODEL_DIR in server.py.
+    ("small.en", "data/models/faster-whisper-small.en"),
+    ("large-v3-turbo", "data/models/faster-whisper-large-v3-turbo"),
+]
 
 if __name__ == "__main__":
-    main()
+    for model_size, out_dir in MODELS:
+        print(f"Downloading faster-whisper model '{model_size}' to {out_dir} ...")
+        if model_size == "large-v3-turbo":
+            print("This one's a larger download (~1.6GB) -- may take a while.")
+        # Instantiating it is what triggers the download+cache; device/compute_type
+        # here don't matter for the download itself, only for the server's later load.
+        WhisperModel(model_size, device="cpu", compute_type="int8", download_root=out_dir)
+        print(f"Done -- server.py will load this from local files at {out_dir}.")
+    print("\nBoth models are set up. Restart server.py and check the startup log for "
+          "two 'faster-whisper (..., int8, CPU) loaded' lines (not 'legacy backend').")

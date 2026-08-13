@@ -131,3 +131,26 @@ output:
 
 logging:
   level: DEBUG
+
+# ============================================================
+# Archer Chat (chatbot + RAG + spoken replies + "sing my idea")
+# ============================================================
+chat:
+  backend: ollama                        # "ollama" | "llama_cpp"
+  ollama_url: "http://127.0.0.1:11434"
+  ollama_model: "llama3.1:8b-instruct-q4_K_M"   # matches what you already `ollama pull`ed
+  gguf_path: null                        # only used if backend: llama_cpp
+  temperature: 0.4
+  max_tokens: 500
+
+tts:
+  # piper.download_voices saves into the CURRENT directory it's run from --
+  # your terminal log shows you ran it from data/spoken_mode/, so that's
+  # where en_US-lessac-medium.onnx (+ .onnx.json) actually landed. Adjust
+  # this path if you later move the voice files or re-download elsewhere.
+  voice_path: "data/spoken_mode/en_US-lessac-medium.onnx"
+
+svs:
+  diffsinger_url: "http://127.0.0.1:8802"   # only needed for the lyrics+melody path -- not set up yet
+  diffsinger_timeout_s: 600
+  default_voice_index: 0                    # index into synthesis.neural.model_paths above
