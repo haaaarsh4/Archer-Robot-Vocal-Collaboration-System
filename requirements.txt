@@ -29,3 +29,13 @@ vaderSentiment>=3.3.2
 openai-whisper
 
 vosk
+
+sentence-transformers>=3.0.0   
+requests>=2.31.0               
+ 
+#   - Ollama (recommended): no pip package needed, install separately from
+#     https://ollama.com, then `ollama pull llama3.1:8b-instruct-q4_K_M`
+#   - llama-cpp-python (in-process alternative, no daemon):
+#     llama-cpp-python>=0.2.90   # uncomment if using chat.backend: llama_cpp
+ 
+piper-tts>=1.2.0
