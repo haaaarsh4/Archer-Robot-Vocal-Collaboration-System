@@ -1750,7 +1750,7 @@
         <div class="prose-stage-content">
           <div class="prose-stage-file">synthesis/vocable_synthesizer.py + output/timing_sync.py</div>
           <h3 class="prose-stage-title">Synthesis and playback</h3>
-          <p class="prose-stage-body">When the harmony engine issues a sing action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with two formant peaks, F1 and F2, which are the resonant frequencies that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant frequencies dynamically, so the robot's vowel quality follows the singer's in real time. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries. Correction from an earlier version of this page: the sentiment reading from stage 4c does not yet feed into this live synthesis path. Right now it drives the standalone preview on the <a href="#" onclick="showPage('translation'); return false;" style="color: var(--accent2);">Sentiment tab</a>, LED color, interval, oscillator shape, only, not the formants of the robot's actual sung voice. Wiring sentiment into the live vowel shaping is a real next step, not something already happening quietly in the background.</p>
+          <p class="prose-stage-body">When the harmony engine issues a sing action, the synthesizer generates the audio. The default engine is additive sinusoidal synthesis with formant shaping. Each of the four vowel shapes (aah, ooo, mmm, hey) is modeled with four stacked formant resonances, the resonant peaks that define the acoustic character of each vowel. The Cree phoneme profile from stage 4 shifts these formant targets dynamically, blending toward the specific phoneme currently active, so the robot's vowel quality follows the singer's in real time. A 30 millisecond crossfade is applied between successive notes to eliminate clicks at note boundaries. Correction from an earlier version of this page: the sentiment reading from stage 4c does not yet feed into this live synthesis path. Right now it drives the standalone preview on the <a href="#" onclick="showPage('translation'); return false;" style="color: var(--accent2);">Sentiment tab</a>, LED color, interval, oscillator shape, only, not the formants of the robot's actual sung voice. Wiring sentiment into the live vowel shaping is a real next step, not something already happening quietly in the background.</p>
           <p class="prose-stage-body" style="margin-top: 12px;">For duet and choir textures, the synthesizer doesn't just render one voice louder. It renders several separate layers, each with its own small pitch detune, timing offset, and formant scaling, then mixes them together, which is what actually produces the "several people singing together" feeling rather than a single voice with reverb slapped on. A small algorithmic reverb, built from a handful of comb and allpass filters, is layered on top, with more wash for a choir than a solo voice.</p>
           <p class="prose-stage-body" style="margin-top: 12px;">This DSP voice can optionally be reskinned into a real trained singing voice before it reaches the speakers. That neural stage is entirely optional, off by default, and gets its own writeup on the new <a href="#" onclick="showPage('synthesis'); return false;" style="color: var(--accent2);">Synthesis tab</a>, since it involves a separate model, a separate process, and a real trade-off between quality and speed.</p>
           <p class="prose-stage-body" style="margin-top: 12px;">Whichever voice comes out, the synthesized audio is handed to TimingSync, which by default schedules playback 70 milliseconds after the note was detected, then nudges that further to land on the nearest upcoming beat once a tempo has been established, so the robot's entrances feel musically placed rather than just delayed. That base delay is intentional either way. It gives the robot the feel of a real performer responding with a slight human lag, rather than an instantaneous echo that would feel mechanical. The audio is played back through sounddevice on the configured output device.</p>
@@ -2315,7 +2315,7 @@
   <section class="section">
     <div class="section-label">Two Voices, Not One</div>
     <h2 class="section-title">The generated voice always exists. The trained voice is optional on top of it.</h2>
-    <p class="section-body">The DSP synthesizer is the foundation and it never goes away. It models each vocable with two formant peaks, F1 and F2, the resonant frequencies that give a vowel its character, and shifts them in real time using the Cree phoneme profile and the sentiment reading covered on the other tabs. This is fast, it's cheap to run, and it's what keeps the robot able to respond to a live singer with no perceptible lag.</p>
+    <p class="section-body">The DSP synthesizer is the foundation and it never goes away. Each vocable, aah, ooo, mmm, hey, is built from a harmonic-rich source tone shaped by four stacked formant resonances, the same basic principle a physical vocal tract uses to turn a buzzing set of vocal-fold harmonics into a recognizable vowel. Those formant targets are not fixed presets either: each one blends between a neutral baseline and the specific Cree phoneme currently being sung, weighted by how strongly that phoneme's influence is active at that instant, so the robot's vowel quality genuinely tracks the sound of the Cree word it's singing, not just its pitch. This is fast, it's cheap to run, and it's what keeps the robot able to respond to a live singer with no perceptible lag.</p>
     <p class="section-body" style="margin-top: 12px;">The neural stage sits after it, not instead of it. It takes whatever the DSP synthesizer produced and runs it through a trained voice conversion model, so the pitch and timing still come from the DSP layer and the harmony engine, but the actual timbre, the thing that makes a voice sound like a specific person, comes from a real trained model. It is switched off by default. If it's off, not installed, or its model files are missing, the pipeline behaves exactly as it did before this stage existed: pure DSP output, nothing silently degraded.</p>
   </section>
 
@@ -2326,6 +2326,7 @@
     <div class="section-label">How The Neural Stage Works</div>
     <h2 class="section-title">A separate process, on purpose</h2>
     <p class="section-body">The neural voice model is heavy. Running it in the same process as the real-time pipeline would mean one slow inference call could stall every other connection on the server while it runs. So it lives in its own FastAPI process, a sidecar, started separately and talked to over HTTP. The main pipeline sends it audio and gets converted audio back. If the sidecar isn't running, or hasn't finished loading, the main app just keeps singing in the plain DSP voice.</p>
+    <p class="section-body" style="margin-top: 12px;">The conversion code itself is a direct port of RVC-Project's own official inference logic, built from the same HuBERT, RMVPE, and generator files the official tooling ships, rather than the popular third-party rvc-python package most projects reach for. That choice came out of a real problem, not a preference. Loading the exact same trained checkpoint through a different reimplementation of the same architecture does not reliably give back the same result. Which HuBERT layer gets used, how pitch gets converted into the bins the generator expects, and the generator's own forward pass all have to match what the checkpoint was actually trained against, almost bit for bit. Get any of that slightly wrong and the output doesn't just sound a little off, it comes out confident, correctly pitched, and completely unintelligible, which is exactly the failure this port exists to avoid.</p>
 
     <div class="prose-pipeline">
 
@@ -2351,12 +2352,12 @@
           <div class="prose-stage-line"></div>
         </div>
         <div class="prose-stage-content">
-          <div class="prose-stage-file">analysis/rmvpe_detector.py</div>
+          <div class="prose-stage-file">neural_env/rvc_pipeline.py: RMVPEPitchExtractor</div>
           <h3 class="prose-stage-title">Extracting the pitch, again, separately</h3>
-          <p class="prose-stage-body">The neural voice model needs its own accurate read on pitch to reconstruct the melody correctly. This uses the same RMVPE network described on the Architecture tab, run again here specifically for the conversion step, since the target voice's pitch has to line up exactly with what the HuBERT features are carrying.</p>
+          <p class="prose-stage-body">The neural voice model needs its own accurate read on pitch to reconstruct the melody correctly, using the same RMVPE network described on the Architecture tab, run again here specifically for the conversion step since the target voice's pitch has to line up exactly with what the HuBERT features are carrying. Its checkpoint is around 180 megabytes, so rather than every loaded voice keeping its own copy in memory, one shared instance is created when the sidecar starts and reused for every conversion after that. RMVPE isn't documented as safe to call from multiple threads at once, so every call to it is quietly serialized behind a lock instead of risking a race.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">RMVPE</span>
-            <span class="node-pill">shared model cache</span>
+            <span class="node-pill">one shared instance, not per-voice</span>
           </div>
         </div>
       </div>
@@ -2387,9 +2388,12 @@
           <div class="prose-stage-file">neural_env/rvc_pipeline.py: RVCOfflineVoice</div>
           <h3 class="prose-stage-title">Generating the final audio</h3>
           <p class="prose-stage-body">The blended features and the extracted pitch go into the trained voice's own generator network, which produces the final waveform in that voice's timbre and target sample rate. The result is what gets sent back to the main pipeline, resampled and mixed in place of the plain DSP audio.</p>
+          <p class="prose-stage-body" style="margin-top: 12px;">Most of what this sidecar renders is a single short note rather than a long file, so a bit of audio is mirrored onto both ends of the clip before any of this runs, then trimmed back off the finished result afterward. Without it, the very start and end of every note, exactly the part a listener notices most, would generate with no context on one side, which tends to sound chewed off rather than sung. The checkpoint load itself is checked rather than trusted, too. If any layer name in a trained voice file doesn't line up with the model it's being loaded into, that mismatch used to pass silently, leaving part of the generator randomly initialized. The output still played back confidently and in tune, it just had no real phonetic content behind it. That load result is now checked and logged instead of assumed fine.</p>
           <div class="node-tech" style="margin-top: 16px;">
             <span class="node-pill">trained generator (.pth)</span>
             <span class="node-pill">per-voice target sample rate</span>
+            <span class="node-pill">edge padding for short clips</span>
+            <span class="node-pill">checkpoint mismatches now logged</span>
           </div>
         </div>
       </div>
@@ -4747,11 +4751,6 @@ let demoNeuralGain = null;            // gain node for demoNeuralSource, driven 
 function setDemoVoiceEngine(engine, btn) {
   if (demoIsPlaying) stopAudio();  // switching engines mid-playback would leave two contradicting robot voices
   demoVoiceEngine = engine;
-  // stopAudio() already silences demoVoice, but only if we were playing.
-  // Silence it unconditionally here too so a leftover DSP oscillator
-  // from an earlier session can never carry into Neural mode even if
-  // playback wasn't active when the switch happened.
-  if (demoVoice) demoVoice.setGain(0);
   btn.closest('#demo-voice-engine-toggle').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('demo-voice-engine-status').textContent = '';
@@ -4763,10 +4762,6 @@ function setDemoVoiceEngine(engine, btn) {
   document.querySelectorAll('#demo-neural-mode-toggle .interval-btn').forEach(b => {
     b.disabled = (engine === 'dsp');
   });
-  // Switching to DSP (or to Neural while Full render is already selected)
-  // is exactly when the timeline becomes needed again, if RMVPE is
-  // selected -- get it going now instead of waiting for Play.
-  if (demoPitchMode === 'rmvpe' && _pitchTimelineNeeded()) ensureDemoPitchTimeline();
 }
 
 // 'generated' = harmony engine + VocableSynthesizer sings a new wordless
@@ -4792,18 +4787,6 @@ const demoVoiceContent = 'direct';
 //          whole track, then full mode/texture/volume layered playback.
 let demoNeuralMode = 'live';
 
-// The offline whole-track RMVPE analysis (ensureDemoPitchTimeline) is only
-// ever read by demoProgressLoop() via pollOfflinePitchAtTime() -- and that
-// loop drives DSP playback and Neural Full-render playback. Neural Live
-// mode uses its own separate, much lighter _demoLiveProgressLoop() instead,
-// which never touches this timeline at all. So kicking off (or forcing
-// Play to wait on) a full-track analysis while in Neural + Live mode was
-// pure overhead: it did nothing for that playback path except break the
-// "starts immediately" promise Live mode is supposed to keep.
-function _pitchTimelineNeeded() {
-  return !(demoVoiceEngine === 'neural' && demoNeuralMode === 'live');
-}
-
 function setDemoNeuralMode(mode, btn) {
   if (demoIsPlaying) stopAudio();
   demoNeuralMode = mode;
@@ -4811,10 +4794,6 @@ function setDemoNeuralMode(mode, btn) {
   btn.classList.add('active');
   demoNeuralRenderedBuffer = null;
   demoNeuralRenderSignature = null;
-  // Switching FROM Live TO Full render is exactly the moment the timeline
-  // starts being needed (if RMVPE is selected) -- get it going right away
-  // instead of only starting it once Play is pressed.
-  if (mode === 'full' && demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
 }
 
 function _neuralRenderSignature() {
@@ -4860,14 +4839,7 @@ const demoPitchToggle = renderPitchEngineToggle('demo-upload-pitch-engine', (mod
     // ensureDemoPitchTimeline(). The whole track already exists, so
     // this kicks off (or reuses) one offline analysis pass instead of
     // streaming audio frame-by-frame the way a live mic has to.
-    // BUT: skip it entirely in Neural + Live mode -- that playback path
-    // never reads this timeline (see _pitchTimelineNeeded above), so
-    // analyzing here just delays "starts immediately" for no benefit.
-    if (_pitchTimelineNeeded()) {
-      ensureDemoPitchTimeline();
-    } else {
-      demoPitchToggle.setStatus('idle');
-    }
+    ensureDemoPitchTimeline();
   } else {
     if (demoPitchAnalysisAbort) { demoPitchAnalysisAbort.abort(); demoPitchAnalysisAbort = null; }
     demoPitchToggle.setStatus('idle');
@@ -4944,9 +4916,8 @@ function handleFileUpload(e) {
     // If RMVPE is already the selected pitch engine, get the offline
     // analysis started right away in the background so it's likely
     // already done by the time the person hits Play, instead of only
-    // starting it at that point. Skipped for Neural + Live, which never
-    // reads this timeline (see _pitchTimelineNeeded).
-    if (demoPitchMode === 'rmvpe' && _pitchTimelineNeeded()) ensureDemoPitchTimeline();
+    // starting it at that point.
+    if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
     runDemoTranscriptSentiment(file);
   };
   reader.readAsArrayBuffer(file);
@@ -5236,12 +5207,10 @@ const DEMO_LIVE_CHUNK_S = 2.5;
 function _checkDemoLiveComplete(streamer) {
   if (streamer._stopped) return;
   if (streamer.chunksDone >= streamer.total && !streamer._queue.length &&
-      !streamer._busy && streamer._activeNodes.length === 0 && streamer._dryEnded) {
+      !streamer._busy && streamer._activeNodes.length === 0) {
     // Every chunk has been attempted, nothing left queued or in flight,
-    // nothing is still audibly playing, AND the simultaneously-playing
-    // dry source track has also finished -- this IS the end, whether
-    // every chunk succeeded or some failed and got skipped, and whether
-    // the robot voice finished before or after the source track did.
+    // and nothing is still audibly playing -- this IS the end, whether
+    // every chunk succeeded or some failed and got skipped.
     if (demoIsPlaying && demoLiveStreamer === streamer) stopAudio();
   }
 }
@@ -5255,61 +5224,29 @@ function _playDemoNeuralLive() {
   const startSample = Math.floor(demoOffset * sr);
   const total = Math.max(1, Math.ceil((data.length - startSample) / chunkLen));
 
-  // Play the original dry track live, right alongside the converted
-  // chunks as they arrive -- same source/gain/analyser wiring used by
-  // DSP and Full-render playback, so all three modes sound and behave
-  // consistently: you hear the real input voice and the robot's
-  // converted voice together, not one after the other.
-  demoSource = demoAudioCtx.createBufferSource();
-  demoSource.buffer = demoAudioBuffer;
-  demoAnalyser = demoAudioCtx.createAnalyser();
-  demoAnalyser.fftSize = 2048;
-  demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
-  demoSource.connect(demoAnalyser);
-  if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
-  demoSourceGain.gain.value = demoSourceVolume;
-  demoSource.connect(demoSourceGain);
-  demoSourceGain.connect(demoAudioCtx.destination);
-
   if (!demoNeuralGain) demoNeuralGain = demoAudioCtx.createGain();
   demoNeuralGain.gain.value = demoRobotVolume;
   demoNeuralGain.connect(demoAudioCtx.destination);
 
-  const playStartTime = demoAudioCtx.currentTime;
-  demoSource.start(0, demoOffset);
-  demoStartTime = playStartTime - demoOffset;
-
   const streamer = {
     _stopped: false, _busy: false, _queue: [], _playHead: 0, _activeNodes: [],
-    _dryEnded: false,
     total, chunksDone: 0, chunksPlayed: 0,
     totalDurationS: (data.length - startSample) / sr,
-    playStartTime,
   };
   demoLiveStreamer = streamer;
 
-  // The dry track ending is now one of the two conditions that end the
-  // whole Live session (see _checkDemoLiveComplete) -- it does NOT stop
-  // things by itself, since robot chunks that are still converting when
-  // the source track finishes should still be allowed to finish playing
-  // rather than getting cut off.
-  demoSource.onended = () => {
-    streamer._dryEnded = true;
-    _checkDemoLiveComplete(streamer);
-  };
-
   // Chunks are chained back-to-back in the order they finish converting,
-  // NOT strictly pinned to "chunk N starts at N*chunkLength seconds
-  // against the source track's clock". CPU-side conversion of a whole
-  // chunk routinely takes longer than the chunk's own duration, so
-  // strict pinning would mean most chunks arrive already late and would
-  // have to be dropped to stay in sync -- on slower hardware that can
-  // mean the robot voice going silent for the entire session. Chaining
-  // guarantees every chunk is eventually heard, in the right order,
-  // right alongside the dry track that's now playing in real time next
-  // to it -- at the cost of the robot voice possibly drifting a little
-  // behind the source track's own timing if conversion can't keep up.
-  // Full render still exists for guaranteed sample-accurate alignment.
+  // NOT pinned to "chunk N starts at N*chunkLength seconds" against a
+  // simultaneously-playing original track. CPU-side conversion of a
+  // whole chunk routinely takes longer than the chunk's own duration, so
+  // pinning it to its original timestamp would mean most chunks arrive
+  // already late relative to a real-time clock and get dropped or play
+  // out of order. Chaining guarantees every chunk is eventually heard,
+  // in the right order, at the cost of the overall playback taking
+  // longer than the source track's own runtime when conversion is slow
+  // -- which on CPU, it usually is. This is why Live mode doesn't also
+  // play the dry source at the same time: there is no real-time clock
+  // here to stay in sync with.
   const pump = async () => {
     if (streamer._busy || streamer._stopped || !streamer._queue.length) return;
     streamer._busy = true;
@@ -5366,6 +5303,7 @@ function _playDemoNeuralLive() {
     streamer._queue.push({ float32: data.slice(s, e) });
   }
 
+  demoStartTime = demoAudioCtx.currentTime;
   demoIsPlaying = true;
   document.getElementById('play-btn').textContent = '\u23F8 Pause';
   _setModeTextureControlsLocked(true);
@@ -5382,16 +5320,11 @@ function _playDemoNeuralLive() {
 // Progress here is just "how many of the chunks have actually played."
 function _demoLiveProgressLoop(streamer) {
   if (!demoIsPlaying || demoLiveStreamer !== streamer) return;
-  // Now that the dry source track actually plays in real time alongside
-  // the streamed chunks, its real elapsed time is a more accurate
-  // progress signal than the old chunk-count approximation (which
-  // assumed every chunk takes an equal, unknown amount of time to both
-  // convert and play).
-  const elapsed = clamp01((demoAudioCtx.currentTime - demoStartTime) / streamer.totalDurationS) * streamer.totalDurationS;
-  const pct = streamer.totalDurationS > 0 ? (elapsed / streamer.totalDurationS) * 100 : 0;
+  const pct = streamer.total > 0 ? clamp01(streamer.chunksPlayed / streamer.total) * 100 : 0;
   document.getElementById('progress-inner').style.width = pct + '%';
-  document.getElementById('time-current').textContent = fmtTime(elapsed);
-  updateDemoTranscriptHighlight(elapsed);
+  const elapsedApprox = (streamer.chunksPlayed / streamer.total) * streamer.totalDurationS;
+  document.getElementById('time-current').textContent = fmtTime(Math.min(elapsedApprox, streamer.totalDurationS));
+  updateDemoTranscriptHighlight(elapsedApprox);
   demoAnimId = requestAnimationFrame(() => _demoLiveProgressLoop(streamer));
 }
 
@@ -5481,12 +5414,6 @@ async function playAudioNeural() {
 // instead of re-rendering.
 function _startNeuralPlayback() {
   if (!demoAudioBuffer || !demoNeuralRenderedBuffer) return;
-
-  // Full-render playback drives demoProgressLoop() same as DSP, which
-  // reads source pitch from this timeline when RMVPE is selected -- make
-  // sure it's actually been requested (pre-warm points upstream now skip
-  // this while in Live mode, so it can't be assumed to already be running).
-  if (demoPitchMode === 'rmvpe') ensureDemoPitchTimeline();
 
   demoSource = demoAudioCtx.createBufferSource();
   demoSource.buffer = demoAudioBuffer;
@@ -5717,10 +5644,10 @@ function _textureLayersFor(texture) {
 }
 
 function pauseAudio() {
-  // Live mode's demoSource plays for real now, but resuming a chunked
-  // one-shot conversion partway through isn't something worth
-  // reconstructing -- Pause still resets Live mode to the start, same
-  // as before. DSP and Full render resume from where they left off.
+  // Live mode has no simultaneously-playing demoSource to measure an
+  // offset from (see _playDemoNeuralLive) -- pausing it just stops
+  // everything and resets to the start, since resuming partway through
+  // a chunked one-shot conversion isn't something to reconstruct.
   demoOffset = demoLiveStreamer ? 0 : (demoAudioCtx.currentTime - demoStartTime);
   if (demoSource) { try { demoSource.stop(); } catch (e) {} }
   demoNeuralSources.forEach(s => { try { s.stop(); } catch (e) {} });
@@ -5958,16 +5885,7 @@ function demoProgressLoop() {
   const explEl = document.getElementById('demo-mode-explanation');
   if (explEl && result.text) explEl.textContent = result.text;
 
-  // Same reasoning as the demoNeuralBridge guard above: the plain
-  // oscillator voice must stay silent outside DSP mode, or it keeps
-  // singing generated aah/ooo tones over top of the Neural engine's
-  // actual RVC-converted output every frame -- which is exactly what
-  // was happening. demoVoice is created once (see playAudio()) and
-  // survives engine switches, so without this guard it kept driving
-  // audio in Neural/Full-render mode any time the demo had ever been
-  // played in DSP mode first, masking the real neural output underneath
-  // a layer of plain synth tone.
-  if (demoVoiceEngine === 'dsp' && demoVoice) {
+  if (demoVoice) {
     if (result.hz && result.action !== 'rest') {
       demoVoice.setVocable(LIVE_VOCABLE_BY_MODE[demoMode] || 'aah');
       demoVoice.setFrequency(result.hz);
@@ -5985,11 +5903,6 @@ function demoProgressLoop() {
       demoVoice.setGain(0);
       if (demoSourceDuckGain) demoSourceDuckGain.gain.setTargetAtTime(1, demoAudioCtx.currentTime, 0.25);
     }
-  } else if (demoVoice) {
-    // Belt-and-suspenders: if we're not in DSP mode, make sure any
-    // leftover oscillator from an earlier DSP play-through is actually
-    // silent, not just un-driven.
-    demoVoice.setGain(0);
   }
 }
 

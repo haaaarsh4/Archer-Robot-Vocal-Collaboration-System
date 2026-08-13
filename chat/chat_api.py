@@ -1,21 +1,3 @@
-"""
-chat/chat_api.py
-
-FastAPI router for the Archer chatbot. Mount this in server.py with:
-
-    from chat.chat_api import router as chat_router
-    app.include_router(chat_router)
-
-Everything here is local-only:
-  - LLM answers via chat/llm_client.py (Ollama or llama.cpp, both local)
-  - Song context via chat/rag_index.py (local embeddings over your own
-    notes in song_notes/, no internet)
-  - Spoken replies via chat/tts_engine.py (Piper, local)
-  - "Sing my idea" via chat/svs_pipeline.py -> your existing RVC sidecar
-
-No third-party APIs are called anywhere in this file.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -35,9 +17,6 @@ from chat.tts_engine import LocalTTS
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# -- module-level singletons, built lazily so importing this file (and
-#    therefore starting the main server) never fails just because Ollama
-#    isn't running yet or the RAG index hasn't been built --
 _rag_index: Optional[SongNotesIndex] = None
 _llm_client: Optional[LocalLLMClient] = None
 _tts: Optional[LocalTTS] = None
@@ -104,8 +83,6 @@ def _get_svs(neural_timbre):
     return _svs_pipeline
 
 
-# ---------------------------------------------------------------- models --
-
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -116,8 +93,6 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage] = []
     mode: str = "text"          # "text" | "audio"
 
-
-# --------------------------------------------------------------- routes --
 
 @router.get("/health")
 def chat_health():
@@ -139,9 +114,6 @@ def chat_health():
 
 @router.post("/reindex")
 def chat_reindex():
-    """Force a rebuild of the song-notes index — call this after editing
-    files in song_notes/ if you don't want to wait for the automatic
-    change-detection on next query."""
     rag = _get_rag()
     n = rag.build_or_load(force_rebuild=True)
     return {"chunks_indexed": n}
@@ -188,8 +160,6 @@ async def sing_from_scratch_vocal(
     file: UploadFile = File(...),
     voice_index: int = Form(0),
 ):
-    """Path A: user hums/sings their idea, we send it through RVC in
-    Archer's trained voice and hand back the result as WAV."""
     try:
         import server as _server  # the main app module, for its already-built neural_timbre instance
         neural_timbre = getattr(_server, "neural_timbre", None)
@@ -228,8 +198,6 @@ class SingFromLyricsRequest(BaseModel):
 
 @router.post("/sing-from-lyrics")
 def sing_from_lyrics(req: SingFromLyricsRequest):
-    """Path B: lyrics + melody, no human scratch vocal needed -- requires
-    a DiffSinger sidecar to be set up separately (see chat/svs_pipeline.py)."""
     try:
         import server as _server
         neural_timbre = getattr(_server, "neural_timbre", None)

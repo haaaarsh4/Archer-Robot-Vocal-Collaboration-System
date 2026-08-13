@@ -23,11 +23,7 @@ pitch:
     device: cpu                     
     is_half: false                  
     context_seconds: 1.0            
-    infer_stride_hops: 4             # was 1 (infer every single hop) -- on CPU, running the
-                                     # full CNN+BiGRU that often can't keep up with real-time
-                                     # audio, which is what caused the growing backlog/lag
-                                     # (backend still reporting pitch well after playback ends).
-                                     # Raise this further (e.g. 6-8) if it's still falling behind.
+    infer_stride_hops: 4             
     voicing_threshold: 0.03         
     confidence_threshold: 0.15      
 
@@ -79,24 +75,20 @@ synthesis:
   vibrato_depth_cents: 12                # sung-vibrato depth in cents
 
   neural:
-    enabled: true               # flipped on -- was false, which is why nothing changed before. Requires neural_env/rvc_server.py sidecar running (GET /neural/status to confirm reachable:true)
+    enabled: true               
     sidecar_url: "http://127.0.0.1:8801"
     sidecar_timeout_s: 5.0
-    device: cpu                  # no GPU available -- switched from cuda:0. See note below: CPU inference is slow, budget for it.
-    pitch_algo: rmvpe            # RVC's pitch tracker; rmvpe is the current best general choice
-    index_rate: 0.66             # RVC retrieval-blend amount
-    protect: 0.33                # protects unvoiced consonants/breath from being over-converted
-    transpose_semitones: 0       # leave at 0 — our DSP source is already at the correct pitch
-    max_latency_warn_s: 0.5      # log a warning if a single conversion call exceeds this
-    model_paths:                 # one entry per choir "singer" — was pointing at a placeholder path, updated to the actual trained model from the screenshot
+    device: cpu                  
+    pitch_algo: rmvpe            
+    index_rate: 0.66             
+    protect: 0.33                
+    transpose_semitones: 0       
+    max_latency_warn_s: 0.5      
+    model_paths:                
       - "assets/synthesis_models/mi-test.pth"
-    index_paths:                 # parallel to model_paths — updated to match
+    index_paths:                 
       - "assets/synthesis_models/mi-test_added_IVF1003_Flat_nprobe_1_mi-test_v2.index"
     offline_render_timeout_s: 900  # max wait for the ONE whole-track sidecar call used by
-                                    # the Upload-MP3 panel's Neural (offline render) mode --
-                                    # this isn't a real-time budget, just a safety ceiling so
-                                    # a stuck sidecar can't hang the request forever. Raise it
-                                    # for longer tracks / slower CPUs.
 
   texture:
     solo:
@@ -132,22 +124,15 @@ output:
 logging:
   level: DEBUG
 
-# ============================================================
-# Archer Chat (chatbot + RAG + spoken replies + "sing my idea")
-# ============================================================
 chat:
   backend: ollama                        # "ollama" | "llama_cpp"
   ollama_url: "http://127.0.0.1:11434"
-  ollama_model: "llama3.1:8b-instruct-q4_K_M"   # matches what you already `ollama pull`ed
+  ollama_model: "llama3.1:8b-instruct-q4_K_M"   
   gguf_path: null                        # only used if backend: llama_cpp
   temperature: 0.4
   max_tokens: 500
 
 tts:
-  # piper.download_voices saves into the CURRENT directory it's run from --
-  # your terminal log shows you ran it from data/spoken_mode/, so that's
-  # where en_US-lessac-medium.onnx (+ .onnx.json) actually landed. Adjust
-  # this path if you later move the voice files or re-download elsewhere.
   voice_path: "data/spoken_mode/en_US-lessac-medium.onnx"
 
 svs:

@@ -1,26 +1,3 @@
-"""
-chat/tts_engine.py
-
-Local text-to-speech for the chatbot's "spoken audio" reply mode.
-Uses Piper (https://github.com/rhasspy/piper) — small, fast neural TTS
-that runs comfortably on CPU with no internet after the one-time voice
-download.
-
-Setup:
-    pip install piper-tts
-    # download a voice, e.g.:
-    python -m piper.download_voices en_US-lessac-medium
-This puts a .onnx + .onnx.json pair in Piper's voices dir; point
-tts.voice_path at the .onnx file in config.yaml.
-
-This is deliberately a separate, swappable stage from RVC. Piper gives you
-a *neutral* spoken voice reading the chatbot's text reply (e.g. "This song
-was written about..."). RVC is for the *singing* path — converting a sung
-scratch vocal into Archer's singing timbre. Don't conflate the two: running
-spoken chat replies through the RVC singing model would sound wrong (RVC
-voice models here are trained on singing, not conversational speech).
-"""
-
 from __future__ import annotations
 
 import io
@@ -43,7 +20,6 @@ class LocalTTS:
         return self._available
 
     def synthesize(self, text: str) -> bytes:
-        """Returns 22.05kHz mono WAV bytes."""
         if not self._available:
             raise RuntimeError("Local TTS voice not configured — set tts.voice_path in config.yaml")
 
