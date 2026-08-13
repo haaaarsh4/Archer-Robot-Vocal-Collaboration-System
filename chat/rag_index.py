@@ -1,32 +1,3 @@
-"""
-chat/rag_index.py
-
-Local-only RAG over your own notes about Archer's songs.
-
-How it works
-------------
-1. You put your song notes as .md or .txt files under `song_notes/`
-   (one file per song is fine, or one big file — chunking handles either).
-   This is YOUR content, written by you, from whatever sources you already
-   have permission to use (your own summaries, your own liner notes, etc).
-   This module never fetches anything from the internet — it only reads
-   files that are already sitting on your disk.
-2. On first run (or whenever a file changes) each doc is split into
-   overlapping chunks and embedded with a small local sentence-transformer
-   model (all-MiniLM-L6-v2, ~80MB, CPU-friendly, no GPU needed).
-3. Embeddings are cached to disk (song_notes/.cache/embeddings.npz) keyed
-   by a hash of the file contents, so unchanged files are never
-   re-embedded.
-4. `query()` embeds the user's question and returns the top-k most
-   similar chunks with their source filename, for injection into the LLM
-   prompt as context.
-
-Nothing here calls out to the network. sentence-transformers downloads its
-model weights once from Hugging Face the first time you run this — after
-that it's cached locally at ~/.cache/torch/sentence_transformers and needs
-no internet again.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -56,9 +27,6 @@ class RetrievedChunk:
 
 
 def _chunk_text(text: str, source: str) -> list[Chunk]:
-    """Paragraph-aware chunking: keep paragraphs whole where possible,
-    otherwise fall back to a fixed-size sliding window so no chunk is
-    absurdly long."""
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
 
     chunks: list[str] = []
@@ -95,7 +63,6 @@ class SongNotesIndex:
         self._chunks: list[Chunk] = []
         self._embeddings: np.ndarray | None = None
 
-    # -- lazy model load so importing this module doesn't pull in torch --
     def _get_model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
@@ -103,9 +70,6 @@ class SongNotesIndex:
         return self._model
 
     def build_or_load(self, force_rebuild: bool = False) -> int:
-        """Scan song_notes/ for .md and .txt files, embed anything new or
-        changed, reuse cached vectors for anything unchanged. Returns the
-        number of chunks currently indexed."""
         self.notes_dir.mkdir(parents=True, exist_ok=True)
         files = sorted(
             [*self.notes_dir.glob("*.md"), *self.notes_dir.glob("*.txt")]
@@ -140,8 +104,6 @@ class SongNotesIndex:
                     all_chunks.extend(file_chunks)
                     all_vecs.append(cached_vecs[start:end])
                     continue
-                # chunk count mismatch (shouldn't happen unless chunker
-                # logic changed) -- fall through and re-embed this file
 
             file_chunks = _chunk_text(content, f.name)
             if not file_chunks:
@@ -161,8 +123,6 @@ class SongNotesIndex:
         self._chunks = all_chunks
         self._embeddings = np.concatenate(all_vecs, axis=0)
 
-        # rebuild manifest offsets fresh (cheap, and keeps it correct even
-        # after files are deleted/renamed)
         new_manifest = {"_offsets": {}}
         cursor = 0
         for f in files:

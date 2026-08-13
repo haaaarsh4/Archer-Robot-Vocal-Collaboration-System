@@ -1,15 +1,3 @@
-"""
-synthesis/neural_timbre.py
-
-Talks to the neural sidecar (neural_env/rvc_server.py) over plain HTTP.
-This file does NOT import rvc-python, fairseq, or faiss — none of that
-lives in the main app's Python environment. The whole rvc-python stack
-runs in its own Python 3.10 venv as a small persistent service, and this
-class is an HTTP client to it.
-
-Requires: `pip install requests` in the MAIN app's environment.
-"""
-
 import io
 import threading
 import time
@@ -35,16 +23,6 @@ class NeuralTimbreConverter:
 
         self._reachable = False
         self._call_count = 0
-        # CPU inference on the sidecar takes multiple seconds per call —
-        # far slower than the rate notes get generated at (every
-        # 100-200ms). Without this, every note fires its own HTTP call,
-        # and since the sidecar can only actually process one at a time,
-        # calls pile up into a backlog that keeps draining long after
-        # playback has stopped (each drained response logging as if it
-        # were current). This lock makes it single-flight on the client
-        # side too: if a conversion is already in flight, skip sending a
-        # new request entirely and just use the DSP audio for this note,
-        # rather than adding to a queue that's already behind.
         self._inflight_lock = threading.Lock()
 
         if self.enabled:
@@ -83,10 +61,6 @@ class NeuralTimbreConverter:
         if not self.enabled or not self._reachable:
             return audio
 
-        # Single-flight: if a conversion is already running, don't even
-        # attempt this one — just use DSP audio for this note. Non-
-        # blocking on purpose; we never want to wait for the previous
-        # call to finish before deciding.
         if not self._inflight_lock.acquire(blocking=False):
             return audio
 
@@ -103,10 +77,6 @@ class NeuralTimbreConverter:
             return result
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 503:
-                # Sidecar's own single-flight guard rejected us — it was
-                # already busy with a call from a moment ago. Expected
-                # and harmless under CPU-speed load; not worth an ERROR
-                # log every time it happens.
                 logger.debug("Neural sidecar busy with another conversion — using DSP audio.")
             else:
                 logger.error(f"Neural sidecar returned an error: {e} — using DSP audio for this note.")
@@ -136,21 +106,6 @@ class NeuralTimbreConverter:
 
     def convert_blocking(self, audio: np.ndarray, sample_rate: int, voice_index: int = 0,
                           timeout_s: float | None = None) -> np.ndarray | None:
-        """
-        Offline counterpart to convert(). convert() is built for the
-        real-time per-note path and deliberately SKIPS the call entirely
-        if a conversion is already in flight (see _inflight_lock above) --
-        the right choice there, since a real-time caller always has the
-        DSP oscillator to fall back to for that one note. An offline
-        render has no such fallback once the user has explicitly asked
-        for the neural voice, so this actually waits: for the lock, and
-        for the sidecar's response, for as long as `timeout_s` allows.
-
-        Returns the converted audio, or None on failure/timeout. Never
-        silently returns the original DSP audio the way convert() does --
-        the caller needs to know it actually failed, not get back
-        something that merely sounds plausible.
-        """
         if not self.enabled or not self._reachable:
             return None
 

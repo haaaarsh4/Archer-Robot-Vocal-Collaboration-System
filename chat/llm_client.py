@@ -1,25 +1,3 @@
-"""
-chat/llm_client.py
-
-Talks to a LOCAL LLM only. Two supported backends, tried in this order:
-
-1. Ollama (recommended) — runs as its own local daemon on 127.0.0.1:11434.
-   Setup:
-       curl -fsSL https://ollama.com/install.sh | sh      # macOS/Linux
-       ollama pull llama3.1:8b-instruct-q4_K_M
-   That pulls a ~4.9GB quantized weight file once; after that everything
-   is 100% offline. No API key, no account needed for local use.
-
-2. llama-cpp-python (fallback) — if Ollama isn't running, and a GGUF path
-   is configured, this loads the model in-process via llama.cpp bindings.
-   Heavier to set up (needs a compiled wheel) but has zero external
-   daemon dependency, useful if you want everything inside one process.
-
-Either way: nothing here ever makes a network call except to
-127.0.0.1:11434 (Ollama's local port). No prompts, song notes, or
-conversation content leave the machine.
-"""
-
 from __future__ import annotations
 
 import json
@@ -98,7 +76,6 @@ class LocalLLMClient:
             return self._chat_llama_cpp(user_message, history, system_prompt, context_block)
         raise ValueError(f"Unknown LLM backend: {self.cfg.backend!r}")
 
-    # -- Ollama backend --
     def _chat_ollama(self, user_message: str, history: list[ChatTurn],
                       system_prompt: str, context_block: str) -> str:
         messages = [{"role": "system", "content": system_prompt}]
@@ -124,7 +101,6 @@ class LocalLLMClient:
         data = resp.json()
         return data.get("message", {}).get("content", "").strip()
 
-    # -- llama-cpp-python backend (in-process, no daemon) --
     def _load_llama_cpp(self):
         if self._llama_cpp_model is not None:
             return self._llama_cpp_model
