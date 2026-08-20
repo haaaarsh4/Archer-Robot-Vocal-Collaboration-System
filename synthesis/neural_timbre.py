@@ -23,7 +23,21 @@ class NeuralTimbreConverter:
 
         self._reachable = False
         self._call_count = 0
-        self._inflight_lock = threading.Lock()
+        # Two separate locks, not one shared _inflight_lock: convert() (the
+        # live mic pipeline's real-time, one-note-at-a-time path) and
+        # convert_blocking() (the web upload panel's Live/Full-render
+        # chunk/track path) are genuinely different callers with different
+        # needs -- one drops instantly if busy, the other waits patiently.
+        # Sharing a single lock meant a multi-second track/chunk conversion
+        # holding the lock would make every real-time note conversion
+        # during that window fail its non-blocking acquire and silently
+        # fall back to DSP audio, even though the actual bottleneck (the
+        # sidecar's own _inference_lock, one model, one hardware) was
+        # already the correct place for that serialization to happen.
+        # Splitting these means each caller only ever contends with
+        # *itself*, not with the other feature.
+        self._live_lock = threading.Lock()
+        self._track_lock = threading.Lock()
 
         if self.enabled:
             self._check_sidecar()
@@ -57,16 +71,16 @@ class NeuralTimbreConverter:
             self.enabled = False
 
     def convert(self, audio: np.ndarray, sample_rate: int, target_hz: float,
-                voice_index: int = 0) -> np.ndarray:
+                voice_index: int = 0, pad_seconds: float | None = None) -> np.ndarray:
         if not self.enabled or not self._reachable:
             return audio
 
-        if not self._inflight_lock.acquire(blocking=False):
+        if not self._live_lock.acquire(blocking=False):
             return audio
 
         try:
             start = time.perf_counter()
-            result = self._call_sidecar(audio, sample_rate, voice_index)
+            result = self._call_sidecar(audio, sample_rate, voice_index, pad_seconds)
             elapsed = time.perf_counter() - start
             self._call_count += 1
             if elapsed > self.max_latency_warn_s:
@@ -89,15 +103,19 @@ class NeuralTimbreConverter:
                         "using DSP audio for this note.")
             return audio
         finally:
-            self._inflight_lock.release()
+            self._live_lock.release()
 
-    def _call_sidecar(self, audio: np.ndarray, sample_rate: int, voice_index: int) -> np.ndarray:
+    def _call_sidecar(self, audio: np.ndarray, sample_rate: int, voice_index: int,
+                       pad_seconds: float | None = None) -> np.ndarray:
         buf = _encode_wav(audio, sample_rate)
+        data = {"voice_index": voice_index, "sample_rate": sample_rate}
+        if pad_seconds is not None:
+            data["pad_seconds"] = pad_seconds
 
         resp = requests.post(
             f"{self.sidecar_url}/convert",
             files={"file": ("scratch.wav", buf, "audio/wav")},
-            data={"voice_index": voice_index, "sample_rate": sample_rate},
+            data=data,
             timeout=self.timeout_s,
         )
         if resp.status_code != 200:
@@ -105,26 +123,40 @@ class NeuralTimbreConverter:
         return _decode_wav_response(resp.content, sample_rate)
 
     def convert_blocking(self, audio: np.ndarray, sample_rate: int, voice_index: int = 0,
-                          timeout_s: float | None = None) -> np.ndarray | None:
+                          timeout_s: float | None = None,
+                          pad_seconds: float | None = None) -> np.ndarray | None:
         if not self.enabled or not self._reachable:
             return None
 
         timeout_s = float(timeout_s if timeout_s is not None else max(self.timeout_s, 900.0))
-        acquired = self._inflight_lock.acquire(timeout=timeout_s)
+        acquired = self._track_lock.acquire(timeout=timeout_s)
         if not acquired:
             logger.error(f"Neural offline render: timed out after {timeout_s:.0f}s waiting for "
-                         "the sidecar to be free of another conversion.")
+                         "another track/chunk conversion already in progress.")
             return None
         try:
             buf = _encode_wav(audio, sample_rate)
+            data = {"voice_index": voice_index, "sample_rate": sample_rate, "wait": "true"}
+            if pad_seconds is not None:
+                data["pad_seconds"] = pad_seconds
+            start = time.perf_counter()
             resp = requests.post(
                 f"{self.sidecar_url}/convert",
                 files={"file": ("track.wav", buf, "audio/wav")},
-                data={"voice_index": voice_index, "sample_rate": sample_rate, "wait": "true"},
+                data=data,
                 timeout=timeout_s,
             )
             if resp.status_code != 200:
                 raise RuntimeError(f"sidecar returned {resp.status_code}: {resp.text}")
+            round_trip_ms = (time.perf_counter() - start) * 1000
+            inference_ms = resp.headers.get("X-Inference-Ms")
+            if inference_ms is not None:
+                # The gap between round-trip and reported inference time is
+                # queueing (waiting on the sidecar's own lock) + network +
+                # WAV encode/decode -- worth knowing apart from actual
+                # model compute time when something feels slow.
+                logger.debug(f"Neural chunk convert: {round_trip_ms:.0f}ms round-trip, "
+                            f"{float(inference_ms):.0f}ms actual inference.")
             return _decode_wav_response(resp.content, sample_rate)
         except requests.exceptions.RequestException as e:
             logger.error(f"Neural offline render: sidecar call failed: {e}")
@@ -133,7 +165,7 @@ class NeuralTimbreConverter:
             logger.error(f"Neural offline render: unexpected failure: {e}")
             return None
         finally:
-            self._inflight_lock.release()
+            self._track_lock.release()
 
 
 def _encode_wav(audio: np.ndarray, sample_rate: int) -> io.BytesIO:
