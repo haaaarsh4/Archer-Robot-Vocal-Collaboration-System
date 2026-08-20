@@ -69,10 +69,20 @@ class RVCOfflineVoice:
     _hubert_cache: dict = {}  # device-str -> loaded HuBERT model, shared across all voices
     _hubert_lock = threading.Lock()
 
-    def __init__(self, model_path: str, index_path: str | None = None, device: str = "cpu"):
+    def __init__(self, model_path: str, index_path: str | None = None, device: str = "cpu",
+                 is_half: bool = False):
         self.device = torch.device(device)
         self.model_path = model_path
         self.index_path = index_path
+        # fp16 only ever makes sense on CUDA/ROCm -- on CPU it's typically
+        # *slower* (no fast fp16 kernels) and the standard RVC-project
+        # behavior is to force it off there regardless of what's asked for.
+        self.is_half = bool(is_half) and self.device.type == "cuda"
+        # int8 dynamic quantization is applied to HuBERT whenever we're on
+        # CPU (see the hubert-loading block below) -- tracked here so
+        # /health can report it truthfully instead of the UI just seeing
+        # "device: cpu" and assuming the slow, unoptimized path.
+        self.quantized = self.device.type == "cpu"
 
         cpt = torch.load(model_path, map_location="cpu")
         cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]
@@ -86,7 +96,7 @@ class RVCOfflineVoice:
                 f"Unsupported checkpoint combination: version={self.version!r}, f0={self.if_f0!r}"
             )
 
-        self.net_g = synth_cls(*cpt["config"], is_half=False)
+        self.net_g = synth_cls(*cpt["config"], is_half=self.is_half)
         del self.net_g.enc_q  # only needed for training; matches rtrvc.get_synthesizer()
 
         load_result = self.net_g.load_state_dict(cpt["weight"], strict=False)
@@ -97,7 +107,7 @@ class RVCOfflineVoice:
                 f"unexpected_keys={load_result.unexpected_keys}"
             )
 
-        self.net_g = self.net_g.float().eval().to(self.device)
+        self.net_g = (self.net_g.half() if self.is_half else self.net_g.float()).eval().to(self.device)
         self.net_g.remove_weight_norm()
         self.tgt_sr = cpt["config"][-1]
 
@@ -107,10 +117,22 @@ class RVCOfflineVoice:
             self.index = faiss.read_index(index_path)
             self.big_npy = self.index.reconstruct_n(0, self.index.ntotal)
 
-        key = str(self.device)
+        # cache key includes is_half now -- a half-precision HuBERT and a
+        # full-precision HuBERT on the same device are NOT interchangeable
+        # (mixing dtypes into net_g would silently corrupt or crash), so
+        # they need to be cached and reused separately.
+        key = f"{self.device}:{'half' if self.is_half else 'float'}"
         with RVCOfflineVoice._hubert_lock:
             if key not in RVCOfflineVoice._hubert_cache:
-                RVCOfflineVoice._hubert_cache[key] = load_hubert_model(self.device, is_half=False)
+                hubert = load_hubert_model(self.device, is_half=self.is_half)
+                if self.device.type == "cpu":
+                    # int8 dynamic quantization on CPU -- real 2-4x speedup on
+                    # HuBERT's linear layers, the actual bottleneck. GPU path
+                    # doesn't need this (fp16 already covers that speedup).
+                    hubert = torch.quantization.quantize_dynamic(
+                        hubert, {torch.nn.Linear}, dtype=torch.qint8
+                    )
+                RVCOfflineVoice._hubert_cache[key] = hubert
             self.hubert = RVCOfflineVoice._hubert_cache[key]
 
     def convert(
@@ -135,7 +157,8 @@ class RVCOfflineVoice:
         if pad_16k > 0:
             audio_16k = np.pad(audio_16k, (pad_16k, pad_16k), mode="reflect")
 
-        audio_16k_t = torch.from_numpy(audio_16k).float().to(self.device)
+        audio_16k_t = torch.from_numpy(audio_16k).to(self.device)
+        audio_16k_t = audio_16k_t.half() if self.is_half else audio_16k_t.float()
 
         feats_in = audio_16k_t.view(1, -1)
         padding_mask = torch.zeros(feats_in.shape, dtype=torch.bool, device=self.device)
@@ -145,18 +168,25 @@ class RVCOfflineVoice:
             feats0 = feats.clone()  
             
         if self.index is not None and index_rate > 0:
-            npy = feats[0].cpu().numpy().astype("float32")
+            # faiss search always wants fp32 regardless of model precision --
+            # cast down for the lookup, then back up to the model's dtype.
+            npy = feats[0].float().cpu().numpy().astype("float32")
             score, ix = self.index.search(npy, k=8)
             if (ix >= 0).all():
                 weight = np.square(1 / np.maximum(score, 1e-9))
                 weight /= weight.sum(axis=1, keepdims=True)
                 npy = np.sum(self.big_npy[ix] * np.expand_dims(weight, axis=2), axis=1)
                 retrieved = torch.from_numpy(npy.astype("float32")).unsqueeze(0).to(self.device)
+                retrieved = retrieved.half() if self.is_half else retrieved.float()
                 feats = retrieved * index_rate + (1 - index_rate) * feats
 
         p_len = audio_16k_t.shape[0] // 160
         pitch = pitchf = None
         if self.if_f0:
+            # RMVPE stays fp32 internally regardless of the generator's
+            # precision (rmvpe_detector.py's own is_half flag is separate
+            # and independently configured) -- audio_16k here is still the
+            # original numpy float32 array, untouched by the cast above.
             f0 = rmvpe.infer(audio_16k, thred=0.03)
             f0 = f0 * pow(2.0, f0_up_key / 12.0)
             if len(f0) < p_len:
@@ -175,8 +205,13 @@ class RVCOfflineVoice:
             f0_mel = np.clip(f0_mel, 1, 255)
             f0_coarse = np.rint(f0_mel).astype(np.int64)
 
+            # pitch = coarse-bin INDICES into an embedding table -- always
+            # stays int64 regardless of precision mode (embedding lookups
+            # don't have a "half" dtype). pitchf = the continuous Hz curve
+            # fed into the generator's math -- this one follows self.is_half.
             pitch = torch.from_numpy(f0_coarse).unsqueeze(0).to(self.device)
             pitchf = torch.from_numpy(f0.astype(np.float32)).unsqueeze(0).to(self.device)
+            pitchf = pitchf.half() if self.is_half else pitchf.float()
 
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
         p_len = min(feats.shape[1], p_len)

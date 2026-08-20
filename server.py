@@ -484,6 +484,20 @@ except Exception as e:
     print("This is non-fatal — the pipeline runs on pure DSP synthesis without it.")
 
 
+# Local chatbot: RAG over song notes + a local LLM, with optional spoken
+# replies (Piper TTS) and "sing my idea" (RVC, and optionally DiffSinger).
+# Everything it touches is local/offline -- see chat/chat_api.py. Mounted
+# as its own router so a chatbot failure (e.g. Ollama not running yet)
+# never prevents the rest of the app from starting.
+try:
+    from chat.chat_api import router as chat_router
+    app.include_router(chat_router)
+    print("Chat router mounted at /api/chat (backend readiness checked lazily on first call).")
+except Exception as e:
+    print(f"Chat router not mounted: {e}")
+    print("This is non-fatal -- the rest of the app runs without the chatbot.")
+
+
 @app.get("/")
 def index():
     return FileResponse(str(FRONTEND_DIR / "index.html"))
@@ -875,13 +889,35 @@ def neural_status():
             {"loaded": False, "enabled": False, "error": neural_timbre_load_error},
             status_code=200,
         )
-    return {
+    status = {
         "loaded": True,
         "enabled": neural_timbre.enabled,
         "sidecar_url": neural_timbre.sidecar_url,
         "sidecar_reachable": neural_timbre._reachable,
         "voices_configured": neural_timbre.num_voices_configured,
     }
+    # Forward the sidecar's own /health detail (device actually in use,
+    # per-voice warm-up time, quantized y/n) so the frontend can show real
+    # numbers before anyone presses Play, instead of that only being
+    # visible in a terminal. This machine's GPU (Phoenix3/gfx1103 laptop
+    # iGPU) isn't ROCm-supported, so "device" here will correctly read
+    # cpu -- this is honest reporting, not a fallback to apologize for.
+    # Best-effort and fast-timeout: this endpoint should never hang or
+    # fail just because that extra detail isn't reachable.
+    if neural_timbre.enabled and neural_timbre._reachable:
+        try:
+            import requests as _requests
+            resp = _requests.get(f"{neural_timbre.sidecar_url}/health", timeout=1.5)
+            resp.raise_for_status()
+            sidecar_health = resp.json()
+            status["device_detail"] = {
+                "torch_cuda_available": sidecar_health.get("torch_cuda_available"),
+                "torch_version": sidecar_health.get("torch_version"),
+                "voices": sidecar_health.get("voices", []),
+            }
+        except Exception:
+            pass  # non-fatal -- the basic status above is still returned
+    return status
 
 
 class RenderNoteRequest(BaseModel):
@@ -1004,7 +1040,7 @@ def render_neural_note(req: RenderNoteRequest):
 
 
 def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: str, voice_index: int,
-                           mode_override: str | None = None) -> bytes:
+                           mode_override: str | None = None, instruments_enabled: bool = True) -> bytes:
     """
     Runs entirely inside a worker thread (see the asyncio.to_thread call
     in render_neural_track below) -- this is real, potentially slow, CPU
@@ -1017,6 +1053,18 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     in-memory buffer instead of a live mic queue, with no real-time
     budget and no per-note single-flight drop -- every note that the
     harmony engine decides to sing gets synthesized and included.
+
+    instruments_enabled=False is the server-side half of the Live Demo's
+    "Sing along with instruments" toggle. The toggle previously only
+    gated the real-time DSP-mode playback path in the browser
+    (demoProgressLoop/pollOfflinePitchAtTime) -- it had no effect at all
+    here, because Full Render mode never touches that code; it runs this
+    completely separate offline pipeline instead, entirely server-side,
+    with its own independent pitch analysis. Without this, the toggle
+    being off did nothing for Full Render, which is exactly the bug
+    being fixed: turning it off must also stop the drum hits detected in
+    THIS loop from being sung and sent to the neural sidecar, not just
+    the ones detected during real-time playback.
     """
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
@@ -1037,6 +1085,24 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     if in_sr != sample_rate:
         audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
+
+    # Computed once, up front, over the whole track -- the same tested
+    # onset-density detector already used for the Sentiment tab's
+    # [instrumental / percussion] transcript labels and the pitch-
+    # timeline endpoint above. Cheap relative to everything else this
+    # function already does (framewise pitch detection + DSP synthesis +
+    # a full neural sidecar pass), so computing it even when
+    # instruments_enabled is True costs nothing worth skipping it for.
+    percussive_spans: list = []
+    if not instruments_enabled:
+        try:
+            window_s = min(2.0, max(0.5, len(audio) / sample_rate))
+            percussive_spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=0.6)
+        except Exception as e:
+            print(f"[neural render] percussive detection skipped: {e}")
+
+    def _in_percussive_span(t: float) -> bool:
+        return any(start <= t <= end for start, end in percussive_spans)
 
     preproc = Preprocessor()
     pitch = PitchDetector()
@@ -1071,7 +1137,10 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
         if is_voiced:
             pitch_input = frame if pitch.method == "rmvpe" else clean
             hz, conf = pitch.detect(pitch_input)
-            if hz:
+            if hz and not (percussive_spans and _in_percussive_span(i * frame_size / sample_rate)):
+                # Same treatment as "no pitch detected this frame" --
+                # the harmony engine's existing silence/rest handling
+                # takes it from here, no special case needed downstream.
                 archer_hz = hz
             phoneme_profile = cree.analyze(clean)
         else:
@@ -1118,6 +1187,7 @@ async def render_neural_track(
     pitch_method: str = Form("rmvpe"),
     voice_index: int = Form(0),
     mode: str = Form(""),
+    instruments_enabled: bool = Form(True),
 ):
     """
     Offline ("bounce") neural render for the Upload-MP3 demo panel's
@@ -1146,7 +1216,7 @@ async def render_neural_track(
     try:
         raw = await file.read()
         wav_bytes = await asyncio.to_thread(
-            _render_track_offline, raw, pitch_method, texture, voice_index, (mode or None)
+            _render_track_offline, raw, pitch_method, texture, voice_index, (mode or None), instruments_enabled
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
@@ -1154,7 +1224,8 @@ async def render_neural_track(
         return JSONResponse({"error": f"Render failed: {e}"}, status_code=500)
 
 
-def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int) -> bytes:
+def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds: float | None = None,
+                           instruments_enabled: bool = True) -> bytes:
     """
     Sends the uploaded track's ACTUAL audio straight through the trained
     RVC voice model -- no harmony engine, no VocableSynthesizer, no
@@ -1169,13 +1240,30 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int) -> bytes:
     track you uploaded -- the output IS the track, re-voiced, not a
     second part layered on top of it.
 
+    instruments_enabled=False is the Live Demo's "Sing along with
+    instruments" toggle. A previous fix wired this into
+    _render_track_offline, on the reasoning that instrumental content
+    should just never get a generated note to sing in the first place --
+    correct for that function, but that function turns out to not be the
+    one actually running here. This is: demoVoiceContent is a hardcoded
+    'direct' constant on the frontend now (an older toggle that used to
+    switch between the two was removed), so the Neural engine always
+    takes THIS path, and this function has no "note" to skip -- it
+    converts a raw waveform, whatever's in it, vocals and drums alike.
+    The fix here has to be different: detect percussive spans in the
+    source audio (same tested onset-density detector as everywhere else)
+    and silence them before HuBERT/RMVPE/the generator ever see that
+    audio, so there's nothing there for RVC to convert into a voice.
+
     Note: if the uploaded file has instrumental backing mixed in with the
     vocals (i.e. it's a normal song, not an isolated vocal stem), that
     backing gets fed into HuBERT too. RVC-Project's own docs recommend an
     isolated vocal stem for best results -- this function doesn't do that
-    separation for you, it converts exactly the audio you sent it. If
+    separation for you, it converts exactly the audio you sent it (minus
+    silenced percussive spans, if instruments_enabled is False). If
     results are muddy, running the file through a vocal separator (UVR5,
-    Demucs, etc.) first and uploading just the vocal stem will help a lot.
+    Demucs, etc.) first and uploading just the vocal stem will help a lot
+    more than the percussive gate alone can.
     """
     from config.config_loader import get_config
     import librosa
@@ -1190,8 +1278,46 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int) -> bytes:
         audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
+    if not instruments_enabled:
+        try:
+            duration_s = len(audio) / sample_rate
+            window_s = min(2.0, max(0.5, duration_s))
+            # min_duration_s scales down for short buffers -- Live mode
+            # sends this function only a few seconds of audio per chunk,
+            # not a whole track, and the 0.6s floor used elsewhere would
+            # never fire on a 2-3s chunk. Never below 0.2s: shorter than
+            # that starts silencing legitimate short vocal transients
+            # (consonants, quick ornaments) instead of only the sustained
+            # rhythmic content this detector is actually built to catch.
+            min_duration_s = max(0.2, min(0.6, duration_s / 4))
+            spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=min_duration_s)
+            if spans:
+                # A hard cut to zero at each span edge clicks audibly --
+                # a short linear fade in/out around the boundary keeps
+                # the silencing itself inaudible as a click, distinct
+                # from (and much cheaper than) a real crossfade.
+                fade_samples = int(0.02 * sample_rate)  # 20ms
+                for start_s, end_s in spans:
+                    start_i = max(0, int(start_s * sample_rate))
+                    end_i = min(len(audio), int(end_s * sample_rate))
+                    if end_i <= start_i:
+                        continue
+                    audio[start_i:end_i] = 0.0
+                    fo = min(fade_samples, start_i)
+                    if fo > 0:
+                        audio[start_i - fo:start_i] *= np.linspace(1.0, 0.0, fo, dtype=np.float32)
+                    fi = min(fade_samples, len(audio) - end_i)
+                    if fi > 0:
+                        audio[end_i:end_i + fi] *= np.linspace(0.0, 1.0, fi, dtype=np.float32)
+                print(f"[convert-track direct] instruments disabled: silenced {len(spans)} percussive "
+                      f"span(s) totaling {sum(e - s for s, e in spans):.1f}s before RVC conversion")
+        except Exception as e:
+            print(f"[convert-track direct] percussive detection skipped: {e}")
+
     timeout_s = float(cfg.get("synthesis", {}).get("neural", {}).get("offline_render_timeout_s", 900))
-    converted = neural_timbre.convert_blocking(audio, sample_rate, voice_index=voice_index, timeout_s=timeout_s)
+    converted = neural_timbre.convert_blocking(
+        audio, sample_rate, voice_index=voice_index, timeout_s=timeout_s, pad_seconds=pad_seconds
+    )
     if converted is None:
         raise RuntimeError(
             "Neural sidecar conversion failed or timed out — check that neural_env/rvc_server.py "
@@ -1207,6 +1333,8 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int) -> bytes:
 async def convert_neural_track(
     file: UploadFile = File(...),
     voice_index: int = Form(0),
+    pad_seconds: float | None = Form(None),
+    instruments_enabled: bool = Form(True),
 ):
     """
     Direct RVC conversion of the uploaded file's own audio -- the 'give
@@ -1219,6 +1347,19 @@ async def convert_neural_track(
     matter what voice model you point it at -- there were never words in
     what it was converting. This endpoint skips all of that and sends
     your uploaded audio's own content straight through RVC instead.
+
+    pad_seconds: optional override for the reflect-padding added on each
+    side before HuBERT/RMVPE/the generator run (see rvc_pipeline.py). The
+    sidecar's configured default (usually 1.0s) is tuned for whole-track
+    quality, where 2s of total padding is negligible next to a multi-
+    minute file. For a short streaming chunk from the Upload-MP3 demo's
+    Live mode, that same 2s can be a large fraction of the chunk's own
+    length -- the frontend passes a smaller value for those calls
+    specifically, to cut real, measurable latency off of exactly the
+    calls where latency is most noticeable. Full-track requests (Full
+    render, or this same endpoint called with the whole file) omit it
+    and get the configured default, since quality matters more than
+    latency for a one-time render.
     """
     if neural_timbre is None or not neural_timbre.enabled or not neural_timbre._reachable:
         return JSONResponse(
@@ -1229,7 +1370,9 @@ async def convert_neural_track(
         )
     try:
         raw = await file.read()
-        wav_bytes = await asyncio.to_thread(_convert_track_direct, raw, voice_index)
+        wav_bytes = await asyncio.to_thread(
+            _convert_track_direct, raw, voice_index, pad_seconds, instruments_enabled
+        )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
         print(f"[neural direct convert error] {e}")
@@ -1324,7 +1467,28 @@ def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
         hz_timeline.append(round(hz, 2) if hz else None)
         conf_timeline.append(round(float(conf), 3) if hz else None)
 
-    return {"frame_time_s": frame_time_s, "hz": hz_timeline, "confidence": conf_timeline}
+    # Reuses the same onset-density detector built for the Sentiment
+    # tab's [drums]/[instrumental] transcript labels (see
+    # _detect_percussive_spans below) instead of building a second,
+    # separate detector -- this is the same underlying question either
+    # way ("is there a steady rhythmic pulse here"), just answered once
+    # per uploaded track and handed back alongside the pitch timeline so
+    # the frontend's instruments toggle has something to gate on. No
+    # extra decode cost: `audio` is already the whole track, already
+    # decoded, from the pitch analysis just above.
+    try:
+        window_s = min(2.0, max(0.5, len(audio) / sample_rate))
+        perc_spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=0.6)
+    except Exception as e:
+        print(f"[pitch analyze] percussive detection skipped: {e}")
+        perc_spans = []
+
+    return {
+        "frame_time_s": frame_time_s,
+        "hz": hz_timeline,
+        "confidence": conf_timeline,
+        "percussive_spans": [{"start": s, "end": e} for s, e in perc_spans],
+    }
 
 
 @app.post("/api/pitch/analyze-track")
