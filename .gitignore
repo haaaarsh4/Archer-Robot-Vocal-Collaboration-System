@@ -1,18 +1,34 @@
+# Python virtual environments
 .venv/
-neural_env/.venv/
+venv/
+env/
+neural_env/
 
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-data/models
-data/models/sentiment-roberta/
-neural_env/assets/hubert_base/
+# ML models and model weights
+data/models/
 assets/rmvpe/
-data/models/whisper/
 assets/synthesis_models/
+
 *.pt
 *.pth
 *.bin
 *.safetensors
+*.ckpt
+*.onnx
 
+# Model/cache directories
+.cache/
+huggingface/
+**/models--*/
+
+# Generated audio
+*.wav
+*.mp3
+*.flac
+
+# macOS
 .DS_Store
