@@ -2,7 +2,6 @@
 .venv/
 venv/
 env/
-neural_env/
 
 # Python cache
 __pycache__/
@@ -12,6 +11,7 @@ __pycache__/
 data/models/
 assets/rmvpe/
 assets/synthesis_models/
+assets/female2/
 
 *.pt
 *.pth
@@ -25,10 +25,10 @@ assets/synthesis_models/
 huggingface/
 **/models--*/
 
-# Generated audio
-*.wav
-*.mp3
-*.flac
+# audio files
+synthesis/VocalSet11
+synthesis/source_takes
+synthesis/(DSP) Robot Vocals
 
 # macOS
 .DS_Store
