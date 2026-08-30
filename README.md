@@ -105,10 +105,6 @@ archer_robot/
 └── download_rvc_core_models.py     # downloads the universal RVC assets (hubert_base.pt, rmvpe.pt)
 ```
 
-A note on `main.py`: it has been removed, and that is correct, not a bug. Its old job, listing audio devices and running the mic only pipeline, is now handled inside `server.py` itself, through `GET /devices` and `POST /pipeline/start` / `/pipeline/stop`. If you see old instructions anywhere that say `python main.py`, they are out of date.
-
----
-
 ## Setup
 
 **You will need:** Python 3.11 or newer, and `ffmpeg` on your system path (used to decode uploaded audio tracks).
