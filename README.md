@@ -46,7 +46,6 @@ mic -> AudioCapture -> Preprocessor -> PitchDetector (yin/rmvpe)
 - **Harmony engine.** Decides the musical response (interval, mode, texture, number of voices) based on what the singer is doing, the tempo, and where phrases begin and end. It also includes a configurable sound cue that can trigger a silence response.
 - **Vocable synthesizer.** The DSP layer (sinusoidal, wavetable, or formant synthesis) always works with zero extra setup. Its output can then be routed through a neurally trained voice.
 - **Neural voice conversion (RVC).** This runs as its own separate process on purpose. `rvc_server.py` is a local sidecar (`http://127.0.0.1:8801` by default) so a heavy PyTorch and RVC stack never blocks the real time audio loop. `server.py` calls it over HTTP per note when `synthesis.neural.enabled` is `true`, and falls back to plain DSP audio automatically if the sidecar is down or a voice fails to load. Check `/neural/status` on the main app and `/health` on the sidecar itself.
-  - One honest limitation, straight from the code: the neural stage currently re-skins the whole mixed DSP ensemble through one trained voice, not each choir layer separately. A true multi-timbre neural choir would need the synthesizer to expose per-voice audio stems before mixing. That is a real gap in the current version, not a bug.
 
 ### The web app's other tools
 
