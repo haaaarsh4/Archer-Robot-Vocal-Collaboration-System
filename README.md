@@ -104,6 +104,7 @@ archer_robot/
 ├── download_sentiment_model.py     # downloads the RoBERTa sentiment model
 └── download_rvc_core_models.py     # downloads the universal RVC assets (hubert_base.pt, rmvpe.pt)
 ```
+---
 
 ## Setup
 
