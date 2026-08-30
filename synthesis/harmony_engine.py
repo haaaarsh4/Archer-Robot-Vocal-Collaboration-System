@@ -1,4 +1,5 @@
 import time
+import random
 import collections
 from dataclasses import dataclass
 from typing import Optional
@@ -72,6 +73,16 @@ class HarmonyEngine:
         self.texture_params = TextureParams(cfg)
         self._texture_override: Optional[VoiceTexture] = None
 
+        # Vocable pools for _choose_vocable(). "common" is what gets used
+        # almost all the time, "rare" is the special-occasion set, and
+        # rare_chance is how often, per NEW NOTE (not per frame -- see the
+        # locking logic in decide()), a rare one gets picked instead.
+        synth_cfg = cfg.get("synthesis", {})
+        self._vocable_common = synth_cfg.get("vocable_set", ["aah", "ooo", "mmm", "hey"])
+        self._vocable_rare = synth_cfg.get("vocable_rare_set", [])
+        self._vocable_rare_chance = float(synth_cfg.get("vocable_rare_chance", 0.0))
+        self._locked_vocable: str | None = None
+
         # Rolling pitch history to infer key
         self._pitch_history: collections.deque = collections.deque(maxlen=32)
         self._current_key_root: int = 0
@@ -85,6 +96,13 @@ class HarmonyEngine:
         self._current_decision: HarmonyDecision | None = None
         self._frames_on_current_note: int = 0
         self._max_frames_per_note: int = 200  # safety cap
+
+        # Hysteresis for note-onset detection (see _resolve_action) -- a
+        # pitch shift has to hold for 2 consecutive frames before it's
+        # treated as a genuinely new note, so a single noisy/vibrato frame
+        # can't retrigger the synthesizer mid-note.
+        self._pending_note_hz: float | None = None
+        self._pending_note_frames: int = 0
 
         # Legacy manual-interval override (see INTERVALS above). Off by default.
         self._manual_override = False
@@ -169,19 +187,31 @@ class HarmonyEngine:
 
         target_hz = self._finalize_pitch(proposal, mode)
 
-        # Choose vocable based on phoneme profile
-        vocable = self._choose_vocable(phoneme_profile)
+        # Note duration: however many beats this mode wants to hold, clipped to a sane max.
+        duration = min(max(proposal.hold_beats, 0.25) * beat_duration_s, 4.0)
+
+        action = self._resolve_action(proposal, target_hz)
+
+        # Vocable is only re-rolled when a genuinely new note starts, and
+        # held steady for every "sustain" frame of that same note. The old
+        # per-frame reroll made sense back when a vocable was just a vowel
+        # color (aah/ooo/mmm/hey) that could drift smoothly within a note.
+        # Now that a vocable can be a whole pre-recorded word or phrase
+        # (neural_wavetable engine), rerolling every frame would mean
+        # switching words dozens of times a second mid-note, which is not
+        # what you want. This is also what makes vocable_rare_chance mean
+        # what it sounds like it means: a chance per NOTE, not per frame.
+        if action == "sing":
+            self._locked_vocable = self._choose_vocable(phoneme_profile)
+        elif action == "rest":
+            self._locked_vocable = None
+        vocable = self._locked_vocable or self._choose_vocable(phoneme_profile)
 
         # Blend Cree phoneme influence into timbre params
         influence = getattr(phoneme_profile, "influence", 0.0) or 0.0
         vowel_color = 0.5 * (1 - influence) + phoneme_profile.vowel_color * influence
         nasality    = phoneme_profile.nasality * influence
         brightness  = 0.5 * (1 - influence) + phoneme_profile.brightness * influence
-
-        # Note duration: however many beats this mode wants to hold, clipped to a sane max.
-        duration = min(max(proposal.hold_beats, 0.25) * beat_duration_s, 4.0)
-
-        action = self._resolve_action(proposal, target_hz)
 
         texture = self._texture_override or DEFAULT_TEXTURE.get(mode, VoiceTexture.SOLO)
         layer = self.texture_params.get(texture)
@@ -251,20 +281,65 @@ class HarmonyEngine:
 
         return target_hz
 
+    # A genuinely new note is roughly a semitone or more away from the
+    # currently-sustained one. Comparing in cents (not raw Hz) makes this
+    # threshold mean the same thing at 100 Hz and at 800 Hz -- a fixed Hz
+    # gap is a huge musical interval low down and a tiny sliver of a
+    # semitone up high, so it fired inconsistently across a singer's range.
+    NOTE_CHANGE_THRESHOLD_CENTS = 70.0
+
     def _resolve_action(self, proposal: ModeProposal, target_hz: Optional[float]) -> str:
         if proposal.action == "rest" or target_hz is None or target_hz <= 0:
             self._frames_on_current_note = 0
+            self._pending_note_hz = None
+            self._pending_note_frames = 0
             return "rest"
 
-        is_new_note = (
+        no_prior_note = (
             self._current_decision is None
             or self._current_decision.action == "rest"
-            or abs(target_hz - self._current_decision.target_hz) > 5.0
+            or self._current_decision.target_hz is None
+            or self._current_decision.target_hz <= 0
+        )
+
+        if no_prior_note:
+            self._frames_on_current_note = 0
+            self._pending_note_hz = None
+            self._pending_note_frames = 0
+            return "sing"
+
+        cents_diff = abs(1200.0 * np.log2(target_hz / self._current_decision.target_hz))
+        pitch_moved = cents_diff > self.NOTE_CHANGE_THRESHOLD_CENTS
+
+        # Require the pitch shift to show up on two consecutive frames
+        # before treating it as a real new note, not one noisy frame of
+        # vibrato/pitch-detector jitter. A single stray frame just resets
+        # the pending counter instead of restarting the whole note --
+        # every genuine held note, at any real singer's vibrato depth,
+        # would otherwise get chopped into dozens of overlapping restarts
+        # (this was the actual cause of the "broken and weird" output --
+        # each restart re-synthesizes and additively stacks a full note
+        # on top of the ones still ringing from a few frames earlier).
+        if pitch_moved:
+            if self._pending_note_hz is not None and \
+                    abs(1200.0 * np.log2(target_hz / self._pending_note_hz)) <= self.NOTE_CHANGE_THRESHOLD_CENTS:
+                self._pending_note_frames += 1
+            else:
+                self._pending_note_hz = target_hz
+                self._pending_note_frames = 1
+        else:
+            self._pending_note_hz = None
+            self._pending_note_frames = 0
+
+        is_new_note = (
+            self._pending_note_frames >= 2
             or self._frames_on_current_note >= self._max_frames_per_note
         )
 
         if is_new_note:
             self._frames_on_current_note = 0
+            self._pending_note_hz = None
+            self._pending_note_frames = 0
             return "sing"
 
         self._frames_on_current_note += 1
@@ -344,19 +419,29 @@ class HarmonyEngine:
             logger.error(f"Key inference error: {e}")
 
     def _choose_vocable(self, profile: PhonemeProfile) -> str:
-        if profile is None or profile.influence < 0.1:
-            defaults = ["aah", "ooo", "mmm", "hey"]
-            idx = len(self._pitch_history) % len(defaults)
-            return defaults[idx]
+        if profile is not None and profile.influence >= 0.1:
+            # Cree phoneme profile is actively steering timbre, keep it in
+            # charge of vocable too. Note: this path still hands back one
+            # of the four original vowel names (aah/ooo/mmm/hey) regardless
+            # of what's in vocable_set/vocable_rare_set. That's an existing
+            # rough edge, not something this change touches, it only
+            # matters if cree_tokenizer.enabled gets turned on.
+            if profile.vowel_color < 0.25:
+                return "hey"
+            elif profile.vowel_color < 0.5:
+                return "aah"
+            elif profile.vowel_color < 0.75:
+                return "ooo"
+            else:
+                return "mmm"
 
-        if profile.vowel_color < 0.25:
-            return "hey"
-        elif profile.vowel_color < 0.5:
+        if self._vocable_rare and self._vocable_rare_chance > 0 and random.random() < self._vocable_rare_chance:
+            return random.choice(self._vocable_rare)
+
+        if not self._vocable_common:
             return "aah"
-        elif profile.vowel_color < 0.75:
-            return "ooo"
-        else:
-            return "mmm"
+        idx = len(self._pitch_history) % len(self._vocable_common)
+        return self._vocable_common[idx]
 
     def set_interval(self, interval: str):
         if interval in self.INTERVALS:

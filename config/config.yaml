@@ -67,12 +67,48 @@ protocol:
   physical_cue_gpio_pin: null            
 
 synthesis:
-  engine: sinusoidal
+  engine: neural_wavetable     # was "sinusoidal" -- now uses the pre-rendered neural takes
+                                # in synthesis/samples/neural/, built by build_vocable_bank.py,
+                                # instead of the pure formant/sine-wave synthesizer. Falls back
+                                # to sinusoidal automatically if that folder is empty.
+                                #
+                                # IMPORTANT re: the female2 swap below -- this engine does NOT
+                                # call the RVC sidecar live. It plays back WAV files that were
+                                # already rendered once, ahead of time, by build_vocable_bank.py,
+                                # using whatever model_paths/index_paths were set in config.yaml
+                                # AT THE TIME THAT SCRIPT WAS RUN. Changing model_paths here does
+                                # nothing to files that already exist in synthesis/samples/neural/
+                                # -- they're baked, not regenerated on the fly. See the note below
+                                # synthesis.neural for what you need to do about that.
+
+  # The "everyday" vocables -- these are what gets picked almost all the
+  # time. HarmonyEngine._choose_vocable() rotates through this list.
   vocable_set:
-    - aah
-    - ooo
-    - mmm
-    - hey
+    - Lalanana
+    - ohoho
+
+  # The special-occasion vocables -- picked instead of the list above only
+  # vocable_rare_chance of the time, per NOTE (not per frame). Match these
+  # names exactly to your .wav filenames in synthesis/source_takes/ and
+  # synthesis/samples/neural/ (minus the .wav).
+  vocable_rare_set:
+    - cold
+    - moon
+    - need
+    - remember
+    - snow
+    - shell
+    - voyage
+    - "welcome to reality"
+    - "you know you're going to feel it"
+
+  # 0.02 = 2% chance per new note. That's roughly 1 in every 50 notes sung,
+  # so depending on tempo, maybe once every 20-40 seconds of continuous
+  # singing. Drop this to 0.005-0.01 if even that feels too frequent once
+  # you hear it live -- it's cheap to tune, just rerun with a new value,
+  # no rebuild needed.
+  vocable_rare_chance: 0.02
+
   crossfade_ms: 30
   ddsp_model_path: null
   timbral_detune_cents: 6                # chorus-style detune used by timbral_thickening mode
@@ -90,15 +126,18 @@ synthesis:
                                   # Staying on CPU -- the real fix is int8 HuBERT quantization
                                   # (rvc_pipeline.py) + correct thread count (rvc_server.py), not
                                   # a GPU that was never going to safely work here.
-    is_half: false                # fp16 has no benefit on CPU
-    pitch_algo: rmvpe            # RVC's pitch tracker; rmvpe is the current best general choice
-    index_rate: 0.66             # RVC retrieval-blend amount
-    protect: 0.33                # protects unvoiced consonants/breath from being over-converted
-    transpose_semitones: 0       # leave at 0 — our DSP source is already at the correct pitch
-    max_latency_warn_s: 0.5      # back to a CPU-realistic threshold
-    model_paths:                 # one entry per choir "singer" — was pointing at a placeholder path, updated to the actual trained model from the screenshot
+    is_half: false
+    pitch_algo: rmvpe
+    index_rate: 0.75
+    protect: 0.33
+    transpose_semitones: [0, 0]
+    filter_radius: 3
+    max_latency_warn_s: 0.5
+    model_paths:
+      - "assets/female2/female2.pth"
       - "assets/synthesis_models/mi-test.pth"
-    index_paths:                 # parallel to model_paths — updated to match
+    index_paths:
+      - "assets/female2/female2_added_IVF1701_Flat_nprobe_1_female2_v2.index"
       - "assets/synthesis_models/mi-test_added_IVF1003_Flat_nprobe_1_mi-test_v2.index"
     offline_render_timeout_s: 900  # max wait for the ONE whole-track sidecar call used by
                                     # the Upload-MP3 panel's Neural (offline render) mode --

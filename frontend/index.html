@@ -1396,6 +1396,13 @@
   #archer-chat-panel { left: 12px; right: 12px; width: auto; bottom: 84px; }
   #archer-chat-fab { right: 16px; bottom: 16px; }
 }
+  .download-icon-btn {
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    padding: 2px 4px; font-size: 15px; line-height: 1; opacity: 0.75;
+    transition: opacity 0.15s ease;
+  }
+  .download-icon-btn:hover:not(:disabled) { opacity: 1; }
+  .download-icon-btn:disabled { opacity: 0.3; cursor: default; }
 </style>
 </head>
 <body>
@@ -3144,6 +3151,16 @@
         </div>
         <span id="demo-voice-engine-status" style="font-size: 11px; color: var(--muted); margin-left: 8px;"></span>
       </div>
+      <div id="demo-voice-model-toggle" style="display: none; align-items: center; margin-bottom: 16px;">
+        <span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Voice model:</span>
+        <div class="interval-picker" style="margin: 0; display: inline-flex;">
+          <button class="interval-btn active" data-voiceidx="0" onclick="setDemoVoiceIndex(0, this)">Model 1</button>
+          <button class="interval-btn" data-voiceidx="1" onclick="setDemoVoiceIndex(1, this)">Model 2</button>
+        </div>
+        <span style="font-size: 12px; color: var(--muted); margin-left: 16px; margin-right: 4px;">Pitch shift:</span>
+        <input type="range" id="demo-transpose-slider" min="-24" max="24" step="1" value="0" oninput="setDemoTranspose(this.value)" style="width: 120px;">
+        <span id="demo-transpose-value" style="font-size: 11px; color: var(--muted); margin-left: 6px; font-family: var(--mono);">0 st</span>
+      </div>
       <div id="demo-neural-mode-toggle" style="display: flex; align-items: center; margin-bottom: 16px;">
         <span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Neural mode:</span>
         <div class="interval-picker" style="margin: 0; display: inline-flex;">
@@ -3182,6 +3199,7 @@
               <span id="time-current">0:00</span>
               <span id="track-name" style="color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 180px;"></span>
               <span id="time-total">0:00</span>
+              <button id="download-btn" class="download-icon-btn" onclick="downloadDemoRender()" disabled title="Download rendered audio">&#8681;</button>
             </div>
           </div>
           <div class="demo-controls">
@@ -3279,6 +3297,13 @@
         </div>
         <span id="demo-mic-voice-engine-status" style="font-size: 11px; font-family: var(--mono); color: var(--muted);"></span>
       </div>
+      <div style="display: none; align-items: center; gap: 10px; margin: 0 0 16px 0;" id="demo-mic-voice-model-row">
+        <span style="font-size: 12px; color: var(--muted);">Voice model:</span>
+        <div class="mode-picker" style="margin: 0;" id="demo-mic-voice-model-toggle">
+          <button class="mode-btn active" data-voiceidx="0" onclick="setDemoVoiceIndex(0, this)">Model 1</button>
+          <button class="mode-btn" data-voiceidx="1" onclick="setDemoVoiceIndex(1, this)">Model 2</button>
+        </div>
+      </div>
       <div class="demo-panel-body">
         <div class="demo-panel-col mic-visual" style="padding: 0;">
           <button class="big-mic-btn" id="demo-mic-btn" onclick="toggleDemoMic()">&#127908;</button>
@@ -3360,8 +3385,24 @@ if (localStorage.getItem('theme') === 'dark') {
 const PAGE_TO_ROUTE = { home: '/', architecture: '/architecture', harmony: '/harmony', synthesis: '/synthesis', translation: '/sentiment', chat: '/chat', demo: '/live-demo' };
 const ROUTE_TO_PAGE = { '': 'home', 'architecture': 'architecture', 'harmony': 'harmony', 'synthesis': 'synthesis', 'sentiment': 'translation', 'chat': 'chat', 'live-demo': 'demo' };
 
+// Every mic-owning panel (Architecture, Harmony, Live Demo, Sentiment's
+// live captions) has its own proper stop function, but switching tabs
+// via showPage() never called any of them, so a mic started on one tab
+// kept streaming in the background no matter which tab you moved to
+// after. This stops all of them on every navigation. Each stop function
+// already guards on its own "is anything actually active" state, so
+// calling one that wasn't running is a safe no-op.
+function stopAllMicSessions() {
+  try { if (typeof stopArchMic === 'function') stopArchMic(); } catch (e) {}
+  try { if (typeof stopHarmonyMic === 'function') stopHarmonyMic(); } catch (e) {}
+  try { if (typeof stopDemoMic === 'function') stopDemoMic(); } catch (e) {}
+  try { if (typeof stopCreeMic === 'function') stopCreeMic(); } catch (e) {}
+}
+
 function showPage(name, updateUrl = true) {
   if (!document.getElementById('page-' + name)) name = 'home';
+
+  stopAllMicSessions();
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -3801,7 +3842,14 @@ function _pitchAnalysisSignature() {
 // Kicks off (or reuses) the offline analysis for the currently uploaded
 // file. Safe to call repeatedly -- it no-ops if a matching timeline is
 // already cached or a matching analysis is already in flight.
+//
+// Gated on demoPlayArmed: dropping a file or switching the pitch engine
+// to RMVPE used to trigger this immediately, hitting the backend before
+// Play was ever clicked. demoPlayArmed only flips true from inside the
+// actual play handlers, so nothing here talks to the server until Play
+// has genuinely been pressed at least once for the current file.
 async function ensureDemoPitchTimeline() {
+  if (!demoPlayArmed) return;
   if (!demoUploadedFile) return;
   const sig = _pitchAnalysisSignature();
   if (demoPitchTimeline && demoPitchTimelineSignature === sig) {
@@ -5027,13 +5075,41 @@ let demoNeuralBridge = null; // bridges detected note onsets to /api/neural/rend
 // ------------------------------------------------------------
 let demoVoiceEngine = 'dsp';          // 'dsp' | 'neural'
 let demoUploadedFile = null;          // the raw File, kept so it can be re-POSTed for a neural render
+let demoPlayArmed = false;            // flips true the first time Play is actually clicked for this
+                                       // file -- ensureDemoPitchTimeline() checks this so nothing
+                                       // hits the backend just from dropping a file or picking RMVPE
 let demoNeuralRenderedBuffer = null;  // decoded AudioBuffer of the last successful render
-let demoNeuralRenderSignature = null; // identifies which (file, texture, pitch method) it was rendered for
+let demoNeuralRenderSignature = null; // identifies which (file, texture, pitch method, MODEL) it was rendered for
+let demoNeuralModelFingerprint = null; // last-seen model identity from /neural/status -- see _getNeuralModelFingerprint
+let demoVoiceIndex = 0;
+let demoTransposeSemitones = 0;
 let demoNeuralRenderInFlight = false;
 let demoNeuralRenderAbort = null;     // AbortController for the in-flight fetch, so Stop can cancel a render
 let demoNeuralSource = null;          // BufferSourceNode playing the rendered track (first layer, kept for back-compat checks)
 let demoNeuralSources = [];           // all active layers when Voice Texture is duet/choir in direct mode
 let demoNeuralGain = null;            // gain node for demoNeuralSource, driven by the ROBOT VOLUME slider
+let demoDspRenderedBuffer = null;     // separate render cache for DSP mode -- DSP doesn't call the neural
+let demoDspRenderSignature = null;    // sidecar at all, so it has no model/voice-index/transpose concept;
+let demoDspRenderInFlight = false;    // keeping this fully separate from the Neural cache above means
+let demoDspRenderAbort = null;        // switching Robot voice can never accidentally play the wrong engine's audio
+
+function setDemoVoiceIndex(idx, btn) {
+  if (demoIsPlaying) stopAudio();
+  demoVoiceIndex = idx;
+  document.querySelectorAll('#demo-voice-model-toggle .interval-btn, #demo-mic-voice-model-toggle .mode-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.voiceidx, 10) === idx);
+  });
+  demoNeuralRenderedBuffer = null;
+  demoNeuralRenderSignature = null;
+  if (micLiveStreamer) { _stopMicNeuralLive(); if (micIsRunning && micVoiceEngine === 'neural') _startMicNeuralLive(); }
+}
+
+function setDemoTranspose(val) {
+  demoTransposeSemitones = parseInt(val, 10);
+  document.getElementById('demo-transpose-value').textContent = (demoTransposeSemitones > 0 ? '+' : '') + demoTransposeSemitones + ' st';
+  demoNeuralRenderedBuffer = null;
+  demoNeuralRenderSignature = null;
+}
 
 function setDemoVoiceEngine(engine, btn) {
   if (demoIsPlaying) stopAudio();  // switching engines mid-playback would leave two contradicting robot voices
@@ -5041,9 +5117,13 @@ function setDemoVoiceEngine(engine, btn) {
   btn.closest('#demo-voice-engine-toggle').querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('demo-voice-engine-status').textContent = '';
-  // Live/Full-render only means anything on the neural path -- DSP has
-  // no trained voice model to convert real audio through at all, it
-  // always sings the generated accompaniment part regardless of this.
+  // The Voice model / Pitch shift row only ever means anything on the
+  // neural path -- DSP has no trained voice model to convert real audio
+  // through at all, it always sings the generated accompaniment part
+  // regardless of this. Fully hidden (not just disabled) for DSP, so
+  // it's never sitting there implying it does something it doesn't.
+  document.getElementById('demo-voice-model-toggle').style.display = (engine === 'dsp') ? 'none' : 'flex';
+  // Live/Full-render only means anything on the neural path too.
   // Disabled, not hidden, same convention as every other engine-gated
   // control on this page -- so it's never a mystery where it went.
   document.querySelectorAll('#demo-neural-mode-toggle .interval-btn').forEach(b => {
@@ -5165,11 +5245,49 @@ function setDemoNeuralMode(mode, btn) {
   _abortPitchTimelineIfNotNeeded();
 }
 
+// Which voice checkpoint the sidecar actually has loaded right now --
+// asked fresh before every render (not cached across renders) so that
+// restarting the sidecar with a different model/config.yaml is enough on
+// its own to invalidate any previously-cached render in THIS tab. Before
+// this existed, _neuralRenderSignature had zero awareness of which model
+// a render came from: swap the model server-side without reloading the
+// page, press Play again with identical file/settings, and the frontend
+// would just replay the OLD model's cached audio buffer, never even
+// hitting the network -- indistinguishable from "the model swap did
+// nothing" even when it actually worked correctly server-side.
+// Requires rvc_server.py's /health to report each voice's model_path
+// (see the note in _neuralRenderSignature below) -- falls back to a
+// constant placeholder if that field isn't present yet, which keeps this
+// from crashing on an older backend but also means the cache-busting
+// this exists for silently doesn't happen until that field is added.
+async function _getNeuralModelFingerprint(voiceIndex = 0) {
+  try {
+    const resp = await fetch('/neural/status');
+    const data = await resp.json();
+    const voice = data?.device_detail?.voices?.[voiceIndex];
+    const fingerprint = voice?.model_path || voice?.model_fingerprint;
+    demoNeuralModelFingerprint = fingerprint || null;
+    return demoNeuralModelFingerprint;
+  } catch (e) {
+    return demoNeuralModelFingerprint; // keep whatever we last knew rather than forcing a re-render on a transient network hiccup
+  }
+}
+
 function _neuralRenderSignature() {
   if (!demoUploadedFile) return null;
+  const modelPart = (demoNeuralModelFingerprint || 'unknown-model') + '#' + demoVoiceIndex + '#' + demoTransposeSemitones;
   if (demoVoiceContent === 'direct') {
-    return [demoUploadedFile.name, demoUploadedFile.size, 'direct', demoInstrumentsEnabled].join('|');
+    return [demoUploadedFile.name, demoUploadedFile.size, 'direct', demoInstrumentsEnabled, modelPart].join('|');
   }
+  return [demoUploadedFile.name, demoUploadedFile.size, demoTexture, demoPitchMode, demoMode, demoInstrumentsEnabled, modelPart].join('|');
+}
+
+// DSP mode's own signature, deliberately not sharing _neuralRenderSignature():
+// DSP never calls the neural sidecar, so voice model / voice index / transpose
+// are meaningless to it -- including them would just cause pointless re-renders
+// every time someone changes the Neural voice selector while DSP is selected.
+function _dspRenderSignature() {
+  if (!demoUploadedFile) return null;
   return [demoUploadedFile.name, demoUploadedFile.size, demoTexture, demoPitchMode, demoMode, demoInstrumentsEnabled].join('|');
 }
 
@@ -5272,14 +5390,19 @@ function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   demoUploadedFile = file;              // kept around so a Neural render can re-POST the raw bytes later
+  demoPlayArmed = false;                 // new file, needs its own explicit Play click before anything analyzes
   demoNeuralRenderedBuffer = null;      // any previous render belonged to a different file -- invalidate it
   demoNeuralRenderSignature = null;
+  demoDspRenderedBuffer = null;         // same for the DSP engine's own cached render
+  demoDspRenderSignature = null;
+  document.getElementById('download-btn').disabled = true;
   demoPitchTimeline = null;             // same for any previously analyzed pitch timeline
   demoPitchTimelineSignature = null;
   if (demoPitchAnalysisAbort) { demoPitchAnalysisAbort.abort(); demoPitchAnalysisAbort = null; }
   const reader = new FileReader();
   reader.onload = async (ev) => {
     if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (demoAudioCtx.state === 'suspended') demoAudioCtx.resume();  // belt-and-suspenders -- a suspended context produces total, error-free silence
     demoAudioBuffer = await demoAudioCtx.decodeAudioData(ev.target.result);
     document.getElementById('audio-player').classList.add('visible');
     document.getElementById('play-btn').disabled = false;
@@ -5626,6 +5749,12 @@ function drawWaveformVis(ab) {
 
 function togglePlay() {
   if (demoIsPlaying) { pauseAudio(); return; }
+  // This is the one real entry point for the Play button, DSP and Neural
+  // both funnel through here, so it's also the right place to arm
+  // demoPlayArmed -- everything gated on that flag (the offline RMVPE
+  // pre-analysis) only starts talking to the backend from this point on,
+  // never just from dropping a file or picking an engine.
+  demoPlayArmed = true;
   // Fires the very first time Play is actually pressed for this file --
   // not on upload (see handleFileUpload/_resetDemoTranscriptSentimentUI),
   // and the guard here means resuming after a pause doesn't re-trigger
@@ -5636,12 +5765,13 @@ function togglePlay() {
     runDemoTranscriptSentiment(demoUploadedFile);
   }
   if (demoVoiceEngine === 'neural') playAudioNeural();
-  else playAudio();
+  else playAudioDsp();
 }
 
 function playAudio() {
   if (!demoAudioBuffer) return;
   if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (demoAudioCtx.state === 'suspended') demoAudioCtx.resume();  // belt-and-suspenders -- a suspended context produces total, error-free silence
   demoSource = demoAudioCtx.createBufferSource();
   demoSource.buffer = demoAudioBuffer;
   demoAnalyser = demoAudioCtx.createAnalyser();
@@ -5772,11 +5902,12 @@ const DEMO_LIVE_PAD_SECONDS = 0.3;
 // playback pump() below and by the speculative prefetch, so there's
 // exactly one code path for "turn this audio into converted audio" --
 // no chance of the two drifting apart.
-async function _convertAudioChunkViaNeural(float32, sr, voiceIndex = '0', padSeconds = DEMO_LIVE_PAD_SECONDS, audioCtx = demoAudioCtx) {
+async function _convertAudioChunkViaNeural(float32, sr, voiceIndex = null, padSeconds = DEMO_LIVE_PAD_SECONDS, audioCtx = demoAudioCtx) {
   const blob = _encodeWavBlob(float32, sr);
   const form = new FormData();
   form.append('file', blob, 'chunk.wav');
-  form.append('voice_index', voiceIndex);
+  form.append('voice_index', voiceIndex === null ? String(demoVoiceIndex) : voiceIndex);
+  form.append('transpose_semitones', String(demoTransposeSemitones));
   if (padSeconds != null) form.append('pad_seconds', String(padSeconds));
   form.append('instruments_enabled', demoInstrumentsEnabled ? 'true' : 'false');
   const resp = await fetch('/api/neural/convert-track', { method: 'POST', body: form });
@@ -6014,6 +6145,9 @@ function _stopDemoLiveStreamer() {
 async function playAudioNeural() {
   if (!demoAudioBuffer || !demoUploadedFile) return;
   if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (demoAudioCtx.state === 'suspended') demoAudioCtx.resume();  // belt-and-suspenders -- a suspended context produces total, error-free silence
+
+  await _getNeuralModelFingerprint(demoVoiceIndex);
 
   if (demoNeuralMode === 'live') {
     _playDemoNeuralLive();
@@ -6039,7 +6173,8 @@ async function playAudioNeural() {
   try {
     const form = new FormData();
     form.append('file', demoUploadedFile);
-    form.append('voice_index', '0');
+    form.append('voice_index', String(demoVoiceIndex));
+    form.append('transpose_semitones', String(demoTransposeSemitones));
 
     let endpoint = '/api/neural/render-track';
     if (demoVoiceContent === 'direct') {
@@ -6069,6 +6204,7 @@ async function playAudioNeural() {
     const decoded = await demoAudioCtx.decodeAudioData(arrayBuf);
     demoNeuralRenderedBuffer = decoded;
     demoNeuralRenderSignature = sig;
+    document.getElementById('download-btn').disabled = false;
     statusEl.textContent = 'Render complete.';
     _startNeuralPlayback();
   } catch (e) {
@@ -6085,12 +6221,80 @@ async function playAudioNeural() {
   }
 }
 
+// Replaces the old client-side-only DSP playback (VoiceEnsemble, a
+// JavaScript reimplementation of the synthesis idea that never touched
+// your real Python pipeline). Calls /api/dsp/render-track instead: the
+// real PitchDetector, RhythmAnalyzer, HarmonyEngine, and
+// VocableSynthesizer, exactly the ones running your neural_wavetable
+// bank, with no RVC sidecar step and no voice-model concept -- DSP mode
+// doesn't select a trained voice, that's a Neural-only idea.
+async function playAudioDsp() {
+  if (!demoAudioBuffer || !demoUploadedFile) return;
+  if (!demoAudioCtx) demoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (demoAudioCtx.state === 'suspended') demoAudioCtx.resume();
+
+  const sig = _dspRenderSignature();
+  if (demoDspRenderedBuffer && demoDspRenderSignature === sig) {
+    _startNeuralPlayback(demoDspRenderedBuffer);
+    return;
+  }
+  if (demoDspRenderInFlight) return;
+
+  demoDspRenderInFlight = true;
+  const statusEl = document.getElementById('demo-voice-engine-status');
+  const playBtn  = document.getElementById('play-btn');
+  playBtn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Rendering with your real synthesis engine\u2026 one moment.';
+
+  demoDspRenderAbort = new AbortController();
+  try {
+    const form = new FormData();
+    form.append('file', demoUploadedFile);
+    form.append('texture', demoTexture);
+    form.append('pitch_method', demoPitchMode === 'rmvpe' ? 'rmvpe' : 'yin');
+    form.append('mode', demoMode);
+    form.append('instruments_enabled', demoInstrumentsEnabled ? 'true' : 'false');
+
+    const resp = await fetch('/api/dsp/render-track', {
+      method: 'POST',
+      body: form,
+      signal: demoDspRenderAbort.signal,
+    });
+
+    if (!resp.ok) {
+      let msg = 'DSP render failed.';
+      try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (e) {}
+      if (statusEl) statusEl.textContent = msg;
+      return;
+    }
+
+    const arrayBuf = await resp.arrayBuffer();
+    const decoded = await demoAudioCtx.decodeAudioData(arrayBuf);
+    demoDspRenderedBuffer = decoded;
+    demoDspRenderSignature = sig;
+    document.getElementById('download-btn').disabled = false;
+    if (statusEl) statusEl.textContent = 'Render complete.';
+    _startNeuralPlayback(demoDspRenderedBuffer);
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      if (statusEl) statusEl.textContent = 'Render cancelled.';
+    } else {
+      console.error('[dsp track render] failed:', e);
+      if (statusEl) statusEl.textContent = 'DSP render failed -- check the server logs.';
+    }
+  } finally {
+    demoDspRenderInFlight = false;
+    demoDspRenderAbort = null;
+    playBtn.disabled = false;
+  }
+}
+
 // Actually starts playback once a rendered buffer exists for the
 // current (file, texture, pitch method) combination -- used both right
 // after a fresh render and on replay/seek, where the buffer is reused
 // instead of re-rendering.
-function _startNeuralPlayback() {
-  if (!demoAudioBuffer || !demoNeuralRenderedBuffer) return;
+function _startNeuralPlayback(renderedBuffer = demoNeuralRenderedBuffer) {
+  if (!demoAudioBuffer || !renderedBuffer) return;
 
   // Full-render playback drives demoProgressLoop() same as DSP, which
   // reads source pitch from this timeline when RMVPE is selected -- make
@@ -6141,7 +6345,7 @@ function _startNeuralPlayback() {
   const playStartTime = demoAudioCtx.currentTime;
   for (const layer of texLayers) {
     const src = demoAudioCtx.createBufferSource();
-    src.buffer = demoNeuralRenderedBuffer;
+    src.buffer = renderedBuffer;
     src.detune.value = layer.detuneCents + modeParams.detuneCents;
 
     let chainEnd = src;
@@ -6352,6 +6556,7 @@ function stopAudio() {
   // rendering) instead of letting it finish and try to play into a
   // demo that's since been stopped/reset.
   if (demoNeuralRenderAbort) { demoNeuralRenderAbort.abort(); demoNeuralRenderAbort = null; }
+  if (demoDspRenderAbort) { demoDspRenderAbort.abort(); demoDspRenderAbort = null; }
   if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
   demoNeuralSources.forEach(s => { try { s.stop(); } catch(e){} });
   demoNeuralSources = [];
@@ -6385,6 +6590,71 @@ function stopAudio() {
   demoTracker.reset(); demoRmvpeHold = createRemotePitchHold();
 }
 
+// Encodes an AudioBuffer to a standard 16-bit PCM WAV Blob, entirely
+// client-side, no external library. Real MP3 encoding needs an actual
+// encoder (e.g. lamejs) this page doesn't currently load -- WAV is
+// lossless and plays natively everywhere (browsers, phones, WhatsApp,
+// Discord) with zero new dependencies, so that's what this produces.
+function _audioBufferToWavBlob(buffer) {
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const numFrames = buffer.length;
+  const bytesPerSample = 2; // 16-bit
+  const blockAlign = numChannels * bytesPerSample;
+  const dataSize = numFrames * blockAlign;
+
+  const arrayBuf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(arrayBuf);
+
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  const channelData = [];
+  for (let ch = 0; ch < numChannels; ch++) channelData.push(buffer.getChannelData(ch));
+
+  let offset = 44;
+  for (let i = 0; i < numFrames; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const sample = Math.max(-1, Math.min(1, channelData[ch][i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([arrayBuf], { type: 'audio/wav' });
+}
+
+function downloadDemoRender() {
+  // Deliberately does not fall back to the other engine's buffer if the
+  // currently selected one hasn't been rendered yet -- that would
+  // silently hand back the wrong engine's audio.
+  const buffer = demoVoiceEngine === 'neural' ? demoNeuralRenderedBuffer : demoDspRenderedBuffer;
+  if (!buffer) return;
+
+  const blob = _audioBufferToWavBlob(buffer);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'archer_robot.wav';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function seekAudio(e) {
   if (!demoAudioBuffer) return;
   const rect = e.currentTarget.getBoundingClientRect();
@@ -6398,11 +6668,12 @@ function seekAudio(e) {
   updateDemoTranscriptHighlight(demoOffset);
   if (demoIsPlaying) {
     pauseAudio();
-    // Neural mode replays the already-rendered buffer at the new offset
-    // rather than re-rendering the whole track just to seek.
+    // Neural and DSP modes both replay their already-rendered buffer at
+    // the new offset rather than re-rendering the whole track just to seek.
     if (demoVoiceEngine === 'neural' && demoNeuralRenderedBuffer) _startNeuralPlayback();
     else if (demoVoiceEngine === 'neural') playAudioNeural();
-    else playAudio();
+    else if (demoVoiceEngine !== 'neural' && demoDspRenderedBuffer) _startNeuralPlayback(demoDspRenderedBuffer);
+    else playAudioDsp();
   } else {
     document.getElementById('progress-inner').style.width = (pct*100) + '%';
   }
@@ -6556,6 +6827,25 @@ function demoProgressLoop() {
   let hz = null;
   if (demoPitchMode === 'rmvpe') {
     hz = pollOfflinePitchAtTime(demoPitchTimeline, elapsed, demoTracker, demoRmvpeHold);
+    if (hz === null && rms > 0.003) {
+      // The offline RMVPE analysis isn't ready yet, or it failed, or its
+      // cached timeline doesn't actually cover this playback for some
+      // other reason. Previously that meant hz just stayed null for the
+      // rest of the track, no fallback at all, which meant the robot's
+      // gain (below) never left 0 for the whole song. Falling back to
+      // the same live YIN detection the other pitch engine uses means a
+      // slow or broken offline analysis degrades the accompaniment
+      // instead of silencing it completely.
+      const detected = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
+      if (detected && detected >= 65 && detected < 1200) {
+        let skipAsPercussive = false;
+        if (!demoInstrumentsEnabled && demoFreqBuf) {
+          demoAnalyser.getFloatFrequencyData(demoFreqBuf);
+          skipAsPercussive = isLikelyPercussiveFrame(demoFreqBuf);
+        }
+        if (!skipAsPercussive) hz = demoTracker.push(detected);
+      }
+    }
   } else if (rms > 0.003) {
     const detected = yinPitch(demoPitchBuf, demoAudioCtx.sampleRate, 0.15);
     if (detected && detected >= 65 && detected < 1200) {
@@ -6692,6 +6982,9 @@ function setMicVoiceEngine(engine, btn) {
   btn.closest('#demo-mic-voice-engine-toggle').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('demo-mic-voice-engine-status').textContent = '';
+  // Same reasoning as the upload panel: DSP never touches a trained
+  // voice model, so the row shouldn't be visible while DSP is selected.
+  document.getElementById('demo-mic-voice-model-row').style.display = (engine === 'dsp') ? 'none' : 'flex';
 
   if (!micIsRunning) return; // engine choice takes effect whenever the mic is (re)started -- see toggleDemoMic
 
@@ -7029,7 +7322,7 @@ function _startMicNeuralLive() {
     const statusEl = document.getElementById('demo-mic-voice-engine-status');
     try {
       statusEl.textContent = `Converting chunk ${chunkNum}\u2026`;
-      const audioBuf = await _convertAudioChunkViaNeural(float32, sr, '0', DEMO_LIVE_PAD_SECONDS, micAudioCtx);
+      const audioBuf = await _convertAudioChunkViaNeural(float32, sr, null, DEMO_LIVE_PAD_SECONDS, micAudioCtx);
       if (streamer._stopped) return;
       const src = micAudioCtx.createBufferSource();
       src.buffer = audioBuf;
