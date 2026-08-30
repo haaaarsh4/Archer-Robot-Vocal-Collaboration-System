@@ -261,16 +261,6 @@ All settings live in `config/config.yaml`. A few of the most important ones:
 
 ---
 
-## Running tests
-
-```bash
-pytest tests/test_pipeline.py -v
-```
-
-Tests run without a microphone, using synthetic audio, so you do not need any hardware to check that the pipeline logic itself is working.
-
----
-
 ## A note on hardware
 
 If you are running this on a laptop with an integrated GPU (for example, an AMD Phoenix or Radeon iGPU), keep `device: cpu` for both `pitch.rmvpe` and `synthesis.neural` in `config.yaml`. These chips generally are not officially supported by ROCm, and the usual workaround to force GPU use is a known hard hang on at least one commonly used chip. CPU performance is kept reasonable through int8 HuBERT quantization and explicit thread count tuning in `rvc_server.py`. That is a deliberate design choice, not a fallback someone forgot to fix.
