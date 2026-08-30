@@ -34,6 +34,8 @@ class VocableSynthesizer:
 
         self._ddsp_model = None
         self._wavetable_samples: dict[str, np.ndarray] = {}
+        self._neural_bank = None   # set up in _init_engine() if synthesis.engine == "neural_wavetable"
+        self._warned_unknown_vocables: set = set()
 
         self._crossfade_samples = int(self.crossfade_ms * self.sample_rate / 1000)
         self._prev_audio: np.ndarray | None = None  # for crossfading
@@ -51,7 +53,34 @@ class VocableSynthesizer:
             self._load_ddsp_model()
         elif self.engine == "wavetable":
             self._load_wavetable_samples()
+        elif self.engine == "neural_wavetable":
+            self._load_neural_bank()
         logger.info(f"Vocable synthesizer engine: {self.engine}")
+
+    # Loads pre-rendered, already RVC-converted vocable takes (see
+    # synthesis/build_vocable_bank.py) and gets them ready for fast
+    # runtime pitch shifting. No neural inference happens here or at
+    # play time, the conversion already happened offline.
+    def _load_neural_bank(self):
+        try:
+            from synthesis.neural_vocable_bank import NeuralVocableBank
+        except ImportError as e:
+            logger.error(f"neural_wavetable engine selected but neural_vocable_bank.py "
+                          f"couldn't be imported ({e}) — falling back to sinusoidal.")
+            self.engine = "sinusoidal"
+            return
+
+        samples_dir = Path(__file__).parent / "samples" / "neural"
+        self._neural_bank = NeuralVocableBank(samples_dir, self.sample_rate)
+
+        if not self._neural_bank.available:
+            logger.warning(
+                "neural_wavetable engine selected but no converted samples were "
+                f"found at {samples_dir}. Run synthesis/build_vocable_bank.py first "
+                "(see its docstring). Falling back to sinusoidal for now."
+            )
+            self.engine = "sinusoidal"
+            self._neural_bank = None
 
     # Loads pre-recorded WAV files from synthesis/samples/
     def _load_wavetable_samples(self):
@@ -171,6 +200,13 @@ class VocableSynthesizer:
 
     def _render_voice(self, decision, n_samples: int, voice_index: int,
                        f0_hz: float, formant_scale: float) -> np.ndarray:
+        if self.engine == "neural_wavetable" and self._neural_bank is not None:
+            audio = self._neural_bank.get(decision.vocable, f0_hz, n_samples)
+            if audio is not None:
+                return audio
+            # Bank has nothing loaded for this vocable at all (not just a
+            # cache miss, get() already handles those). Fall through just
+            # this once rather than going silent.
         if self.engine == "wavetable":
             return self._synthesize_wavetable(decision, n_samples)
         return self._synthesize_sinusoidal(decision, n_samples, voice_index=voice_index,
@@ -213,6 +249,21 @@ class VocableSynthesizer:
 
         vocable = "mmm" if is_humming else decision.vocable
         vc = decision.vowel_color
+        if vocable not in self.FORMANTS and vocable != "mmm" and vocable not in self._warned_unknown_vocables:
+            # Only the original four vowels (aah/ooo/mmm/hey) have a real
+            # formant profile. Any other vocable, e.g. anything from a
+            # neural_wavetable bank that isn't currently loaded, silently
+            # became "aah" here before with zero trace of why. Logging it
+            # once per unique vocable (not per note -- this can otherwise
+            # fire dozens of times a second) turns a confusing wrong sound
+            # into an obvious, explainable one -- if you see this while
+            # neural_wavetable is meant to be active, its bank likely
+            # isn't actually loaded (check for "neural_wavetable engine
+            # selected but no converted samples were found" in the log).
+            logger.warning(f"Sinusoidal engine has no formant profile for vocable '{vocable}' "
+                            "-- substituting 'aah'. This is expected only when the configured "
+                            "engine has fallen back to sinusoidal.")
+            self._warned_unknown_vocables.add(vocable)
         table = self.FORMANTS.get(vocable, self.FORMANTS["aah"])
         bright, dark = table["bright"], table["dark"]
         formant_freqs = [(b * (1 - vc) + d * vc) * formant_scale for b, d in zip(bright, dark)]

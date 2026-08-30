@@ -30,19 +30,6 @@ app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 @app.on_event("startup")
 async def _prewarm_rmvpe():
-    """
-    Loads RMVPE into the process-wide model cache (see PitchDetector's
-    _RMVPE_MODEL_CACHE) at server startup instead of on the first request
-    that actually needs it. Without this, whichever click happens to be
-    first -- toggling RMVPE, hitting Play, starting a mic -- eats the
-    one-time load cost live, which on a short demo clip can mean the whole
-    clip finishes before RMVPE ever reports a single note. Every load
-    after this one hits the cache and is instant regardless of prewarm.
-
-    Set pitch.rmvpe.prewarm: false in config.yaml to skip this (e.g. if
-    you never use RMVPE and don't want the torch import / checkpoint read
-    slowing down server startup).
-    """
     from config.config_loader import get_config
     cfg = get_config()
     if not cfg.get("pitch", {}).get("rmvpe", {}).get("prewarm", True):
@@ -61,16 +48,12 @@ async def _prewarm_rmvpe():
         except Exception as e:
             print(f"[startup] RMVPE pre-warm failed: {e}")
 
-    # Runs in a background thread so it doesn't delay the server actually
-    # starting to accept connections -- YIN and everything else works
-    # immediately either way; RMVPE just becomes fast a few seconds sooner.
     threading.Thread(target=_load, daemon=True).start()
 
 broadcast_queue: _queue.Queue = _queue.Queue(maxsize=64)
 pipeline_running = False
 pipeline_stop_event = threading.Event()
 
-# Detect whether local audio hardware is available
 AUDIO_AVAILABLE = False
 try:
     import pyaudio as _pyaudio
@@ -80,7 +63,6 @@ try:
 except Exception:
     pass
 
-# Load the trained Cree -> English translation model once at startup
 translator = None
 translator_load_error = None
 try:
@@ -94,49 +76,11 @@ except Exception as e:
           "spm_config.json exist relative to your project root.")
 
 
-# Sentiment scorer, two backends:
-#
-# PRIMARY: cardiffnlp/twitter-roberta-base-sentiment-latest -- a real
-# trained neural network (125M-parameter RoBERTa), fine-tuned by the
-# CardiffNLP research group on ~124 million tweets for 3-class sentiment
-# (negative/neutral/positive), released on HuggingFace. This is a genuine,
-# widely-used, dataset-trained classifier, not a lexicon lookup -- it reads
-# a whole sentence's context (negation, sarcasm markers, word order),
-# something a word-by-word dictionary like VADER structurally cannot do.
-# Downloads its weights (~500MB) from huggingface.co on first run and
-# caches them locally after that.
-#
-# FALLBACK: VADER (a lexicon + hand-coded-rules tool, not ML -- see below)
-# for environments with no internet access to huggingface.co, e.g. an
-# offline server or a sandboxed CI job. Which one actually ran is reported
-# in every response as "engine", so this is never silently degraded.
 sentiment_analyzer = None            # VADER instance, if loaded
 sentiment_load_error = None
 roberta_sentiment = None             # transformers pipeline, if loaded
 roberta_load_error = None
 
-# Sentiment scorer, two backends:
-#
-# PRIMARY: cardiffnlp/twitter-roberta-base-sentiment-latest -- a real
-# trained neural network (125M-parameter RoBERTa), fine-tuned by the
-# CardiffNLP research group on ~124 million tweets for 3-class sentiment
-# (negative/neutral/positive). This is a genuine, widely-used, dataset-
-# trained classifier, not a lexicon lookup -- it reads a whole sentence's
-# context (negation, sarcasm markers, word order), something a word-by-word
-# dictionary like VADER structurally cannot do.
-#
-# server.py NEVER downloads this model itself and makes no network calls
-# for it, at startup or per-request. It only loads from SENTIMENT_MODEL_DIR
-# on disk, with local_files_only=True enforced explicitly -- so if that
-# directory is missing or incomplete, this fails immediately and falls
-# back to VADER rather than silently attempting a network fetch. Run
-# download_sentiment_model.py once, separately, before starting the
-# server, to populate that directory.
-#
-# FALLBACK: VADER (a lexicon + hand-coded-rules tool, not ML -- see below)
-# for whenever the local model directory isn't there. Which one actually
-# ran is reported in every response as "engine", so this is never silently
-# degraded without you knowing.
 SENTIMENT_MODEL_DIR = "data/models/sentiment-roberta"
 
 sentiment_analyzer = None            # VADER instance, if loaded
@@ -203,23 +147,6 @@ def _roberta_valence(text: str):
 
 
 def score_sentiment(text: str, vocal: dict = None) -> dict:
-    """
-    Real (not canned) valence + heuristic arousal for one English sentence,
-    plus the same musical/LED mapping the frontend has always used for the
-    hand-authored CREE_EXAMPLES. Kept here, not in the frontend, so the
-    mapping only lives in one place once the model driving it is real.
-
-    `vocal`, if given, is real signal-derived features from the actual
-    recorded audio (see /api/analyze): pitch_range_semitones (from this
-    project's own RMVPE/YIN pitch engine via /api/pitch/analyze-track) and
-    rms_mean / rms_variance (loudness, from the raw waveform). These are
-    blended into arousal only -- wider pitch range and louder, more
-    dynamic singing reads as more aroused, which is well-supported by
-    vocal-emotion research (Scherer et al.). Valence stays text-only: there
-    is no comparably reliable way to get valence out of solo vocal audio
-    with signal processing alone (no harmony/key reference to read
-    major/minor from), so this deliberately doesn't pretend to.
-    """
     text = (text or "").strip()
     if not text:
         return {"error": "No text provided"}
@@ -236,13 +163,6 @@ def score_sentiment(text: str, vocal: dict = None) -> dict:
     else:
         return {"error": f"No sentiment backend loaded. RoBERTa: {roberta_load_error}. VADER: {sentiment_load_error}"}
 
-    # Arousal heuristic (v1, not itself a trained signal, regardless of
-    # which valence engine ran above):
-    #  - emotional charge: how far the active engine is from calling this
-    #    neutral at all (RoBERTa's 1-P(neutral), or VADER's pos+neg)
-    #  - intensifier words ("very", "so", "never"...)
-    #  - exclamation marks / ALL-CAPS words as emphasis markers
-    #  - shorter, punchier sentences read as more intense than long ones
     words = text.split()
     intensifier_hits = sum(1 for w in words if w.strip(".,!?").lower() in _INTENSIFIERS)
     exclaim = text.count("!")
@@ -259,9 +179,6 @@ def score_sentiment(text: str, vocal: dict = None) -> dict:
 
     audio_arousal = None
     if vocal:
-        # pitch_range_semitones: 0-24 (two octaves) mapped to 0-1. Louder
-        # (rms_mean, already 0-1) and more dynamically varied (rms_variance)
-        # singing both read as more aroused too.
         pitch_component = max(0.0, min(1.0, (vocal.get("pitch_range_semitones") or 0.0) / 24.0))
         loudness_component = max(0.0, min(1.0, vocal.get("rms_mean") or 0.0))
         dynamics_component = max(0.0, min(1.0, (vocal.get("rms_variance") or 0.0) * 8.0))
@@ -313,36 +230,8 @@ def score_sentiment(text: str, vocal: dict = None) -> dict:
     }
 
 
-# Server-side speech-to-text via Whisper, loaded from local files only --
-# same no-network-in-server.py pattern as the sentiment model above. This
-# replaces the browser's built-in webkitSpeechRecognition entirely: that
-# API only works in official Google Chrome/Edge (it silently streams audio
-# to Google's servers using a private API key open-source Chromium/Brave/
-# Firefox/Safari don't have), which makes it fundamentally unreliable
-# across browsers -- not a bug fixable from this page's JavaScript.
-# Transcribing on our own server instead means the browser's only job is
-# "record audio, send it here" -- works identically everywhere.
 WHISPER_MODEL_DIR = "data/models/whisper"
 
-# Two separate faster-whisper configs, not one: a live mic phrase and an
-# uploaded full track have fundamentally different latency budgets. An
-# earlier version of this file used large-v3-turbo everywhere on the
-# theory that turbo is "fast enough" -- and on a GPU or a strong modern
-# CPU it usually is, but on modest CPU-only hardware (no GPU here, per
-# this project's ALSA/JACK startup warnings), an 809M-parameter model
-# doing beam_size=5 decoding can genuinely take minutes for a single
-# short phrase. That's fine for a one-time track upload where a minute
-# of wait is acceptable; it's not fine for a live conversation where
-# every single phrase pays that cost. So:
-#   - MIC_MODEL_SIZE stays small and fast -- every phrase in the live
-#     Sentiment-tab pipeline goes through this one.
-#   - TRACK_MODEL_SIZE stays large and accurate -- only the Live Demo's
-#     "Upload an MP3" whole-track analysis pays its slower per-request
-#     cost, and that's a single request per upload, not one per phrase.
-# If your hardware turns out to handle large-v3-turbo quickly (a decent
-# modern CPU with AVX512-VNNI, or any GPU), you can point MIC_MODEL_SIZE
-# at it too -- this split is a default informed by "3-4 minutes per
-# phrase" being reported, not a hard technical ceiling.
 MIC_WHISPER_MODEL_SIZE = "small.en"
 MIC_WHISPER_MODEL_DIR = "data/models/faster-whisper-small.en"
 TRACK_WHISPER_MODEL_SIZE = "large-v3-turbo"
@@ -350,14 +239,6 @@ TRACK_WHISPER_MODEL_DIR = "data/models/faster-whisper-large-v3-turbo"
 
 
 def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpoint: str):
-    """Loads one faster-whisper config, falling back to the legacy
-    openai-whisper checkpoint if faster-whisper isn't set up. Returns
-    (model, backend_kind, load_error) -- backend_kind is "faster",
-    "openai", or None if nothing loaded. Called twice at startup (once
-    per model tier above) so both configs are fully loaded and warm
-    before the server accepts its first request -- no model ever loads
-    lazily inside a request handler, which is what caused the multi-
-    minute stall the mic-path PANNs loader used to have (see below)."""
     if os.path.isdir(model_dir):
         try:
             from faster_whisper import WhisperModel
@@ -394,43 +275,16 @@ whisper_model_mic, whisper_backend_mic, whisper_load_error_mic = _load_faster_wh
 whisper_model_track, whisper_backend_track, whisper_load_error_track = _load_faster_whisper_backend(
     TRACK_WHISPER_MODEL_SIZE, TRACK_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint
 )
-# If the accurate track model isn't set up yet, fall back to whatever
-# the mic model is rather than leaving track uploads broken entirely.
 if whisper_model_track is None and whisper_model_mic is not None:
     print("Track-upload model not available; falling back to the mic model for /api/transcribe/annotated too "
           "(less accurate than large-v3-turbo would be -- run download_faster_whisper_model.py to fix this).")
     whisper_model_track, whisper_backend_track = whisper_model_mic, whisper_backend_mic
 
-# Kept for anything (health checks, older code paths) that still wants
-# a single "is Whisper loaded at all" signal.
 whisper_model = whisper_model_mic or whisper_model_track
 whisper_backend = whisper_backend_mic or whisper_backend_track
 whisper_load_error = whisper_load_error_mic or whisper_load_error_track
 
 
-# Vosk: a real local, real-time streaming ASR engine (Kaldi-based),
-# separate from Whisper entirely. Whisper -- either backend above -- can
-# only transcribe a complete audio clip you hand it; it has no notion of
-# "partial result while still listening", which is why the mic pipeline
-# has always had to wait for a pause (VAD) before calling it. The
-# earlier attempt at instant captions used the browser's own
-# SpeechRecognition API instead, which genuinely can stream -- but it
-# works by sending your audio to Google's speech servers over the
-# network, and Brave (and some other privacy-focused browsers) blocks
-# that specific traffic by default, which is almost certainly why no
-# live captions ever appeared. Vosk needs no network call at all: it
-# runs the whole recognizer locally and emits partial results within a
-# couple hundred milliseconds of audio arriving, which is what makes
-# genuine word-by-word captions possible. See download_vosk_model.py.
-# VOSK_MODEL_DIR = "data/models/vosk-model-en-us-0.22" -- the larger,
-# more accurate Vosk model (~1.8GB vs ~40MB for the small one).
-# Independent evaluation puts its WER roughly 20% lower than the small
-# model's, and it's the model used directly in Vosk's own real-time
-# streaming examples -- still designed for live use, just a bigger
-# acoustic/language model under the hood. This is the "don't care if
-# it's bigger, want the best accuracy that's still real-time" pick;
-# vosk-model-small-en-us-0.15 remains the fallback for constrained
-# hardware (loads in a fraction of the time, far less RAM).
 VOSK_MODEL_DIR = "data/models/vosk-model-en-us-0.22"
 vosk_model = None
 vosk_load_error = None
@@ -463,11 +317,6 @@ except Exception as e:
     print(f"HarmonyEngine not loaded: {harmony_load_error}")
 
 
-# Optional neural voice-conversion stage — reskins VocableSynthesizer's DSP
-# output into a trained real-voice timbre (see NEURAL_VOICE_ROADMAP.md).
-# Disabled by default via synthesis.neural.enabled in config.yaml; if it's
-# off, not installed, or has no trained model configured, the pipeline
-# behaves exactly as it did before this stage existed — pure DSP output.
 neural_timbre = None
 neural_timbre_load_error = None
 try:
@@ -484,11 +333,6 @@ except Exception as e:
     print("This is non-fatal — the pipeline runs on pure DSP synthesis without it.")
 
 
-# Local chatbot: RAG over song notes + a local LLM, with optional spoken
-# replies (Piper TTS) and "sing my idea" (RVC, and optionally DiffSinger).
-# Everything it touches is local/offline -- see chat/chat_api.py. Mounted
-# as its own router so a chatbot failure (e.g. Ollama not running yet)
-# never prevents the rest of the app from starting.
 try:
     from chat.chat_api import router as chat_router
     app.include_router(chat_router)
@@ -556,17 +400,6 @@ def translate_health():
     return {"status": "ok" if translator else "model_not_loaded", "error": translator_load_error}
 
 
-# Real Plains Cree word validation, via ALTLab's open-source morphological
-# FST (github.com/giellalt/lang-crk, mirrored at
-# github.com/UAlbertaALTLab/plains-cree-fsts). This is NOT speech
-# recognition -- there is no live Cree ASR anywhere, see the note on the
-# sentiment page -- it's a real morphological analyzer: given a typed word,
-# it tells you whether it's a recognized nêhiyawêwin word form, its
-# dictionary lemma, and its part of speech, using the same ~16,500-stem
-# analyzer that powers ALTLab's own e-dictionary and spellchecker. It also
-# recognizes ASCII-typed words (no macrons) as informal spellings of the
-# correctly-accented form -- e.g. "ewapamat" analyzes as a non-normative
-# ("Err/Orth") spelling of "êwâpamât".
 CREE_FST_PATH = "data/models/crk-descriptive-analyzer.hfstol"
 cree_analyzer_fst = None
 cree_fst_load_error = None
@@ -584,10 +417,6 @@ except Exception as e:
 
 _CREE_FLAG_RE = re.compile(r"@[^@]*@")
 
-# Alphabet used for spelling-suggestion edits: standard Cree SRO letters,
-# both plain and macron-accented vowels, so a candidate like "tanisi" can
-# still reach "tânisi" within one edit even though the accented form uses
-# a different character than the one typed.
 _CREE_ALPHABET = list("acehiklmnopstwyâêîô")
 
 
@@ -596,11 +425,6 @@ def _clean_analysis_tag(raw: str) -> str:
 
 
 def _extract_lemma_pos(cleaned: str):
-    """Pull the dictionary lemma + POS out of a cleaned analysis string
-    like 'PV/e+wâpamêw+V+TA+...' or 'IC+tasôw+V+AI+...'. Skips leading
-    grammatical markers -- preverbs (PV/...) and bare tags like the
-    Initial-Change marker 'IC' -- rather than just the first '+'-segment,
-    since either can precede the actual stem."""
     parts = cleaned.split("+")
 
     def is_marker(p):
@@ -612,10 +436,6 @@ def _extract_lemma_pos(cleaned: str):
 
 
 def _edits1(word: str) -> set:
-    """All strings one insertion/deletion/substitution/transposition away
-    from `word`, restricted to Cree SRO letters. Standard spelling-
-    correction technique (same idea as Peter Norvig's spell-checker),
-    just checked against the real FST instead of a frequency dictionary."""
     splits = [(word[:i], word[i:]) for i in range(len(word) + 1)]
     deletes = [L + R[1:] for L, R in splits if R]
     transposes = [L + R[1] + R[0] + R[2:] for L, R in splits if len(R) > 1]
@@ -625,12 +445,6 @@ def _edits1(word: str) -> set:
 
 
 def suggest_cree_word(word: str, deep: bool = False, max_suggestions: int = 5) -> list:
-    """'Did you mean' suggestions for a word the FST doesn't recognize.
-    Real, not fabricated: every suggestion returned is a string that the
-    FST itself confirms is a valid nêhiyawêwin word form. edit-distance-1
-    is fast enough to run on every keystroke (~10-30ms); edit-distance-2
-    (deep=True) is ~1s, so it's reserved for one-off checks like pressing
-    Translate on a single unrecognized word, not live-as-you-type."""
     if cree_analyzer_fst is None or not word:
         return []
 
@@ -677,9 +491,6 @@ class CreeAnalyzeRequest(BaseModel):
 
 
 def analyze_cree_word(word: str, deep_suggestions: bool = False) -> dict:
-    """Looks up one word in the real FST. recognized=False just means this
-    specific analyzer (16,500 stems, still a work in progress per ALTLab)
-    doesn't have it -- not proof the word isn't valid Cree."""
     if cree_analyzer_fst is None:
         return {"word": word, "recognized": None, "error": cree_fst_load_error}
 
@@ -691,8 +502,6 @@ def analyze_cree_word(word: str, deep_suggestions: bool = False) -> dict:
     analyses = []
     for raw, weight in results:
         cleaned = _clean_analysis_tag(raw)
-        # Preverbs (PV/e, PV/ka, ...) and bare markers (IC, ...) can
-        # precede the actual stem -- _extract_lemma_pos skips those.
         lemma, pos = _extract_lemma_pos(cleaned)
         is_variant = "Err/Orth" in cleaned  # non-normative spelling (e.g. macrons dropped)
         analyses.append({"lemma": lemma, "pos": pos, "tag": cleaned, "is_orthographic_variant": is_variant})
@@ -702,12 +511,6 @@ def analyze_cree_word(word: str, deep_suggestions: bool = False) -> dict:
 
 @app.post("/api/cree/analyze")
 def cree_analyze(req: CreeAnalyzeRequest):
-    """Real-time Cree word validation -- is this a recognized nêhiyawêwin
-    word, its lemma/part of speech, and if not, real 'did you mean'
-    suggestions confirmed against the same FST (see suggest_cree_word).
-    deep_suggestions=True also checks edit-distance-2, at ~1s cost -- use
-    it for one-off checks (e.g. a Translate button), not on every
-    keystroke."""
     text = (req.text or "").strip()
     if not text:
         return {"words": []}
@@ -728,9 +531,6 @@ def cree_health():
 
 @app.post("/api/sentiment")
 def sentiment(req: SentimentRequest):
-    """Scores English text directly. See score_sentiment() for how RoBERTa
-    (primary) vs. VADER (fallback) get chosen, and what's real vs.
-    heuristic in the arousal score either way."""
     result = score_sentiment(req.text)
     if "error" in result:
         no_backend = roberta_sentiment is None and sentiment_analyzer is None
@@ -749,12 +549,6 @@ def sentiment_health():
 
 
 class VocalFeatures(BaseModel):
-    """Real signal-derived features from the actual recorded audio, not
-    estimates. pitch_range_semitones comes from this project's own
-    RMVPE/YIN pitch engine via /api/pitch/analyze-track; rms_mean/
-    rms_variance are plain loudness stats computed client-side from the
-    same recording via the Web Audio API. See score_sentiment()'s
-    docstring for how (and why only partially) these feed into the result."""
     pitch_range_semitones: float = 0.0
     rms_mean: float = 0.0
     rms_variance: float = 0.0
@@ -768,14 +562,6 @@ class AnalyzeRequest(BaseModel):
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest):
-    """
-    One call for the sentiment demo: Cree text in -> translate -> sentiment,
-    or English speech transcript in -> sentiment directly.
-    already_english=True skips translation (e.g. text captured live via the
-    browser's English speech recognition) and scores it directly.
-    vocal, if provided, blends real pitch/loudness features from the sung
-    audio into arousal -- see score_sentiment().
-    """
     text = (req.text or "").strip()
     if not text:
         return JSONResponse({"error": "No text provided"}, status_code=400)
@@ -861,8 +647,6 @@ class TextureRequest(BaseModel):
 
 @app.post("/harmony/texture")
 def set_texture(req: TextureRequest):
-    """Pin a voice texture regardless of accompaniment mode — e.g. a
-    'concert mode' UI button that blooms whatever's playing into a choir."""
     if harmony_engine is None:
         return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
     harmony_engine.set_texture(req.texture)
@@ -896,14 +680,6 @@ def neural_status():
         "sidecar_reachable": neural_timbre._reachable,
         "voices_configured": neural_timbre.num_voices_configured,
     }
-    # Forward the sidecar's own /health detail (device actually in use,
-    # per-voice warm-up time, quantized y/n) so the frontend can show real
-    # numbers before anyone presses Play, instead of that only being
-    # visible in a terminal. This machine's GPU (Phoenix3/gfx1103 laptop
-    # iGPU) isn't ROCm-supported, so "device" here will correctly read
-    # cpu -- this is honest reporting, not a fallback to apologize for.
-    # Best-effort and fast-timeout: this endpoint should never hang or
-    # fail just because that extra detail isn't reachable.
     if neural_timbre.enabled and neural_timbre._reachable:
         try:
             import requests as _requests
@@ -927,24 +703,10 @@ class RenderNoteRequest(BaseModel):
     mode: str = "unison_shadowing"
     texture: str = "solo"
     voice_index: int = 0
+    transpose_semitones: float | None = None
 
 
 def _build_render_decision(req: "RenderNoteRequest", cfg: dict):
-    """
-    Builds a stand-in for HarmonyDecision, good enough to drive
-    VocableSynthesizer.synthesize() for one browser-triggered note.
-
-    This is NOT the real harmony_engine.decide() output. The browser's
-    client-side accompaniment engine (index.html) doesn't run Cree
-    phoneme analysis -- there's no MFCC extraction in JS -- so there is
-    no real brightness/nasality/vowel_color to send up. This uses the
-    same neutral profile server.py already falls back to for unvoiced
-    frames elsewhere (cree._neutral_profile in ws_mic / run_local_pipeline).
-    If your CreeTokenizer's actual neutral values aren't
-    (brightness=0.5, vowel_color=0.5, nasality=0.0), change them here
-    to match -- this is the one place in this endpoint that's a
-    reasonable guess rather than read from your code.
-    """
     from synthesis.accompaniment_modes import AccompanimentMode
 
     try:
@@ -974,27 +736,6 @@ def _build_render_decision(req: "RenderNoteRequest", cfg: dict):
 
 @app.post("/api/neural/render")
 def render_neural_note(req: RenderNoteRequest):
-    """
-    Renders ONE sung note through the real Python pipeline --
-    VocableSynthesizer -> NeuralTimbreConverter -- and returns it as a
-    WAV file.
-
-    This is what actually gets your trained RVC voice into the browser
-    Live Demo. The demo's RobotVoice/VoiceEnsemble classes in index.html
-    are a from-scratch JS reimplementation of the synthesizer that runs
-    entirely client-side and never calls into this backend or the neural
-    sidecar at all -- that's why synthesis.neural.enabled alone changed
-    nothing you could hear on that page. See the NeuralNoteBridge class
-    in index.html for the frontend side of this.
-
-    Costs one HTTP round trip + one VocableSynthesizer render + one RVC
-    sidecar call per request -- expect roughly 50-500ms depending on
-    whether synthesis.neural.device is actually hitting a free GPU (see
-    max_latency_warn_s in config.yaml, which the sidecar call already
-    logs against). Because of that latency, the frontend plays its
-    instant local oscillator first and only swaps this audio in once it
-    arrives -- it never goes silent to wait for this endpoint.
-    """
     if neural_timbre is None or not neural_timbre.enabled or not neural_timbre._reachable:
         return JSONResponse(
             {"error": "Neural stage not ready -- check synthesis.neural.enabled in "
@@ -1010,23 +751,13 @@ def render_neural_note(req: RenderNoteRequest):
         cfg = get_config()
         decision = _build_render_decision(req, cfg)
 
-        # A fresh VocableSynthesizer per request is deliberate, not an
-        # oversight. VocableSynthesizer keeps _prev_audio state to
-        # crossfade successive notes together, which assumes one
-        # continuous sequential caller -- exactly true in
-        # run_local_pipeline, not true here, where this endpoint can get
-        # concurrent requests from multiple demo sessions or overlapping
-        # notes. Sharing one instance would crossfade unrelated notes
-        # into each other. The default sinusoidal engine does no file
-        # I/O in __init__, so this costs milliseconds, not a model
-        # reload -- only the wavetable engine would make this expensive,
-        # and it isn't your configured engine.
         synth = VocableSynthesizer()
         scratch_audio = synth.synthesize(decision)
 
         sample_rate = cfg["audio"]["sample_rate"]
         final_audio = neural_timbre.convert(
-            scratch_audio, sample_rate, decision.target_hz, voice_index=req.voice_index
+            scratch_audio, sample_rate, decision.target_hz, voice_index=req.voice_index,
+            transpose_semitones=req.transpose_semitones,
         )
 
         buf = io.BytesIO()
@@ -1040,32 +771,8 @@ def render_neural_note(req: RenderNoteRequest):
 
 
 def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: str, voice_index: int,
-                           mode_override: str | None = None, instruments_enabled: bool = True) -> bytes:
-    """
-    Runs entirely inside a worker thread (see the asyncio.to_thread call
-    in render_neural_track below) -- this is real, potentially slow, CPU
-    work: framewise pitch/rhythm/harmony analysis over the WHOLE track,
-    DSP synthesis of every note, then one whole-track call to the neural
-    sidecar. None of it belongs on the asyncio event loop.
-
-    This is the offline counterpart to run_local_pipeline()/NeuralNoteBridge:
-    same analysis -> harmony -> synthesis chain, but walked over a fixed
-    in-memory buffer instead of a live mic queue, with no real-time
-    budget and no per-note single-flight drop -- every note that the
-    harmony engine decides to sing gets synthesized and included.
-
-    instruments_enabled=False is the server-side half of the Live Demo's
-    "Sing along with instruments" toggle. The toggle previously only
-    gated the real-time DSP-mode playback path in the browser
-    (demoProgressLoop/pollOfflinePitchAtTime) -- it had no effect at all
-    here, because Full Render mode never touches that code; it runs this
-    completely separate offline pipeline instead, entirely server-side,
-    with its own independent pitch analysis. Without this, the toggle
-    being off did nothing for Full Render, which is exactly the bug
-    being fixed: turning it off must also stop the drum hits detected in
-    THIS loop from being sung and sent to the neural sidecar, not just
-    the ones detected during real-time playback.
-    """
+                           mode_override: str | None = None, instruments_enabled: bool = True,
+                           transpose_semitones: float | None = None, apply_neural: bool = True) -> bytes:
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
     from analysis.pitch_detector import PitchDetector
@@ -1086,13 +793,6 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
         audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
-    # Computed once, up front, over the whole track -- the same tested
-    # onset-density detector already used for the Sentiment tab's
-    # [instrumental / percussion] transcript labels and the pitch-
-    # timeline endpoint above. Cheap relative to everything else this
-    # function already does (framewise pitch detection + DSP synthesis +
-    # a full neural sidecar pass), so computing it even when
-    # instruments_enabled is True costs nothing worth skipping it for.
     percussive_spans: list = []
     if not instruments_enabled:
         try:
@@ -1109,12 +809,6 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     pitch.set_method(pitch_method)
     rhythm = RhythmAnalyzer()
     cree = CreeTokenizer()
-    # A FRESH HarmonyEngine for this render -- deliberately not the
-    # shared module-level harmony_engine. That instance carries live
-    # sovereignty/mode state for whatever's happening on /ws/mic right
-    # now; a batch render shouldn't read that state or mutate it out
-    # from under a live session (same reasoning as the fresh
-    # VocableSynthesizer per call in render_neural_note above).
     harmony = HarmonyEngine()
     harmony.set_texture(texture)
     if mode_override:
@@ -1122,10 +816,11 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     synth = VocableSynthesizer()
 
     n_frames = len(audio) // frame_size
-    # Tail padding: a note starting near the very end of the track can
-    # still be mid-sustain once the source audio runs out, so the output
-    # buffer needs room past len(audio) or its tail gets clipped off.
+    frame_hop_s = frame_size / sample_rate
     robot = np.zeros(len(audio) + int(4.0 * sample_rate), dtype=np.float32)
+
+    runs: list[dict] = []
+    current_run: dict | None = None
 
     for i in range(n_frames):
         frame = audio[i * frame_size:(i + 1) * frame_size]
@@ -1138,9 +833,6 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
             pitch_input = frame if pitch.method == "rmvpe" else clean
             hz, conf = pitch.detect(pitch_input)
             if hz and not (percussive_spans and _in_percussive_span(i * frame_size / sample_rate)):
-                # Same treatment as "no pitch detected this frame" --
-                # the harmony engine's existing silence/rest handling
-                # takes it from here, no special case needed downstream.
                 archer_hz = hz
             phoneme_profile = cree.analyze(clean)
         else:
@@ -1156,19 +848,40 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
         )
 
         if decision.action == "sing":
-            scratch = synth.synthesize(decision)
-            start_sample = i * frame_size
-            end_sample = start_sample + len(scratch)
-            if end_sample > len(robot):
-                robot = np.pad(robot, (0, end_sample - len(robot)))
-            robot[start_sample:end_sample] += scratch
+            current_run = {"start_frame": i, "decision": decision, "n_frames": 1}
+            runs.append(current_run)
+        elif decision.action == "sustain":
+            if current_run is None:
+                current_run = {"start_frame": i, "decision": decision, "n_frames": 1}
+                runs.append(current_run)
+            else:
+                current_run["n_frames"] += 1
+        else:
+            current_run = None
+
+    MAX_RUN_SECONDS = 12.0  # safety cap so one stuck drone/note can't blow up render time/memory
+    for run in runs:
+        decision = run["decision"]
+        decision.duration_s = min(run["n_frames"] * frame_hop_s, MAX_RUN_SECONDS)
+        scratch = synth.synthesize(decision)
+        start_sample = run["start_frame"] * frame_size
+        end_sample = start_sample + len(scratch)
+        if end_sample > len(robot):
+            robot = np.pad(robot, (0, end_sample - len(robot)))
+        robot[start_sample:end_sample] += scratch
 
     peak = float(np.max(np.abs(robot))) if robot.size else 0.0
     if peak > 1.0:
         robot = robot / peak  # avoid clipping where overlapping/sustained notes summed above 0dBFS
 
+    if not apply_neural:
+        out_buf = io.BytesIO()
+        sf.write(out_buf, robot.astype(np.float32), sample_rate, format="WAV")
+        return out_buf.getvalue()
+
     timeout_s = float(cfg.get("synthesis", {}).get("neural", {}).get("offline_render_timeout_s", 900))
-    converted = neural_timbre.convert_blocking(robot, sample_rate, voice_index=voice_index, timeout_s=timeout_s)
+    converted = neural_timbre.convert_blocking(robot, sample_rate, voice_index=voice_index, timeout_s=timeout_s,
+                                                transpose_semitones=transpose_semitones)
     if converted is None:
         raise RuntimeError(
             "Neural sidecar conversion failed or timed out — check that neural_env/rvc_server.py "
@@ -1180,6 +893,26 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     return out_buf.getvalue()
 
 
+@app.post("/api/dsp/render-track")
+async def render_dsp_track(
+    file: UploadFile = File(...),
+    texture: str = Form("solo"),
+    pitch_method: str = Form("yin"),
+    mode: str = Form(""),
+    instruments_enabled: bool = Form(True),
+):
+    try:
+        raw = await file.read()
+        wav_bytes = await asyncio.to_thread(
+            _render_track_offline, raw, pitch_method, texture, 0, (mode or None),
+            instruments_enabled, None, False,
+        )
+        return Response(content=wav_bytes, media_type="audio/wav")
+    except Exception as e:
+        print(f"[dsp track render error] {e}")
+        return JSONResponse({"error": f"Render failed: {e}"}, status_code=500)
+
+
 @app.post("/api/neural/render-track")
 async def render_neural_track(
     file: UploadFile = File(...),
@@ -1188,23 +921,8 @@ async def render_neural_track(
     voice_index: int = Form(0),
     mode: str = Form(""),
     instruments_enabled: bool = Form(True),
+    transpose_semitones: float | None = Form(None),
 ):
-    """
-    Offline ("bounce") neural render for the Upload-MP3 demo panel's
-    Neural voice-engine mode.
-
-    Unlike /api/neural/render (real-time, one note at a time, DSP-first-
-    then-swap -- see NeuralNoteBridge in index.html), this processes the
-    WHOLE uploaded track through analysis -> harmony -> DSP synthesis
-    first, then sends the ENTIRE resulting robot-voice track through the
-    neural sidecar in a single call and waits for it, however long that
-    takes. Nothing plays in the browser until this request resolves.
-
-    This is the actual answer to real-time neural conversion never
-    keeping up with a live singer: it isn't disabled here, it's just
-    moved off the real-time path entirely, same idea as bouncing a
-    track in a DAW instead of monitoring a plugin live.
-    """
     if neural_timbre is None or not neural_timbre.enabled or not neural_timbre._reachable:
         return JSONResponse(
             {"error": "Neural stage not ready -- check synthesis.neural.enabled in "
@@ -1216,7 +934,8 @@ async def render_neural_track(
     try:
         raw = await file.read()
         wav_bytes = await asyncio.to_thread(
-            _render_track_offline, raw, pitch_method, texture, voice_index, (mode or None), instruments_enabled
+            _render_track_offline, raw, pitch_method, texture, voice_index, (mode or None), instruments_enabled,
+            transpose_semitones
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
@@ -1224,99 +943,91 @@ async def render_neural_track(
         return JSONResponse({"error": f"Render failed: {e}"}, status_code=500)
 
 
+def _silence_instrumental_spans(audio: np.ndarray, sample_rate: int, log_prefix: str) -> np.ndarray:
+    duration_s = len(audio) / sample_rate
+    window_s = min(2.0, max(0.5, duration_s))
+    min_duration_s = max(0.2, min(0.6, duration_s / 4))
+    spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=min_duration_s)
+    if not spans:
+        return audio
+
+    vocal_segments = []
+    if whisper_model_track is not None:
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                sf.write(tmp.name, audio, sample_rate, format="WAV")
+                tmp_path = tmp.name
+            try:
+                raw_segments = _whisper_transcribe_raw_segments(
+                    tmp_path, "en", whisper_model_track, whisper_backend_track
+                )
+                vocal_segments = [s for s in raw_segments if s["no_speech_prob"] < WHISPER_NO_SPEECH_VOCAL_PRESENT_THRESHOLD]
+            finally:
+                os.unlink(tmp_path)
+        except Exception as e:
+            print(f"[{log_prefix}] vocal-presence check failed ({e}) -- falling back to "
+                  "rhythmic-density-only silencing for this render.")
+    else:
+        print(f"[{log_prefix}] Whisper not loaded -- can't confirm vocal presence, falling back to "
+              "rhythmic-density-only silencing (may over-silence chant-over-drum content).")
+
+    def _has_vocal_overlap(start_s, end_s):
+        return any(seg["start"] < end_s and seg["end"] > start_s for seg in vocal_segments)
+
+    kept_spans = [(s, e) for s, e in spans if not _has_vocal_overlap(s, e)]
+    skipped = len(spans) - len(kept_spans)
+    if skipped:
+        print(f"[{log_prefix}] kept {skipped} percussive span(s) that overlapped confident vocal "
+              "segments -- not silencing real singing just because a drum is also present.")
+
+    if not kept_spans:
+        return audio
+
+    fade_samples = int(0.02 * sample_rate)  # 20ms, avoids an audible click at the silencing boundary
+    for start_s, end_s in kept_spans:
+        start_i = max(0, int(start_s * sample_rate))
+        end_i = min(len(audio), int(end_s * sample_rate))
+        if end_i <= start_i:
+            continue
+        audio[start_i:end_i] = 0.0
+        fo = min(fade_samples, start_i)
+        if fo > 0:
+            audio[start_i - fo:start_i] *= np.linspace(1.0, 0.0, fo, dtype=np.float32)
+        fi = min(fade_samples, len(audio) - end_i)
+        if fi > 0:
+            audio[end_i:end_i + fi] *= np.linspace(0.0, 1.0, fi, dtype=np.float32)
+    print(f"[{log_prefix}] instruments disabled: silenced {len(kept_spans)} confirmed-instrumental "
+          f"span(s) totaling {sum(e - s for s, e in kept_spans):.1f}s before RVC conversion")
+    return audio
+
+
 def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds: float | None = None,
-                           instruments_enabled: bool = True) -> bytes:
-    """
-    Sends the uploaded track's ACTUAL audio straight through the trained
-    RVC voice model -- no harmony engine, no VocableSynthesizer, no
-    generated aah/ooo/mmm/hey content in between. This is the same thing
-    RVC WebUI's Model Inference tab does: HuBERT extracts whatever real
-    phonetic content is actually in the file (real words, if the file has
-    real singing/speech in it) and the generator resynthesizes it in the
-    trained voice's timbre.
-
-    Unlike _render_track_offline (which generates a NEW robot vocal part
-    from scratch to accompany the track), this REPLACES the voice on the
-    track you uploaded -- the output IS the track, re-voiced, not a
-    second part layered on top of it.
-
-    instruments_enabled=False is the Live Demo's "Sing along with
-    instruments" toggle. A previous fix wired this into
-    _render_track_offline, on the reasoning that instrumental content
-    should just never get a generated note to sing in the first place --
-    correct for that function, but that function turns out to not be the
-    one actually running here. This is: demoVoiceContent is a hardcoded
-    'direct' constant on the frontend now (an older toggle that used to
-    switch between the two was removed), so the Neural engine always
-    takes THIS path, and this function has no "note" to skip -- it
-    converts a raw waveform, whatever's in it, vocals and drums alike.
-    The fix here has to be different: detect percussive spans in the
-    source audio (same tested onset-density detector as everywhere else)
-    and silence them before HuBERT/RMVPE/the generator ever see that
-    audio, so there's nothing there for RVC to convert into a voice.
-
-    Note: if the uploaded file has instrumental backing mixed in with the
-    vocals (i.e. it's a normal song, not an isolated vocal stem), that
-    backing gets fed into HuBERT too. RVC-Project's own docs recommend an
-    isolated vocal stem for best results -- this function doesn't do that
-    separation for you, it converts exactly the audio you sent it (minus
-    silenced percussive spans, if instruments_enabled is False). If
-    results are muddy, running the file through a vocal separator (UVR5,
-    Demucs, etc.) first and uploading just the vocal stem will help a lot
-    more than the percussive gate alone can.
-    """
+                           instruments_enabled: bool = True, transpose_semitones: float | None = None) -> bytes:
     from config.config_loader import get_config
     import librosa
 
     cfg = get_config()
-    sample_rate = cfg["audio"]["sample_rate"]
 
     audio, in_sr = sf.read(io.BytesIO(raw_audio_bytes), dtype="float32", always_2d=False)
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
+
+    CONVERSION_SAMPLE_RATE_FLOOR = 44100
+    sample_rate = in_sr if in_sr >= CONVERSION_SAMPLE_RATE_FLOOR else CONVERSION_SAMPLE_RATE_FLOOR
     if in_sr != sample_rate:
         audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
     if not instruments_enabled:
         try:
-            duration_s = len(audio) / sample_rate
-            window_s = min(2.0, max(0.5, duration_s))
-            # min_duration_s scales down for short buffers -- Live mode
-            # sends this function only a few seconds of audio per chunk,
-            # not a whole track, and the 0.6s floor used elsewhere would
-            # never fire on a 2-3s chunk. Never below 0.2s: shorter than
-            # that starts silencing legitimate short vocal transients
-            # (consonants, quick ornaments) instead of only the sustained
-            # rhythmic content this detector is actually built to catch.
-            min_duration_s = max(0.2, min(0.6, duration_s / 4))
-            spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=min_duration_s)
-            if spans:
-                # A hard cut to zero at each span edge clicks audibly --
-                # a short linear fade in/out around the boundary keeps
-                # the silencing itself inaudible as a click, distinct
-                # from (and much cheaper than) a real crossfade.
-                fade_samples = int(0.02 * sample_rate)  # 20ms
-                for start_s, end_s in spans:
-                    start_i = max(0, int(start_s * sample_rate))
-                    end_i = min(len(audio), int(end_s * sample_rate))
-                    if end_i <= start_i:
-                        continue
-                    audio[start_i:end_i] = 0.0
-                    fo = min(fade_samples, start_i)
-                    if fo > 0:
-                        audio[start_i - fo:start_i] *= np.linspace(1.0, 0.0, fo, dtype=np.float32)
-                    fi = min(fade_samples, len(audio) - end_i)
-                    if fi > 0:
-                        audio[end_i:end_i + fi] *= np.linspace(0.0, 1.0, fi, dtype=np.float32)
-                print(f"[convert-track direct] instruments disabled: silenced {len(spans)} percussive "
-                      f"span(s) totaling {sum(e - s for s, e in spans):.1f}s before RVC conversion")
+            audio = _silence_instrumental_spans(audio, sample_rate, "convert-track direct")
         except Exception as e:
             print(f"[convert-track direct] percussive detection skipped: {e}")
 
     timeout_s = float(cfg.get("synthesis", {}).get("neural", {}).get("offline_render_timeout_s", 900))
     converted = neural_timbre.convert_blocking(
-        audio, sample_rate, voice_index=voice_index, timeout_s=timeout_s, pad_seconds=pad_seconds
+        audio, sample_rate, voice_index=voice_index, timeout_s=timeout_s, pad_seconds=pad_seconds,
+        transpose_semitones=transpose_semitones,
     )
     if converted is None:
         raise RuntimeError(
@@ -1335,32 +1046,8 @@ async def convert_neural_track(
     voice_index: int = Form(0),
     pad_seconds: float | None = Form(None),
     instruments_enabled: bool = Form(True),
+    transpose_semitones: float | None = Form(None),
 ):
-    """
-    Direct RVC conversion of the uploaded file's own audio -- the 'give
-    me the actual words back, just sung in the trained voice' mode.
-
-    Compare to /api/neural/render-track: that endpoint runs analysis ->
-    harmony engine -> VocableSynthesizer to generate a brand new wordless
-    accompaniment part (aah/ooo/mmm/hey) and THEN sends that generated
-    audio through RVC, so the output was never going to contain words no
-    matter what voice model you point it at -- there were never words in
-    what it was converting. This endpoint skips all of that and sends
-    your uploaded audio's own content straight through RVC instead.
-
-    pad_seconds: optional override for the reflect-padding added on each
-    side before HuBERT/RMVPE/the generator run (see rvc_pipeline.py). The
-    sidecar's configured default (usually 1.0s) is tuned for whole-track
-    quality, where 2s of total padding is negligible next to a multi-
-    minute file. For a short streaming chunk from the Upload-MP3 demo's
-    Live mode, that same 2s can be a large fraction of the chunk's own
-    length -- the frontend passes a smaller value for those calls
-    specifically, to cut real, measurable latency off of exactly the
-    calls where latency is most noticeable. Full-track requests (Full
-    render, or this same endpoint called with the whole file) omit it
-    and get the configured default, since quality matters more than
-    latency for a one-time render.
-    """
     if neural_timbre is None or not neural_timbre.enabled or not neural_timbre._reachable:
         return JSONResponse(
             {"error": "Neural stage not ready -- check synthesis.neural.enabled in "
@@ -1371,7 +1058,7 @@ async def convert_neural_track(
     try:
         raw = await file.read()
         wav_bytes = await asyncio.to_thread(
-            _convert_track_direct, raw, voice_index, pad_seconds, instruments_enabled
+            _convert_track_direct, raw, voice_index, pad_seconds, instruments_enabled, transpose_semitones
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
@@ -1380,22 +1067,6 @@ async def convert_neural_track(
 
 
 def _decode_audio_via_ffmpeg(raw_audio_bytes: bytes, target_sr: int) -> np.ndarray:
-    """Decode arbitrary-container audio (webm/opus in particular) to mono
-    float32 PCM at target_sr, using ffmpeg directly instead of
-    soundfile/libsndfile.
-
-    This is the fix for the "[pitch analyze error] ... Format not
-    recognised" line that's been in this project's logs on essentially
-    every mic-recorded segment: libsndfile (what `soundfile` wraps) has
-    no WebM/Opus decoder at all -- it only handles WAV/FLAC/OGG-Vorbis/
-    AIFF/etc. The old code called sf.read() directly on the raw webm
-    bytes, which was guaranteed to fail for browser-recorded audio; the
-    failure was just swallowed by the surrounding try/except and
-    pitch_range_semitones silently defaulted to 0. ffmpeg is already a
-    hard dependency here (Whisper's own loader shells out to it), so
-    this doesn't add anything new to the environment -- it just uses it
-    somewhere that actually needed it.
-    """
     with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp_in:
         tmp_in.write(raw_audio_bytes)
         tmp_in_path = tmp_in.name
@@ -1416,22 +1087,6 @@ def _decode_audio_via_ffmpeg(raw_audio_bytes: bytes, target_sr: int) -> np.ndarr
 
 
 def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
-    """
-    Runs in a worker thread (see asyncio.to_thread in analyze_pitch_track
-    below). Analyzes an entire uploaded track's pitch ONCE, up front, and
-    returns a fixed-hop timeline covering the whole file.
-
-    This is the pitch-only counterpart to _render_track_offline above,
-    and exists for exactly the same reason: RMVPE is a CNN+BiGRU that
-    routinely takes longer than one audio frame's real-time budget on
-    CPU. Streaming a pre-recorded upload's audio to /ws/pitch the same
-    way a live mic has to would hit that same wall -- the backend falls
-    behind, and what it reports drifts further from what's actually
-    playing the longer the track runs. Since the whole file already
-    exists up front, there's no reason to pretend it's a live stream:
-    analyze it once, return a timeline, and let the frontend look pitch
-    up by playback time instead.
-    """
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
     from analysis.pitch_detector import PitchDetector
@@ -1467,15 +1122,6 @@ def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
         hz_timeline.append(round(hz, 2) if hz else None)
         conf_timeline.append(round(float(conf), 3) if hz else None)
 
-    # Reuses the same onset-density detector built for the Sentiment
-    # tab's [drums]/[instrumental] transcript labels (see
-    # _detect_percussive_spans below) instead of building a second,
-    # separate detector -- this is the same underlying question either
-    # way ("is there a steady rhythmic pulse here"), just answered once
-    # per uploaded track and handed back alongside the pitch timeline so
-    # the frontend's instruments toggle has something to gate on. No
-    # extra decode cost: `audio` is already the whole track, already
-    # decoded, from the pitch analysis just above.
     try:
         window_s = min(2.0, max(0.5, len(audio) / sample_rate))
         perc_spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=0.6)
@@ -1496,18 +1142,6 @@ async def analyze_pitch_track(
     file: UploadFile = File(...),
     pitch_method: str = Form("rmvpe"),
 ):
-    """
-    Offline whole-track pitch analysis for the Upload-MP3 demo panel.
-
-    Used when the panel's pitch engine is set to RMVPE: instead of
-    streaming the uploaded track's audio to /ws/pitch frame-by-frame
-    (the same real-time RMVPE path a live mic has no choice but to use,
-    and the same one whose CPU inference time exceeds the real-time
-    frame budget), the whole file is analyzed once, here, and the
-    resulting timeline is sent back for the frontend to look up by
-    playback time. YIN doesn't need this at all -- it stays on its
-    existing cheap real-time path -- this endpoint is RMVPE-specific.
-    """
     try:
         raw = await file.read()
         result = await asyncio.to_thread(_analyze_pitch_offline, raw, pitch_method)
@@ -1517,42 +1151,14 @@ async def analyze_pitch_track(
         return JSONResponse({"error": f"Pitch analysis failed: {e}"}, status_code=500)
 
 
-# OpenAI's own Whisper CLI ships these exact thresholds to flag a
-# segment as likely garbage/hallucinated rather than real speech (see
-# openai-whisper's transcribe.py default arguments -- compression_ratio_
-# threshold, logprob_threshold, no_speech_threshold). faster-whisper
-# exposes the same three numbers per segment, so the same check applies
-# to either backend. This is what catches things like Whisper
-# fabricating "Honor Song for Dr. Suzanne Kite." over audio that's
-# actually wordless vocables: no real transcription happened there, but
-# Whisper is a language model as much as an acoustic one, and it's
-# forced to output *something* -- on non-speech/chant/music audio it
-# will confidently invent a plausible-sounding sentence instead of
-# admitting it doesn't know. Flagging on these thresholds means we stop
-# trusting that fabricated text instead of displaying it as if it were
-# a real transcription.
 WHISPER_LOGPROB_THRESHOLD = -1.0
 WHISPER_COMPRESSION_RATIO_THRESHOLD = 2.4
 WHISPER_NO_SPEECH_THRESHOLD = 0.6
 
+WHISPER_NO_SPEECH_VOCAL_PRESENT_THRESHOLD = 0.5
+
 
 def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) -> list:
-    """
-    Shared backend call used by both the mic-phrase path
-    (_transcribe_audio_blob) and the whole-track path
-    (_transcribe_track_annotated) -- this is the ONE place that talks to
-    faster-whisper/openai-whisper directly. Having both paths call the
-    same function is what keeps them from drifting apart. `model`/
-    `backend` are passed in explicitly rather than read from a single
-    global pair, since the mic and track paths now use two different
-    model tiers (see MIC_WHISPER_MODEL_SIZE / TRACK_WHISPER_MODEL_SIZE
-    above) -- a fast one for live phrases, a larger accurate one for
-    uploaded tracks where waiting longer is acceptable.
-
-    Returns a list of raw segment dicts with word-level timestamps
-    (start/end per word, not just per segment) and the three confidence
-    fields _classify_segments needs.
-    """
     if backend == "faster":
         def _run(lang, want_words):
             segments_iter, _info = model.transcribe(
@@ -1565,19 +1171,11 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) ->
             segments = _run(language, True)
         except Exception as e:
             if language is None:
-                # language=None makes Whisper run its own language-ID
-                # decode pass before transcribing, and that pass is
-                # numerically unstable on short/quiet/ambiguous clips --
-                # it can emit NaN logits and blow up entirely. Retry once
-                # forcing English rather than losing the phrase outright.
                 print(f"[transcribe] auto-detect decode failed ({e}); retrying with language='en'")
                 language = "en"
             try:
                 segments = _run(language, True)
             except Exception as e2:
-                # Same word-timestamp alignment fragility as the legacy
-                # backend can hit on short/quiet clips -- retry once more
-                # without word timestamps rather than losing the phrase.
                 print(f"[transcribe] word-timestamp alignment failed ({e2}); retrying without word timestamps")
                 segments = _run(language, False)
         return [
@@ -1601,17 +1199,6 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) ->
             try:
                 result = _run(language, True)
             except Exception as e2:
-                # word_timestamps=True runs openai-whisper's DTW/cross-
-                # attention word-alignment step, which is fragile on
-                # short or quiet clips -- this is what produced the
-                # "Linear(in_features=512, out_features=512, bias=True)"
-                # and "cannot reshape tensor of 0 elements" errors (the
-                # str() of some of its internal failures is a raw
-                # PyTorch module repr, not a readable message). Retry
-                # once more with word_timestamps off entirely: this
-                # loses the per-word breakdown for this one phrase, but
-                # the phrase itself still gets transcribed instead of
-                # failing outright.
                 print(f"[transcribe] word-timestamp alignment failed ({e2}); retrying without word timestamps")
                 result = _run(language, False)
         return [
@@ -1627,11 +1214,6 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) ->
 
 
 def _classify_segments(raw_segments: list) -> list:
-    """
-    Applies the hallucination-filtering thresholds to each raw segment
-    and attaches word-level timestamps to the ones that pass. Shared by
-    both transcription paths -- see _whisper_transcribe_raw_segments.
-    """
     annotated = []
     for s in raw_segments:
         likely_hallucinated = (
@@ -1646,10 +1228,6 @@ def _classify_segments(raw_segments: list) -> list:
             "label": s["text"] if not likely_hallucinated else "[non-lexical vocals]",
             "confident": not likely_hallucinated,
         }
-        # Word-level timestamps only make sense to hand back for
-        # segments that weren't flagged as hallucinated -- if the whole
-        # sentence was fabricated, the "words" inside it are just as
-        # fake, so there's nothing real to break down.
         if not likely_hallucinated and s.get("words"):
             seg["words"] = [{"word": w["word"], "start": round(w["start"], 2), "end": round(w["end"], 2)}
                              for w in s["words"] if w["word"]]
@@ -1657,12 +1235,6 @@ def _classify_segments(raw_segments: list) -> list:
     return annotated
 
 
-# AudioSet classes worth surfacing as instrument tags -- filtered down
-# from AudioSet's 527 classes to actual instruments, skipping broad
-# umbrella tags ("Music", "Sound effect") that add nothing beyond what
-# the fallback rhythm detector already implies, and skipping non-
-# instrument classes (Speech, Silence, etc.) that PANNs also scores on
-# the same audio but that aren't instrument labels.
 _PANNS_INSTRUMENT_CLASSES = {
     "Violin, fiddle", "Viola", "Cello", "Double bass",
     "Flute", "Clarinet", "Oboe", "Bassoon", "Saxophone",
@@ -1676,25 +1248,6 @@ _PANNS_INSTRUMENT_CLASSES = {
     "Sitar", "Steel guitar, slide guitar",
 }
 
-# PANNs (Pretrained Audio Neural Networks, trained on AudioSet) for real
-# instrument tagging -- violin, flute, drum, guitar, etc. as actual
-# distinct labels, not one generic '[instrumental / percussion]' bucket.
-# Optional dependency, same graceful-fallback pattern as the Whisper
-# backends above: a server that hasn't run `pip install panns-inference
-# torchlibrosa` still works fine, just with the coarser rhythm-only
-# fallback in _detect_instrument_spans instead of real per-instrument
-# labels.
-#
-# This used to load lazily -- only on the first actual call, deep inside
-# a request handler -- which is almost certainly what caused the
-# reported multi-minute stall after clicking stop: PANNs downloads and
-# caches a ~300MB checkpoint from Zenodo on first use if it isn't
-# already cached, and that download+load was happening silently inside
-# whatever phrase happened to be transcribed first, not at server
-# startup where a slow one-time cost belongs and is visible in the log.
-# Loading it eagerly here, in the same place as Whisper and Vosk, fixes
-# that -- any request now, including the very first one, uses an
-# already-warm model.
 panns_model = None
 panns_labels = None
 try:
@@ -1711,15 +1264,6 @@ except Exception as e:
 
 
 def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
-    """
-    Tags spans of audio with actual instrument names using PANNs where
-    available. The earlier rhythm-density detector can only say "steady
-    pulse detected" -- it has no way to name what's making the pulse,
-    and it can't see a sustained melodic instrument (violin, flute) at
-    all, since those don't necessarily produce the sharp rhythmic
-    onsets that detector looks for. PANNs is a real trained sound-event
-    classifier and can actually distinguish these.
-    """
     model, labels = panns_model, panns_labels
 
     if model is None:
@@ -1754,8 +1298,6 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
                                    "label": f"[{label.lower()}]", "confident": False})
         i += hop_samples
 
-    # Merge adjacent/overlapping same-label windows into contiguous
-    # ranges instead of a new entry every 1s hop.
     raw_spans.sort(key=lambda s: (s["label"], s["start"]))
     merged = []
     for s in raw_spans:
@@ -1767,13 +1309,6 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
 
 
 def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: float) -> list:
-    """Runs instrument detection (PANNs, or the rhythm-only fallback) and
-    merges it into an existing annotated-segment list, sorted by start
-    time. Shared by both transcription paths. min_duration_s is passed
-    through so short mic phrases (a couple seconds) and full tracks
-    (tens of seconds) each use a sensible minimum instead of one fixed
-    value that's either too twitchy for a full song or unreachable for
-    a short phrase."""
     try:
         annotated.extend(_detect_instrument_spans(raw_bytes, min_duration_s))
     except Exception as e:
@@ -1783,53 +1318,16 @@ def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: 
 
 
 def _transcribe_audio_blob(raw: bytes, language: str = "en") -> dict:
-    """Runs in a worker thread (see /api/transcribe) -- writes the
-    uploaded audio to a temp file (Whisper/ffmpeg need a real file path,
-    not in-memory bytes) and transcribes it. Cleans up the temp file
-    either way.
-
-    This is the mic-phrase path (Sentiment tab's live listening and the
-    Cree/English toggle) -- short clips, a few seconds each. It shares
-    its actual transcription + hallucination-filtering + percussive-
-    detection logic with _transcribe_track_annotated (the Live Demo
-    upload path) via _whisper_transcribe_raw_segments/_classify_segments/
-    _add_percussive_segments, so a phrase full of sung chant or drumming
-    picked up by the mic gets the same honest [non-lexical vocals]/
-    [drums] treatment as an uploaded track does, instead of Whisper
-    inventing a fake sentence for it. `text` stays a flat string built
-    only from confident segments for backward compatibility with the
-    existing frontend flow; `segments`/`has_lexical_speech` carry the
-    richer per-word/per-label breakdown for callers that want it.
-
-    language=None lets Whisper auto-detect instead of forcing English.
-    This is used for the "Speaking Cree" mic mode: Whisper has no
-    nêhiyawêwin (Cree) language model at all -- it isn't one of the
-    languages it was trained on -- so there's no "correct" language code
-    to pass. Forcing language="en" would just mangle Cree audio into
-    English words; leaving it unset instead lets Whisper fall back to
-    whatever language its acoustic model thinks is the closest phonetic
-    match, which is still an approximation, not real Cree transcription,
-    but a less actively wrong one than force-fitting English.
-    """
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
     try:
         if os.path.getsize(tmp_path) < 512:
-            # Too small to possibly contain a decodable audio frame (a
-            # webm container header alone is close to this size). This is
-            # the exact condition that produced "cannot reshape tensor of
-            # 0 elements" -- Whisper's own decoder crashing on an
-            # effectively empty clip. Skip the model call entirely rather
-            # than let it throw.
             return {"text": "", "bytes_received": len(raw), "segment_count": 0, "no_speech_probs": [],
                     "segments": [], "has_lexical_speech": False}
 
         raw_segments = _whisper_transcribe_raw_segments(tmp_path, language, whisper_model_mic, whisper_backend_mic)
         annotated = _classify_segments(raw_segments)
-        # Mic phrases are short (a couple seconds after VAD trims
-        # silence), so a 2s-minimum drum span would almost never fire --
-        # use a much shorter floor here than the whole-track path does.
         annotated = _add_percussive_segments(annotated, raw, min_duration_s=0.6)
 
         confident_text = " ".join(s["label"] for s in annotated if s["confident"] and s["label"])
@@ -1851,37 +1349,6 @@ def _transcribe_audio_blob(raw: bytes, language: str = "en") -> dict:
 
 def _detect_percussive_spans(audio: np.ndarray, sr: int, window_s: float = 2.0,
                               density_threshold: float = 1.5, min_duration_s: float = 2.0) -> list:
-    """
-    Flags time ranges with a steady, regular rhythmic pulse -- hand
-    drums, powwow drums, rattles, clapping -- using onset detection
-    instead of harmonic-percussive source separation.
-
-    An earlier version of this function tried HPSS (splitting audio into
-    a "percussive" and "harmonic" component, flagging spans where the
-    percussive component's frame-level loudness dominated). Tested
-    directly against a real honor-song recording with continuous hand
-    drum under continuous chanting, it found nothing: the vocals are
-    loud and sustained enough that the percussive component never
-    "wins" on a frame-by-frame loudness basis, even though the drum is
-    audibly present and steady throughout. That's a real limitation of
-    HPSS on music where percussion sits under, not beside, the dominant
-    sound.
-
-    This version instead detects onset events (any sharp increase in
-    spectral energy -- a drum hit, a plucked note, a consonant) and
-    checks how *densely and regularly* they occur in sliding windows.
-    Steady drumming produces frequent, evenly spaced onsets regardless
-    of what's mixed on top of it; sparse, irregular onsets (occasional
-    word attacks with no drum) don't. Verified against the same test
-    recording: this correctly flags a continuous span covering nearly
-    the entire ~35s track, matching what's actually audible in it.
-
-    This is still a heuristic about rhythmic density, not a classifier
-    that identifies "drums" as an instrument -- a different steady
-    pulse (a shaker, a clock, rhythmic clapping) would trigger the same
-    label. The label describes "steady rhythmic pulse detected", which
-    is what it actually measures.
-    """
     import librosa
     onset_env = librosa.onset.onset_strength(y=audio, sr=sr)
     times = librosa.times_like(onset_env, sr=sr)
@@ -1912,17 +1379,6 @@ def _detect_percussive_spans(audio: np.ndarray, sr: int, window_s: float = 2.0,
 
 
 def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
-    """
-    Whole-track transcription for uploaded audio (Live Demo's "Upload an
-    MP3" panel), meant for full songs rather than short mic phrases.
-    Shares its actual transcription/filtering/percussive-detection logic
-    with _transcribe_audio_blob (the mic path) -- see that function's
-    docstring and _whisper_transcribe_raw_segments for why. The only
-    real difference here is the percussive-detection minimum span length
-    (full tracks use a longer floor than short mic phrases do) and the
-    response shape (no legacy bytes_received/segment_count fields, since
-    nothing depends on those for this endpoint).
-    """
     with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
@@ -1946,18 +1402,6 @@ def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
 
 @app.post("/api/transcribe")
 async def transcribe(file: UploadFile = File(...), language: str = Form("en")):
-    """
-    Server-side speech-to-text via Whisper, for the sentiment demo's mic
-    input. See the WHISPER_MODEL_DIR loading block above for why this
-    exists instead of the browser's built-in speech recognition: that
-    only works in official Chrome/Edge, this works in every browser that
-    can record audio at all.
-
-    `language` comes from the frontend's English/Cree mic toggle:
-    "en" forces English (the original behavior). "cr" is passed through
-    as language=None to Whisper -- see _transcribe_audio_blob's docstring
-    for why there's no real "cr" option to force.
-    """
     if whisper_model_mic is None:
         return JSONResponse({"error": f"Whisper (mic model) not loaded: {whisper_load_error_mic}"}, status_code=503)
     try:
@@ -1977,15 +1421,6 @@ async def transcribe(file: UploadFile = File(...), language: str = Form("en")):
 
 @app.post("/api/transcribe/annotated")
 async def transcribe_annotated(file: UploadFile = File(...), language: str = Form("en")):
-    """
-    Whole-track transcription for Live Demo's uploaded audio, with
-    timestamped segments and hallucination filtering -- see
-    _transcribe_track_annotated's docstring for why this is a separate
-    endpoint from /api/transcribe rather than a flag on it: this does
-    real per-segment confidence filtering plus a full HPSS pass for
-    percussive detection, which is unnecessary weight for the mic's
-    short per-phrase calls.
-    """
     if whisper_model_track is None:
         return JSONResponse({"error": f"Whisper (track model) not loaded: {whisper_load_error_track}"}, status_code=503)
     try:
@@ -2051,7 +1486,6 @@ async def ws_broadcast(ws: WebSocket):
 
 @app.websocket("/ws/mic")
 async def ws_mic(ws: WebSocket):
-    """Browser streams float32 PCM -> Python runs aubio YIN -> sends back note JSON."""
     await ws.accept()
     if harmony_engine is None:
         await ws.send_text(json.dumps({"type": "error", "message": f"HarmonyEngine not loaded: {harmony_load_error}"}))
@@ -2074,13 +1508,6 @@ async def ws_mic(ws: WebSocket):
         start       = time.perf_counter()
 
         while True:
-            # A single frame of audio arrives as raw bytes; a mode switch
-            # arrives as JSON text on the same socket. receive() (rather
-            # than receive_bytes()) lets both share this one connection, so
-            # the frontend can flip pitch algorithms without tearing down
-            # and reconnecting the mic stream — which is what "switch mid-
-            # song" actually requires, since a reconnect would drop audio
-            # and reset every bit of rhythm/harmony state below.
             message = await ws.receive()
             if message.get("type") == "websocket.disconnect":
                 break
@@ -2106,43 +1533,15 @@ async def ws_mic(ws: WebSocket):
             if len(frame) == 0:
                 continue
 
-            # Same preprocessing path the local pipeline uses: one silence
-            # check, plus RMS normalization so quiet browser-mic input
-            # actually reaches the pitch detector at a usable level instead
-            # of being fed in raw. Previously this handler recomputed its
-            # own silence check inline and skipped normalization entirely,
-            # so the web demo and the local pipeline were quietly running
-            # on two different signal paths.
             clean_frame, is_voiced = preproc.process(frame)
-            # This call was missing entirely. Without it, rhythm.phrase_state
-            # never leaves its starting value and rhythm.current_tempo never
-            # leaves 0.0, which meant call_and_response and the tempo-based
-            # switch to contour_following could never actually trigger on
-            # this path, only in the local pipeline, which does call this.
             rhythm.push_frame(clean_frame, is_voiced)
 
             archer_hz       = None
             phoneme_profile = cree._neutral_profile
 
             if is_voiced:
-                # RMVPE gets the raw frame, not clean_frame -- see
-                # preprocessor.py's per-frame RMS renormalization, which
-                # introduces a gain discontinuity at every frame boundary.
-                # YIN handles that fine (hence clean_frame unchanged for
-                # it); RMVPE's mel-spectrogram over a long continuous
-                # window does not, and it has its own internal amplitude
-                # handling already (confirmed in test_rmvpe_standalone.py,
-                # which never renormalizes per-frame either).
                 pitch_input = frame if pitch.method == "rmvpe" else clean_frame
-                # Off the event loop for the same reason as /ws/pitch (see
-                # comment there) -- inline RMVPE inference here would block
-                # every other open connection this process is serving.
                 hz, conf = await asyncio.to_thread(pitch.detect, pitch_input)
-                # pitch.detect() already applies the correct method-specific
-                # confidence gate and returns hz=None below it -- don't
-                # re-check `conf` against the YIN-only cfg value here (see
-                # the detailed comment in /ws/pitch for why that silently
-                # dropped valid RMVPE readings).
                 if hz:
                     archer_hz = hz
                 phoneme_profile = cree.analyze(clean_frame)
@@ -2155,7 +1554,6 @@ async def ws_mic(ws: WebSocket):
 
             elapsed_s = time.perf_counter() - start
 
-            # Sovereignty: checked every frame, independent of translation/pitch
             harmony.protocol.check_sound_cue(archer_hz, is_voiced, elapsed_s)
 
             decision = harmony.decide(
@@ -2190,21 +1588,6 @@ async def ws_mic(ws: WebSocket):
 
 @app.websocket("/ws/pitch")
 async def ws_pitch(ws: WebSocket):
-    """
-    Lightweight pitch-only sibling of /ws/mic: no rhythm/harmony/Cree
-    state, just "audio in -> {hz, note, confidence, method} out". This is
-    what the frontend's live-demo pitch toggle (YIN vs RMVPE) talks to,
-    since running actual RMVPE inference in the browser isn't practical —
-    it's a trained U-Net + BiGRU, not a few lines of DSP like the YIN path
-    the demos already run client-side in JS. Streaming the mic to this
-    endpoint instead keeps the "toggle mid-song" requirement working
-    without duplicating /ws/mic's full harmony pipeline for a demo page
-    that only needs the detected note.
-
-    Query param `method` ("yin" | "yinfft" | "rmvpe") sets the starting
-    algorithm; the same {"type":"set_pitch_method","method":...} control
-    message /ws/mic accepts works here too, for switching mid-stream.
-    """
     await ws.accept()
     try:
         from config.config_loader import get_config
@@ -2216,13 +1599,6 @@ async def ws_pitch(ws: WebSocket):
         preproc = Preprocessor()
         pitch   = PitchDetector()
 
-        # The mic-capture panels force their AudioContext to 44100Hz to
-        # match config.yaml, but the Upload-MP3 panel opens a plain
-        # `new AudioContext()` with no rate specified -- the browser/OS
-        # picks (commonly 48000). Trusting cfg's sample_rate here instead
-        # of what the client actually sent silently mis-resamples every
-        # downstream pitch calculation. Apply the client's real rate
-        # before touching pitch.detect() at all.
         requested_sample_rate = ws.query_params.get("sample_rate")
         if requested_sample_rate:
             try:
@@ -2232,12 +1608,6 @@ async def ws_pitch(ws: WebSocket):
 
         requested_method = ws.query_params.get("method")
         if requested_method:
-            # set_method() synchronously loads the RMVPE checkpoint the
-            # first time it's ever requested in this process (later calls
-            # hit PitchDetector's process-wide model cache and return
-            # near-instantly). Running that first, one-time load in a
-            # thread keeps it from blocking every other open connection
-            # on this single-process event loop while it happens.
             await asyncio.to_thread(pitch.set_method, requested_method)
 
         while True:
@@ -2269,8 +1639,6 @@ async def ws_pitch(ws: WebSocket):
             clean_frame, is_voiced = preproc.process(frame)
 
             if is_voiced:
-                # See the identical comment in /ws/mic above: RMVPE gets
-                # the raw frame, YIN keeps getting clean_frame.
                 pitch_input = frame if pitch.method == "rmvpe" else clean_frame
                 # Run detect() off the event loop. For RMVPE this is a
                 # CNN+BiGRU inference call over up to a second of resampled
