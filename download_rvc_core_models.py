@@ -1,24 +1,3 @@
-"""
-Downloads the two universal RVC assets that rvc_server.py / rvc_pipeline.py
-need to run at all, regardless of which trained voice you use:
-
-  1. hubert_base.pt   -- the feature extractor every RVC voice conversion
-                          runs audio through before it ever touches a
-                          specific trained voice model.
-  2. rmvpe.pt          -- the pitch-extraction model config.yaml points at
-                          via pitch.rmvpe.model_path.
-
-Both are published by the original RVC author (lj1995) on HuggingFace and
-are the same files every RVC-based project uses -- they are NOT specific
-to this project's trained voices (female2, mi-test), which have to be
-supplied separately (see the README's "Neural singing voices" section).
-
-Usage:
-    python download_rvc_core_models.py
-
-Safe to re-run: existing files are left alone.
-"""
-
 import os
 import urllib.request
 

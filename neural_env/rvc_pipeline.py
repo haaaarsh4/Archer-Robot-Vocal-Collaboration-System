@@ -34,7 +34,7 @@ def _resample_np(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
     if orig_sr == target_sr:
         return audio
     import librosa
-    return librosa.resample(audio, orig_sr=orig_sr, target_sr=target_sr)
+    return librosa.resample(audio, orig_sr=orig_sr, target_sr=target_sr, res_type="soxr_vhq")
 
 
 _HP_B, _HP_A = signal.butter(N=5, Wn=48, btype="high", fs=16000)
@@ -70,12 +70,17 @@ class RVCOfflineVoice:
     _hubert_lock = threading.Lock()
 
     def __init__(self, model_path: str, index_path: str | None = None, device: str = "cpu",
-                 is_half: bool = False):
+                 is_half: bool = False, quantize_hubert: bool = False):
         self.device = torch.device(device)
         self.model_path = model_path
         self.index_path = index_path
         self.is_half = bool(is_half) and self.device.type == "cuda"
-        self.quantized = self.device.type == "cpu"
+        # Was unconditionally True whenever device == "cpu". int8 dynamic
+        # quantization is a real speed win on a weak CPU, but it measurably
+        # degrades the phonetic features HuBERT extracts -- the official
+        # WebUI never quantizes. Now opt-in, defaulting to off, since sound
+        # quality is the stated priority.
+        self.quantized = bool(quantize_hubert) and self.device.type == "cpu"
 
         cpt = torch.load(model_path, map_location="cpu")
         cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]
@@ -112,11 +117,11 @@ class RVCOfflineVoice:
                 self.index.nprobe = max(self.index.nprobe, 8)
             self.big_npy = self.index.reconstruct_n(0, self.index.ntotal)
 
-        key = f"{self.device}:{'half' if self.is_half else 'float'}"
+        key = f"{self.device}:{'half' if self.is_half else 'float'}:{'q8' if self.quantized else 'fp'}"
         with RVCOfflineVoice._hubert_lock:
             if key not in RVCOfflineVoice._hubert_cache:
                 hubert = load_hubert_model(self.device, is_half=self.is_half)
-                if self.device.type == "cpu":
+                if self.quantized:
                     hubert = torch.quantization.quantize_dynamic(
                         hubert, {torch.nn.Linear}, dtype=torch.qint8
                     )
@@ -129,7 +134,7 @@ class RVCOfflineVoice:
         sample_rate: int,
         rmvpe: RMVPEPitchExtractor,
         f0_up_key: float = 0,
-        index_rate: float = 0.66,
+        index_rate: float = 0.75,
         protect: float = 0.33,
         rms_mix_rate: float = 0.25,
         pad_seconds: float = 1.0,
@@ -167,6 +172,7 @@ class RVCOfflineVoice:
 
         p_len = audio_16k_t.shape[0] // 160
         pitch = pitchf = None
+        f0_clip_pct = 0.0
         if self.if_f0:
             f0 = rmvpe.infer(audio_16k, thred=0.03)
             f0 = f0 * pow(2.0, f0_up_key / 12.0)
@@ -181,7 +187,38 @@ class RVCOfflineVoice:
                 r = filter_radius if filter_radius % 2 == 1 else filter_radius + 1
                 f0 = signal.medfilt(f0, kernel_size=r)
 
+            # A median filter alone kills single-frame pitch-tracking
+            # glitches, but it also flattens genuine gradual pitch
+            # movement (vibrato, portamento, note-to-note glides) into
+            # short flat plateaus with hard jumps between them -- that
+            # staircase shape is exactly what reads as "auto-tuned" or
+            # "robotic" instead of sung, even when every individual pitch
+            # value is accurate. Savitzky-Golay fits a local polynomial
+            # through a short window instead of just picking the middle
+            # value, so it follows a real glide's actual shape rather
+            # than stepping through it. Window kept short (70ms) so it
+            # smooths frame jitter without also flattening real vibrato,
+            # which cycles faster than that.
+            if len(f0) >= 9:
+                win = min(7, len(f0) if len(f0) % 2 == 1 else len(f0) - 1)
+                if win >= 5:
+                    f0 = signal.savgol_filter(f0, window_length=win, polyorder=2)
+                    f0 = np.clip(f0, 0.0, None)
+
             f0_min, f0_max = 50.0, 1100.0
+            # Diagnostic only -- if a large fraction of the (already
+            # transposed) voiced frames sit outside the model's valid pitch
+            # embedding range, they get clamped to the same edge bin below,
+            # which sounds exactly like "autotune": many different real
+            # pitches all collapsing onto one flat note. This surfaces that
+            # as a printed percentage rather than silently clamping and
+            # leaving it a mystery why a given transpose value sounds
+            # robotic while another doesn't.
+            voiced_f0 = f0[~uv] if np.any(~uv) else f0
+            if len(voiced_f0):
+                out_of_range = np.sum((voiced_f0 < f0_min) | (voiced_f0 > f0_max))
+                f0_clip_pct = 100.0 * out_of_range / len(voiced_f0)
+
             f0_mel_min = 1127 * np.log(1 + f0_min / 700)
             f0_mel_max = 1127 * np.log(1 + f0_max / 700)
             f0_mel = 1127 * np.log(1 + f0 / 700)
@@ -193,6 +230,11 @@ class RVCOfflineVoice:
             pitch = torch.from_numpy(f0_coarse).unsqueeze(0).to(self.device)
             pitchf = torch.from_numpy(f0.astype(np.float32)).unsqueeze(0).to(self.device)
             pitchf = pitchf.half() if self.is_half else pitchf.float()
+
+        if f0_clip_pct > 15.0:
+            print(f"[rvc_pipeline] {f0_clip_pct:.0f}% of voiced frames fall outside the model's "
+                  f"50-1100Hz pitch range at this transpose setting (f0_up_key={f0_up_key:+.0f}) -- "
+                  "this will sound flat/robotic for those stretches. Try a different transpose value.")
 
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
         p_len = min(feats.shape[1], p_len)

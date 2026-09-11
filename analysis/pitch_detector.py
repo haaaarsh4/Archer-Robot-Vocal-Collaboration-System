@@ -52,11 +52,11 @@ class _RMVPEStream:
             self._raw_buffer = self._raw_buffer[-self._context_samples_raw:]
 
         if len(self._raw_buffer) < self._min_raw_needed:
-            return None, 0.0  # not enough audio yet for a meaningful window
+            return None, 0.0, False  # not enough audio yet for a meaningful window
 
         self._pushes_since_infer += 1
         if self._pushes_since_infer < self._infer_stride_hops and self._last_hz is not None:
-            return self._last_hz, self._last_conf
+            return self._last_hz, self._last_conf, False  # cached echo, not a new inference
         self._pushes_since_infer = 0
 
         if self._source_sr != self.TARGET_SR:
@@ -70,13 +70,13 @@ class _RMVPEStream:
 
         f0_hops, conf_hops = self._model.infer(audio_16k, voicing_threshold=self._voicing_threshold)
         if len(f0_hops) == 0:
-            return None, 0.0
+            return None, 0.0, True
 
         hz = float(f0_hops[-1])
         conf = float(conf_hops[-1])
         self._last_hz = hz if hz > 0 else None
         self._last_conf = conf
-        return self._last_hz, conf
+        return self._last_hz, conf, True
 
 
 class PitchDetector:
@@ -234,17 +234,28 @@ class PitchDetector:
         return smoothed_hz, best_conf
 
     def _detect_rmvpe(self, frame: np.ndarray) -> tuple:
-        hz, conf = self._rmvpe_stream.push(frame)
+        hz, conf, is_new = self._rmvpe_stream.push(frame)
 
         self._rmvpe_debug_counter += 1
         if self._rmvpe_debug_counter % 20 == 0:  # ~4x/sec at 512-sample hops @44.1kHz -- enough to see real numbers, not enough to flood the log
             logger.debug(
-                f"[rmvpe raw] hz={hz if hz else 0:.1f} conf={conf:.3f} "
+                f"[rmvpe raw] hz={hz if hz else 0:.1f} conf={conf:.3f} is_new={is_new} "
                 f"(gate: conf>={self._rmvpe_confidence_threshold}, hz in [{self.min_freq:.0f},{self.max_freq:.0f}])"
             )
 
         if hz is None or conf < self._rmvpe_confidence_threshold or not (self.min_freq <= hz <= self.max_freq):
             return None, conf
+
+        if not is_new:
+            # Cache echo of the last real inference -- _smooth() already
+            # made its decision about this exact reading the moment it
+            # first arrived. Re-running it through _smooth() here would
+            # let one noisy measurement "confirm" a pending jump against
+            # an identical copy of itself, which isn't confirmation at
+            # all -- it defeated the entire point of requiring two
+            # independent readings to agree before accepting a big jump.
+            # Just keep repeating whatever's already been committed.
+            return self._last_stable_hz, conf
 
         smoothed_hz = self._smooth(hz)
         return smoothed_hz, conf
