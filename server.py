@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import numpy as np
 import soundfile as sf
 import uvicorn
+from scipy.signal import butter, lfilter
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -129,12 +130,6 @@ _INTENSIFIERS = {
 
 
 def _roberta_valence(text: str):
-    """Runs the real model. Returns (valence, emotional_charge) where
-    valence is P(positive) - P(negative) in [-1, 1] -- a continuous score
-    from the model's own class probabilities, not just its single loudest
-    label -- and emotional_charge = 1 - P(neutral), i.e. how far the model
-    is from calling this sentence neutral at all, in [0, 1]. Returns None
-    if the model isn't loaded."""
     if roberta_sentiment is None:
         return None
     scores = {row["label"].lower(): row["score"] for row in roberta_sentiment(text)[0]}
@@ -238,13 +233,39 @@ TRACK_WHISPER_MODEL_SIZE = "large-v3-turbo"
 TRACK_WHISPER_MODEL_DIR = "data/models/faster-whisper-large-v3-turbo"
 
 
+def _whisper_compute_device() -> tuple:
+    """Pick the fastest device actually available instead of hardcoding CPU. int8-on-CPU was a
+    reasonable default when it might be the only option, but if this is ever deployed on a box
+    with an NVIDIA GPU, float16-on-CUDA is a large multiple faster for the same large-v3-turbo
+    weights, and this project already treats CUDA-if-available as the standard pattern
+    elsewhere (see DEVICE in translate_transformer.py). Falls back to CPU/int8 quietly if
+    torch isn't installed or CUDA init fails for any reason."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda", "float16"
+    except Exception as e:
+        print(f"[transcribe] CUDA check failed, staying on CPU ({e})")
+    return "cpu", "int8"
+
+
 def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpoint: str):
     if os.path.isdir(model_dir):
         try:
             from faster_whisper import WhisperModel
-            model = WhisperModel(model_size, device="cpu", compute_type="int8",
-                                  download_root=model_dir, local_files_only=True)
-            print(f"faster-whisper ({model_size}, int8, CPU) loaded from local files at {model_dir}.")
+            device, compute_type = _whisper_compute_device()
+            try:
+                model = WhisperModel(model_size, device=device, compute_type=compute_type,
+                                      download_root=model_dir, local_files_only=True)
+            except Exception as e:
+                if device == "cuda":
+                    print(f"faster-whisper ({model_size}) failed to load on CUDA ({e}); falling back to CPU/int8.")
+                    model = WhisperModel(model_size, device="cpu", compute_type="int8",
+                                          download_root=model_dir, local_files_only=True)
+                    device, compute_type = "cpu", "int8"
+                else:
+                    raise
+            print(f"faster-whisper ({model_size}, {compute_type}, {device.upper()}) loaded from local files at {model_dir}.")
             return model, "faster", None
         except Exception as e:
             print(f"faster-whisper ({model_size}) failed to load ({e}); trying legacy openai-whisper.")
@@ -316,6 +337,19 @@ except Exception as e:
     harmony_load_error = str(e)
     print(f"HarmonyEngine not loaded: {harmony_load_error}")
 
+synthesizer = None
+synthesizer_load_error = None
+try:
+    from synthesis.vocable_synthesizer import VocableSynthesizer
+    synthesizer = VocableSynthesizer()
+    if harmony_engine is not None:
+        harmony_engine.set_synthesizer(synthesizer)
+        print("Shared VocableSynthesizer initialized and wired to HarmonyEngine.")
+    else:
+        print("VocableSynthesizer created but HarmonyEngine not loaded yet.")
+except Exception as e:
+    synthesizer_load_error = str(e)
+    print(f"VocableSynthesizer not loaded: {synthesizer_load_error}")
 
 neural_timbre = None
 neural_timbre_load_error = None
@@ -611,6 +645,15 @@ def protocol_toggle():
     new_state = harmony_engine.protocol.toggle(source="manual_ui")
     return {"ok": True, "enabled": new_state}
 
+@app.post("/harmony/octave-shift")
+def set_octave_shift(req: dict):
+    """Set the octave shift offset in real-time. Updates live during playback."""
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    semitones = float(req.get("semitones", 0.0))
+    semitones = max(-24, min(24, semitones))
+    harmony_engine.set_octave_shift(semitones)
+    return {"ok": True, "semitones": semitones}
 
 @app.post("/protocol/enable")
 def protocol_enable():
@@ -634,7 +677,6 @@ class FusionModeRequest(BaseModel):
 
 @app.post("/harmony/fusion-mode")
 def set_fusion_mode(req: FusionModeRequest):
-    """Explicit opt-in for triadic harmony (contemporary/fusion only — never the default)."""
     if harmony_engine is None:
         return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
     harmony_engine.set_fusion_mode(req.enabled)
@@ -696,6 +738,66 @@ def neural_status():
     return status
 
 
+SAMPLES_NEURAL_DIR = Path(__file__).parent / "synthesis" / "samples" / "neural"
+
+
+@app.get("/api/vocables/manifest")
+def vocables_manifest():
+    """
+    Exposes the pre-rendered neural vocable takes -- the real recorded (and
+    voice-converted) "cold"/"moon"/"need"/etc. samples that DSP mode's own
+    Python pipeline already sings from -- to the browser, so the live mic
+    panel's DSP voice can play the ACTUAL recordings (pitch-shifted a
+    little in real time) instead of a synthetic sawtooth-and-formants
+    oscillator that has never had anything to do with what was recorded.
+
+    Returns available=False (not an error) if the bank hasn't been built
+    yet -- see build_vocable_bank.py -- so the browser can fall back to
+    a placeholder voice instead of breaking.
+    """
+    global synthesizer
+    if synthesizer is None or getattr(synthesizer, "_neural_bank", None) is None:
+        return {"available": False, "vocables": []}
+
+    bank = synthesizer._neural_bank
+    vocables = []
+    for vocable, bases in bank._bases.items():
+        registers = [
+            {
+                "name": base.name,
+                "f0_hz": round(float(base.f0_hz), 2),
+                "brightness": round(float(base.brightness), 3),
+                "duration_s": round(len(base.audio) / bank.sample_rate, 3),
+                "url": f"/api/vocables/sample/{base.name}.wav",
+            }
+            for base in bases
+        ]
+        vocables.append({"vocable": vocable, "registers": registers})
+
+    return {"available": True, "sample_rate": bank.sample_rate, "vocables": vocables}
+
+
+@app.get("/api/vocables/sample/{filename}")
+def vocables_sample(filename: str):
+    # Guard against path traversal -- only a bare filename, no separators
+    # or "..", and it must resolve to something actually inside the
+    # neural samples directory, never anything reachable by walking out
+    # of it.
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return JSONResponse({"error": "invalid filename"}, status_code=400)
+
+    candidate = (SAMPLES_NEURAL_DIR / filename).resolve()
+    try:
+        candidate.relative_to(SAMPLES_NEURAL_DIR.resolve())
+    except ValueError:
+        return JSONResponse({"error": "invalid filename"}, status_code=400)
+
+    if not candidate.exists() or candidate.suffix.lower() != ".wav":
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    return FileResponse(str(candidate), media_type="audio/wav")
+
+
 class RenderNoteRequest(BaseModel):
     target_hz: float
     vocable: str = "aah"
@@ -751,8 +853,10 @@ def render_neural_note(req: RenderNoteRequest):
         cfg = get_config()
         decision = _build_render_decision(req, cfg)
 
-        synth = VocableSynthesizer()
-        scratch_audio = synth.synthesize(decision)
+        global synthesizer
+        if synthesizer is None:
+            return JSONResponse({"error": "Synthesizer not loaded"}, status_code=503)
+        scratch_audio = synthesizer.synthesize(decision)
 
         sample_rate = cfg["audio"]["sample_rate"]
         final_audio = neural_timbre.convert(
@@ -770,21 +874,76 @@ def render_neural_note(req: RenderNoteRequest):
         return JSONResponse({"error": f"Render failed: {e}"}, status_code=500)
 
 
+def apply_echo_effect(audio: np.ndarray, sample_rate: int, delay_ms: float, feedback: float,
+                       max_repeats: int = 10, damping_hz: float = 3200.0) -> np.ndarray:
+    feedback = float(np.clip(feedback, 0.0, 0.88))
+    if feedback <= 0.001 or delay_ms <= 0 or len(audio) < 64:
+        return audio
+
+    delay_samples = int(delay_ms * sample_rate / 1000)
+    if delay_samples < 1:
+        return audio
+
+    n_audible = int(np.ceil(np.log(10 ** (-50 / 20)) / np.log(feedback)))
+    n_taps = max(1, min(max_repeats, n_audible))
+
+    out = np.zeros(len(audio) + delay_samples * n_taps, dtype=np.float64)
+    out[:len(audio)] = audio
+
+    tap_signal = audio.astype(np.float64)
+    nyquist = sample_rate / 2.0
+    for k in range(1, n_taps + 1):
+        gain = feedback ** k
+        corner_hz = max(500.0, damping_hz * (0.8 ** (k - 1)))
+        b, a = butter(2, min(0.99, corner_hz / nyquist), btype="low")
+        tap_signal = lfilter(b, a, tap_signal)  # cumulative -- each tap is filtered again on top of the last
+        start = delay_samples * k
+        end = start + len(tap_signal)
+        out[start:end] += tap_signal * gain
+
+    peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak > 1.0:
+        out = out / peak
+
+    return out.astype(np.float32)
+
+
 def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: str, voice_index: int,
                            mode_override: str | None = None, instruments_enabled: bool = True,
-                           transpose_semitones: float | None = None, apply_neural: bool = True) -> bytes:
+                           transpose_semitones: float | None = None, apply_neural: bool = True,
+                           delay_ms: float | None = None, echo_amount: float | None = None,
+                           contour_baseline_db: float | None = None,
+                           contour_max_bright_db: float | None = None,
+                           contour_max_dark_db: float | None = None) -> bytes:
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
     from analysis.pitch_detector import PitchDetector
     from analysis.rhythm_analyzer import RhythmAnalyzer
     from analysis.phonetic_analysis import CreeTokenizer
     from synthesis.harmony_engine import HarmonyEngine
-    from synthesis.vocable_synthesizer import VocableSynthesizer
+    from synthesis.vocable_synthesizer import (
+        VocableSynthesizer, apply_pitch_curve_follow, apply_amplitude_curve_follow,
+    )
     import librosa
 
     cfg = get_config()
     sample_rate = cfg["audio"]["sample_rate"]
     frame_size = cfg["audio"]["frame_size"]
+
+    mcfg = cfg.get("modes", {})
+    effective_delay_ms = float(delay_ms) if delay_ms is not None else float(mcfg.get("delay_echo_ms", 350.0))
+    effective_echo_feedback = (float(echo_amount) / 100.0) if echo_amount is not None \
+        else float(mcfg.get("delay_echo_feedback", 0.45))
+
+    synth_cfg_for_contour = cfg.get("synthesis", {})
+    _default_baseline_shift = float(synth_cfg_for_contour.get("contour_baseline_brightness_shift", 0.18))
+    _default_brightness_amount = float(synth_cfg_for_contour.get("contour_brightness_amount", 0.45))
+    effective_contour_baseline_db = float(contour_baseline_db) if contour_baseline_db is not None \
+        else _default_baseline_shift * 10.0
+    effective_contour_max_bright_db = float(contour_max_bright_db) if contour_max_bright_db is not None \
+        else effective_contour_baseline_db + _default_brightness_amount * 10.0
+    effective_contour_max_dark_db = float(contour_max_dark_db) if contour_max_dark_db is not None \
+        else max(0.0, _default_brightness_amount * 10.0 - effective_contour_baseline_db)
 
     audio, in_sr = sf.read(io.BytesIO(raw_audio_bytes), dtype="float32", always_2d=False)
     if audio.ndim > 1:
@@ -813,7 +972,15 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     harmony.set_texture(texture)
     if mode_override:
         harmony.set_forced_mode(mode_override)
-    synth = VocableSynthesizer()
+    harmony.set_contour_brightness_db(
+        effective_contour_baseline_db, effective_contour_max_bright_db, effective_contour_max_dark_db
+    )
+
+    global synthesizer
+    if synthesizer is None:
+        raise RuntimeError("Synthesizer not loaded - check server startup logs")
+    synth = synthesizer
+    harmony.set_synthesizer(synth)
 
     n_frames = len(audio) // frame_size
     frame_hop_s = frame_size / sample_rate
@@ -847,32 +1014,99 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
             tempo_bpm=rhythm.current_tempo, phoneme_profile=phoneme_profile,
         )
 
+        # RMS of this frame's own (gated/cleaned) input -- one reading per
+        # frame, same cadence as the pitch curve above. This is what lets
+        # the rendered note's OWN loudness follow the real performance's
+        # dynamics afterward (see apply_amplitude_curve_follow) instead of
+        # every note coming out at one fixed, static volume regardless of
+        # whether the singer was belting or barely audible.
+        frame_rms = float(np.sqrt(np.mean(clean.astype(np.float64) ** 2))) if is_voiced else 0.0
+
         if decision.action == "sing":
-            current_run = {"start_frame": i, "decision": decision, "n_frames": 1}
+            current_run = {"start_frame": i, "decision": decision, "n_frames": 1,
+                            "pitch_curve": [decision.target_hz],
+                            "amplitude_curve": [frame_rms]}
             runs.append(current_run)
         elif decision.action == "sustain":
             if current_run is None:
-                current_run = {"start_frame": i, "decision": decision, "n_frames": 1}
+                current_run = {"start_frame": i, "decision": decision, "n_frames": 1,
+                                "pitch_curve": [decision.target_hz],
+                                "amplitude_curve": [frame_rms]}
                 runs.append(current_run)
             else:
                 current_run["n_frames"] += 1
+                if decision.target_hz is not None and decision.target_hz > 0:
+                    current_run["pitch_curve"].append(decision.target_hz)
+                current_run["amplitude_curve"].append(frame_rms)
         else:
             current_run = None
 
+    SAME_WORD_CROSSFADE_S = 0.03
+    WORD_CHANGE_CROSSFADE_S = 0.09
+    GAP_FADE_IN_S = 0.008  # just long enough to kill a true zero-to-full-amplitude click after real silence
     MAX_RUN_SECONDS = 12.0  # safety cap so one stuck drone/note can't blow up render time/memory
+
+    content_end = 0  # furthest sample index any run actually wrote audio into
+    prev_vocable: str | None = None
     for run in runs:
         decision = run["decision"]
         decision.duration_s = min(run["n_frames"] * frame_hop_s, MAX_RUN_SECONDS)
-        scratch = synth.synthesize(decision)
+        scratch = synth.synthesize(decision, blocking=True, apply_crossfade=False)
+
+        pitch_curve = np.asarray(run["pitch_curve"], dtype=np.float64)
+        if pitch_curve.size >= 2 and decision.target_hz:
+            scratch = apply_pitch_curve_follow(
+                scratch, sample_rate, base_hz=decision.target_hz,
+                pitch_curve_hz=pitch_curve, frame_hop_s=frame_hop_s,
+            )
+
+        amplitude_curve = np.asarray(run["amplitude_curve"], dtype=np.float64)
+        if amplitude_curve.size >= 2:
+            scratch = apply_amplitude_curve_follow(
+                scratch, sample_rate, amplitude_curve=amplitude_curve, frame_hop_s=frame_hop_s,
+            )
+        scratch = np.asarray(scratch, dtype=np.float32).copy()
+
         start_sample = run["start_frame"] * frame_size
         end_sample = start_sample + len(scratch)
         if end_sample > len(robot):
             robot = np.pad(robot, (0, end_sample - len(robot)))
-        robot[start_sample:end_sample] += scratch
+
+        vocable_changed = prev_vocable is not None and getattr(decision, "vocable", None) != prev_vocable
+        overlap = content_end - start_sample
+
+        if overlap > 0:
+            cf = int((WORD_CHANGE_CROSSFADE_S if vocable_changed else SAME_WORD_CROSSFADE_S) * sample_rate)
+            cf = max(0, min(cf, overlap, len(scratch)))
+            if cf > 0:
+                if vocable_changed:
+                    t = np.linspace(0, np.pi / 2, cf)
+                    fade_in, fade_out = np.sin(t), np.cos(t)
+                else:
+                    fade_in = np.linspace(0, 1, cf)
+                    fade_out = np.linspace(1, 0, cf)
+                existing = robot[start_sample:start_sample + cf]
+                robot[start_sample:start_sample + cf] = existing * fade_out + scratch[:cf] * fade_in
+                robot[start_sample + cf:end_sample] = scratch[cf:]
+            else:
+                robot[start_sample:end_sample] = scratch
+        else:
+            gap_fade = min(int(GAP_FADE_IN_S * sample_rate), len(scratch))
+            if gap_fade > 0 and start_sample > 0:
+                scratch[:gap_fade] *= np.linspace(0.0, 1.0, gap_fade)
+            robot[start_sample:end_sample] = scratch
+
+        content_end = max(content_end, end_sample)
+        prev_vocable = getattr(decision, "vocable", None)
+
+    robot = robot[:max(len(audio), content_end)]
 
     peak = float(np.max(np.abs(robot))) if robot.size else 0.0
     if peak > 1.0:
         robot = robot / peak  # avoid clipping where overlapping/sustained notes summed above 0dBFS
+
+    if mode_override == "delayed_response":
+        robot = apply_echo_effect(robot, sample_rate, effective_delay_ms, effective_echo_feedback)
 
     if not apply_neural:
         out_buf = io.BytesIO()
@@ -900,12 +1134,21 @@ async def render_dsp_track(
     pitch_method: str = Form("yin"),
     mode: str = Form(""),
     instruments_enabled: bool = Form(True),
+    delay_ms: float | None = Form(None),
+    echo_amount: float | None = Form(None),
+    contour_baseline_db: float | None = Form(None),
+    contour_max_bright_db: float | None = Form(None),
+    contour_max_dark_db: float | None = Form(None),
 ):
     try:
         raw = await file.read()
         wav_bytes = await asyncio.to_thread(
-            _render_track_offline, raw, pitch_method, texture, 0, (mode or None),
-            instruments_enabled, None, False,
+            _render_track_offline, raw, pitch_method, texture, 0,
+            mode_override=(mode or None), instruments_enabled=instruments_enabled,
+            transpose_semitones=None, apply_neural=False,
+            delay_ms=delay_ms, echo_amount=echo_amount,
+            contour_baseline_db=contour_baseline_db, contour_max_bright_db=contour_max_bright_db,
+            contour_max_dark_db=contour_max_dark_db,
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
@@ -922,6 +1165,11 @@ async def render_neural_track(
     mode: str = Form(""),
     instruments_enabled: bool = Form(True),
     transpose_semitones: float | None = Form(None),
+    delay_ms: float | None = Form(None),
+    echo_amount: float | None = Form(None),
+    contour_baseline_db: float | None = Form(None),
+    contour_max_bright_db: float | None = Form(None),
+    contour_max_dark_db: float | None = Form(None),
 ):
     if neural_timbre is None or not neural_timbre.enabled or not neural_timbre._reachable:
         return JSONResponse(
@@ -934,8 +1182,12 @@ async def render_neural_track(
     try:
         raw = await file.read()
         wav_bytes = await asyncio.to_thread(
-            _render_track_offline, raw, pitch_method, texture, voice_index, (mode or None), instruments_enabled,
-            transpose_semitones
+            _render_track_offline, raw, pitch_method, texture, voice_index,
+            mode_override=(mode or None), instruments_enabled=instruments_enabled,
+            transpose_semitones=transpose_semitones,
+            delay_ms=delay_ms, echo_amount=echo_amount,
+            contour_baseline_db=contour_baseline_db, contour_max_bright_db=contour_max_bright_db,
+            contour_max_dark_db=contour_max_dark_db,
         )
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
@@ -943,48 +1195,112 @@ async def render_neural_track(
         return JSONResponse({"error": f"Render failed: {e}"}, status_code=500)
 
 
-def _silence_instrumental_spans(audio: np.ndarray, sample_rate: int, log_prefix: str) -> np.ndarray:
-    duration_s = len(audio) / sample_rate
-    window_s = min(2.0, max(0.5, duration_s))
-    min_duration_s = max(0.2, min(0.6, duration_s / 4))
-    spans = _detect_percussive_spans(audio, sample_rate, window_s=window_s, min_duration_s=min_duration_s)
+_demucs_model = None
+_demucs_lock = threading.Lock()
+
+
+def _get_demucs_model():
+    global _demucs_model
+    if _demucs_model is not None:
+        return _demucs_model
+    with _demucs_lock:
+        if _demucs_model is None:
+            from demucs.pretrained import get_model
+            print("[demucs] loading htdemucs source-separation model (first call only, "
+                  "downloads weights if not already cached)...")
+            _demucs_model = get_model("htdemucs")
+            _demucs_model.eval()
+            print("[demucs] htdemucs ready.")
+    return _demucs_model
+
+
+def _separate_vocal(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    import torch
+    from demucs.apply import apply_model
+    from demucs.audio import convert_audio
+
+    model = _get_demucs_model()
+    wav = torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32)).unsqueeze(0)  # (1, n) mono
+    if wav.shape[0] == 1:
+        wav = wav.expand(2, -1)  # demucs expects stereo-shaped input; duplicate mono to both channels
+    wav = convert_audio(wav, sample_rate, model.samplerate, model.audio_channels)
+
+    with torch.no_grad():
+        sources = apply_model(model, wav.unsqueeze(0), device="cpu", progress=False)[0]
+
+    source_names = model.sources  # typically ["drums", "bass", "other", "vocals"]
+    vocals_idx = source_names.index("vocals")
+    vocal_stem = sources[vocals_idx].mean(dim=0).cpu().numpy()
+
+    if model.samplerate != sample_rate:
+        import librosa
+        vocal_stem = librosa.resample(vocal_stem, orig_sr=model.samplerate, target_sr=sample_rate)
+
+    vocal_stem = np.asarray(vocal_stem, dtype=np.float32)
+    n = len(audio)
+    if len(vocal_stem) == n:
+        return vocal_stem
+    if len(vocal_stem) > n:
+        return vocal_stem[:n]
+    return np.pad(vocal_stem, (0, n - len(vocal_stem)))
+
+
+def _silence_instrumental_spans(audio: np.ndarray, sample_rate: int, log_prefix: str,
+                                 frame_s: float = 0.10, min_span_s: float = 0.3,
+                                 harmonic_ratio_threshold: float = 0.35,
+                                 flatness_threshold: float = 0.35) -> np.ndarray:
+    n = len(audio)
+    if n < int(frame_s * sample_rate):
+        return audio
+
+    import librosa
+    harmonic, percussive = librosa.effects.hpss(audio)
+
+    hop = max(1, int(frame_s * sample_rate))
+    n_frames = max(1, n // hop)
+
+    stft_mag = np.abs(librosa.stft(audio, n_fft=1024, hop_length=256)) + 1e-10
+    flatness_full = librosa.feature.spectral_flatness(S=stft_mag)[0]
+    flatness_times = librosa.frames_to_time(np.arange(len(flatness_full)), sr=sample_rate, hop_length=256)
+
+    is_instrumental = np.zeros(n_frames, dtype=bool)
+    for i in range(n_frames):
+        start_i = i * hop
+        end_i = min(n, start_i + hop)
+        he = float(np.sum(harmonic[start_i:end_i].astype(np.float64) ** 2))
+        pe = float(np.sum(percussive[start_i:end_i].astype(np.float64) ** 2))
+        total = he + pe
+        if total <= 1e-9:
+            continue
+        ratio = he / total
+
+        t0, t1 = start_i / sample_rate, end_i / sample_rate
+        mask = (flatness_times >= t0) & (flatness_times < t1)
+        flat = float(np.mean(flatness_full[mask])) if np.any(mask) else 1.0
+
+        is_instrumental[i] = not (ratio >= harmonic_ratio_threshold and flat <= flatness_threshold)
+
+    spans = []
+    cur_start = None
+    for i in range(n_frames):
+        if is_instrumental[i] and cur_start is None:
+            cur_start = i * hop / sample_rate
+        elif not is_instrumental[i] and cur_start is not None:
+            end_t = i * hop / sample_rate
+            if end_t - cur_start >= min_span_s:
+                spans.append((cur_start, end_t))
+            cur_start = None
+    if cur_start is not None:
+        end_t = n / sample_rate
+        if end_t - cur_start >= min_span_s:
+            spans.append((cur_start, end_t))
+
     if not spans:
         return audio
 
-    vocal_segments = []
-    if whisper_model_track is not None:
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                sf.write(tmp.name, audio, sample_rate, format="WAV")
-                tmp_path = tmp.name
-            try:
-                raw_segments = _whisper_transcribe_raw_segments(
-                    tmp_path, "en", whisper_model_track, whisper_backend_track
-                )
-                vocal_segments = [s for s in raw_segments if s["no_speech_prob"] < WHISPER_NO_SPEECH_VOCAL_PRESENT_THRESHOLD]
-            finally:
-                os.unlink(tmp_path)
-        except Exception as e:
-            print(f"[{log_prefix}] vocal-presence check failed ({e}) -- falling back to "
-                  "rhythmic-density-only silencing for this render.")
-    else:
-        print(f"[{log_prefix}] Whisper not loaded -- can't confirm vocal presence, falling back to "
-              "rhythmic-density-only silencing (may over-silence chant-over-drum content).")
-
-    def _has_vocal_overlap(start_s, end_s):
-        return any(seg["start"] < end_s and seg["end"] > start_s for seg in vocal_segments)
-
-    kept_spans = [(s, e) for s, e in spans if not _has_vocal_overlap(s, e)]
-    skipped = len(spans) - len(kept_spans)
-    if skipped:
-        print(f"[{log_prefix}] kept {skipped} percussive span(s) that overlapped confident vocal "
-              "segments -- not silencing real singing just because a drum is also present.")
-
-    if not kept_spans:
-        return audio
-
-    fade_samples = int(0.02 * sample_rate)  # 20ms, avoids an audible click at the silencing boundary
-    for start_s, end_s in kept_spans:
+    audio = audio.copy()
+    fade_samples = int(0.02 * sample_rate)
+    for start_s, end_s in spans:
         start_i = max(0, int(start_s * sample_rate))
         end_i = min(len(audio), int(end_s * sample_rate))
         if end_i <= start_i:
@@ -996,8 +1312,9 @@ def _silence_instrumental_spans(audio: np.ndarray, sample_rate: int, log_prefix:
         fi = min(fade_samples, len(audio) - end_i)
         if fi > 0:
             audio[end_i:end_i + fi] *= np.linspace(0.0, 1.0, fi, dtype=np.float32)
-    print(f"[{log_prefix}] instruments disabled: silenced {len(kept_spans)} confirmed-instrumental "
-          f"span(s) totaling {sum(e - s for s, e in kept_spans):.1f}s before RVC conversion")
+
+    print(f"[{log_prefix}] (fallback) silenced {len(spans)} instrumental span(s) totaling "
+          f"{sum(e - s for s, e in spans):.1f}s (frame-level HPSS, {n / sample_rate:.1f}s clip)")
     return audio
 
 
@@ -1018,15 +1335,30 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds:
         audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
+    DEMUCS_MIN_DURATION_S = 6.0
+    duration_s = len(audio) / sample_rate
+
+    audio_for_rvc = audio
+
     if not instruments_enabled:
-        try:
-            audio = _silence_instrumental_spans(audio, sample_rate, "convert-track direct")
-        except Exception as e:
-            print(f"[convert-track direct] percussive detection skipped: {e}")
+        if duration_s >= DEMUCS_MIN_DURATION_S:
+            try:
+                vocal_stem = _separate_vocal(audio, sample_rate)
+                audio_for_rvc = vocal_stem
+                print(f"[convert-track direct] separated vocal from instrumental via Demucs "
+                      f"({duration_s:.1f}s clip) -- RVC converts the isolated vocal only, and "
+                      "the instrumental is discarded entirely: \"instruments off\" means the "
+                      "robot performs solo, with no drum/instrument sound in the output at all.")
+            except Exception as e:
+                print(f"[convert-track direct] Demucs separation failed ({e}) -- falling back "
+                      "to frame-level instrumental muting for this render.")
+                audio_for_rvc = _silence_instrumental_spans(audio, sample_rate, "convert-track direct")
+        else:
+            audio_for_rvc = _silence_instrumental_spans(audio, sample_rate, "convert-track direct")
 
     timeout_s = float(cfg.get("synthesis", {}).get("neural", {}).get("offline_render_timeout_s", 900))
     converted = neural_timbre.convert_blocking(
-        audio, sample_rate, voice_index=voice_index, timeout_s=timeout_s, pad_seconds=pad_seconds,
+        audio_for_rvc, sample_rate, voice_index=voice_index, timeout_s=timeout_s, pad_seconds=pad_seconds,
         transpose_semitones=transpose_semitones,
     )
     if converted is None:
@@ -1035,8 +1367,10 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds:
             "is running and see its terminal output / GET /neural/status."
         )
 
+    final = converted
+
     out_buf = io.BytesIO()
-    sf.write(out_buf, converted.astype(np.float32), sample_rate, format="WAV")
+    sf.write(out_buf, final.astype(np.float32), sample_rate, format="WAV")
     return out_buf.getvalue()
 
 
@@ -1137,6 +1471,69 @@ def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
     }
 
 
+def _detect_vocal_pitch_spans(raw_audio_bytes: bytes, min_duration_s: float = 0.3,
+                               max_gap_s: float = 0.5) -> list:
+    """Frame-by-frame scan for a real, trackable fundamental frequency, using this project's
+    own pitch engine (the same RMVPE/YIN detector that drives the live accompaniment pitch
+    tracking) -- not Whisper's no_speech_prob. A stretch of audio with a detected pitch in it
+    is, by definition, not silence, regardless of whether Whisper's speech-likelihood model
+    recognizes it as "speech". This is the ground truth used to force a transcription attempt
+    on anything Whisper's own silence gate would otherwise have thrown away, per the reference
+    audio's own dozens of short sung/chanted pulses across ~80% of its length.
+
+    Short gaps between pitched frames (a breath, a consonant, the dip between two notes in an
+    "ah-ah-ah" style vocable run) are bridged rather than treated as separate spans, since
+    those are one continuous vocal phrase, not silence.
+    """
+    from config.config_loader import get_config
+    from core.preprocessor import Preprocessor
+    from analysis.pitch_detector import PitchDetector
+
+    cfg = get_config()
+    sample_rate = cfg["audio"]["sample_rate"]
+    frame_size = cfg["audio"]["frame_size"]
+    frame_time_s = frame_size / sample_rate
+
+    audio = _decode_audio_via_ffmpeg(raw_audio_bytes, sample_rate)
+    audio = np.ascontiguousarray(audio, dtype=np.float32)
+
+    preproc = Preprocessor()
+    pitch = PitchDetector()
+    pitch.set_method("rmvpe")
+
+    n_frames = len(audio) // frame_size
+    voiced_flags = []
+    for i in range(n_frames):
+        frame = audio[i * frame_size:(i + 1) * frame_size]
+        clean, is_voiced = preproc.process(frame)
+        hz = None
+        if is_voiced:
+            pitch_input = frame if pitch.method == "rmvpe" else clean
+            hz, _conf = pitch.detect(pitch_input)
+        else:
+            pitch.reset()
+        voiced_flags.append(bool(hz))
+
+    spans = []
+    cur_start = None
+    last_voiced_end = 0.0
+    for i, voiced in enumerate(voiced_flags):
+        t = i * frame_time_s
+        if voiced:
+            if cur_start is None:
+                cur_start = t
+            last_voiced_end = t + frame_time_s
+        elif cur_start is not None and (t - last_voiced_end) > max_gap_s:
+            spans.append((cur_start, last_voiced_end))
+            cur_start = None
+    if cur_start is not None:
+        spans.append((cur_start, last_voiced_end))
+
+    return [(round(s, 2), round(e, 2)) for s, e in spans if e - s >= min_duration_s]
+
+
+
+
 @app.post("/api/pitch/analyze-track")
 async def analyze_pitch_track(
     file: UploadFile = File(...),
@@ -1155,29 +1552,64 @@ WHISPER_LOGPROB_THRESHOLD = -1.0
 WHISPER_COMPRESSION_RATIO_THRESHOLD = 2.4
 WHISPER_NO_SPEECH_THRESHOLD = 0.6
 
-WHISPER_NO_SPEECH_VOCAL_PRESENT_THRESHOLD = 0.5
 
+def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend,
+                                      use_vad: bool = True,
+                                      no_speech_threshold: "float | None" = WHISPER_NO_SPEECH_THRESHOLD,
+                                      beam_size: int = 5, best_of: int = 5,
+                                      temperature: tuple = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)) -> list:
+    """Run Whisper decode.
 
-def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) -> list:
+    use_vad controls whether Silero VAD pre-filters audio before Whisper ever
+    sees it. VAD is tuned to detect *talking* -- pauses, breath, silence
+    between sentences. Sustained singing, chant, and wordless vocables (long
+    held notes, "ah-ah-ah" type vocalizing) do not always look like "speech"
+    to it, so VAD can silently drop whole stretches of a song before Whisper
+    gets a chance to attempt a decode at all. That produces the symptom of
+    "the first spoken line transcribes fine, then nothing for the rest of
+    the track" -- it's not that Whisper heard the rest and rejected it, VAD
+    never handed it over. Track/song uploads should therefore run with
+    use_vad=False so every second of audio gets a decode attempt; the
+    hallucination-confidence check downstream is what separates real speech
+    from noise, not VAD. Live mic input can keep VAD, since that path is
+    about chunking a real-time stream on pauses, not full-song coverage.
+
+    beam_size/best_of/temperature are exposed so a forced re-decode on
+    already-uncertain material (see _force_transcribe_clip) can use a cheaper
+    config -- full 5-wide beam search plus a 6-step temperature ladder is
+    worth paying for the primary pass, where getting real English words right
+    matters, but is wasted compute on a clip we already know isn't going to
+    produce a clean high-confidence result.
+    """
     if backend == "faster":
-        def _run(lang, want_words):
-            segments_iter, _info = model.transcribe(
-                tmp_path, language=lang, beam_size=5, vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=400), word_timestamps=want_words,
+        def _run(lang, want_words, vad):
+            kwargs = dict(
+                language=lang, beam_size=beam_size, best_of=best_of, word_timestamps=want_words,
+                condition_on_previous_text=False,  # prevents repetition-loop hallucination cascades on music
+                temperature=temperature,  # retries at higher temp instead of giving up silently
+                compression_ratio_threshold=WHISPER_COMPRESSION_RATIO_THRESHOLD,
+                log_prob_threshold=WHISPER_LOGPROB_THRESHOLD,
+                no_speech_threshold=no_speech_threshold,
             )
+            if vad:
+                kwargs["vad_filter"] = True
+                kwargs["vad_parameters"] = dict(min_silence_duration_ms=400)
+            else:
+                kwargs["vad_filter"] = False
+            segments_iter, _info = model.transcribe(tmp_path, **kwargs)
             return list(segments_iter)
 
         try:
-            segments = _run(language, True)
+            segments = _run(language, True, use_vad)
         except Exception as e:
             if language is None:
                 print(f"[transcribe] auto-detect decode failed ({e}); retrying with language='en'")
                 language = "en"
             try:
-                segments = _run(language, True)
+                segments = _run(language, True, use_vad)
             except Exception as e2:
                 print(f"[transcribe] word-timestamp alignment failed ({e2}); retrying without word timestamps")
-                segments = _run(language, False)
+                segments = _run(language, False, use_vad)
         return [
             {"start": s.start, "end": s.end, "text": s.text.strip(),
              "avg_logprob": s.avg_logprob, "no_speech_prob": s.no_speech_prob,
@@ -1188,7 +1620,15 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) ->
 
     if backend == "openai":
         def _run(lang, want_words):
-            return model.transcribe(tmp_path, language=lang, fp16=False, word_timestamps=want_words)
+            return model.transcribe(
+                tmp_path, language=lang, fp16=False, word_timestamps=want_words,
+                condition_on_previous_text=False,
+                temperature=temperature,
+                compression_ratio_threshold=WHISPER_COMPRESSION_RATIO_THRESHOLD,
+                logprob_threshold=WHISPER_LOGPROB_THRESHOLD,
+                no_speech_threshold=no_speech_threshold,
+                beam_size=beam_size, best_of=best_of,
+            )
 
         try:
             result = _run(language, True)
@@ -1213,25 +1653,182 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend) ->
     return []
 
 
+
+# Whisper meta-tags it sometimes emits for non-speech audio ("[Music]", "(singing)", music
+# notes, etc.) -- these aren't a transcription of anything and should never appear in the
+# anglicized text.
+_WHISPER_META_TAG_RE = re.compile(r"[\[\(][^\]\)]{0,40}[\]\)]|[\u266a\u266b\u2669-\u266c]")
+# Collapses pathological repeat loops (the classic Whisper-on-music failure mode: the same
+# token or short phrase repeated dozens of times) down to a natural handful of repeats instead
+# of either the full garbage run or discarding the segment outright.
+_REPEAT_RUN_RE = re.compile(r"\b(\w+(?:\s+\w+){0,3})\b(?:\s+\1\b){2,}", re.IGNORECASE)
+
+
+def _anglicize_cleanup(text: str, max_repeats: int = 3) -> str:
+    """Turn a raw, not-fully-confident Whisper decode into a readable anglicized line.
+
+    This is deliberately NOT translation and never touches meaning -- it only cleans up the
+    artifacts of forcing an English decoder to render sounds (including Cree words and
+    wordless vocables) it doesn't have real words for: bracketed meta-tags, music-note
+    glyphs, and the repeated-token loops Whisper falls into when it isn't sure what it's
+    hearing. What's left is Whisper's best phonetic-English spelling of the sound, which is
+    exactly what an anglicized rendering is supposed to be.
+    """
+    if not text:
+        return ""
+    cleaned = _WHISPER_META_TAG_RE.sub(" ", text)
+
+    def _collapse(m: "re.Match") -> str:
+        phrase = m.group(1)
+        return " ".join([phrase] * max_repeats)
+
+    prev = None
+    while prev != cleaned:
+        prev = cleaned
+        cleaned = _REPEAT_RUN_RE.sub(_collapse, cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,-\u2026")
+    return cleaned
+
+
+def _merge_nearby_gaps(gaps: list, merge_gap_s: float = 2.5, max_chunk_s: float = 8.0) -> list:
+    """Bundle nearby uncovered pitch gaps into a handful of phrase-length spans instead of
+    dozens of individual pulses. Each merged span becomes exactly one forced-decode call
+    below, which is what keeps the call count low without falling back to a single pass over
+    the *entire* track -- dumping a whole song into one decode is what buried short vocal
+    bursts inside a mostly-silent/percussive window and made Whisper skip them outright
+    (that was the previous version's regression). max_chunk_s puts a hard ceiling on how much
+    gets merged into one clip for the same reason: even if the pitch detector finds long
+    near-continuous stretches, capping each forced-decode clip at a few seconds keeps enough
+    of a short-context advantage that Whisper can't just gloss over a burst the way it does
+    inside a much longer window."""
+    if not gaps:
+        return []
+    ordered = sorted(gaps, key=lambda g: g["start"])
+    merged = [dict(ordered[0])]
+    for g in ordered[1:]:
+        candidate_end = max(merged[-1]["end"], g["end"])
+        fits_gap = g["start"] - merged[-1]["end"] <= merge_gap_s
+        fits_cap = candidate_end - merged[-1]["start"] <= max_chunk_s
+        if fits_gap and fits_cap:
+            merged[-1]["end"] = candidate_end
+        else:
+            merged.append(dict(g))
+    return merged
+
+
+def _extract_audio_clip_to_tempfile(raw_audio_bytes: bytes, start_s: float, end_s: float,
+                                     pad_s: float = 0.15) -> str:
+    """Trim raw_audio_bytes down to [start_s - pad_s, end_s + pad_s] and write it out as a
+    16kHz mono wav. The small padding gives Whisper a sliver of surrounding audio so a burst
+    right at the clip boundary doesn't get its onset/tail clipped mid-word."""
+    with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp_in:
+        tmp_in.write(raw_audio_bytes)
+        tmp_in_path = tmp_in.name
+    out_fd, out_path = tempfile.mkstemp(suffix=".wav")
+    os.close(out_fd)
+    try:
+        clip_start = max(0.0, start_s - pad_s)
+        duration = max(0.05, (end_s + pad_s) - clip_start)
+        # -ss placed AFTER -i (output/decode seeking) instead of before it: input seeking on a
+        # compressed format like mp3 is only approximately frame-accurate, and a clip that's
+        # off by even a fraction of a second can hand Whisper the tail of one phrase and the
+        # head of the next instead of the actual phrase the pitch detector flagged -- which
+        # would look exactly like "transcribing the wrong thing" even if the decode itself is
+        # working correctly. Output seeking costs a bit more (ffmpeg decodes from the start of
+        # the file to find the exact point) but guarantees the clip boundaries are the real
+        # ones, and these clips are short enough that the extra cost is negligible.
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", tmp_in_path, "-ss", f"{clip_start:.3f}",
+             "-t", f"{duration:.3f}", "-ac", "1", "-ar", "16000", out_path],
+            capture_output=True, check=True,
+        )
+        return out_path
+    except subprocess.CalledProcessError as e:
+        try:
+            os.unlink(out_path)
+        except OSError:
+            pass
+        raise RuntimeError(f"ffmpeg clip extraction failed: {e.stderr.decode(errors='replace')[:300]}")
+    finally:
+        try:
+            os.unlink(tmp_in_path)
+        except OSError:
+            pass
+
+
+def _force_transcribe_clip(raw_audio_bytes: bytes, start_s: float, end_s: float,
+                            language, model, backend) -> str:
+    """Force a transcription attempt on a merged phrase-length clip the pitch detector has
+    confirmed has a real singing voice somewhere in it, with Whisper's silence gate off so it
+    hands back its best phonetic-English guess instead of being allowed to call it silence.
+
+    This uses the SAME beam_size=5/best_of=5/full-temperature-ladder config as the primary
+    pass, not a cheaper greedy shortcut. A cheaper decode was tried here and made things worse,
+    not just lower-quality: beam_size=1 (greedy) decoding has a well-known failure mode where
+    it commits early to a single continuation and can predict an end-of-segment token well
+    before the audio actually ends, with no alternative hypotheses to fall back on -- which is
+    exactly what a 6-second clip collapsing to "Hey" and a 10-second clip collapsing to "named"
+    looks like. Beam search keeps several candidate continuations alive and scores them over
+    the full length, which is the standard mitigation for this. The call-count reduction from
+    _merge_nearby_gaps is what pays for this quality, not a cheaper decode per call."""
+    clip_path = _extract_audio_clip_to_tempfile(raw_audio_bytes, start_s, end_s)
+    try:
+        raw_segs = _whisper_transcribe_raw_segments(
+            clip_path, language, model, backend, use_vad=False, no_speech_threshold=None)
+    finally:
+        try:
+            os.unlink(clip_path)
+        except OSError:
+            pass
+    joined = " ".join(s["text"] for s in raw_segs if s["text"]).strip()
+    return _anglicize_cleanup(joined, max_repeats=2)
+
+
 def _classify_segments(raw_segments: list) -> list:
+    """Three-tier classification instead of a blunt confident/discarded split.
+
+    Tier "speech"    -- passes all of Whisper's own reliability checks: shown as normal,
+                         high-confidence English text (this is where genuine spoken English,
+                         e.g. the emcee's introduction, ends up).
+    Tier "vocal"      -- fails the strict checks but Whisper still heard something
+                         voice-like (no_speech_prob isn't near-certain silence/noise) and
+                         produced text: shown as an anglicized, lower-confidence line after
+                         cleanup. This is where sung Cree and wordless vocables land, instead
+                         of being thrown away as a generic "[non-lexical vocals]" tag.
+    Tier "silent"     -- no_speech_prob is high AND there's no usable text left after
+                         cleanup: genuinely nothing lexical here. Left unlabeled; the
+                         instrument/percussion pass fills these gaps in afterward.
+    """
     annotated = []
     for s in raw_segments:
-        likely_hallucinated = (
-            s["no_speech_prob"] > WHISPER_NO_SPEECH_THRESHOLD
-            or s["avg_logprob"] < WHISPER_LOGPROB_THRESHOLD
-            or s["compression_ratio"] > WHISPER_COMPRESSION_RATIO_THRESHOLD
-            or not s["text"]
+        passes_strict_check = (
+            s["no_speech_prob"] <= WHISPER_NO_SPEECH_THRESHOLD
+            and s["avg_logprob"] >= WHISPER_LOGPROB_THRESHOLD
+            and s["compression_ratio"] <= WHISPER_COMPRESSION_RATIO_THRESHOLD
+            and s["text"]
         )
-        seg = {
-            "start": round(s["start"], 2),
-            "end": round(s["end"], 2),
-            "label": s["text"] if not likely_hallucinated else "[non-lexical vocals]",
-            "confident": not likely_hallucinated,
-        }
-        if not likely_hallucinated and s.get("words"):
-            seg["words"] = [{"word": w["word"], "start": round(w["start"], 2), "end": round(w["end"], 2)}
-                             for w in s["words"] if w["word"]]
-        annotated.append(seg)
+        if passes_strict_check:
+            seg = {
+                "start": round(s["start"], 2), "end": round(s["end"], 2),
+                "label": s["text"], "confident": True, "type": "speech",
+            }
+            if s.get("words"):
+                seg["words"] = [{"word": w["word"], "start": round(w["start"], 2), "end": round(w["end"], 2)}
+                                 for w in s["words"] if w["word"]]
+            annotated.append(seg)
+            continue
+
+        # Not a clean pass -- but was there anything voice-like here at all? A no_speech_prob
+        # near 1.0 means Whisper itself thinks this stretch is silence or non-vocal noise, in
+        # which case there's nothing to anglicize and it should fall through to the
+        # instrumental pass instead of showing an empty or fabricated line.
+        anglicized = _anglicize_cleanup(s["text"]) if s["no_speech_prob"] < 0.92 else ""
+        if anglicized:
+            annotated.append({
+                "start": round(s["start"], 2), "end": round(s["end"], 2),
+                "label": anglicized, "confident": False, "type": "vocal",
+            })
+        # else: genuinely nothing lexical/vocal here -- leave the gap for instrument detection.
     return annotated
 
 
@@ -1246,6 +1843,15 @@ _PANNS_INSTRUMENT_CLASSES = {
     "Marimba, xylophone", "Glockenspiel", "Chime", "Bell",
     "Harp", "Accordion", "Bagpipes", "Didgeridoo", "Shofar",
     "Sitar", "Steel guitar, slide guitar",
+}
+
+# AudioSet classes that indicate wordless vocal sound (chant, humming, vocalizing) rather than
+# an instrument. Used only to pick a more honest label than the generic percussion fallback
+# for gaps Whisper produced no usable text for at all -- it never feeds back into the "vocal"
+# tier above, which already comes straight from Whisper's own (anglicized) text.
+_PANNS_VOCAL_CLASSES = {
+    "Singing", "Chant", "Humming", "Yodeling", "Vocal music", "A capella",
+    "Choir", "Male singing", "Female singing", "Child singing",
 }
 
 panns_model = None
@@ -1272,7 +1878,8 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
         duration = len(fb_audio) / fallback_sr
         window_s = min(2.0, max(0.5, duration))
         spans = _detect_percussive_spans(fb_audio, fallback_sr, window_s=window_s, min_duration_s=min_duration_s)
-        return [{"start": s, "end": e, "label": "[instrumental / percussion]", "confident": False} for s, e in spans]
+        return [{"start": s, "end": e, "label": "[instrumental / percussion]", "confident": False,
+                 "type": "instrumental"} for s, e in spans]
 
     panns_sr = 32000  # PANNs' expected input sample rate
     audio = _decode_audio_via_ffmpeg(raw_bytes, panns_sr)
@@ -1295,7 +1902,15 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
                 start_t = i / panns_sr
                 end_t = min((i + win_samples) / panns_sr, duration)
                 raw_spans.append({"start": round(start_t, 2), "end": round(end_t, 2),
-                                   "label": f"[{label.lower()}]", "confident": False})
+                                   "label": f"[{label.lower()}]", "confident": False, "type": "instrumental"})
+            elif label in _PANNS_VOCAL_CLASSES and score > 0.15:
+                # Whisper produced no usable text for this stretch at all, but this is
+                # wordless vocalizing rather than an instrument -- label it honestly as that
+                # instead of folding it into "[instrumental / percussion]".
+                start_t = i / panns_sr
+                end_t = min((i + win_samples) / panns_sr, duration)
+                raw_spans.append({"start": round(start_t, 2), "end": round(end_t, 2),
+                                   "label": "[wordless vocals]", "confident": False, "type": "instrumental"})
         i += hop_samples
 
     raw_spans.sort(key=lambda s: (s["label"], s["start"]))
@@ -1308,13 +1923,56 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
     return [s for s in merged if s["end"] - s["start"] >= min_duration_s]
 
 
+def _subtract_intervals(span: dict, occupied: list) -> list:
+    """Cut the parts of `span` that overlap any interval already claimed by a vocal/speech
+    segment, returning zero or more leftover pieces. This is what keeps the transcript from
+    showing a "[instrumental / percussion] 0:00-0:34" row sitting on top of a confident
+    "Honour song for..." row at 0:00-0:02 -- the vocal segment always wins the overlap, and
+    the instrumental row only covers what's actually left over."""
+    pieces = [(span["start"], span["end"])]
+    for occ_start, occ_end in occupied:
+        next_pieces = []
+        for s, e in pieces:
+            if occ_end <= s or occ_start >= e:
+                next_pieces.append((s, e))  # no overlap with this occupied interval
+                continue
+            if occ_start > s:
+                next_pieces.append((s, occ_start))
+            if occ_end < e:
+                next_pieces.append((occ_end, e))
+        pieces = next_pieces
+    return [{**span, "start": round(s, 2), "end": round(e, 2)} for s, e in pieces]
+
+
 def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: float) -> list:
+    """Add instrument/percussion spans, but only into the gaps the vocal pass left uncovered,
+    so the final transcript is a single ordered, non-overlapping timeline instead of two
+    independently-generated layers stacked on top of each other."""
+    occupied = sorted((seg["start"], seg["end"]) for seg in annotated)
     try:
-        annotated.extend(_detect_instrument_spans(raw_bytes, min_duration_s))
+        instrument_spans = _detect_instrument_spans(raw_bytes, min_duration_s)
     except Exception as e:
         print(f"[transcribe] instrument detection skipped: {e}")
+        instrument_spans = []
+
+    for span in instrument_spans:
+        for piece in _subtract_intervals(span, occupied):
+            if piece["end"] - piece["start"] >= min_duration_s:
+                annotated.append(piece)
+
     annotated.sort(key=lambda seg: seg["start"])
-    return annotated
+
+    # Adjacent pieces of the same instrumental label that ended up back-to-back after
+    # subtraction (e.g. a drum span split around a short vocal line) read better merged into
+    # one row than as two near-identical rows a fraction of a second apart.
+    merged = []
+    for seg in annotated:
+        if (merged and merged[-1].get("type") == "instrumental" == seg.get("type")
+                and merged[-1]["label"] == seg["label"] and seg["start"] - merged[-1]["end"] <= 0.5):
+            merged[-1]["end"] = seg["end"]
+        else:
+            merged.append(seg)
+    return merged
 
 
 def _transcribe_audio_blob(raw: bytes, language: str = "en") -> dict:
@@ -1326,7 +1984,8 @@ def _transcribe_audio_blob(raw: bytes, language: str = "en") -> dict:
             return {"text": "", "bytes_received": len(raw), "segment_count": 0, "no_speech_probs": [],
                     "segments": [], "has_lexical_speech": False}
 
-        raw_segments = _whisper_transcribe_raw_segments(tmp_path, language, whisper_model_mic, whisper_backend_mic)
+        raw_segments = _whisper_transcribe_raw_segments(
+            tmp_path, language, whisper_model_mic, whisper_backend_mic, use_vad=True)
         annotated = _classify_segments(raw_segments)
         annotated = _add_percussive_segments(annotated, raw, min_duration_s=0.6)
 
@@ -1383,8 +2042,52 @@ def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
         tmp.write(raw)
         tmp_path = tmp.name
     try:
-        raw_segments = _whisper_transcribe_raw_segments(tmp_path, language, whisper_model_track, whisper_backend_track)
+        # use_vad=False: this is a full song upload, not a live mic stream, so we want a decode
+        # attempt across the *entire* file rather than letting speech-tuned VAD silently drop
+        # the sung/chanted stretches before Whisper ever sees them (see the docstring on
+        # _whisper_transcribe_raw_segments). The three-tier classifier below is what separates
+        # real speech from anglicized vocalizing from actual silence, not VAD.
+        raw_segments = _whisper_transcribe_raw_segments(
+            tmp_path, language, whisper_model_track, whisper_backend_track, use_vad=False)
         annotated = _classify_segments(raw_segments)
+
+        # Even with VAD off, Whisper's own no_speech_threshold check can still decide a whole
+        # stretch is silent and drop it before it ever becomes a raw segment at all -- which is
+        # exactly what was collapsing every sung/chanted pulse in the track into one giant
+        # "[instrumental / percussion]" block. The pitch detector is the ground truth here: if
+        # it finds a real fundamental frequency in a stretch Whisper left uncovered, that
+        # stretch gets an anglicized line, no exceptions.
+        try:
+            pitch_spans = _detect_vocal_pitch_spans(raw)
+        except Exception as e:
+            print(f"[transcribe] pitch-based vocal detection skipped: {e}")
+            pitch_spans = []
+
+        occupied = sorted((seg["start"], seg["end"]) for seg in annotated)
+        uncovered_gaps = [
+            gap for p_start, p_end in pitch_spans
+            for gap in _subtract_intervals({"start": p_start, "end": p_end}, occupied)
+            if gap["end"] - gap["start"] >= 0.3
+        ]
+
+        # Nearby gaps are bundled into a handful of phrase-length clips (a few seconds each)
+        # rather than either one decode per pitch pulse (correct, but ~20-30 model calls on a
+        # short track -- the original slowdown) or one decode over the entire file (fast, but
+        # it buries each short burst inside a mostly-silent/percussive window and Whisper just
+        # omits it -- the regression that dropped every vocal line down to "[wordless
+        # vocalizing]"). Each merged clip gets exactly one forced, cheap-decode call and becomes
+        # one continuous segment, which also fills in the sub-2-second silences between pulses
+        # that were falling through both the vocal and instrumental passes entirely.
+        for chunk in _merge_nearby_gaps(uncovered_gaps, merge_gap_s=2.5):
+            text = _force_transcribe_clip(
+                raw, chunk["start"], chunk["end"], language, whisper_model_track, whisper_backend_track)
+            annotated.append({
+                "start": chunk["start"], "end": chunk["end"],
+                "label": text if text else "[wordless vocalizing]",
+                "confident": False, "type": "vocal",
+            })
+        annotated.sort(key=lambda seg: seg["start"])
+
         annotated = _add_percussive_segments(annotated, raw, min_duration_s=2.0)
 
         confident_text = " ".join(s["label"] for s in annotated if s["confident"] and s["label"])
@@ -1460,6 +2163,7 @@ def pipeline_start(body: dict):
     t.start()
     pipeline_running = True
     return {"ok": True}
+
 
 
 @app.post("/pipeline/stop")
@@ -1640,27 +2344,7 @@ async def ws_pitch(ws: WebSocket):
 
             if is_voiced:
                 pitch_input = frame if pitch.method == "rmvpe" else clean_frame
-                # Run detect() off the event loop. For RMVPE this is a
-                # CNN+BiGRU inference call over up to a second of resampled
-                # audio and can take longer than one frame's real-time
-                # budget on CPU -- if it runs inline here it blocks *every*
-                # open connection on this single-process event loop for
-                # that whole time, which is how the backlog snowballs and
-                # the server keeps reporting pitch long after playback and
-                # the browser's onended have already fired. Backgrounding
-                # it doesn't make the inference faster, but it stops one
-                # slow call from stalling everything else while it runs.
                 hz, conf = await asyncio.to_thread(pitch.detect, pitch_input)
-                # NOTE: pitch.detect() already applies the *correct*
-                # confidence gate internally -- rmvpe.confidence_threshold
-                # (0.15) for RMVPE, pitch.confidence_threshold (0.3) for
-                # YIN/YINFFT -- and already returns hz=None for anything
-                # below that gate. Previously this re-checked `conf` here
-                # against cfg["pitch"]["confidence_threshold"] (the YIN
-                # value, 0.3) regardless of which method was active, which
-                # silently discarded every RMVPE reading with confidence
-                # between 0.15 and 0.3 -- a large fraction of real notes.
-                # Trust hz; don't re-gate it with the wrong threshold.
                 if hz:
                     await ws.send_text(json.dumps({
                         "type":       "pitch",
@@ -1683,41 +2367,6 @@ async def ws_pitch(ws: WebSocket):
 
 @app.websocket("/ws/live-transcribe")
 async def ws_live_transcribe(ws: WebSocket):
-    """
-    Real-time, fully local streaming transcription via Vosk -- purely
-    for instant visual feedback while the mic pipeline's normal VAD is
-    still waiting for a pause. This does NOT replace /api/transcribe:
-    the accurate, hallucination-filtered, sentiment-integrated
-    transcript still comes from the Whisper-based pipeline once a
-    phrase ends. This endpoint just fills the gap while you're still
-    talking, at whatever accuracy a small streaming model can manage --
-    noticeably rougher than Whisper, in exchange for latency in the
-    low hundreds of milliseconds instead of "however long the phrase
-    plus a full Whisper pass takes".
-
-    Same wire convention as /ws/pitch: raw float32 PCM bytes at the
-    client's native AudioContext sample rate (passed as the
-    `sample_rate` query param), mono. Resampling to the 16kHz int16 PCM
-    Vosk actually expects happens here, not on the client, so the
-    frontend doesn't need its own resampling code beyond what it
-    already does to capture raw samples.
-
-    Vosk's recognizer calls (AcceptWaveform/Result/PartialResult) are
-    blocking C++ calls via its Python bindings, not async-native --
-    they're dispatched through asyncio.to_thread() inside the loop
-    below rather than called directly. An earlier version called them
-    directly on the event loop; since a chunk arrives every ~100-250ms
-    continuously while the mic is running, that monopolized the entire
-    single-threaded event loop on every single chunk, which starved
-    every other in-flight coroutine on the same loop -- including the
-    already-computed HTTP response for a /api/transcribe request
-    waiting for its turn to actually get sent. The accurate transcript
-    wasn't stuck computing in that case; it was fully done and just
-    couldn't get scheduled to deliver its response until this loop
-    stopped sending (i.e., until the mic was stopped) -- which is
-    exactly the "everything appears at once, only after clicking Stop"
-    bug this fixes.
-    """
     await ws.accept()
     if vosk_model is None:
         await ws.send_text(json.dumps({"type": "error", "message": vosk_load_error or "Vosk not loaded"}))
@@ -1746,11 +2395,6 @@ async def ws_live_transcribe(ws: WebSocket):
             if len(frame) == 0:
                 continue
 
-            # Downsample to Vosk's required 16kHz and convert to int16
-            # PCM. Linear interpolation, same lightweight approach used
-            # elsewhere in this file for browser-rate audio -- this
-            # doesn't need to be broadcast-quality, just intelligible
-            # enough for a small streaming acoustic model.
             if source_sr != 16000:
                 ratio = source_sr / 16000
                 out_len = max(1, int(len(frame) / ratio))
@@ -1766,8 +2410,6 @@ async def ws_live_transcribe(ws: WebSocket):
             pcm16 = (pcm16 * 32767.0).astype(np.int16)
 
             def _vosk_process_chunk(pcm_bytes: bytes):
-                # Runs in a worker thread. See the docstring above for
-                # why this can't run directly on the event loop.
                 if recognizer.AcceptWaveform(pcm_bytes):
                     return "final", json.loads(recognizer.Result()).get("text", "")
                 return "partial", json.loads(recognizer.PartialResult()).get("partial", "")
@@ -1782,22 +2424,6 @@ async def ws_live_transcribe(ws: WebSocket):
 
 
 def _apply_neural_timbre(audio: np.ndarray, sample_rate: int, decision) -> np.ndarray:
-    """
-    Runs the neural voice-conversion stage on VocableSynthesizer's output,
-    if it's loaded and enabled. Fails safe to the original DSP audio for
-    any reason (disabled, not loaded, model missing, inference error).
-
-    Scope note: VocableSynthesizer._render_ensemble() already mixes a
-    choir's N DSP voice layers into one buffer before returning it, so
-    this currently reskins the whole mixed ensemble through a single
-    trained voice (voice_index=0) rather than giving each of the N layers
-    its own distinct trained timbre. A true multi-timbre neural choir
-    needs VocableSynthesizer to expose per-voice stems before mixing, so
-    each stem can go through a different NeuralTimbreConverter voice_index
-    before being summed — a real follow-up, not implemented here. This is
-    the correct, honest v1: one real trained voice, reskinning the DSP
-    ensemble's existing detune/timing/formant variation.
-    """
     if neural_timbre is None or not neural_timbre.enabled:
         return audio
     return neural_timbre.convert(audio, sample_rate, decision.target_hz, voice_index=0)
@@ -1812,7 +2438,6 @@ def run_local_pipeline(stop_event, input_device: int):
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
         from analysis.phonetic_analysis import CreeTokenizer
-        from synthesis.vocable_synthesizer import VocableSynthesizer
         from output.timing_sync import TimingSync
         import librosa as _lib
 
@@ -1824,13 +2449,14 @@ def run_local_pipeline(stop_event, input_device: int):
         rhythm       = RhythmAnalyzer()
         cree         = CreeTokenizer()
         harmony      = harmony_engine   # shared instance — same sovereignty state as /ws/mic
-        synth        = VocableSynthesizer()
         timing       = TimingSync()
 
         timing.start()
         capture.start()
         currently_singing = False
         start = time.perf_counter()
+        note_covered_until = 0.0
+        REFILL_LOOKAHEAD_S = 0.12
 
         while not stop_event.is_set():
             try:
@@ -1844,11 +2470,6 @@ def run_local_pipeline(stop_event, input_device: int):
             archer_hz = None
             if is_voiced:
                 pitch_input = frame if pitch.method == "rmvpe" else clean
-                # run_local_pipeline already runs in its own background
-                # thread (not the asyncio event loop), so no to_thread
-                # needed here -- just the same gating fix as /ws/pitch and
-                # /ws/mic: pitch.detect() already applies the correct
-                # method-specific confidence threshold internally.
                 hz, conf = pitch.detect(pitch_input)
                 if hz:
                     archer_hz = hz
@@ -1869,17 +2490,54 @@ def run_local_pipeline(stop_event, input_device: int):
                 phoneme_profile=cree._neutral_profile,
             )
 
+            # blocking=False (the default) is deliberate here, NOT an
+            # oversight: this is the live, real-time path, and blocking=True
+            # forces NeuralVocableBank.get_blocking() -- a synchronous,
+            # full-quality phase-vocoder render meant for offline batch
+            # rendering only (see its own docstring). Calling it per note
+            # in this loop was stalling the whole capture/decide loop on
+            # every single onset. blocking=False uses the instant cached /
+            # fast-resample path and upgrades the cache to full quality in
+            # a background thread, which is what this loop actually needs.
+            #
+            # The live per-note RVC re-voicing pass (_apply_neural_timbre)
+            # has also been removed from this loop. It isn't a quality
+            # setting for real-time use -- it's a genuinely slow, separate
+            # network model pass (the architecture page says so directly:
+            # "analyze, then play", not instant), and it was costing
+            # ~750-800ms of synchronous stall PER NOTE (see your own log:
+            # "Neural chunk convert: 784ms round-trip"), which is what was
+            # actually causing the choppy, seemingly-random, note-behind-
+            # reality sound -- not a synthesis quality problem. The
+            # samples in synthesis/samples/neural/ are already the
+            # trained voice's timbre (build_vocable_bank.py converted them
+            # through RVC once, offline) -- singing them live via the DSP
+            # engine already carries that voice; this was a redundant
+            # second live RVC pass on top, not something adding quality
+            # worth an 800ms stall. If you want the extra live re-voicing
+            # pass back, it needs to run asynchronously and swap into
+            # `timing` when ready (the same instant-then-swapped pattern
+            # index.html's own browser demo uses for its Neural mode),
+            # never synchronously inline like this.
             if decision.action == "sing":
-                scratch_audio = synth.synthesize(decision)
-                final_audio = _apply_neural_timbre(scratch_audio, cfg["audio"]["sample_rate"], decision)
+                final_audio = synthesizer.synthesize(decision)
                 timing.schedule(final_audio, decision.action)
                 currently_singing = True
+                note_covered_until = time.perf_counter() + len(final_audio) / cfg["audio"]["sample_rate"]
+
             elif decision.action == "sustain":
                 currently_singing = True
+                now = time.perf_counter()
+                if now >= note_covered_until - REFILL_LOOKAHEAD_S:
+                    final_audio = synthesizer.synthesize(decision, legato=True)
+                    timing.schedule(final_audio, decision.action)
+                    note_covered_until = now + len(final_audio) / cfg["audio"]["sample_rate"]
+
             else:
                 if currently_singing:
                     timing.flush()
                 currently_singing = False
+                note_covered_until = 0.0
 
             if archer_hz:
                 msg = {

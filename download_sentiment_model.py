@@ -1,16 +1,3 @@
-"""
-Downloads and caches cardiffnlp/twitter-roberta-base-sentiment-latest
-locally, so server.py can load it fully offline afterwards (it enforces
-local_files_only=True and never hits the network itself -- see the
-comments above SENTIMENT_MODEL_DIR in server.py).
-
-Needs internet access to huggingface.co. One-time only -- after this
-finishes, server.py will find the model on disk on every future run.
-
-Usage:
-    python download_sentiment_model.py
-"""
-
 import os
 
 MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"

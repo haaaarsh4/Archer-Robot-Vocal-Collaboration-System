@@ -77,7 +77,8 @@ def _load_voices():
     _index_paths = [_resolve_asset_path(p, project_root) for p in ncfg.get("index_paths", [])]
     device = ncfg.get("device", "cpu")
     is_half = bool(ncfg.get("is_half", False))
-    index_rate = float(ncfg.get("index_rate", 0.66))
+    quantize_hubert = bool(ncfg.get("quantize_hubert", False))
+    index_rate = float(ncfg.get("index_rate", 0.75))
     protect = float(ncfg.get("protect", 0.33))
     transpose_cfg = ncfg.get("transpose_semitones", 0)
     rms_mix_rate = float(ncfg.get("rms_mix_rate", 0.25))
@@ -115,7 +116,8 @@ def _load_voices():
             continue
         index_path = _index_paths[i] if i < len(_index_paths) else None
         try:
-            voice = RVCOfflineVoice(model_path, index_path=index_path, device=device, is_half=is_half)
+            voice = RVCOfflineVoice(model_path, index_path=index_path, device=device, is_half=is_half,
+                                     quantize_hubert=quantize_hubert)
             _voices.append(voice)
             _load_errors.append(None)
             transpose = _per_voice(transpose_cfg, i, 0.0)
@@ -130,7 +132,7 @@ def _load_voices():
             has_index = "with index" if voice.index is not None else "no index"
             print(f"[OK] Voice {i} loaded: {model_path} ({has_index}, version={voice.version}, "
                   f"f0={bool(voice.if_f0)}, tgt_sr={voice.tgt_sr}, transpose={transpose:+.0f}) on {device} "
-                  f"(half={voice.is_half})")
+                  f"(half={voice.is_half}, hubert_quantized={voice.quantized})")
             _warm_up_voice(i, voice, index_rate, protect, rms_mix_rate, pad_seconds)
         except Exception as e:
             print(f"[ERROR] Voice {i} failed to load ({model_path}): {e}")

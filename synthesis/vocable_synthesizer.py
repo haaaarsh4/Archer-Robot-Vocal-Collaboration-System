@@ -9,15 +9,228 @@ import librosa
 from scipy.signal import lfilter, butter, iirnotch, iirpeak
 
 
+def render_continuous_vocable_follow(base_audio: np.ndarray, base_hz: float,
+                                      pitch_curve_hz: np.ndarray, amplitude_curve: np.ndarray,
+                                      sample_rate: int, frame_hop_s: float,
+                                      loop_crossfade_s: float = 0.12) -> np.ndarray:
+    """
+    Renders one whole sung PHRASE as a single, uninterrupted read through
+    `base_audio`, whose read speed bends continuously to follow
+    `pitch_curve_hz` (one reading per source frame, same cadence
+    apply_pitch_curve_follow and apply_amplitude_curve_follow use).
+
+    This exists specifically for "one locked word instead of Mix" mode,
+    and fixes a real bug in the normal note-by-note path: a recorded
+    take like "Ohoho" (2+ seconds) is often much longer than a single
+    sung note (often a few hundred milliseconds). The normal path
+    (_fit_length in neural_vocable_bank.py) re-triggers and squeezes the
+    WHOLE word into each note's short duration, and once squeezing hits
+    its own sanity floor it has no choice left but to TRUNCATE -- so in
+    practice you only ever hear the first fraction of a second of the
+    word, over and over, once per note, never the rest of it. That's
+    audible as constant stuttering restarts that never sound like the
+    source recording, because most of the recording is never played.
+
+    The fix here is architectural, not a tuning knob: don't treat a
+    multi-second word as something that has to fit inside one note at
+    all. Read through it exactly once, continuously, for the WHOLE
+    phrase (however many individual notes the melody has), the same way
+    a person humming along doesn't restart the syllable on every new
+    pitch -- their voice just bends. If the phrase runs longer than the
+    recording, loop back into it (crossfaded, via the same loop-safe
+    technique NeuralVocableBank already uses) rather than stopping.
+
+    Standard variable-speed resampling: at every output sample, the
+    source read position advances by (target_hz / base_hz) source-
+    samples for that instant, so a higher target pitch reads through the
+    recording faster and a lower one reads it slower -- read speed and
+    pitch are the same knob here, exactly like changing turntable speed.
+    """
+    if len(pitch_curve_hz) == 0 or base_hz <= 0 or len(base_audio) == 0:
+        return np.zeros(0, dtype=np.float32)
+
+    n_out = int(round(len(pitch_curve_hz) * frame_hop_s * sample_rate))
+    if n_out <= 0:
+        return np.zeros(0, dtype=np.float32)
+
+    frame_times = (np.arange(len(pitch_curve_hz)) + 0.5) * frame_hop_s
+    out_times = np.arange(n_out) / float(sample_rate)
+    hz_curve = np.interp(out_times, frame_times, pitch_curve_hz,
+                          left=pitch_curve_hz[0], right=pitch_curve_hz[-1])
+    hz_curve = np.clip(hz_curve, 1.0, None)
+    rate_curve = hz_curve / base_hz
+
+    # Loop the base take so there's always enough material to read
+    # through no matter how long the phrase runs -- a real loop, not a
+    # fragment, so the word's own natural shape (attack, vowel, tail)
+    # repeats intact each time around rather than being cut apart.
+    crossfade_len = min(len(base_audio) // 6, int(loop_crossfade_s * sample_rate))
+    loop_unit = _loop_safe(base_audio, crossfade_len) if crossfade_len >= 8 else base_audio
+    loop_len = len(loop_unit)
+
+    read_pos = np.cumsum(rate_curve)
+    read_pos = np.concatenate(([0.0], read_pos[:-1])) if n_out > 0 else read_pos
+    src_idx = np.mod(read_pos, loop_len)
+    out = np.interp(src_idx, np.arange(loop_len), loop_unit).astype(np.float32)
+
+    if amplitude_curve is not None and len(amplitude_curve) >= 2:
+        out = apply_amplitude_curve_follow(out, sample_rate, amplitude_curve=np.asarray(amplitude_curve, dtype=np.float64),
+                                            frame_hop_s=frame_hop_s)
+
+    # Short fades at the very start/end of the phrase so it doesn't click
+    # against the silence on either side.
+    fade_n = min(len(out) // 2, int(0.015 * sample_rate))
+    if fade_n > 1:
+        out[:fade_n] *= np.linspace(0.0, 1.0, fade_n, dtype=np.float32)
+        out[-fade_n:] *= np.linspace(1.0, 0.0, fade_n, dtype=np.float32)
+
+    return out
+
+
+def _loop_safe(segment: np.ndarray, crossfade_len: int) -> np.ndarray:
+    """Same technique as NeuralVocableBank._make_loop_safe -- duplicated
+    here (rather than imported) to avoid a circular import between
+    vocable_synthesizer.py and neural_vocable_bank.py, since both are
+    small, self-contained, and unlikely to drift apart."""
+    n = len(segment)
+    if crossfade_len <= 0 or crossfade_len * 2 >= n:
+        return segment
+    head = segment[:crossfade_len]
+    tail = segment[n - crossfade_len:]
+    t = np.linspace(0, np.pi / 2, crossfade_len)
+    blended_head = tail * np.cos(t) + head * np.sin(t)
+    body = segment[crossfade_len:n - crossfade_len]
+    return np.concatenate([blended_head, body]).astype(np.float32)
+
+
+def apply_pitch_curve_follow(audio: np.ndarray, sample_rate: int, base_hz: float,
+                              pitch_curve_hz: np.ndarray, frame_hop_s: float,
+                              max_cents: float = 250.0) -> np.ndarray:
+    """
+    Nudges an already-rendered, single-pitch buffer to continuously
+    track a real performance's own pitch curve across the length of one
+    held note, instead of staying frozen at whatever pitch was detected
+    the instant the note first triggered.
+
+    Why this exists: a "run" of frames belonging to one sustained note
+    only ever gets ONE synthesize() call, at the pitch measured on the
+    run's very first frame (see _render_track_offline in server.py).
+    Everything measured on every later frame of that same note -- a
+    singer's natural vibrato, a slow bend into the next phrase, just the
+    ordinary micro-wobble of a real human voice holding a note -- was
+    being thrown away entirely. The note was accurate at the instant it
+    started and then went perfectly, robotically flat for its whole
+    duration, however long that was. That mismatch between "the exact
+    pitch the moment it happened" and "a static pitch held afterward" is
+    a large part of why a held note can sound like it doesn't actually
+    track the real performance.
+
+    The fix is a variable-rate resample: reading faster through the
+    already-rendered buffer raises its momentary pitch, reading slower
+    lowers it (same principle neural_vocable_bank.py's own
+    _fast_resample_shift already uses for a full shift, just applied
+    continuously here instead of once). `pitch_curve_hz` is one f0
+    reading per source frame across the run; it gets interpolated up to
+    per-sample resolution, turned into a per-sample instantaneous
+    speed ratio against `base_hz` (the pitch the buffer was actually
+    rendered at), integrated into a warped read position, and the
+    buffer is re-read along that warped position.
+
+    `max_cents` bounds how far this is allowed to pull -- it's meant for
+    the natural wobble within a note (typically well under a semitone),
+    not for correcting a genuinely wrong onset pitch, which is what note
+    re-triggering already handles. A big, sustained deviation gets
+    clamped rather than dragging the buffer arbitrarily far, since sign-
+    ificant pitch movement should already have re-triggered a new note
+    (see HarmonyEngine.NOTE_CHANGE_THRESHOLD_CENTS) rather than showing
+    up here.
+    """
+    n = len(audio)
+    if n == 0 or pitch_curve_hz.size == 0 or base_hz <= 0:
+        return audio
+    if pitch_curve_hz.size == 1:
+        return audio  # nothing to follow -- the note never moved
+
+    frame_times = (np.arange(len(pitch_curve_hz)) + 0.5) * frame_hop_s
+    sample_times = np.arange(n) / float(sample_rate)
+    curve = np.interp(sample_times, frame_times, pitch_curve_hz,
+                       left=pitch_curve_hz[0], right=pitch_curve_hz[-1])
+
+    cents_offset = 1200.0 * np.log2(np.clip(curve, 1e-6, None) / base_hz)
+    cents_offset = np.clip(cents_offset, -max_cents, max_cents)
+    ratio = 2.0 ** (cents_offset / 1200.0)
+
+    warped_pos = np.cumsum(ratio)
+    warped_pos -= warped_pos[0]
+    warped_pos = np.clip(warped_pos, 0, n - 1)
+
+    followed = np.interp(warped_pos, np.arange(n), audio)
+    return followed.astype(np.float32)
+
+
+def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
+                                  amplitude_curve: np.ndarray, frame_hop_s: float,
+                                  min_gain: float = 0.15, max_gain: float = 1.6) -> np.ndarray:
+    """
+    Continuously reshapes an already-rendered note's own loudness to track
+    the real performance's dynamics across the note -- the amplitude
+    counterpart of apply_pitch_curve_follow above.
+
+    Why this exists: every note synth.synthesize() renders comes out at
+    one fixed loudness (self.volume, plus whatever the envelope/limiter
+    already do to it), set once and held for the note's whole duration.
+    Everything the real singer's own volume did across that same stretch
+    of time -- swelling into a held note, trailing off at the end of a
+    phrase, the ordinary breath-driven rise and fall of an actual human
+    voice -- was thrown away entirely. A robot part that sings at the
+    same loudness whether the input was a belt or a whisper doesn't read
+    as "following" a real performance nearly as much as one that actually
+    swells and recedes with it.
+
+    `amplitude_curve` is one RMS reading per source frame across the
+    run (see _render_track_offline), same cadence as the pitch curve.
+    It's normalized against its OWN median rather than some fixed
+    absolute loudness, so a steadily-sung note ends up close to unity
+    gain throughout and only genuine relative swells/dips in the real
+    performance move the output up or down from there -- this is a
+    dynamics shape, not a volume control. Clamped to [min_gain, max_gain]
+    so a brief quiet moment inside an otherwise-sung note doesn't fall to
+    total silence (that would read as a dropout, not as dynamics) and a
+    loud moment doesn't blow past a sane ceiling.
+    """
+    n = len(audio)
+    if n == 0 or amplitude_curve.size == 0:
+        return audio
+    if amplitude_curve.size == 1:
+        return audio  # only one reading for the whole note -- nothing to follow
+
+    voiced = amplitude_curve[amplitude_curve > 0]
+    reference = float(np.median(voiced)) if voiced.size else 0.0
+    if reference <= 1e-9:
+        return audio  # the whole run measured as silence -- leave it alone rather than dividing by ~0
+
+    frame_times = (np.arange(len(amplitude_curve)) + 0.5) * frame_hop_s
+    sample_times = np.arange(n) / float(sample_rate)
+    curve = np.interp(sample_times, frame_times, amplitude_curve,
+                       left=amplitude_curve[0], right=amplitude_curve[-1])
+
+    gain = np.clip(curve / reference, min_gain, max_gain)
+
+    # Smooth the gain curve itself a little (short moving average) so the
+    # output follows the performance's actual dynamic SHAPE, not every
+    # single frame-to-frame RMS jitter -- unsmoothed, this reads as a fast
+    # tremolo riding on top of the note rather than a musical swell/fade.
+    smooth_samples = max(1, int(0.03 * sample_rate))
+    if smooth_samples > 1:
+        pad = smooth_samples // 2
+        padded = np.pad(gain, (pad, pad), mode="edge")
+        kernel = np.ones(smooth_samples) / smooth_samples
+        gain = np.convolve(padded, kernel, mode="valid")[:n]
+
+    return (audio * gain).astype(np.float32)
+
+
 class VocableSynthesizer:
-    FORMANTS = {
-        "aah": {"bright": (730, 1400, 2600, 3300), "dark": (680, 1100, 2450, 3200)},   # "ah" as in father
-        "ooo": {"bright": (400, 900,  2300, 3000), "dark": (320, 700,  2200, 2900)},   # "oo" as in boot
-        "mmm": {"bright": (280, 950,  2100, 2900), "dark": (250, 850,  2000, 2800)},   # closed/nasal hum
-        "hey": {"bright": (600, 2100, 2700, 3300), "dark": (500, 1750, 2600, 3200)},   # "eh" as in bed
-    }
-    FORMANT_WEIGHTS    = (1.0, 0.6, 0.28, 0.14)
-    FORMANT_BANDWIDTH_HZ = (80.0, 90.0, 130.0, 220.0)
 
     def __init__(self):
         cfg = get_config()
@@ -27,27 +240,75 @@ class VocableSynthesizer:
         self.ddsp_model_path = cfg["synthesis"]["ddsp_model_path"]
         self.vocable_set = cfg["synthesis"]["vocable_set"]
         self.volume = cfg["output"]["volume"]
-        self.timbral_detune_cents = cfg["synthesis"].get("timbral_detune_cents", 6)
-        self.breathiness = cfg["synthesis"].get("breathiness", 0.045)
-        self.vibrato_rate_hz = cfg["synthesis"].get("vibrato_rate_hz", 5.3)
-        self.vibrato_depth_cents = cfg["synthesis"].get("vibrato_depth_cents", 12)
 
         self._ddsp_model = None
         self._wavetable_samples: dict[str, np.ndarray] = {}
-        self._neural_bank = None   # set up in _init_engine() if synthesis.engine == "neural_wavetable"
+        self._neural_bank = None
         self._warned_unknown_vocables: set = set()
 
         self._crossfade_samples = int(self.crossfade_ms * self.sample_rate / 1000)
-        self._prev_audio: np.ndarray | None = None  # for crossfading
+        self._prev_audio: np.ndarray | None = None
+        # Which vocable the last rendered chunk actually was -- lets
+        # _crossfade tell "the pitch moved within the same word" apart
+        # from "we just switched from singing one word to a completely
+        # different one", which need very different blending (see
+        # _crossfade for why).
+        self._prev_vocable: str | None = None
+        # A longer, gentler blend used only when the vocable identity
+        # itself changes, on top of the ordinary crossfade_ms used for
+        # same-word note-to-note transitions. Two unrelated recorded
+        # words don't share any waveform structure to align, so a short
+        # linear blend between them reads as a hard cut with a slight
+        # dip rather than an actual transition -- a longer, equal-power
+        # (constant-perceived-loudness) blend gives the ear enough time
+        # to register it as one sound handing off to another instead of
+        # one stopping and a different one starting.
+        self._identity_crossfade_samples = max(
+            self._crossfade_samples, int(cfg["synthesis"].get("vocable_change_crossfade_ms", 90) * self.sample_rate / 1000)
+        )
 
         self._max_voice_layers = 12
-        self._vibrato_phases = [0.0] * self._max_voice_layers
 
         self._rng = np.random.default_rng()
 
+        # Cache of the per-voice detune/timing-jitter/formant "fingerprint"
+        # for whatever note is currently being sustained, so legato
+        # top-ups of the SAME held note reuse it instead of redrawing
+        # fresh randomness every refill -- see _render_ensemble.
+        self._locked_ensemble_params: tuple | None = None
+        self._locked_note_key: tuple | None = None
+
+        # NEW: live octave shift in semitones
+        self._octave_shift_semitones = 0.0
+
         self._init_engine()
 
-    # Routes to the right loader based on which engine is configured
+    # NEW method
+    def set_octave_shift(self, semitones: float):
+        """Update the octave shift offset in real-time."""
+        self._octave_shift_semitones = float(semitones)
+
+    def get_vocable_brightness_map(self) -> dict[str, float] | None:
+        """
+        Exposes the neural vocable bank's own measured, audio-derived
+        brightness score (0=warmest loaded vocable, 1=brightest) per
+        vocable, so HarmonyEngine._choose_vocable can pick a word whose
+        actual recorded tone matches the melody's register/trend instead
+        of rotating through vocable_set with no regard for what any of
+        the words actually sound like. Returns None (not an empty dict)
+        when there's nothing to report -- wrong engine, bank not loaded,
+        or bank failed to load -- so the caller can tell "no data" apart
+        from "loaded, but somehow empty" and fall back cleanly either way.
+        """
+        if self.engine != "neural_wavetable" or self._neural_bank is None:
+            return None
+        try:
+            brightness_map = self._neural_bank.vocable_brightness_map()
+        except Exception as e:
+            logger.warning(f"Could not read vocable brightness map: {e}")
+            return None
+        return brightness_map or None
+
     def _init_engine(self):
         if self.engine == "ddsp":
             self._load_ddsp_model()
@@ -55,45 +316,62 @@ class VocableSynthesizer:
             self._load_wavetable_samples()
         elif self.engine == "neural_wavetable":
             self._load_neural_bank()
+            # Prewarm the neural bank if it loaded successfully
+            if self._neural_bank is not None and self._neural_bank.available:
+                try:
+                    cfg = get_config()
+                    fmin = cfg["pitch"]["min_frequency"]
+                    fmax = cfg["pitch"]["max_frequency"]
+                    self._neural_bank.prewarm_range(fmin, fmax)
+                    logger.info(f"Neural vocable bank prewarmed from {fmin}Hz to {fmax}Hz")
+                except Exception as e:
+                    logger.warning(f"Neural vocable bank prewarm failed: {e} — will warm up lazily on first notes")
         logger.info(f"Vocable synthesizer engine: {self.engine}")
 
-    # Loads pre-rendered, already RVC-converted vocable takes (see
-    # synthesis/build_vocable_bank.py) and gets them ready for fast
-    # runtime pitch shifting. No neural inference happens here or at
-    # play time, the conversion already happened offline.
+    def _load_ddsp_model(self):
+        try:
+            from synthesis.ddsp_synthesizer import DDSPVocoder
+            if os.path.exists(self.ddsp_model_path):
+                self._ddsp_model = DDSPVocoder(self.ddsp_model_path, self.sample_rate)
+                logger.info(f"DDSP model loaded from {self.ddsp_model_path}")
+            else:
+                logger.error(f"DDSP model not found at {self.ddsp_model_path}")
+        except Exception as e:
+            logger.error(f"DDSP model load error: {e}")
+
     def _load_neural_bank(self):
         try:
             from synthesis.neural_vocable_bank import NeuralVocableBank
         except ImportError as e:
-            logger.error(f"neural_wavetable engine selected but neural_vocable_bank.py "
-                          f"couldn't be imported ({e}) — falling back to sinusoidal.")
-            self.engine = "sinusoidal"
+            logger.error(
+                f"neural_wavetable engine selected but neural_vocable_bank.py couldn't "
+                f"be imported ({e}). Singing is DISABLED (silent) until this is fixed -- "
+                "not substituting a different-sounding synth engine."
+            )
             return
 
         samples_dir = Path(__file__).parent / "samples" / "neural"
         self._neural_bank = NeuralVocableBank(samples_dir, self.sample_rate)
 
         if not self._neural_bank.available:
-            logger.warning(
-                "neural_wavetable engine selected but no converted samples were "
-                f"found at {samples_dir}. Run synthesis/build_vocable_bank.py first "
-                "(see its docstring). Falling back to sinusoidal for now."
+            logger.error(
+                "neural_wavetable engine selected but no converted samples were found "
+                f"at {samples_dir}. Run synthesis/build_vocable_bank.py first (see its "
+                "docstring). Singing is DISABLED (silent) until this is fixed -- not "
+                "substituting a different-sounding synth engine."
             )
-            self.engine = "sinusoidal"
             self._neural_bank = None
 
-    # Loads pre-recorded WAV files from synthesis/samples/
     def _load_wavetable_samples(self):
         try:
             samples_dir = Path(__file__).parent / "samples"
             if not samples_dir.exists():
-                logger.warning(
-                    f"No samples directory at {samples_dir} — "
-                    "falling back to sinusoidal synthesis. "
-                    "Add WAV files named aah.wav, ooo.wav, mmm.wav, hey.wav "
-                    "to synthesis/samples/ for wavetable mode."
+                logger.error(
+                    f"No samples directory at {samples_dir}. Add WAV files named "
+                    "aah.wav, ooo.wav, mmm.wav, hey.wav to synthesis/samples/ for "
+                    "wavetable mode. Singing is DISABLED (silent) until this is fixed "
+                    "-- not substituting a different-sounding synth engine."
                 )
-                self.engine = "sinusoidal"
                 return
 
             for vocable in self.vocable_set:
@@ -106,15 +384,41 @@ class VocableSynthesizer:
                     logger.warning(f"Sample not found: {path}")
 
             if not self._wavetable_samples:
-                logger.warning("No samples loaded — falling back to sinusoidal")
-                self.engine = "sinusoidal"
+                logger.error(
+                    "No wavetable samples loaded. Singing is DISABLED (silent) until "
+                    "this is fixed -- not substituting a different-sounding synth engine."
+                )
 
         except Exception as e:
-            logger.error(f"Wavetable load error: {e} — falling back to sinusoidal")
-            self.engine = "sinusoidal"
+            logger.error(
+                f"Wavetable load error: {e}. Singing is DISABLED (silent) until this "
+                "is fixed -- not substituting a different-sounding synth engine."
+            )
 
-    # Generate audio for the given HarmonyDecision
-    def synthesize(self, decision):
+    def synthesize(self, decision, blocking: bool = False, legato: bool = False, apply_crossfade: bool = True):
+        """
+        legato=True says "this chunk is a mid-note continuation, not a real
+        note onset or a real note ending" -- see _apply_envelope for why
+        that matters. Callers doing one-shot renders (offline bounce,
+        single-note preview) should leave this False, which is also the
+        default so existing call sites don't change behavior.
+
+        apply_crossfade=True (the default) blends this call's start
+        against whatever the LAST synthesize() call on this instance
+        produced -- correct for the live, one-call-follows-the-next-in-
+        real-time streaming path, where "last call" and "immediately
+        before this, on the timeline" are the same thing. They are NOT
+        the same thing for an offline batch render that places each
+        note by its own absolute sample position (see
+        _render_track_offline in server.py): two calls can be seconds
+        apart on the real timeline while still being back-to-back calls
+        into this shared, reused synthesizer instance. Blending against
+        self._prev_audio there would smear in whatever unrelated word
+        happened to render last, not whatever's actually adjacent on the
+        timeline. Batch callers that do their own timeline-aware
+        stitching should pass apply_crossfade=False and handle blending
+        themselves once they know each note's real placement.
+        """
         if decision.action == "rest" or decision.target_hz <= 0:
             n_samples = int(0.1 * self.sample_rate)
             return np.zeros(n_samples, dtype=np.float32)
@@ -127,55 +431,91 @@ class VocableSynthesizer:
 
         if num_voices <= 1:
             audio = self._render_voice(decision, n_samples, voice_index=0,
-                                        f0_hz=decision.target_hz, formant_scale=1.0)
+                                        f0_hz=decision.target_hz, formant_scale=1.0,
+                                        blocking=blocking)          # <-- ADD blocking
         else:
-            audio = self._render_ensemble(decision, n_samples, num_voices)
+            audio = self._render_ensemble(decision, n_samples, num_voices,
+                                        blocking=blocking, legato=legato)
 
-        # Apply amplitude envelope (attack + release to avoid clicks)
-        audio = self._apply_envelope(audio)
-
-        # Apply Cree phoneme timbre shaping
+        audio = self._apply_envelope(audio, legato=legato)
         audio = self._apply_phoneme_shaping(audio, decision)
 
         reverb_amount = float(getattr(decision, "reverb_amount", 0.08))
         if reverb_amount > 0:
             audio = self._apply_reverb(audio, reverb_amount)
 
-        # Volume
         audio = audio * self.volume
-
         audio = np.tanh(audio * 1.15) / np.tanh(1.15)
 
-        # Crossfade with previous output for smooth transitions
-        audio = self._crossfade(audio)
+        if apply_crossfade:
+            audio = self._crossfade(audio, vocable=getattr(decision, "vocable", None))
+            self._prev_audio = audio
+            self._prev_vocable = getattr(decision, "vocable", None)
 
-        self._prev_audio = audio
         return audio.astype(np.float32)
 
-    def _render_ensemble(self, decision, n_samples: int, num_voices: int) -> np.ndarray:
+    def _render_ensemble(self, decision, n_samples: int, num_voices: int,
+                        blocking: bool = False, legato: bool = False) -> np.ndarray:
         detune_spread = float(getattr(decision, "detune_spread_cents", 10.0))
         jitter_ms = float(getattr(decision, "timing_jitter_ms", 15.0))
         formant_spread = float(getattr(decision, "formant_spread", 0.1))
         max_jitter_samples = int(jitter_ms * self.sample_rate / 1000)
 
-        if num_voices == 1:
-            detune_offsets = [0.0]
+        # Identifies "the note currently being held" -- pitch, vocable,
+        # and the texture parameters that shape it. When a note is truly
+        # just continuing (legato=True, same signature as last time),
+        # reuse the exact same per-voice detune offsets, jitter shifts,
+        # and formant scales as last call instead of redrawing them.
+        #
+        # Before this: a held multi-voice note (duet/choir texture --
+        # drone_support's whole identity, for instance) got its ensemble
+        # re-randomized on every single legato top-up (server.py refills
+        # the queue roughly every 1-2s while sustaining). The pitch
+        # wasn't moving, but which way each voice leaned in cents, how
+        # far its onset was offset, and its formant "size" all silently
+        # reshuffled underneath it -- an otherwise-static pad kept
+        # subtly shimmering/warping every refill instead of holding one
+        # stable chord. A genuine new note (legato=False, or the
+        # signature actually changed) still draws fresh randomness, same
+        # as before -- this only stops re-rolling a note that hasn't
+        # actually changed.
+        note_key = (round(float(decision.target_hz), 3), decision.vocable, num_voices,
+                    round(detune_spread, 2), round(jitter_ms, 2), round(formant_spread, 3))
+
+        if legato and self._locked_ensemble_params is not None and self._locked_note_key == note_key:
+            detune_offsets, jitter_shifts, formant_scales = self._locked_ensemble_params
         else:
-            base = np.linspace(-detune_spread, detune_spread, num_voices)
-            detune_offsets = base + self._rng.normal(0, detune_spread * 0.15, num_voices)
-            detune_offsets[0] = 0.0  # keep one voice dead-center as the "lead"
+            if num_voices == 1:
+                detune_offsets = np.array([0.0])
+            else:
+                base = np.linspace(-detune_spread, detune_spread, num_voices)
+                detune_offsets = base + self._rng.normal(0, detune_spread * 0.15, num_voices)
+                detune_offsets[0] = 0.0
+
+            jitter_shifts = np.zeros(num_voices, dtype=int)
+            if max_jitter_samples > 0:
+                for i in range(1, num_voices):
+                    jitter_shifts[i] = int(self._rng.integers(-max_jitter_samples, max_jitter_samples + 1))
+
+            formant_scales = np.ones(num_voices)
+            for i in range(1, num_voices):
+                formant_scales[i] = 1.0 + self._rng.uniform(-1, 1) * formant_spread
+
+            self._locked_ensemble_params = (detune_offsets, jitter_shifts, formant_scales)
+            self._locked_note_key = note_key
 
         mix = np.zeros(n_samples, dtype=np.float64)
         for i in range(num_voices):
             cents = float(detune_offsets[i])
             f0 = decision.target_hz * (2 ** (cents / 1200.0))
-            f_scale = 1.0 + (self._rng.uniform(-1, 1) * formant_spread if i > 0 else 0.0)
+            f_scale = float(formant_scales[i])
 
             voice = self._render_voice(decision, n_samples, voice_index=i,
-                                        f0_hz=f0, formant_scale=f_scale)
+                                        f0_hz=f0, formant_scale=f_scale,
+                                        blocking=blocking)          # <-- PASS blocking
 
-            if max_jitter_samples > 0 and i > 0:
-                shift = int(self._rng.integers(-max_jitter_samples, max_jitter_samples + 1))
+            shift = int(jitter_shifts[i])
+            if shift != 0:
                 voice = self._shift_samples(voice, shift)
 
             gain = 1.0 / (1.0 + 0.12 * abs(cents) / max(detune_spread, 1.0))
@@ -199,155 +539,86 @@ class VocableSynthesizer:
         return out
 
     def _render_voice(self, decision, n_samples: int, voice_index: int,
-                       f0_hz: float, formant_scale: float) -> np.ndarray:
-        if self.engine == "neural_wavetable" and self._neural_bank is not None:
-            audio = self._neural_bank.get(decision.vocable, f0_hz, n_samples)
+                    f0_hz: float, formant_scale: float,
+                    blocking: bool = False) -> np.ndarray:   # <-- ADD blocking param
+        shifted_f0 = f0_hz
+
+        if self.engine == "neural_wavetable":
+            if self._neural_bank is None:
+                # ... error handling ...
+                return np.zeros(n_samples, dtype=np.float32)
+
+            # Use the correct retrieval method based on blocking flag
+            if blocking:
+                audio = self._neural_bank.get_blocking(decision.vocable, shifted_f0, n_samples)
+            else:
+                audio = self._neural_bank.get(decision.vocable, shifted_f0, n_samples)
+
             if audio is not None:
                 return audio
-            # Bank has nothing loaded for this vocable at all (not just a
-            # cache miss, get() already handles those). Fall through just
-            # this once rather than going silent.
+
+            # ... warning if unknown vocable ...
+            return np.zeros(n_samples, dtype=np.float32)
+
         if self.engine == "wavetable":
-            return self._synthesize_wavetable(decision, n_samples)
-        return self._synthesize_sinusoidal(decision, n_samples, voice_index=voice_index,
-                                            f0_override=f0_hz, formant_scale=formant_scale)
+            if not self._wavetable_samples:
+                if "__no_wavetable__" not in self._warned_unknown_vocables:
+                    self._warned_unknown_vocables.add("__no_wavetable__")
+                    logger.error(
+                        "wavetable engine has no samples loaded -- singing is silent "
+                        "until this is fixed (see the startup error above)."
+                    )
+                return np.zeros(n_samples, dtype=np.float32)
+            return self._synthesize_wavetable(decision, n_samples, shifted_f0)
 
-    def _synthesize_sinusoidal(self, decision, n_samples, voice_index: int = 0,
-                                f0_override: float | None = None, formant_scale: float = 1.0):
-        t = np.arange(n_samples) / self.sample_rate
+        if self.engine == "ddsp":
+            if self._ddsp_model is None:
+                if "__no_ddsp_model__" not in self._warned_unknown_vocables:
+                    self._warned_unknown_vocables.add("__no_ddsp_model__")
+                    logger.error(
+                        "ddsp engine has no model loaded -- singing is silent until "
+                        "this is fixed (see the startup error above)."
+                    )
+                return np.zeros(n_samples, dtype=np.float32)
+            try:
+                return self._ddsp_model.synthesize(decision, n_samples, shifted_f0)
+            except Exception as e:
+                if "__ddsp_error__" not in self._warned_unknown_vocables:
+                    self._warned_unknown_vocables.add("__ddsp_error__")
+                    logger.error(f"DDSP synthesis failed: {e} -- resting this note "
+                                 "instead of substituting a different-sounding synth voice.")
+                return np.zeros(n_samples, dtype=np.float32)
 
-        f0 = f0_override if f0_override is not None else decision.target_hz
-        if decision.mode == AccompanimentMode.TIMBRAL and f0_override is None:
-            f0 *= 2 ** (self.timbral_detune_cents / 1200.0)
+        logger.error(
+            f"synthesis.engine={self.engine!r} isn't a recognized engine "
+            "(expected neural_wavetable, wavetable, or ddsp) -- singing is silent."
+        )
+        return np.zeros(n_samples, dtype=np.float32)
 
-        is_humming = getattr(decision, "mode", None) == AccompanimentMode.HUM
-        vibrato_ceiling = 0.5 if is_humming else 1.0
-
-        slot = voice_index % self._max_voice_layers
-        rate_offset = 0.0 if voice_index == 0 else (voice_index * 0.13) % 0.6 - 0.3
-        vib_rate = max(0.5, self.vibrato_rate_hz + rate_offset)
-
-        vibrato_amount = np.clip(decision.duration_s / 0.6, 0.0, 1.0) * vibrato_ceiling
-        phase_inc = 2 * np.pi * vib_rate / self.sample_rate
-        vib_phase = self._vibrato_phases[slot] + np.arange(n_samples) * phase_inc
-        self._vibrato_phases[slot] = float((vib_phase[-1] + phase_inc) % (2 * np.pi)) if n_samples else self._vibrato_phases[slot]
-        vibrato_cents = self.vibrato_depth_cents * vibrato_amount * np.sin(vib_phase)
-
-        jitter = self._smoothed_noise(n_samples, std=0.0035, cutoff_hz=12.0)
-        instantaneous_f0 = f0 * (2 ** (vibrato_cents / 1200.0)) * (1.0 + jitter)
-        phase = 2 * np.pi * np.cumsum(instantaneous_f0) / self.sample_rate
-
-        max_harmonic = int(self.sample_rate / 2 / f0)
-        source = np.zeros(n_samples, dtype=np.float64)
-        for k in range(1, min(max_harmonic + 1, 32)):
-            amp = 1.0 / (k ** 1.75)
-            source += amp * np.sin(k * phase)
-
-        peak = np.max(np.abs(source))
-        if peak > 0:
-            source /= peak
-
-        vocable = "mmm" if is_humming else decision.vocable
-        vc = decision.vowel_color
-        if vocable not in self.FORMANTS and vocable != "mmm" and vocable not in self._warned_unknown_vocables:
-            # Only the original four vowels (aah/ooo/mmm/hey) have a real
-            # formant profile. Any other vocable, e.g. anything from a
-            # neural_wavetable bank that isn't currently loaded, silently
-            # became "aah" here before with zero trace of why. Logging it
-            # once per unique vocable (not per note -- this can otherwise
-            # fire dozens of times a second) turns a confusing wrong sound
-            # into an obvious, explainable one -- if you see this while
-            # neural_wavetable is meant to be active, its bank likely
-            # isn't actually loaded (check for "neural_wavetable engine
-            # selected but no converted samples were found" in the log).
-            logger.warning(f"Sinusoidal engine has no formant profile for vocable '{vocable}' "
-                            "-- substituting 'aah'. This is expected only when the configured "
-                            "engine has fallen back to sinusoidal.")
-            self._warned_unknown_vocables.add(vocable)
-        table = self.FORMANTS.get(vocable, self.FORMANTS["aah"])
-        bright, dark = table["bright"], table["dark"]
-        formant_freqs = [(b * (1 - vc) + d * vc) * formant_scale for b, d in zip(bright, dark)]
-
-        audio = np.zeros(n_samples, dtype=np.float64)
-        nyquist = self.sample_rate / 2.0
-        brightness = decision.brightness * (0.5 if is_humming else 1.0)
-        for freq, weight, bw in zip(formant_freqs, self.FORMANT_WEIGHTS, self.FORMANT_BANDWIDTH_HZ):
-            freq = float(np.clip(freq, 40.0, nyquist * 0.98))
-            resonated = self._bandpass(source, freq, bw)
-            brightness_boost = 1.0 + brightness * 0.4
-            audio += resonated * weight * brightness_boost
-
-        audio += source * 0.12
-
-        breathiness = self.breathiness * (0.2 if is_humming else 1.0)
-        if breathiness > 0:
-            noise = self._rng.normal(0, 1, n_samples)
-            breath = self._bandpass(noise, formant_freqs[0], 220.0) * 0.6
-            breath += self._bandpass(noise, formant_freqs[1], 260.0) * 0.4
-            audio += breath * breathiness
-
-        peak = np.max(np.abs(audio))
-        if peak > 0:
-            audio = audio / peak * 0.92
-
-        shimmer = self._smoothed_noise(n_samples, std=0.035, cutoff_hz=9.0)
-        audio = audio * (1.0 + shimmer)
-
-        return audio.astype(np.float32)
-
-    def _smoothed_noise(self, n_samples: int, std: float, cutoff_hz: float) -> np.ndarray:
-        if n_samples < 4:
-            return np.zeros(n_samples)
-        try:
-            noise = self._rng.normal(0, 1, n_samples)
-            nyquist = self.sample_rate / 2.0
-            wn = min(cutoff_hz / nyquist, 0.99)
-            b, a = butter(2, wn, btype="low")
-            smoothed = lfilter(b, a, noise)
-            rms = np.sqrt(np.mean(smoothed ** 2))
-            if rms > 0:
-                smoothed = smoothed / rms * std
-            return smoothed
-        except Exception:
-            return np.zeros(n_samples)
-
-    def _bandpass(self, signal: np.ndarray, center_hz: float, bandwidth_hz: float) -> np.ndarray:
-        nyquist = self.sample_rate / 2.0
-        bandwidth_hz = max(bandwidth_hz, 10.0)
-        low = max((center_hz - bandwidth_hz / 2) / nyquist, 1e-4)
-        high = min((center_hz + bandwidth_hz / 2) / nyquist, 0.999)
-        if low >= high:
-            return signal
-        try:
-            b, a = butter(2, [low, high], btype="band")
-            return lfilter(b, a, signal)
-        except Exception as e:
-            logger.error(f"Formant filter error at {center_hz:.0f}Hz: {e}")
-            return signal
-
-    # Takes a pre-recorded human voice sample and shifts its pitch to match the target frequency
-    def _synthesize_wavetable(self, decision, n_samples):
+    def _synthesize_wavetable(self, decision, n_samples, f0_hz):
+        """
+        Synthesize from wavetable samples using phase vocoder pitch shifting.
+        The key fix: librosa.effects.pitch_shift() preserves duration while
+        changing pitch.
+        """
         try:
             sample = self._wavetable_samples.get(
                 decision.vocable,
                 next(iter(self._wavetable_samples.values()))
             )
 
-            # Estimate original pitch of the sample
             f0_orig, _, _ = librosa.pyin(
                 sample, fmin=60, fmax=800, sr=self.sample_rate
             )
             f0_orig_mean = float(np.nanmedian(f0_orig)) if f0_orig is not None else 220.0
 
-            # Semitone shift needed
-            n_steps = 12 * np.log2(decision.target_hz / f0_orig_mean)
+            n_steps = 12 * np.log2(f0_hz / f0_orig_mean)
 
-            # Phase vocoder pitch shift
+            # Phase vocoder pitch shift (preserves duration!)
             shifted = librosa.effects.pitch_shift(
                 sample, sr=self.sample_rate, n_steps=float(n_steps)
             )
 
-            # Loop or trim to n_samples
             if len(shifted) < n_samples:
                 repeats = int(np.ceil(n_samples / len(shifted)))
                 shifted = np.tile(shifted, repeats)
@@ -356,15 +627,51 @@ class VocableSynthesizer:
             return audio.astype(np.float32)
 
         except Exception as e:
-            logger.error(f"Wavetable synthesis error: {e} — using sinusoidal fallback")
-            return self._synthesize_sinusoidal(decision, n_samples)
+            logger.error(f"Wavetable synthesis error: {e} -- resting this note")
+            return np.zeros(n_samples, dtype=np.float32)
 
-    # Prevents clicks at note boundaries by fading in and out
-    def _apply_envelope(self, audio):
+    def _apply_envelope(self, audio, legato: bool = False):
+        """
+        Attack/release ramp for a genuinely new note onset or a genuine
+        note ending. Skipped (down to a hairline 2ms declick) for legato
+        continuation chunks.
+
+        Why this matters: every synthesize() call already gets stitched to
+        the one before it by _crossfade(), which does its own 30ms
+        fade-out-of-old / fade-in-of-new blend. That's the right place for
+        smoothing a real transition. But when a note is just being
+        *continued* -- same pitch, same vocable, singer still holding the
+        note, another chunk queued up because the previous one is about to
+        run out (see the sustain handling in server.py's live pipeline) --
+        this envelope used to fade the audio down toward silence and back
+        up on every single one of those chunks too. Stacked on top of
+        _crossfade()'s own fade, that produced two multiplied fades
+        instead of one: the tail fades out roughly quadratically instead
+        of linearly (audibly faster/deeper), and the new chunk's rise to
+        full volume gets smeared out to ~30ms instead of reaching volume
+        by 10ms. The audible result is a soft "pulse" or "breath" every
+        time a held note gets topped up -- which, over a multi-second
+        sustained note refilled several times, sounds exactly like the
+        voice periodically starting and stopping instead of holding one
+        continuous tone.
+
+        A true onset (a brand new "sing" action) still gets its full
+        attack, and a true one-shot render (preview endpoint, offline
+        bounce) still gets its full attack+release -- legato is only
+        for the "there is more of this same note coming" case.
+        """
+        envelope = np.ones(len(audio))
+
+        if legato:
+            declick_samples = min(int(0.002 * self.sample_rate), len(audio) // 4)
+            if declick_samples > 0:
+                envelope[:declick_samples] = np.linspace(0, 1, declick_samples)
+                envelope[-declick_samples:] = np.linspace(1, 0, declick_samples)
+            return audio * envelope
+
         attack_samples = min(int(0.01 * self.sample_rate), len(audio) // 4)
         release_samples = min(int(0.03 * self.sample_rate), len(audio) // 4)
 
-        envelope = np.ones(len(audio))
         envelope[:attack_samples] = np.linspace(0, 1, attack_samples)
         envelope[-release_samples:] = np.linspace(1, 0, release_samples)
 
@@ -373,8 +680,43 @@ class VocableSynthesizer:
     def _apply_phoneme_shaping(self, audio, decision):
         try:
             if decision.brightness > 0.55:
-                gain_db = (decision.brightness - 0.55) * 10.0  # up to ~4.5 dB
+                gain_db = (decision.brightness - 0.55) * 10.0
                 audio = self._high_shelf(audio, corner_hz=3200.0, gain_db=gain_db)
+            elif decision.brightness < 0.45:
+                # Was boost-only -- brightness had no way to darken the
+                # tone at all, only ever brighten it or do nothing. Fine
+                # when nothing ever pushed brightness DOWN from neutral,
+                # but contour_following now deliberately does exactly
+                # that on a falling phrase (see HarmonyEngine.decide),
+                # and with no cut available that half of its effect would
+                # have been completely silent -- audibly identical to
+                # sitting at neutral. Mirrors the boost side: same
+                # corner, same 10x scale, just negative gain (a cut).
+                gain_db = (decision.brightness - 0.45) * 10.0
+                audio = self._high_shelf(audio, corner_hz=3200.0, gain_db=gain_db)
+
+            # vowel_color has carried a real value through PhonemeProfile
+            # -> HarmonyDecision this whole time (0=bright front vowel
+            # like "ee", 1=dark back vowel like "oh/oo" -- see
+            # CREE_PHONEME_PROFILES in phonetic_analysis.py) but nothing
+            # here ever actually read it -- it reached this function and
+            # was simply never used. brightness's shelf is a broad tilt
+            # across everything above ~3.2kHz; this is different and
+            # complementary -- a single resonant peak that actually SLIDES
+            # in frequency with vowel_color, from a bright ~2400Hz "ee"-
+            # ish formant down to a dark ~900Hz "oh/oo"-ish one, which
+            # reads as the vowel itself shifting rather than a tone
+            # control moving. Skipped near dead-center (0.45-0.55) so an
+            # ordinary, unremarkable vowel doesn't get colored for no
+            # reason -- this is for when something (contour_following's
+            # continuous lean, or the Cree phoneme classifier itself)
+            # has actually pushed it toward one end or the other.
+            if abs(decision.vowel_color - 0.5) > 0.05:
+                formant_hz = 2400.0 - decision.vowel_color * 1500.0  # 0 -> 2400Hz, 1 -> 900Hz
+                depth = min(1.0, (abs(decision.vowel_color - 0.5) - 0.05) / 0.45) * 0.55
+                b_formant, a_formant = iirpeak(formant_hz, 3.0, fs=self.sample_rate)
+                formant_shaped = lfilter(b_formant, a_formant, audio)
+                audio = audio * (1 - depth) + formant_shaped * depth
 
             if decision.nasality > 0.3:
                 notch_freq = 1000.0
@@ -388,7 +730,6 @@ class VocableSynthesizer:
                 nasal_boost = lfilter(b_peak, a_peak, audio)
                 audio = audio * (1 - depth * 0.3) + nasal_boost * (depth * 0.3)
 
-            # Normalize after filtering
             peak = np.max(np.abs(audio))
             if peak > 0:
                 audio /= peak
@@ -400,7 +741,7 @@ class VocableSynthesizer:
             return audio
 
     def _high_shelf(self, audio: np.ndarray, corner_hz: float, gain_db: float) -> np.ndarray:
-        if gain_db <= 0:
+        if gain_db == 0:
             return audio
         try:
             A = 10 ** (gain_db / 40.0)
@@ -471,21 +812,45 @@ class VocableSynthesizer:
             logger.error(f"Reverb error: {e} — returning dry signal")
             return audio
 
-    # Blends the start of the new note with the tail of the previous one over
-    def _crossfade(self, new_audio: np.ndarray) -> np.ndarray:
-        if self._prev_audio is None or len(new_audio) < self._crossfade_samples:
+    def _crossfade(self, new_audio: np.ndarray, vocable: str | None = None) -> np.ndarray:
+        if self._prev_audio is None:
             return new_audio
 
-        cf = self._crossfade_samples
-        fade_in = np.linspace(0, 1, cf)
-        fade_out = np.linspace(1, 0, cf)
+        identity_changed = (
+            vocable is not None and self._prev_vocable is not None and vocable != self._prev_vocable
+        )
+        cf = self._identity_crossfade_samples if identity_changed else self._crossfade_samples
+
+        if len(new_audio) < cf:
+            cf = len(new_audio)
+        if cf <= 0:
+            return new_audio
 
         prev_tail = self._prev_audio[-cf:] if len(self._prev_audio) >= cf else self._prev_audio
+        overlap_len = min(cf, len(prev_tail), len(new_audio))
+        if overlap_len <= 0:
+            return new_audio
+
+        if identity_changed:
+            # Equal-power (constant perceived loudness through the
+            # blend) rather than the plain linear ramp used for a
+            # same-word pitch move. A linear crossfade between two
+            # DIFFERENT recorded words has an audible dip in the middle
+            # (loudness bottoms out around 0.5+0.5 instead of staying
+            # constant), which reads as a little gap between "one sound
+            # stopping" and "another starting" -- exactly the abrupt
+            # jump-cut this exists to avoid. The sin/cos pair keeps
+            # combined energy roughly constant throughout the blend.
+            t = np.linspace(0, np.pi / 2, overlap_len)
+            fade_in = np.sin(t)
+            fade_out = np.cos(t)
+        else:
+            fade_in = np.linspace(0, 1, overlap_len)
+            fade_out = np.linspace(1, 0, overlap_len)
 
         new_audio = new_audio.copy()
-        overlap_len = min(cf, len(prev_tail), len(new_audio))
         new_audio[:overlap_len] = (
-            new_audio[:overlap_len] * fade_in[:overlap_len]
-            + prev_tail[:overlap_len] * fade_out[:overlap_len]
+            new_audio[:overlap_len] * fade_in
+            + prev_tail[:overlap_len] * fade_out
         )
         return new_audio
