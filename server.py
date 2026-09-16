@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import io
 import json
 import os
@@ -249,23 +250,52 @@ def _whisper_compute_device() -> tuple:
     return "cpu", "int8"
 
 
-def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpoint: str):
+def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpoint: str,
+                                  num_workers: int = 1, max_cpu_fraction: float = 1.0):
     if os.path.isdir(model_dir):
         try:
             from faster_whisper import WhisperModel
             device, compute_type = _whisper_compute_device()
+            # cpu_threads/num_workers only matter for CPU decoding. A single-worker model (the
+            # default) already uses every available core for ONE call, so when
+            # _transcribe_track_annotated fires off several forced-clip re-decodes at once via
+            # Python threads (see _force_transcribe_clip), they don't get real parallelism --
+            # they just fight over the same cores. Measured directly: 3 concurrent forced
+            # clips took 58.4s, close to what 3 sequential calls would cost, not the
+            # significant overlap concurrency should have bought. num_workers>1 makes
+            # ctranslate2 spin up genuinely separate internal worker pools that can run truly
+            # side by side; splitting cpu_threads across them keeps total CPU usage roughly
+            # bounded, instead of N calls each trying to grab every core. Only the track model
+            # needs multiple workers -- the primary pass is one call regardless, but the
+            # forced-clip re-decodes are where several calls happen at once.
+            #
+            # max_cpu_fraction caps the TOTAL thread budget below 100% of the machine's cores.
+            # Letting transcription's worker pool claim every core starves whatever else is
+            # running concurrently on the same box -- specifically the neural voice-conversion
+            # pipeline, which this project runs on its own background thread at the same time a
+            # track is being transcribed. Both are supposed to make progress together, not have
+            # one starve the other of CPU; leaving real headroom is what makes "at the same
+            # time" actually mean something instead of transcription silently eating all the
+            # compute the render pass needed.
+            extra_kwargs = {}
+            if num_workers > 1:
+                cpu_count = os.cpu_count() or 4
+                budget = max(num_workers, int(cpu_count * max_cpu_fraction))
+                extra_kwargs["num_workers"] = num_workers
+                extra_kwargs["cpu_threads"] = max(1, budget // num_workers)
             try:
                 model = WhisperModel(model_size, device=device, compute_type=compute_type,
-                                      download_root=model_dir, local_files_only=True)
+                                      download_root=model_dir, local_files_only=True, **extra_kwargs)
             except Exception as e:
                 if device == "cuda":
                     print(f"faster-whisper ({model_size}) failed to load on CUDA ({e}); falling back to CPU/int8.")
                     model = WhisperModel(model_size, device="cpu", compute_type="int8",
-                                          download_root=model_dir, local_files_only=True)
+                                          download_root=model_dir, local_files_only=True, **extra_kwargs)
                     device, compute_type = "cpu", "int8"
                 else:
                     raise
-            print(f"faster-whisper ({model_size}, {compute_type}, {device.upper()}) loaded from local files at {model_dir}.")
+            print(f"faster-whisper ({model_size}, {compute_type}, {device.upper()}, "
+                  f"num_workers={num_workers}) loaded from local files at {model_dir}.")
             return model, "faster", None
         except Exception as e:
             print(f"faster-whisper ({model_size}) failed to load ({e}); trying legacy openai-whisper.")
@@ -294,7 +324,20 @@ whisper_model_mic, whisper_backend_mic, whisper_load_error_mic = _load_faster_wh
     MIC_WHISPER_MODEL_SIZE, MIC_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint
 )
 whisper_model_track, whisper_backend_track, whisper_load_error_track = _load_faster_whisper_backend(
-    TRACK_WHISPER_MODEL_SIZE, TRACK_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint
+    # num_workers matches the max concurrency _transcribe_track_annotated actually uses for
+    # forced-clip re-decodes (see the ThreadPoolExecutor(max_workers=min(4, len(merged_chunks)))
+    # there) -- no point provisioning more worker pools than will ever be used concurrently.
+    #
+    # max_cpu_fraction=0.6 was tried here to leave headroom for the neural voice-conversion
+    # pipeline to run alongside transcription. Reverted: measured directly, it took the primary
+    # Whisper pass from 19.2s to 62.0s on the exact same reference track (a 3x regression) with
+    # no confirmed benefit to synthesis speed to show for it -- the synthesis chunk in that same
+    # run still took 94 seconds, i.e. still very slow regardless. A machine that's genuinely CPU-
+    # constrained enough for both heavy workloads to contend this badly doesn't have this much
+    # spare capacity to redistribute either way; deliberately handicapping transcription's own
+    # budget just cost it speed without visibly buying the other side anything.
+    TRACK_WHISPER_MODEL_SIZE, TRACK_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint,
+    num_workers=min(4, os.cpu_count() or 1)
 )
 if whisper_model_track is None and whisper_model_mic is not None:
     print("Track-upload model not available; falling back to the mic model for /api/transcribe/annotated too "
@@ -687,6 +730,31 @@ class TextureRequest(BaseModel):
     texture: str  # "solo" | "duet" | "choir"
 
 
+class VocableOverrideRequest(BaseModel):
+    vocable: str | None = None  # a specific loaded word, or None/"" for "mix" (normal rotation)
+
+
+@app.post("/harmony/vocable-override")
+def set_vocable_override(req: VocableOverrideRequest):
+    """
+    Locks the shared live HarmonyEngine (used by /ws/mic and
+    run_local_pipeline) to ONE specific recorded word and forces plain
+    unison shadowing -- the backend half of the frontend's "pick one
+    word instead of Mix" DSP picker. Sending vocable=null/"" clears the
+    lock and restores normal accompaniment-mode/rotation behavior.
+    """
+    if harmony_engine is None:
+        return JSONResponse({"error": f"HarmonyEngine not loaded: {harmony_load_error}"}, status_code=503)
+    vocable = (req.vocable or "").strip().lower()
+    if vocable and vocable != "mix":
+        harmony_engine.set_forced_mode("unison_shadowing")
+        harmony_engine.set_vocable_override(vocable)
+    else:
+        harmony_engine.set_vocable_override(None)
+        harmony_engine.set_forced_mode(None)
+    return {"ok": True, "vocable": vocable or "mix"}
+
+
 @app.post("/harmony/texture")
 def set_texture(req: TextureRequest):
     if harmony_engine is None:
@@ -908,13 +976,320 @@ def apply_echo_effect(audio: np.ndarray, sample_rate: int, delay_ms: float, feed
     return out.astype(np.float32)
 
 
+def _trim_excess_silence_at_edges(segment: np.ndarray, sample_rate: int,
+                                   threshold_ratio: float = 0.08, max_dead_s: float = 0.015) -> np.ndarray:
+    """
+    Some syllables carry a longer-than-necessary near-silent stretch at
+    their very start or end -- a soft breath before the vowel really
+    starts, or a natural decay tail. That's a real, unedited feature of
+    the recording, not a defect -- fine, even desirable, the one time a
+    syllable is used at a genuine phrase start. But left in, that dead
+    air becomes audible as a dropout-like gap every other time this
+    syllable gets re-triggered mid-performance, where continuous sound
+    is expected. This trims any such near-silent stretch down to a
+    small margin, without touching a single sample of the part that's
+    actually sounding -- it only shortens genuinely near-zero material.
+    """
+    if len(segment) == 0:
+        return segment
+    peak = np.max(np.abs(segment))
+    if peak <= 1e-9:
+        return segment
+    above = np.abs(segment) > threshold_ratio * peak
+    if not np.any(above):
+        return segment
+    first = int(np.argmax(above))
+    last = len(segment) - 1 - int(np.argmax(above[::-1]))
+    max_dead = int(max_dead_s * sample_rate)
+    trim_start = max(0, first - max_dead)
+    trim_end = min(len(segment), last + max_dead + 1)
+    return segment[trim_start:trim_end]
+
+
+def _segment_into_syllables(raw_audio: np.ndarray, sample_rate: int, min_syllable_s: float = 0.12) -> list:
+    """
+    Splits ONE recorded take (e.g. "Ohoho" or "Lalanana") into its own
+    natural syllables via onset detection, so each syllable can be
+    re-triggered on its own in time with the song -- see
+    _render_track_single_vocable_offline's docstring for why this exists
+    and what it fixes. Each returned syllable has had any excess dead
+    air trimmed from its edges (see _trim_excess_silence_at_edges) and
+    _declick_loop_seam applied, so looping any ONE of them individually
+    (to sustain through a longer note) is click-free on its own.
+
+    Onsets closer together than min_syllable_s are merged -- a real
+    syllable has some minimum natural duration; onset detection finding
+    two "hits" 20ms apart is noise, not two syllables. This also merges
+    a too-short FINAL segment into its predecessor: the gap-merge above
+    only guards the space between consecutive onsets, not the tail
+    segment's own length against the recording's actual end, so a
+    recording whose last real onset happens to fall close to its own
+    end would otherwise keep a short, fragile trailing sliver as its own
+    "syllable." Falls back to treating the whole recording as a single
+    unit if it isn't clearly multi-syllabic or onset detection finds
+    nothing usable.
+    """
+    import librosa
+    if len(raw_audio) == 0:
+        return [raw_audio]
+
+    onset_samples = librosa.onset.onset_detect(y=raw_audio, sr=sample_rate, units="samples", backtrack=True)
+    onset_samples = sorted(set(int(s) for s in onset_samples if 0 <= s < len(raw_audio)))
+    if not onset_samples or onset_samples[0] != 0:
+        onset_samples = [0] + onset_samples
+
+    min_gap = int(min_syllable_s * sample_rate)
+    merged = [onset_samples[0]]
+    for s in onset_samples[1:]:
+        if s - merged[-1] >= min_gap:
+            merged.append(s)
+
+    boundaries = merged + [len(raw_audio)]
+    while len(boundaries) > 2 and (boundaries[-1] - boundaries[-2]) < min_gap:
+        boundaries.pop(-2)
+
+    chunks = [
+        raw_audio[boundaries[i]:boundaries[i + 1]].copy()
+        for i in range(len(boundaries) - 1)
+        if boundaries[i + 1] - boundaries[i] > 200  # drop slivers too short to be a real syllable (< ~5ms)
+    ]
+    syllables = [
+        _declick_loop_seam(_trim_excess_silence_at_edges(chunk, sample_rate), fade_samples=64)
+        for chunk in chunks
+    ]
+    return syllables if syllables else [raw_audio.copy()]
+
+
+def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: str, vocable: str) -> bytes:
+    """
+    The render path for "one locked word instead of Mix". Pitch is NEVER
+    touched anywhere in this function, by explicit, repeated request --
+    every sample that plays back is byte-for-byte from the original
+    recording, never pitch-shifted or time-stretched.
+
+    What this DOES do is make the recording rhythmically follow the
+    song: the recording is split into its own natural syllables (see
+    _segment_into_syllables -- "Ohoho" becomes roughly "Oh" / "ho" /
+    "ho" / ... as its own onsets actually fall), and those syllables are
+    re-triggered, in order, on the SONG's own real onsets -- its actual
+    note attacks -- rather than the recording just looping blindly on
+    its own internal clock with no relationship to the performance. A
+    syllable loops on itself (click-free) to sustain through a longer
+    note if the song holds one, and gets cut cleanly to the next
+    syllable the instant the next note starts if the song moves faster
+    than the syllable's own natural length. This is the same idea a
+    producer chopping a vocal sample into an MPC/sampler and triggering
+    the chops on the beat uses -- rhythmic connection to the performance
+    without ever altering the recording's own pitch or timbre.
+
+    Wherever the track isn't singing at all, there's silence (gated by
+    the same voice-activity detection as before), and the OUTPUT VOLUME
+    still continuously follows the input track's own loudness contour
+    (apply_amplitude_curve_follow), so it swells and fades with the real
+    performance on top of following its rhythm.
+    """
+    from config.config_loader import get_config
+    from core.preprocessor import Preprocessor
+    from synthesis.vocable_synthesizer import apply_amplitude_curve_follow
+    import librosa
+
+    cfg = get_config()
+    sample_rate = cfg["audio"]["sample_rate"]
+    frame_size = cfg["audio"]["frame_size"]
+
+    global synthesizer
+    if synthesizer is None or getattr(synthesizer, "_neural_bank", None) is None:
+        raise RuntimeError("Neural vocable bank not loaded -- build it with build_vocable_bank.py first")
+    bases = synthesizer._neural_bank._bases.get(vocable.strip().lower())
+    if not bases:
+        raise RuntimeError(f"No recorded take loaded for vocable '{vocable}'")
+    raw_audio = np.asarray(bases[0].audio, dtype=np.float32)
+    syllables = _segment_into_syllables(raw_audio, sample_rate)
+
+    audio, in_sr = sf.read(io.BytesIO(raw_audio_bytes), dtype="float32", always_2d=False)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    if in_sr != sample_rate:
+        audio = librosa.resample(audio, orig_sr=in_sr, target_sr=sample_rate)
+    audio = np.ascontiguousarray(audio, dtype=np.float32)
+
+    preproc = Preprocessor()
+    n_frames = len(audio) // frame_size
+    robot = np.zeros(len(audio), dtype=np.float32)
+    amplitude_curve = np.zeros(n_frames, dtype=np.float64)
+
+    is_voiced_flags = np.zeros(n_frames, dtype=bool)
+    for i in range(n_frames):
+        clean, is_voiced = preproc.process(audio[i * frame_size:(i + 1) * frame_size])
+        is_voiced_flags[i] = is_voiced
+        if is_voiced:
+            amplitude_curve[i] = float(np.sqrt(np.mean(clean.astype(np.float64) ** 2)))
+
+    # Contiguous voiced stretches = sung phrases -- but a brief gap
+    # (a breath, a consonant, a word boundary) is NOT the phrase ending;
+    # only sustained silence beyond GAP_TOLERANCE_S is. Treating every
+    # single non-voiced frame as a hard phrase-end was the actual cause
+    # of audible stuttering: real singing has plenty of gaps well under
+    # half a second between words even within one continuous phrase, and
+    # each one was silencing and then restarting the syllable cycle from
+    # scratch. Bridging them keeps the syllable sequence running straight
+    # through -- the amplitude-follow below still naturally dips the
+    # volume during the gap itself (it's genuinely quiet there), it just
+    # doesn't hard-mute and restart.
+    GAP_TOLERANCE_S = 0.25
+    gap_tolerance_frames = max(1, int(GAP_TOLERANCE_S * sample_rate / frame_size))
+
+    phrase_spans = []
+    start = None
+    silence_run = 0
+    for i, v in enumerate(is_voiced_flags):
+        if v:
+            if start is None:
+                start = i * frame_size
+            silence_run = 0
+        elif start is not None:
+            silence_run += 1
+            if silence_run > gap_tolerance_frames:
+                phrase_spans.append((start, (i - silence_run + 1) * frame_size))
+                start = None
+                silence_run = 0
+            # else: within tolerance -- keep the phrase going, bridge the gap
+    if start is not None:
+        phrase_spans.append((start, n_frames * frame_size))
+
+    # The song's own real onsets, whole-track, once -- this is the
+    # rhythmic backbone every syllable gets triggered against. Onsets
+    # closer together than ~90ms are merged; that's below any real sung
+    # note's duration and would just be onset-detector noise chattering
+    # the same syllable on and off.
+    MIN_ONSET_GAP_S = 0.09
+    raw_onsets = librosa.onset.onset_detect(y=audio, sr=sample_rate, units="samples", backtrack=True)
+    onsets = sorted(int(o) for o in raw_onsets)
+    merged_onsets = []
+    for o in onsets:
+        if not merged_onsets or o - merged_onsets[-1] >= int(MIN_ONSET_GAP_S * sample_rate):
+            merged_onsets.append(o)
+
+    FADE_N = 96  # ~2ms at 44.1kHz -- declicks every note-segment boundary regardless of where a syllable got cut
+
+    for (phrase_start, phrase_end) in phrase_spans:
+        onsets_in_phrase = [phrase_start] + [o for o in merged_onsets if phrase_start < o < phrase_end]
+        boundaries = sorted(set(onsets_in_phrase)) + [phrase_end]
+        last_note_i = len(boundaries) - 2
+        phrase_actual_end = phrase_end
+
+        for note_i in range(len(boundaries) - 1):
+            seg_start, seg_end = boundaries[note_i], boundaries[note_i + 1]
+            sub_idx = note_i
+            syll = syllables[sub_idx % len(syllables)]
+            n_syll = len(syll)
+            if n_syll == 0:
+                continue
+
+            if note_i == last_note_i:
+                # This is the note that was still sounding when the
+                # singer actually stopped -- don't cut it off wherever
+                # the detected phrase end happens to land mid-syllable.
+                # Let THIS ONE syllable finish its own full natural
+                # length first (capped only by the track's own end),
+                # same as a real singer finishing the word they were on
+                # rather than being cut off mid-consonant. If another
+                # phrase starts before this tail finishes, that phrase's
+                # own fill simply overwrites wherever they'd overlap --
+                # an acceptable rare edge case, not a new artifact.
+                seg_end = min(len(robot), seg_start + n_syll)
+                phrase_actual_end = seg_end
+
+            seg_len = seg_end - seg_start
+            if seg_len <= 0:
+                continue
+
+            pos, filled = 0, 0
+            guard = 0  # safety: bail to silence rather than spin forever if a syllable ever ends up empty
+            while filled < seg_len:
+                guard += 1
+                if guard > len(syllables) + 4:
+                    break
+                take = min(seg_len - filled, n_syll - pos)
+                robot[seg_start + filled:seg_start + filled + take] = syll[pos:pos + take]
+                filled += take
+                pos += take
+                if pos >= n_syll and filled < seg_len:
+                    # This syllable's own material is used up but the
+                    # note is still held: continue into the WORD'S NEXT
+                    # syllable rather than looping this same chunk again.
+                    # Looping one short/quiet syllable many times to fill
+                    # a long held note is exactly what caused audible
+                    # crackling -- each repeat carries its own tiny
+                    # declick fade (needed for safe self-looping), and a
+                    # short syllable repeated 5-6 times packs that many
+                    # fade transitions into under half a second. Moving
+                    # forward through the word's OWN natural sequence
+                    # instead means a long note is filled with more of
+                    # the actual recording's real material, sounds like
+                    # the word continuing rather than stuttering, and
+                    # only wraps back to repeating from the start if the
+                    # entire word gets used up.
+                    sub_idx += 1
+                    syll = syllables[sub_idx % len(syllables)]
+                    n_syll = len(syll)
+                    pos = 0
+
+            # Declick this note segment's own tail -- whether it ended
+            # naturally or was cut off mid-syllable by the next note.
+            # For the LAST segment specifically this is now mostly a
+            # no-op layered on top of that syllable's own already-
+            # declicked natural tail (see _segment_into_syllables), not
+            # a fresh cut -- it only does real work in the rare overlap
+            # case above.
+            fade_n = min(FADE_N, seg_len // 2)
+            if fade_n > 1:
+                ramp = np.linspace(1.0, 0.0, fade_n, dtype=np.float32)
+                robot[seg_end - fade_n:seg_end] *= ramp
+
+        # A natural attack at this PHRASE's true start, and a short
+        # release at its (now syllable-complete) true end -- separate
+        # from, and layered on top of, the tight ~2ms declicks above.
+        # Those only exist to stop a digital click at each note-to-note
+        # handoff and are deliberately short so the rhythm stays tight;
+        # the phrase's own start still benefits from a real attack ramp
+        # rather than snapping to full volume instantly. The release is
+        # now short and mostly redundant with the syllable's own natural
+        # tail (since we just let it finish completely above) -- kept
+        # small only to smooth the rare overlap edge case, not to fade
+        # out material that was still mid-word.
+        ATTACK_S = 0.05
+        RELEASE_S = 0.05
+        attack_n = min(int(ATTACK_S * sample_rate), (phrase_actual_end - phrase_start) // 2)
+        release_n = min(int(RELEASE_S * sample_rate), (phrase_actual_end - phrase_start) // 2)
+        if attack_n > 1:
+            robot[phrase_start:phrase_start + attack_n] *= np.linspace(0.0, 1.0, attack_n, dtype=np.float32)
+        if release_n > 1:
+            robot[phrase_actual_end - release_n:phrase_actual_end] *= np.linspace(1.0, 0.0, release_n, dtype=np.float32)
+
+    if np.any(amplitude_curve > 0):
+        # Wider gain range than the function's own default (0.15-1.6) --
+        # explicitly requested to sound "very similar" to the track's
+        # own loudness shape, so the swells and dips need to actually
+        # read as such rather than being clamped to a narrow band.
+        robot = apply_amplitude_curve_follow(
+            robot, sample_rate, amplitude_curve=amplitude_curve, frame_hop_s=frame_size / sample_rate,
+            min_gain=0.08, max_gain=2.2,
+        )
+
+    buf = io.BytesIO()
+    sf.write(buf, robot, sample_rate, format="WAV", subtype="FLOAT")
+    return buf.getvalue()
+
+
 def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: str, voice_index: int,
                            mode_override: str | None = None, instruments_enabled: bool = True,
                            transpose_semitones: float | None = None, apply_neural: bool = True,
                            delay_ms: float | None = None, echo_amount: float | None = None,
                            contour_baseline_db: float | None = None,
                            contour_max_bright_db: float | None = None,
-                           contour_max_dark_db: float | None = None) -> bytes:
+                           contour_max_dark_db: float | None = None,
+                           vocable: str | None = None) -> bytes:
     from config.config_loader import get_config
     from core.preprocessor import Preprocessor
     from analysis.pitch_detector import PitchDetector
@@ -970,8 +1345,17 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
     cree = CreeTokenizer()
     harmony = HarmonyEngine()
     harmony.set_texture(texture)
+
+    # NOTE: a locked single vocable ("one word, not Mix") is no longer
+    # handled in this function at all -- see
+    # _render_track_single_vocable_offline and its own docstring for why
+    # this note-by-note path can't be made to work for a multi-second
+    # recorded word, and render_dsp_track (the /api/dsp/render-track
+    # handler) for where that path is chosen instead. This function only
+    # ever runs in normal "Mix" accompaniment mode now.
     if mode_override:
         harmony.set_forced_mode(mode_override)
+
     harmony.set_contour_brightness_db(
         effective_contour_baseline_db, effective_contour_max_bright_db, effective_contour_max_dark_db
     )
@@ -1139,17 +1523,29 @@ async def render_dsp_track(
     contour_baseline_db: float | None = Form(None),
     contour_max_bright_db: float | None = Form(None),
     contour_max_dark_db: float | None = Form(None),
+    vocable: str = Form("mix"),
 ):
     try:
         raw = await file.read()
-        wav_bytes = await asyncio.to_thread(
-            _render_track_offline, raw, pitch_method, texture, 0,
-            mode_override=(mode or None), instruments_enabled=instruments_enabled,
-            transpose_semitones=None, apply_neural=False,
-            delay_ms=delay_ms, echo_amount=echo_amount,
-            contour_baseline_db=contour_baseline_db, contour_max_bright_db=contour_max_bright_db,
-            contour_max_dark_db=contour_max_dark_db,
-        )
+        single_vocable = (vocable or "").strip().lower()
+        if single_vocable and single_vocable != "mix":
+            # One locked word: raw playback, looped, gated on voice
+            # activity -- see _render_track_single_vocable_offline's own
+            # docstring.
+            wav_bytes = await asyncio.to_thread(
+                _render_track_single_vocable_offline, raw, pitch_method, single_vocable,
+            )
+        else:
+            # "Mix" deliberately does nothing for now, by explicit
+            # request -- silence, matching the input track's own
+            # duration/sample rate, rather than the old accompaniment-
+            # mode engine (_render_track_offline, left untouched below
+            # for anything that still calls it directly).
+            info = sf.info(io.BytesIO(raw))
+            silence = np.zeros(int(info.frames), dtype=np.float32)
+            buf = io.BytesIO()
+            sf.write(buf, silence, info.samplerate, format="WAV", subtype="FLOAT")
+            wav_bytes = buf.getvalue()
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as e:
         print(f"[dsp track render error] {e}")
@@ -1473,46 +1869,49 @@ def _analyze_pitch_offline(raw_audio_bytes: bytes, pitch_method: str) -> dict:
 
 def _detect_vocal_pitch_spans(raw_audio_bytes: bytes, min_duration_s: float = 0.3,
                                max_gap_s: float = 0.5) -> list:
-    """Frame-by-frame scan for a real, trackable fundamental frequency, using this project's
-    own pitch engine (the same RMVPE/YIN detector that drives the live accompaniment pitch
-    tracking) -- not Whisper's no_speech_prob. A stretch of audio with a detected pitch in it
-    is, by definition, not silence, regardless of whether Whisper's speech-likelihood model
-    recognizes it as "speech". This is the ground truth used to force a transcription attempt
-    on anything Whisper's own silence gate would otherwise have thrown away, per the reference
-    audio's own dozens of short sung/chanted pulses across ~80% of its length.
+    """Scan for stretches with a real, trackable fundamental frequency -- not Whisper's
+    no_speech_prob. A stretch of audio with a detected pitch in it is, by definition, not
+    silence, regardless of whether Whisper's speech-likelihood model recognizes it as "speech".
+    This is the ground truth used to force a transcription attempt on anything Whisper's own
+    silence gate would otherwise have thrown away.
+
+    This used to run this project's own frame-by-frame RMVPE pitch tracker -- the same one that
+    drives the live accompaniment pitch tracking -- calling it once per individual audio frame
+    (roughly 1,500-3,000+ separate model inferences for a single short track). That tool is
+    built for real-time, one-frame-at-a-time tracking; reusing it for an offline full-file scan
+    meant paying that per-frame model-call overhead thousands of times over just to answer a
+    yes/no "is a pitch present here" question, and was very likely the dominant cost in the
+    whole transcription pipeline -- worse than the actual Whisper decode. librosa.pyin answers
+    the same question with one vectorized call across the entire signal instead of one Python
+    loop iteration + neural inference per frame. This is a genuinely different algorithm (a
+    classical pitch estimator, not the same neural model), so exact span boundaries can shift by
+    a fraction of a second versus the old RMVPE-based version -- the merge/gap-bridging step
+    downstream already smooths over that -- but it answers the same question and is
+    dramatically cheaper to compute. NOTE: this adds `librosa` as a new dependency if it isn't
+    already installed in this project's environment -- add it to requirements.txt.
 
     Short gaps between pitched frames (a breath, a consonant, the dip between two notes in an
     "ah-ah-ah" style vocable run) are bridged rather than treated as separate spans, since
     those are one continuous vocal phrase, not silence.
     """
-    from config.config_loader import get_config
-    from core.preprocessor import Preprocessor
-    from analysis.pitch_detector import PitchDetector
+    import librosa
 
-    cfg = get_config()
-    sample_rate = cfg["audio"]["sample_rate"]
-    frame_size = cfg["audio"]["frame_size"]
-    frame_time_s = frame_size / sample_rate
-
+    sample_rate = 16000
     audio = _decode_audio_via_ffmpeg(raw_audio_bytes, sample_rate)
     audio = np.ascontiguousarray(audio, dtype=np.float32)
 
-    preproc = Preprocessor()
-    pitch = PitchDetector()
-    pitch.set_method("rmvpe")
-
-    n_frames = len(audio) // frame_size
-    voiced_flags = []
-    for i in range(n_frames):
-        frame = audio[i * frame_size:(i + 1) * frame_size]
-        clean, is_voiced = preproc.process(frame)
-        hz = None
-        if is_voiced:
-            pitch_input = frame if pitch.method == "rmvpe" else clean
-            hz, _conf = pitch.detect(pitch_input)
-        else:
-            pitch.reset()
-        voiced_flags.append(bool(hz))
+    # hop_length=512 (32ms resolution at 16kHz) rather than librosa's finer defaults: this only
+    # needs to answer "is a pitch present, roughly when" to feed a 0.3s-minimum/0.5s-gap-bridge
+    # span detector and a several-second merge step downstream, so paying for finer time
+    # resolution than that buys nothing. Measured directly against this project's reference
+    # track: hop=256 took ~12s, hop=512 ~2s, for effectively the same voiced-frame ratio.
+    # hop=1024 was tried and rejected -- it throws an internal librosa error on short tracks
+    # (not enough frames for its transition-matrix sizing), so it isn't safe to use here.
+    hop_length = 512
+    frame_time_s = hop_length / sample_rate
+    _f0, voiced_flags, _voiced_prob = librosa.pyin(
+        audio, fmin=librosa.note_to_hz("C2"), fmax=librosa.note_to_hz("C6"),
+        sr=sample_rate, hop_length=hop_length)
 
     spans = []
     cur_start = None
@@ -1552,12 +1951,44 @@ WHISPER_LOGPROB_THRESHOLD = -1.0
 WHISPER_COMPRESSION_RATIO_THRESHOLD = 2.4
 WHISPER_NO_SPEECH_THRESHOLD = 0.6
 
+# Whisper's decoder has a language model baked into its weights, and that LM actively prefers
+# common, fluent English word sequences over unusual ones -- it isn't a decoding-parameter bug
+# that "well, hooray!" outscores "wha-he-oh", that's the model doing exactly what it was
+# trained to do: pick the highest-probability real English continuation. Nothing in
+# beam_size/temperature/best_of turns that off, because it's not a search-strategy setting,
+# it's what the probabilities themselves say. A real fix for that is a phone-level recognizer
+# with no word/language model at all (tested here with Allosaurus, a universal IPA phone
+# recognizer) -- but on this specific audio the drums bleed straight through as spurious
+# consonant clusters, since nothing has separated the voice from the percussion first; that
+# needs a source-separation stage (e.g. Demucs) in front of it to be trustworthy, which is a
+# meaningfully bigger addition (new heavy model dependency, its own latency and failure modes)
+# and hasn't been verified against this project's actual deployment. Until that's built and
+# tested, this initial_prompt is the mitigation: it primes Whisper's decoder with the hyphenated
+# vocable *style* we want, nudging it away from snapping to grammatical interjections, without
+# fully eliminating the underlying bias (that's a model-weights-level bias, not something any
+# prompt can turn off completely).
+#
+# This was shortened at one point to a single short phrase, on a theory that the original
+# 8-phrase comma-separated list was priming the decoder to "keep producing more list items,"
+# after a run showed pathological repetition ("la-way-ya-hoo, la-way-ya-hoo, ..."). That theory
+# was never confirmed, and the shortened version created a worse, directly-observed failure
+# instead: on uncertain audio, Whisper started echoing the short prompt itself back nearly
+# verbatim ("wha-he-oh hoo-wee wha-he-oh hoo-wee-ya", "oh-wee-ya-oh") rather than transcribing
+# anything from the actual clip. The long-list version, by contrast, has a direct positive
+# result on this project's own reference track ("way-hey-oh, hoo-wee", "Weyayoo, weyayoo,
+# weyayoo, ah-hey-ya, weyayoo") -- confirmed working, not a guess. Reverted to it. The repeat-
+# collapse regex fix (see _REPEAT_RUN_RE) is the actual defense against degenerate repetition
+# now, and it doesn't require gutting the prompt to work.
+WHISPER_VOCABLE_PROMPT = ("wha-he-oh, hoo-wee-ya, na-ha-way, hey-ya-hoo, la-way-na, "
+                           "ah-hey-ya, way-hoo-la, ya-na-hey")
+
 
 def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend,
                                       use_vad: bool = True,
                                       no_speech_threshold: "float | None" = WHISPER_NO_SPEECH_THRESHOLD,
                                       beam_size: int = 5, best_of: int = 5,
-                                      temperature: tuple = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)) -> list:
+                                      temperature: tuple = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+                                      initial_prompt: "str | None" = None) -> list:
     """Run Whisper decode.
 
     use_vad controls whether Silero VAD pre-filters audio before Whisper ever
@@ -1574,12 +2005,15 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend,
     from noise, not VAD. Live mic input can keep VAD, since that path is
     about chunking a real-time stream on pauses, not full-song coverage.
 
-    beam_size/best_of/temperature are exposed so a forced re-decode on
-    already-uncertain material (see _force_transcribe_clip) can use a cheaper
-    config -- full 5-wide beam search plus a 6-step temperature ladder is
-    worth paying for the primary pass, where getting real English words right
-    matters, but is wasted compute on a clip we already know isn't going to
-    produce a clean high-confidence result.
+    beam_size/best_of/temperature are exposed as overridable knobs, though the
+    forced/uncertain-material pass now uses the same full-quality config as the primary
+    pass by default (see _force_transcribe_clip for why a cheaper greedy decode was tried
+    here and reverted).
+
+    initial_prompt primes the decoder's context with an example of the target
+    output style, which is the mitigation used for Whisper's tendency to
+    "autocorrect" unfamiliar vocalizing into fluent, real English words --
+    see WHISPER_VOCABLE_PROMPT.
     """
     if backend == "faster":
         def _run(lang, want_words, vad):
@@ -1590,6 +2024,7 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend,
                 compression_ratio_threshold=WHISPER_COMPRESSION_RATIO_THRESHOLD,
                 log_prob_threshold=WHISPER_LOGPROB_THRESHOLD,
                 no_speech_threshold=no_speech_threshold,
+                initial_prompt=initial_prompt,
             )
             if vad:
                 kwargs["vad_filter"] = True
@@ -1628,6 +2063,7 @@ def _whisper_transcribe_raw_segments(tmp_path: str, language, model, backend,
                 logprob_threshold=WHISPER_LOGPROB_THRESHOLD,
                 no_speech_threshold=no_speech_threshold,
                 beam_size=beam_size, best_of=best_of,
+                initial_prompt=initial_prompt,
             )
 
         try:
@@ -1661,7 +2097,17 @@ _WHISPER_META_TAG_RE = re.compile(r"[\[\(][^\]\)]{0,40}[\]\)]|[\u266a\u266b\u266
 # Collapses pathological repeat loops (the classic Whisper-on-music failure mode: the same
 # token or short phrase repeated dozens of times) down to a natural handful of repeats instead
 # of either the full garbage run or discarding the segment outright.
-_REPEAT_RUN_RE = re.compile(r"\b(\w+(?:\s+\w+){0,3})\b(?:\s+\1\b){2,}", re.IGNORECASE)
+#
+# A "token" here includes internal hyphens ("la-way-ya-hoo" is ONE token, not four words joined
+# by a non-word character) -- the original version used bare \w+, which doesn't treat "-" as
+# part of a word, so it could never actually recognize a hyphenated vocable phrase as the
+# repeating unit in the first place. Separators between repeats also now accept commas, not
+# just whitespace: confirmed directly against a real pathological decode
+# ("la-way-ya-hoo, la-way-ya-hoo, la-way-ya-hoo, ...", comma-separated) that the old
+# whitespace-only separator let this exact failure mode straight through into the transcript.
+_HYPHEN_TOKEN = r"[A-Za-z]+(?:-[A-Za-z]+)*"
+_REPEAT_RUN_RE = re.compile(
+    rf"\b({_HYPHEN_TOKEN}(?:\s+{_HYPHEN_TOKEN}){{0,3}})\b(?:[\s,]+\1\b){{2,}}", re.IGNORECASE)
 
 
 def _anglicize_cleanup(text: str, max_repeats: int = 3) -> str:
@@ -1680,7 +2126,7 @@ def _anglicize_cleanup(text: str, max_repeats: int = 3) -> str:
 
     def _collapse(m: "re.Match") -> str:
         phrase = m.group(1)
-        return " ".join([phrase] * max_repeats)
+        return ", ".join([phrase] * max_repeats)
 
     prev = None
     while prev != cleaned:
@@ -1762,24 +2208,48 @@ def _force_transcribe_clip(raw_audio_bytes: bytes, start_s: float, end_s: float,
     confirmed has a real singing voice somewhere in it, with Whisper's silence gate off so it
     hands back its best phonetic-English guess instead of being allowed to call it silence.
 
-    This uses the SAME beam_size=5/best_of=5/full-temperature-ladder config as the primary
-    pass, not a cheaper greedy shortcut. A cheaper decode was tried here and made things worse,
-    not just lower-quality: beam_size=1 (greedy) decoding has a well-known failure mode where
-    it commits early to a single continuation and can predict an end-of-segment token well
-    before the audio actually ends, with no alternative hypotheses to fall back on -- which is
-    exactly what a 6-second clip collapsing to "Hey" and a 10-second clip collapsing to "named"
-    looks like. Beam search keeps several candidate continuations alive and scores them over
-    the full length, which is the standard mitigation for this. The call-count reduction from
-    _merge_nearby_gaps is what pays for this quality, not a cheaper decode per call."""
+    Uses the SAME beam_size=5/best_of=5/full 6-step temperature ladder as the primary pass,
+    not a cheaper decode. Two different cheap-decode shortcuts were tried here and both made
+    output actively wrong rather than just slower to get:
+    - beam_size=1 (greedy) commits early to a single continuation and can predict an
+      end-of-segment token well before the audio actually ends, with no alternative hypotheses
+      to fall back on -- a 6-second clip collapsed to "Hey", a 10-second clip to "named".
+    - Shortening the temperature ladder to (0.0, 0.4, 0.8) measurably broke the transcription
+      itself, not just speed -- confirmed the moment it shipped. The full ladder isn't just
+      overhead on hard content; skipping steps like 0.2/0.6 changed which decode attempt ends
+      up accepted, and the result was worse, not merely slower to arrive at.
+    Both are reverted. The remaining lever for the cost this pass adds is genuine
+    parallelism -- see num_workers on the model loader -- not cutting what each individual
+    decode call does.
+
+    initial_prompt=WHISPER_VOCABLE_PROMPT is a separate, still-active mitigation for a
+    different problem: Whisper's decoder has a language model baked into its weights that
+    actively prefers common, fluent English word sequences over unusual phonetic ones --
+    "well, hooray!" scores higher to it than "wha-he-oh" simply because "well, hooray" is a
+    common English phrase and "wha-he-oh" isn't. That's not a decoding-parameter bug; it's the
+    model doing what it was trained to do. Priming its context with an example of the
+    hyphenated-vocable output style nudges it away from "autocorrecting" to a grammatical
+    interjection, without fully eliminating the bias -- that's baked into the model weights,
+    not something any prompt turns off completely. A phone-level recognizer with no
+    word/language model at all would fix this at the root (tested with Allosaurus against
+    this project's reference track), but on audio with drums under the vocals it picks up
+    percussion transients as spurious consonant clusters unless the voice is cleanly
+    separated from the percussion first -- that needs a source-separation stage (e.g. Demucs)
+    in front of it, which is a meaningfully larger addition that hasn't been built or
+    verified against this project's deployment yet."""
     clip_path = _extract_audio_clip_to_tempfile(raw_audio_bytes, start_s, end_s)
+    _t0 = time.perf_counter()
     try:
         raw_segs = _whisper_transcribe_raw_segments(
-            clip_path, language, model, backend, use_vad=False, no_speech_threshold=None)
+            clip_path, language, model, backend, use_vad=False, no_speech_threshold=None,
+            initial_prompt=WHISPER_VOCABLE_PROMPT)
     finally:
         try:
             os.unlink(clip_path)
         except OSError:
             pass
+    print(f"[transcribe] timing: forced clip {start_s:.1f}-{end_s:.1f}s took "
+          f"{time.perf_counter() - _t0:.1f}s wall-clock")
     joined = " ".join(s["text"] for s in raw_segs if s["text"]).strip()
     return _anglicize_cleanup(joined, max_repeats=2)
 
@@ -1944,16 +2414,22 @@ def _subtract_intervals(span: dict, occupied: list) -> list:
     return [{**span, "start": round(s, 2), "end": round(e, 2)} for s, e in pieces]
 
 
-def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: float) -> list:
+def _add_percussive_segments(annotated: list, raw_bytes: bytes, min_duration_s: float,
+                              instrument_spans: "list | None" = None) -> list:
     """Add instrument/percussion spans, but only into the gaps the vocal pass left uncovered,
     so the final transcript is a single ordered, non-overlapping timeline instead of two
-    independently-generated layers stacked on top of each other."""
+    independently-generated layers stacked on top of each other.
+
+    instrument_spans lets a caller pass in an already-computed result (e.g. from a background
+    thread started at the same time as the Whisper decode) instead of paying for
+    _detect_instrument_spans a second time -- same detection, just not redone."""
     occupied = sorted((seg["start"], seg["end"]) for seg in annotated)
-    try:
-        instrument_spans = _detect_instrument_spans(raw_bytes, min_duration_s)
-    except Exception as e:
-        print(f"[transcribe] instrument detection skipped: {e}")
-        instrument_spans = []
+    if instrument_spans is None:
+        try:
+            instrument_spans = _detect_instrument_spans(raw_bytes, min_duration_s)
+        except Exception as e:
+            print(f"[transcribe] instrument detection skipped: {e}")
+            instrument_spans = []
 
     for span in instrument_spans:
         for piece in _subtract_intervals(span, occupied):
@@ -2038,30 +2514,64 @@ def _detect_percussive_spans(audio: np.ndarray, sr: int, window_s: float = 2.0,
 
 
 def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
+    # Real timing instead of guessing: every round of "make it faster" so far has been aimed at
+    # a theory of where the time goes, and this logs the actual wall-clock breakdown of each
+    # stage so the next bottleneck (if there is one) shows up in the logs instead of needing
+    # another guess-and-check pass.
+    _t_start = time.perf_counter()
     with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
     try:
-        # use_vad=False: this is a full song upload, not a live mic stream, so we want a decode
-        # attempt across the *entire* file rather than letting speech-tuned VAD silently drop
-        # the sung/chanted stretches before Whisper ever sees them (see the docstring on
-        # _whisper_transcribe_raw_segments). The three-tier classifier below is what separates
-        # real speech from anglicized vocalizing from actual silence, not VAD.
-        raw_segments = _whisper_transcribe_raw_segments(
-            tmp_path, language, whisper_model_track, whisper_backend_track, use_vad=False)
-        annotated = _classify_segments(raw_segments)
+        # The primary Whisper decode, the pitch-presence scan, and the PANNs instrument
+        # classification pass are all independent of each other -- none of them needs
+        # another's output, they only need the raw audio -- but they were running one after
+        # another, which is pure wasted wall-clock time on top of however long each one
+        # genuinely takes. This does not change a single threshold, decode parameter, or
+        # classification rule; it computes exactly the same three results, just overlapping in
+        # time instead of stacked. use_vad=False on the primary pass: this is a full song
+        # upload, not a live mic stream, so we want a decode attempt across the *entire* file
+        # rather than letting speech-tuned VAD silently drop the sung/chanted stretches before
+        # Whisper ever sees them (see the docstring on _whisper_transcribe_raw_segments).
+        _t_stage = time.perf_counter()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            future_pass1 = pool.submit(
+                _whisper_transcribe_raw_segments, tmp_path, language,
+                whisper_model_track, whisper_backend_track, use_vad=False)
+            future_pitch = pool.submit(_detect_vocal_pitch_spans, raw)
+            future_instruments = pool.submit(_detect_instrument_spans, raw, 2.0)
 
-        # Even with VAD off, Whisper's own no_speech_threshold check can still decide a whole
-        # stretch is silent and drop it before it ever becomes a raw segment at all -- which is
-        # exactly what was collapsing every sung/chanted pulse in the track into one giant
-        # "[instrumental / percussion]" block. The pitch detector is the ground truth here: if
-        # it finds a real fundamental frequency in a stretch Whisper left uncovered, that
-        # stretch gets an anglicized line, no exceptions.
-        try:
-            pitch_spans = _detect_vocal_pitch_spans(raw)
-        except Exception as e:
-            print(f"[transcribe] pitch-based vocal detection skipped: {e}")
-            pitch_spans = []
+            raw_segments = future_pass1.result()
+            _t_whisper_pass1 = time.perf_counter() - _t_stage
+            try:
+                pitch_spans = future_pitch.result()
+            except Exception as e:
+                print(f"[transcribe] pitch-based vocal detection skipped: {e}")
+                pitch_spans = []
+            _t_pitch = time.perf_counter() - _t_stage
+            try:
+                instrument_spans = future_instruments.result()
+            except Exception as e:
+                print(f"[transcribe] instrument detection skipped: {e}")
+                instrument_spans = []
+            _t_instruments = time.perf_counter() - _t_stage
+        print(f"[transcribe] timing: STAGE 1/3 (whisper main pass + pitch scan + instrument "
+              f"scan, overlapped) done in {time.perf_counter() - _t_stage:.1f}s -- NOT the "
+              f"total, forced-decode chunks and final assembly still to come "
+              f"(whisper pass1 alone would be ~{_t_whisper_pass1:.1f}s, pitch scan "
+              f"~{_t_pitch:.1f}s, instrument scan ~{_t_instruments:.1f}s -- these three "
+              f"overlapped, so the stage total above is roughly the largest of them, not "
+              f"the sum)")
+
+        # The three-tier classifier below is what separates real speech from anglicized
+        # vocalizing from actual silence, not VAD. Even with VAD off, Whisper's own
+        # no_speech_threshold check can still decide a whole stretch is silent and drop it
+        # before it ever becomes a raw segment at all -- which is exactly what was collapsing
+        # every sung/chanted pulse in the track into one giant "[instrumental / percussion]"
+        # block. The pitch detector is the ground truth here: if it finds a real fundamental
+        # frequency in a stretch Whisper left uncovered, that stretch gets an anglicized line,
+        # no exceptions.
+        annotated = _classify_segments(raw_segments)
 
         occupied = sorted((seg["start"], seg["end"]) for seg in annotated)
         uncovered_gaps = [
@@ -2075,21 +2585,38 @@ def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
         # short track -- the original slowdown) or one decode over the entire file (fast, but
         # it buries each short burst inside a mostly-silent/percussive window and Whisper just
         # omits it -- the regression that dropped every vocal line down to "[wordless
-        # vocalizing]"). Each merged clip gets exactly one forced, cheap-decode call and becomes
-        # one continuous segment, which also fills in the sub-2-second silences between pulses
-        # that were falling through both the vocal and instrumental passes entirely.
-        for chunk in _merge_nearby_gaps(uncovered_gaps, merge_gap_s=2.5):
-            text = _force_transcribe_clip(
-                raw, chunk["start"], chunk["end"], language, whisper_model_track, whisper_backend_track)
-            annotated.append({
-                "start": chunk["start"], "end": chunk["end"],
-                "label": text if text else "[wordless vocalizing]",
-                "confident": False, "type": "vocal",
-            })
-        annotated.sort(key=lambda seg: seg["start"])
+        # vocalizing]"). Each merged clip gets exactly one forced, full-quality decode call
+        # (see _force_transcribe_clip for why it isn't a cheaper one) and becomes one
+        # continuous segment, which also fills in the sub-2-second silences between pulses that
+        # were falling through both the vocal and instrumental passes entirely. The clips are
+        # independent of each other -- different, non-overlapping audio -- so they're also run
+        # concurrently instead of one at a time.
+        merged_chunks = _merge_nearby_gaps(uncovered_gaps, merge_gap_s=2.5)
+        _t_forced = time.perf_counter()
+        if merged_chunks:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(merged_chunks))) as pool:
+                chunk_futures = [
+                    pool.submit(_force_transcribe_clip, raw, chunk["start"], chunk["end"],
+                                language, whisper_model_track, whisper_backend_track)
+                    for chunk in merged_chunks
+                ]
+                for chunk, future in zip(merged_chunks, chunk_futures):
+                    text = future.result()
+                    annotated.append({
+                        "start": chunk["start"], "end": chunk["end"],
+                        "label": text if text else "[wordless vocalizing]",
+                        "confident": False, "type": "vocal",
+                    })
+            annotated.sort(key=lambda seg: seg["start"])
+        print(f"[transcribe] timing: STAGE 2/3 ({len(merged_chunks)} forced-decode chunk(s)) "
+              f"took {time.perf_counter() - _t_forced:.1f}s -- NOT the total, instrument "
+              f"gap-fill and final assembly still to come")
 
-        annotated = _add_percussive_segments(annotated, raw, min_duration_s=2.0)
+        annotated = _add_percussive_segments(annotated, raw, min_duration_s=2.0,
+                                              instrument_spans=instrument_spans)
 
+        print(f"[transcribe] timing: STAGE 3/3 DONE -- TOTAL transcription time "
+              f"{time.perf_counter() - _t_start:.1f}s (this is the real end-to-end number)")
         confident_text = " ".join(s["label"] for s in annotated if s["confident"] and s["label"])
         return {
             "segments": annotated,
@@ -2429,6 +2956,227 @@ def _apply_neural_timbre(audio: np.ndarray, sample_rate: int, decision) -> np.nd
     return neural_timbre.convert(audio, sample_rate, decision.target_hz, voice_index=0)
 
 
+def _declick_loop_seam(audio: np.ndarray, fade_samples: int = 128) -> np.ndarray:
+    """
+    A click remover, not a transformation of the sound. Looping ANY
+    recording that doesn't already end exactly where it began produces
+    an audible digital click at the seam -- a sharp, broadband
+    discontinuity that isn't part of the recording, just an artifact of
+    cutting it into a loop. This fades only the first/last few
+    milliseconds down toward silence (NOT toward each other -- this
+    isn't a crossfade blend of head and tail content, which would mix
+    the two together and is exactly the kind of transformation this was
+    asked not to do) so the seam is a silent gap instead of a click.
+    Every other sample of the actual recording is completely untouched;
+    at 44.1kHz, 128 samples is under 3ms -- shorter than the ear's
+    integration time for pitch/timbre perception, so this doesn't
+    change how the word sounds, only removes the click at the cut.
+    """
+    n = len(audio)
+    fade_samples = min(fade_samples, n // 4)
+    if fade_samples < 2:
+        return audio
+    out = audio.copy()
+    ramp = np.linspace(0.0, 1.0, fade_samples, dtype=np.float32)
+    out[:fade_samples] *= ramp
+    out[-fade_samples:] *= ramp[::-1]
+    return out
+
+
+class _SyllableCycler:
+    """
+    Real-time counterpart to _render_track_single_vocable_offline /
+    _segment_into_syllables -- see that function's docstring for the
+    full reasoning. Pitch is never touched here either: every sample
+    played back is byte-for-byte from the original recording.
+
+    The recording is split into its own natural syllables once (on
+    load). Each time a NEW onset is detected in the live singing (via
+    RhythmAnalyzer's own onset detector, passed in as `onset_id` -- any
+    value that changes exactly when a new onset fires; its caller passes
+    rhythm.latest_onset), this advances to the next syllable in order
+    and restarts it from its own beginning -- landing on the singer's
+    actual rhythm instead of an arbitrary loop position. Between onsets,
+    the current syllable simply loops on itself (click-free) to sustain
+    through a held note. A genuine new PHRASE (real silence -- amplitude
+    VAD, not a pitch-confidence blip) resets back to the first syllable,
+    the same way a person starts the word over from its beginning each
+    time they start singing again rather than resuming mid-word.
+
+    Every phrase also gets a natural ATTACK when it starts -- ramping up
+    from silence over ATTACK_S instead of snapping to full volume
+    instantly, since a real voice doesn't switch on like a light switch.
+
+    On the way OUT, this does NOT fade out wherever the silence happened
+    to begin -- it finishes playing the CURRENT syllable to its own full
+    natural length first (one whole "La", not half of one), and only
+    THEN actually goes silent. That syllable's own edges are already
+    declicked (see _segment_into_syllables), so letting it finish is
+    already a smooth, natural close on its own; no separate fade needed.
+    If singing resumes before that syllable finishes, nothing was ever
+    cut short in the first place -- it just continues.
+
+    Volume (never pitch) continuously follows the input's own loudness,
+    identical mechanism to before -- this envelope is layered on top of
+    that, not a replacement for it.
+    """
+    ATTACK_S = 0.05
+    GAP_TOLERANCE_S = 0.25  # a breath, a consonant, a word boundary -- not a phrase ending; see next_chunk
+
+    def __init__(self):
+        self.vocable: str | None = None
+        self.syllables: list | None = None
+        self.syllable_idx = 0
+        self.read_pos = 0
+        self.was_voiced = False
+        self._last_onset_id = None
+        self._typical_rms: float | None = None
+        self._gain = 1.0
+        self._silence_s = 0.0    # elapsed real time since voicing was last seen, for gap-bridging
+        self._phrase_env = 0.0   # 0..1 attack/release envelope for the current phrase
+
+    def _ensure_loaded(self, vocable: str):
+        if vocable == self.vocable and self.syllables is not None:
+            return
+        global synthesizer
+        bank = getattr(synthesizer, "_neural_bank", None) if synthesizer else None
+        bases = bank._bases.get(vocable) if bank else None
+        if not bases:
+            self.syllables = None
+            return
+        raw_audio = np.asarray(bases[0].audio, dtype=np.float32)
+        self.syllables = _segment_into_syllables(raw_audio, bank.sample_rate)
+        self.vocable = vocable
+        self.syllable_idx = 0
+        self.read_pos = 0
+
+    def _read_syllables(self, n_samples: int) -> np.ndarray:
+        """Fills n_samples by reading forward through the syllable
+        sequence, continuing into the next syllable once the current one
+        is used up -- shared by normal playback and the release tail
+        below, since a release still needs real recorded material to
+        fade out, not silence."""
+        out = np.empty(n_samples, dtype=np.float32)
+        filled = 0
+        guard = 0  # safety: if every syllable somehow ended up empty, bail to silence instead of spinning forever
+        while filled < n_samples:
+            guard += 1
+            if guard > len(self.syllables) + 4:
+                out[filled:] = 0.0
+                break
+            syll = self.syllables[self.syllable_idx % len(self.syllables)]
+            n = len(syll)
+            if n == 0:
+                self.syllable_idx += 1
+                self.read_pos = 0
+                continue
+            take = min(n_samples - filled, n - self.read_pos)
+            out[filled:filled + take] = syll[self.read_pos:self.read_pos + take]
+            filled += take
+            self.read_pos += take
+            if self.read_pos >= n and filled < n_samples:
+                # Sustaining through a held note past this syllable's own
+                # material: continue into the word's next syllable
+                # rather than looping this one again -- see the offline
+                # renderer's identical spot for the full reasoning.
+                self.syllable_idx += 1
+                self.read_pos = 0
+        return out
+
+    def next_chunk(self, vocable: str, is_voiced: bool, onset_id, input_rms: float, n_samples: int, sample_rate: int):
+        self._ensure_loaded(vocable)
+        if not self.syllables:
+            self._gain = 1.0
+            self._phrase_env = 0.0
+            self.was_voiced = False
+            return None
+
+        if is_voiced:
+            self._silence_s = 0.0
+            bridged_voiced = True
+        else:
+            self._silence_s += n_samples / float(sample_rate)
+            # Bridge brief gaps instead of hard-stopping on every single
+            # non-voiced frame -- real singing has plenty of gaps well
+            # under GAP_TOLERANCE_S between words even mid-phrase, and
+            # treating each one as a full phrase-end was exactly what
+            # caused audible stuttering (stop / restart / stop / restart
+            # within a single sung phrase). The input_rms fed in for a
+            # bridged gap is genuinely near-zero, so the volume-follow
+            # below still naturally ducks it -- it just doesn't hard-mute
+            # and reset the syllable sequence for a gap this short.
+            bridged_voiced = self.was_voiced and (self._silence_s <= self.GAP_TOLERANCE_S)
+
+        if not bridged_voiced:
+            if not self.was_voiced:
+                # Already finished and fully stopped -- true silence.
+                self._gain = 1.0
+                return None
+
+            # A genuine phrase end: don't cut off wherever we happen to
+            # be. Finish the CURRENT syllable's own natural length first
+            # -- full gain, no fade, don't advance or loop it -- and
+            # only actually go silent once it's genuinely done. If
+            # singing resumes before that happens, next_chunk just falls
+            # through to the normal path below on the next call; nothing
+            # here needs undoing since nothing was cut short.
+            syll = self.syllables[self.syllable_idx % len(self.syllables)]
+            n = len(syll)
+            if self.read_pos < n:
+                take = min(n_samples, n - self.read_pos)
+                out = np.zeros(n_samples, dtype=np.float32)
+                out[:take] = syll[self.read_pos:self.read_pos + take]
+                self.read_pos += take
+                return out * self._gain
+            else:
+                # The syllable finished naturally exactly on/before this
+                # call -- now actually stop.
+                self.was_voiced = False
+                self._gain = 1.0
+                self._phrase_env = 0.0
+                return None
+
+        if not self.was_voiced:
+            # A genuine new phrase (real amplitude silence, sustained
+            # past the gap tolerance, just ended): start the word over
+            # from its own first syllable. _phrase_env is already 0 here
+            # (set when the previous phrase actually finished stopping),
+            # so the attack ramp below starts from true silence.
+            self.syllable_idx = 0
+            self.read_pos = 0
+            self._last_onset_id = onset_id
+        elif onset_id is not None and onset_id != self._last_onset_id:
+            # A new onset within an ongoing phrase: advance to the next
+            # syllable, restarted from its own beginning.
+            self._last_onset_id = onset_id
+            self.syllable_idx += 1
+            self.read_pos = 0
+        self.was_voiced = True
+
+        # Advance the attack envelope toward 1 (a no-op once it's
+        # already there, mid-phrase).
+        attack_step = n_samples / (sample_rate * self.ATTACK_S)
+        start_env, end_env = self._phrase_env, min(1.0, self._phrase_env + attack_step)
+        env_ramp = np.linspace(start_env, end_env, n_samples, dtype=np.float32)
+        self._phrase_env = end_env
+
+        # Same loudness-following mechanism as before -- dynamics only.
+        input_rms = max(float(input_rms), 1e-6)
+        if self._typical_rms is None:
+            self._typical_rms = input_rms
+        else:
+            self._typical_rms = 0.98 * self._typical_rms + 0.02 * input_rms
+        # Wider range than before -- matches the offline renderer's
+        # widened bounds so live and offline dynamics-following feel
+        # consistent, and so swells/dips are actually pronounced rather
+        # than clamped to a narrow band.
+        target_gain = float(np.clip(input_rms / max(self._typical_rms, 1e-6), 0.1, 2.0))
+        self._gain = 0.72 * self._gain + 0.28 * target_gain
+
+        chunk = self._read_syllables(n_samples)
+        return chunk * env_ramp * self._gain
+
+
 def run_local_pipeline(stop_event, input_device: int):
     global pipeline_running
     try:
@@ -2450,13 +3198,12 @@ def run_local_pipeline(stop_event, input_device: int):
         cree         = CreeTokenizer()
         harmony      = harmony_engine   # shared instance — same sovereignty state as /ws/mic
         timing       = TimingSync()
+        syllable_cycler = _SyllableCycler()
 
         timing.start()
         capture.start()
         currently_singing = False
         start = time.perf_counter()
-        note_covered_until = 0.0
-        REFILL_LOOKAHEAD_S = 0.12
 
         while not stop_event.is_set():
             try:
@@ -2519,25 +3266,32 @@ def run_local_pipeline(stop_event, input_device: int):
             # `timing` when ready (the same instant-then-swapped pattern
             # index.html's own browser demo uses for its Neural mode),
             # never synchronously inline like this.
-            if decision.action == "sing":
-                final_audio = synthesizer.synthesize(decision)
-                timing.schedule(final_audio, decision.action)
-                currently_singing = True
-                note_covered_until = time.perf_counter() + len(final_audio) / cfg["audio"]["sample_rate"]
-
-            elif decision.action == "sustain":
-                currently_singing = True
-                now = time.perf_counter()
-                if now >= note_covered_until - REFILL_LOOKAHEAD_S:
-                    final_audio = synthesizer.synthesize(decision, legato=True)
-                    timing.schedule(final_audio, decision.action)
-                    note_covered_until = now + len(final_audio) / cfg["audio"]["sample_rate"]
-
-            else:
-                if currently_singing:
+            if harmony._vocable_override:
+                # A word is locked (see /harmony/vocable-override): play
+                # the recorded .wav's own syllables, completely
+                # unmodified in pitch, re-triggered in time with the
+                # singer's real rhythm (rhythm.latest_onset, from
+                # RhythmAnalyzer's own onset detector below) instead of
+                # looping blindly on the recording's own clock. Silence
+                # brief gap doesn't reset it -- see GAP_TOLERANCE_S in
+                # _SyllableCycler. Volume (not pitch) continuously
+                # follows the input's own loudness -- see its docstring.
+                input_rms = float(np.sqrt(np.mean(clean.astype(np.float64) ** 2))) if is_voiced else 0.0
+                chunk = syllable_cycler.next_chunk(
+                    harmony._vocable_override, is_voiced, rhythm.latest_onset, input_rms, frame_size,
+                    cfg["audio"]["sample_rate"],
+                )
+                if chunk is not None:
+                    timing.schedule(chunk, "sing")
+                    currently_singing = True
+                elif currently_singing:
                     timing.flush()
-                currently_singing = False
-                note_covered_until = 0.0
+                    currently_singing = False
+
+            # else: "Mix" selected -- deliberately does nothing (no robot
+            # audio at all) for now. decision (above) is still computed
+            # so the pitch-tracking telemetry message below keeps
+            # working; it's just no longer used to drive any synthesis.
 
             if archer_hz:
                 msg = {
@@ -2562,7 +3316,9 @@ def run_local_pipeline(stop_event, input_device: int):
                 except _queue.Full:
                     pass
     except Exception as e:
+        import traceback
         print(f"[pipeline error] {e}")
+        traceback.print_exc()
     finally:
         pipeline_running = False
 
