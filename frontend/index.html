@@ -3326,14 +3326,13 @@
       </div>
 
       <div id="demo-dsp-vocable-toggle" style="display: flex; align-items: center; margin-bottom: 16px; flex-wrap: wrap; row-gap: 8px;"
-           title="Mix: the normal accompaniment engine picks between all loaded words and modes. Pick one word instead and the robot just sings THAT recording, pitch-shifted to follow your melody exactly, one to one -- silent wherever nothing's being sung. No accompaniment-mode math on top.">
+           title="Mix: the normal accompaniment engine picks between all loaded words and modes. Pick one word instead and the robot just plays THAT recording raw and unmodified, looped, gated on whether the track is singing -- no accompaniment-mode math on top.">
         <span style="font-size: 12px; color: var(--muted); margin-right: 4px;">Vocable:</span>
         <div class="interval-picker" id="demo-dsp-vocable-picker" style="margin: 0; display: inline-flex; flex-wrap: wrap;">
           <button class="interval-btn active" data-vocable="mix" onclick="setDemoVocable('mix', this)">Mix</button>
         </div>
         <span id="demo-dsp-vocable-status" style="font-size: 11px; color: var(--muted); margin-left: 8px;"></span>
       </div>
-
 
       <div id="demo-accompaniment-mode-section">
         <div class="control-label">Accompaniment mode</div>
@@ -3350,8 +3349,8 @@
         </div>
       </div>
 
-      <!-- OCTAVE SHIFT SLIDER -- always relevant, stays visible for every mode. -->
-      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;" title="Shifts the robot's whole part up or down, in semitones, on top of whatever the active accompaniment mode already decides. -24 is two octaves down, +24 is two octaves up, 0 is unchanged.">
+      <!-- OCTAVE SHIFT SLIDER -- Neural engine only now; DSP output is never re-pitched client-side (see _startNeuralPlayback). -->
+      <div id="demo-pitch-shift-row" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;" title="Shifts the robot's whole part up or down, in semitones. Neural engine only -- DSP always plays back exactly what the backend rendered, with no client-side re-pitching.">
         <span style="font-size: 13px; color: var(--muted); min-width: 110px;">Pitch shift:</span>
         <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;">
           <span style="font-size: 11px; color: var(--muted); font-family: var(--mono);">-24</span>
@@ -3360,6 +3359,7 @@
           <span style="font-size: 11px; color: var(--muted); font-family: var(--mono);">+24</span>
           <span id="demo-octave-shift-value" style="font-size: 13px; font-family: var(--mono); min-width: 56px; color: var(--accent2);">0 st</span>
         </div>
+        <span id="demo-pitch-shift-note" style="font-size: 11px; color: var(--muted);">(Neural engine only)</span>
       </div>
 
       <div id="demo-echo-controls" style="display: none; margin-bottom: 24px;">
@@ -3473,22 +3473,24 @@
                    oninput="setDemoNeuralVoiceCount(parseInt(this.value, 10))" style="width: 140px;">
             <span id="demo-neural-voice-count-value" style="font-size: 12px; color: var(--muted); margin-left: 8px; font-family: var(--mono);">2 / 2</span>
           </div>
-          <div class="harmony-overlay-note" id="demo-live-notes">
-            <div>
-              <div class="overlay-label">Source pitch</div>
-              <div class="overlay-singer" id="demo-src-note">-</div>
+          <div id="demo-pitch-overlay-section">
+            <div class="harmony-overlay-note" id="demo-live-notes">
+              <div>
+                <div class="overlay-label">Source pitch</div>
+                <div class="overlay-singer" id="demo-src-note">-</div>
+              </div>
+              <span class="overlay-arrow">&#8594;</span>
+              <div>
+                <div class="overlay-label">Robot response</div>
+                <div class="overlay-robot" id="demo-rob-note">-</div>
+              </div>
+              <div style="margin-left: auto; text-align: right;">
+                <div class="overlay-label">Confidence</div>
+                <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
+              </div>
             </div>
-            <span class="overlay-arrow">&#8594;</span>
-            <div>
-              <div class="overlay-label">Robot response</div>
-              <div class="overlay-robot" id="demo-rob-note">-</div>
-            </div>
-            <div style="margin-left: auto; text-align: right;">
-              <div class="overlay-label">Confidence</div>
-              <div style="font-family: var(--mono); font-size: 14px; color: var(--muted);" id="demo-conf">-</div>
-            </div>
+            <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
           </div>
-          <div class="note-explanation" id="demo-mode-explanation" style="margin-top:14px;">Matching the source pitch exactly, doubling it like someone singing along beside it.</div>
 
           <div id="demo-ts-section" style="display: none;">
             <div class="control-label" style="margin-top: 20px;">Transcript</div>
@@ -4161,6 +4163,12 @@ const INTERVAL_EXPLANATIONS = {
   7: 'The robot sings a perfect fifth above. The 3:2 frequency ratio makes this the most naturally consonant two-voice harmony. It is the default.',
   12: 'The robot sings an octave above — exactly double your frequency. The two voices blend closely while filling a wider range.',
 };
+
+// Same styled box as LIVE_MODE_DESCRIPTIONS (both render into
+// #demo-mode-explanation, the .note-explanation element) -- kept as one
+// shared constant so the two states always look identical, not just
+// coincidentally similar.
+const SINGLE_VOCABLE_EXPLANATION = "Playing the raw recording, unmodified in pitch, looped -- paused wherever the track isn't singing, resuming from exactly where it paused, with volume following the track's own dynamics.";
 
 const LIVE_MODE_DESCRIPTIONS = {
   unison_shadowing:     'Matching the pitch exactly, doubling it like someone singing along beside it.',
@@ -5442,9 +5450,15 @@ function setDemoVoiceEngine(engine, btn) {
   document.getElementById('demo-dsp-vocable-toggle').style.display = (engine === 'dsp') ? 'flex' : 'none';
   const section = document.getElementById('demo-accompaniment-mode-section');
   if (section) section.style.display = (engine === 'dsp' && demoVocable !== 'mix') ? 'none' : '';
+  const explEl = document.getElementById('demo-mode-explanation');
+  if (explEl) explEl.textContent = (engine === 'dsp' && demoVocable !== 'mix') ? SINGLE_VOCABLE_EXPLANATION : (LIVE_MODE_DESCRIPTIONS[demoMode] || '');
   document.querySelectorAll('#demo-neural-mode-toggle .interval-btn').forEach(b => {
     b.disabled = (engine === 'dsp');
   });
+  const pitchSlider = document.getElementById('demo-octave-shift-slider');
+  if (pitchSlider) pitchSlider.disabled = (engine === 'dsp');
+  const pitchNote = document.getElementById('demo-pitch-shift-note');
+  if (pitchNote) pitchNote.style.display = (engine === 'dsp') ? '' : 'none';
   _updateNeuralVoiceCountUI();
   if (demoPitchMode === 'rmvpe' && _pitchTimelineNeeded()) ensureDemoPitchTimeline();
   _abortPitchTimelineIfNotNeeded();
@@ -5780,14 +5794,14 @@ function setDemoTexture(texture, btn) {
 // Mix (the default) is the full accompaniment engine: mode selection,
 // vocable rotation, textures, all of it. Picking one specific word here
 // instead locks the backend (see server.py's /api/dsp/render-track
-// `vocable` field -> HarmonyEngine.set_vocable_override) to ONLY that
-// one recording, forced into plain unison shadowing -- the robot just
-// sings that exact take, pitch-shifted live to follow the melody
-// one-to-one, and stays silent wherever nothing's being sung. All of
-// the accompaniment-mode machinery (octave/timbral/echo/contour/drone/
-// call-response/humming) is bypassed entirely for as long as one word
-// is picked, which is also why the Accompaniment mode section itself
-// is hidden while that's true -- those controls would have no effect.
+// `vocable` field -> HarmonyEngine.set_vocable_override, and
+// _render_track_single_vocable_offline) to ONLY that one recording,
+// played back raw and unmodified in pitch, looped, gated on whether the
+// track is singing, with its volume following the track's own dynamics.
+// All of the accompaniment-mode machinery is bypassed entirely for as
+// long as one word is picked, which is also why the Accompaniment mode
+// section itself is hidden while that's true -- those controls would
+// have no effect.
 let demoVocable = 'mix';
 
 function setDemoVocable(name, btn) {
@@ -5799,10 +5813,20 @@ function setDemoVocable(name, btn) {
   const single = name !== 'mix';
   const section = document.getElementById('demo-accompaniment-mode-section');
   if (section) section.style.display = single ? 'none' : '';
+  // The pitch-detection panel stays visible in both modes (Mix and a
+  // locked word) -- Source pitch and Confidence are real detected
+  // values either way. Only the explanation text underneath changes,
+  // into the exact same styled box (#demo-mode-explanation /
+  // .note-explanation) Mix/Neural mode already uses, so both states
+  // look identical, not just similar.
+  const explEl = document.getElementById('demo-mode-explanation');
+  if (explEl) explEl.textContent = single ? SINGLE_VOCABLE_EXPLANATION : (LIVE_MODE_DESCRIPTIONS[demoMode] || '');
+  const robNoteEl = document.getElementById('demo-rob-note');
+  if (robNoteEl && single) robNoteEl.textContent = '-'; // no pitch-matching happens in this mode, so there's no "robot response" note to show
   const statusEl = document.getElementById('demo-dsp-vocable-status');
   if (statusEl) {
     statusEl.textContent = single
-      ? `Singing "${name}" only, matched to the melody -- accompaniment mode disabled.`
+      ? `Playing "${name}" raw and unmodified, looped, gated on the track's singing.`
       : '';
   }
 
@@ -5847,7 +5871,6 @@ async function _loadDspVocableOptions() {
   }
 }
 _loadDspVocableOptions();
-
 
 function _setModeTextureControlsLocked(locked) {
   document.querySelectorAll('#demo-mode-picker .mode-btn').forEach(b => {
@@ -5947,10 +5970,33 @@ function _buildDemoTranscriptRow(seg) {
       wordEntries.push({ start: w.start, end: w.end, el: wordEl });
     });
   } else {
-    const label = document.createElement('span');
-    label.textContent = seg.label;
-    if (!seg.confident) label.style.fontStyle = 'italic';
-    row.appendChild(label);
+    // Non-confident rows (anglicized "way-hey-oh" style vocal lines, and instrumental/
+    // percussion labels) don't carry real per-word timestamps -- Whisper's word-level timing
+    // for these gets discarded during the anglicize/repeat-collapse cleanup on the server,
+    // since cleanup can change the word count and would desync real timestamps from the
+    // cleaned text. Approximating even spacing across the segment's [start, end] is a
+    // standard karaoke-style fallback: not real alignment, but it's what lets a "way-hey-oh"
+    // line get the same sweeping highlight as a confident English line, instead of never
+    // highlighting at all.
+    const tokens = seg.label.split(/(\s+)/).filter(t => t.length);
+    const wordTokenCount = tokens.filter(t => !/^\s+$/.test(t)).length;
+    const duration = Math.max(0.01, seg.end - seg.start);
+    const perWord = duration / Math.max(1, wordTokenCount);
+    let wordIdx = 0;
+    tokens.forEach(t => {
+      const el = document.createElement('span');
+      el.textContent = t;
+      if (/^\s+$/.test(t)) {
+        row.appendChild(el);
+        return;
+      }
+      el.className = 'demo-transcript-word';
+      if (!seg.confident) el.style.fontStyle = 'italic';
+      row.appendChild(el);
+      const wStart = seg.start + wordIdx * perWord;
+      wordEntries.push({ start: wStart, end: wStart + perWord, el });
+      wordIdx++;
+    });
   }
   return { row, wordEntries };
 }
@@ -6019,21 +6065,31 @@ function updateDemoTranscriptHighlight(elapsed) {
   } else {
     revealDemoSentimentIfReady();
   }
-  if (!demoTranscriptWordEls.length) return;
-  let activeEl = null;
-  for (const w of demoTranscriptWordEls) {
-    const isActive = elapsed >= w.start && elapsed < w.end;
-    if (isActive) {
-      w.el.classList.add('demo-transcript-word-active');
-      activeEl = w.el;
-    } else {
-      w.el.classList.remove('demo-transcript-word-active');
+  if (demoTranscriptWordEls.length) {
+    for (const w of demoTranscriptWordEls) {
+      const isActive = elapsed >= w.start && elapsed < w.end;
+      w.el.classList.toggle('demo-transcript-word-active', isActive);
     }
   }
-  if (activeEl) {
+
+  // Scroll to whichever revealed row is currently playing. This has to work for every row,
+  // not just confident English ones with word-level timestamps -- a track like this one is
+  // almost entirely non-confident "vocal"/"instrumental" rows (no word list at all), and the
+  // old version only ever scrolled off word-level activity, so it silently never moved for
+  // any of those rows even though the transcript panel does have a scrollbar and more content
+  // than fits.
+  let activeRow = null;
+  for (let i = demoTranscriptRevealedCount - 1; i >= 0; i--) {
+    const seg = demoTranscriptSegments[i];
+    if (elapsed >= seg.start) {
+      activeRow = seg._rowEl || null;
+      break;
+    }
+  }
+  if (activeRow) {
     const container = document.getElementById('demo-transcript-out').closest('.cree-transcript-log');
     if (container) {
-      const rowTop = activeEl.parentElement.offsetTop;
+      const rowTop = activeRow.offsetTop;
       if (rowTop < container.scrollTop || rowTop > container.scrollTop + container.clientHeight - 40) {
         container.scrollTop = rowTop - container.clientHeight / 2;
       }
@@ -6785,7 +6841,9 @@ function _startNeuralPlayback(renderedBuffer = demoNeuralRenderedBuffer) {
   }
 
   const bakedInSemitones = isDirect ? 0 : (MODE_SEMITONES[demoMode] ?? 0);
-  const extraCents = (demoPitchShiftSemitones - bakedInSemitones) * 100;
+  // DSP output is never re-pitched here, full stop -- see the download
+  // mixdown function below for the identical reasoning.
+  const extraCents = (demoVoiceEngine === 'dsp') ? 0 : (demoPitchShiftSemitones - bakedInSemitones) * 100;
   const modeShiftedBuffer = extraCents
     ? _pitchShiftBufferPreserveDuration(demoAudioCtx, renderedBuffer, extraCents)
     : renderedBuffer;
@@ -7129,7 +7187,9 @@ async function _renderDownloadBuffer() {
   const modeParams = isDirect ? _modeParamsFor(demoMode) : { detuneCents: 0, delayS: 0, echoFeedback: 0, lowpassHz: null, gate: false };
   const reverbAmount = isDirect ? _reverbAmountFor(demoTexture) : 0;
   const bakedInSemitones = isDirect ? 0 : (MODE_SEMITONES[demoMode] ?? 0);
-  const extraCents = (demoPitchShiftSemitones - bakedInSemitones) * 100;
+  // Same fix as _startNeuralPlayback -- DSP is never re-pitched here,
+  // so what you download matches what actually gets sung, exactly.
+  const extraCents = (demoVoiceEngine === 'dsp') ? 0 : (demoPitchShiftSemitones - bakedInSemitones) * 100;
   const modeShiftedBuffer = extraCents
     ? _pitchShiftBufferPreserveDuration(demoAudioCtx, renderedBuffer, extraCents)
     : renderedBuffer;
@@ -7400,13 +7460,18 @@ function demoProgressLoop() {
   if (demoVoiceEngine === 'dsp' && demoNeuralBridge) demoNeuralBridge.update(result, elapsed, demoMode, demoTexture);
 
   const sNote = hz ? hzToNote(hz) : null;
-  const rNote = (result.hz && result.action !== 'rest') ? hzToNote(result.hz) : null;
+  const singleVocable = (demoVoiceEngine === 'dsp' && demoVocable !== 'mix');
+  const rNote = (!singleVocable && result.hz && result.action !== 'rest') ? hzToNote(result.hz) : null;
   document.getElementById('demo-src-note').textContent = sNote ? sNote.name : '-';
-  document.getElementById('demo-rob-note').textContent = rNote ? rNote.name : '-';
+  // In single-vocable mode nothing is pitch-matched, so there's no
+  // "robot response" note -- Source pitch and Confidence above are
+  // still real detected values either way, which is the whole point of
+  // leaving this panel visible instead of hiding it.
+  document.getElementById('demo-rob-note').textContent = singleVocable ? '-' : (rNote ? rNote.name : '-');
   const confPct = demoPitchMode === 'rmvpe' ? demoRmvpeHold.lastConfidence : rms;
   document.getElementById('demo-conf').textContent = hz ? (confPct * 100).toFixed(0) + '%' : '-';
   const explEl = document.getElementById('demo-mode-explanation');
-  if (explEl && result.text) explEl.textContent = result.text;
+  if (explEl) explEl.textContent = singleVocable ? SINGLE_VOCABLE_EXPLANATION : (result.text || '');
 
   if (demoVoiceEngine === 'dsp' && demoVoice) {
     if (result.hz && result.action !== 'rest') {
