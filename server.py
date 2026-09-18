@@ -1006,6 +1006,130 @@ def _trim_excess_silence_at_edges(segment: np.ndarray, sample_rate: int,
     return segment[trim_start:trim_end]
 
 
+def _apply_internal_crossfades(buf: np.ndarray, splice_offsets: list, overlap: int,
+                                prev_tail: np.ndarray | None = None) -> np.ndarray:
+    """
+    ROOT-CAUSE FIX for "the DSP/locked-vocable voice sounds broken, with
+    a lot of stops and cracks" and for "when the word finishes once and
+    starts again, that part sounds broken too" -- both reports turned
+    out to be the exact same underlying mechanism, just triggered at
+    different rates.
+
+    Every syllable _segment_into_syllables produces already has its own
+    head and tail ramped down toward silence (see _declick_loop_seam) --
+    that's correct, and necessary, for looping any ONE syllable by
+    itself without a click. But both consumers of that syllable list
+    (_render_track_single_vocable_offline, building one continuous note
+    out of possibly several syllables back to back and stringing notes
+    together across a phrase; and _SyllableCycler, doing the same thing
+    live) were placing these already-independently-declicked pieces
+    directly next to each other with nothing else done at the seam.
+    Two declicked edges touching is CLICK-free (no discontinuity), but
+    it is NOT loudness-free: syllable A's tail ramps down toward zero,
+    then syllable B's head ramps back up from zero, right next to it --
+    so the ear hears a brief, real dip toward silence at every single
+    place two pieces meet. One such dip, on its own, is short enough
+    (a few ms) to be inaudible. But a whole word is built from many of
+    these -- every syllable-to-syllable move within one held note, every
+    note-to-note move across a sung phrase, AND the exact same thing
+    again when a whole word finishes and wraps back around to its own
+    first syllable to start over -- so over the length of an actual
+    performance they land at the RATE the song changes notes (several
+    times a second isn't unusual for real singing). That reads as the
+    voice repeatedly stopping and stuttering instead of flowing, and
+    it's the same mechanism whether the two pieces on either side of a
+    given seam happen to be two different syllables of the same word,
+    the same syllable repeating on itself, or the last syllable of a
+    word handing off to its own first syllable to start the word over.
+
+    The fix is an actual audio crossfade at each seam -- blending what's
+    already sitting on both sides of it with equal-power (constant
+    combined loudness through the blend, no dip) sin/cos curves -- not
+    a fresh fade to silence and back. This overwrites `overlap` samples
+    starting at each offset in `splice_offsets` with that blend; it
+    never inserts or removes samples, so a caller that already sized
+    `buf` to land on a specific timeline (a note's own duration, a
+    phrase's own boundaries) doesn't need to account for any change in
+    length -- only the content right at each seam changes.
+
+    `prev_tail` optionally supplies the real audio that came immediately
+    before `buf` even started (e.g. the previous streamed chunk's last
+    few samples in the live path), for blending a seam that falls
+    exactly on `buf`'s own first sample (offset 0) -- there's nothing
+    inside `buf` itself to blend against there otherwise.
+    """
+    n = len(buf)
+    if n == 0 or overlap <= 1:
+        return buf
+    for offset in splice_offsets:
+        if offset <= 0:
+            if prev_tail is None or len(prev_tail) < 2:
+                continue
+            ov = min(overlap, len(prev_tail), n)
+            if ov <= 1:
+                continue
+            t = np.linspace(0, np.pi / 2, ov, dtype=np.float32)
+            tail = prev_tail[-ov:].astype(np.float32)
+            head = buf[:ov].astype(np.float32)
+            buf[:ov] = tail * np.cos(t) + head * np.sin(t)
+            continue
+        ov = min(overlap, offset, n - offset)
+        if ov <= 1:
+            continue
+        t = np.linspace(0, np.pi / 2, ov, dtype=np.float32)
+        tail = buf[offset - ov:offset].copy()
+        head = buf[offset:offset + ov].copy()
+        buf[offset:offset + ov] = tail * np.cos(t) + head * np.sin(t)
+    return buf
+
+
+def _boundaries_for_syllables(raw_audio: np.ndarray, sample_rate: int, min_syllable_s: float = 0.12) -> list:
+    """Just the sample-index cut points _segment_into_syllables would use,
+    without slicing or declicking -- kept separate so the SAME boundaries
+    can be reused against a pitch-shifted (duration-preserving) version
+    of the same recording later. See the note in
+    _render_track_single_vocable_offline's pitch-shift cache for why that
+    matters: shifting a note's pitch should never also change which
+    stretch of the recording counts as "syllable #3"."""
+    import librosa
+    if len(raw_audio) == 0:
+        return [0, 0]
+    onset_samples = librosa.onset.onset_detect(y=raw_audio, sr=sample_rate, units="samples", backtrack=True)
+    onset_samples = sorted(set(int(s) for s in onset_samples if 0 <= s < len(raw_audio)))
+    if not onset_samples or onset_samples[0] != 0:
+        onset_samples = [0] + onset_samples
+
+    min_gap = int(min_syllable_s * sample_rate)
+    merged = [onset_samples[0]]
+    for s in onset_samples[1:]:
+        if s - merged[-1] >= min_gap:
+            merged.append(s)
+
+    boundaries = merged + [len(raw_audio)]
+    while len(boundaries) > 2 and (boundaries[-1] - boundaries[-2]) < min_gap:
+        boundaries.pop(-2)
+    return boundaries
+
+
+def _slice_syllables_at_boundaries(audio: np.ndarray, boundaries: list, sample_rate: int) -> list:
+    """Cuts `audio` at pre-computed `boundaries` (see
+    _boundaries_for_syllables) and declicks each piece -- the actual
+    slicing/declicking half of what _segment_into_syllables used to do
+    in one step, now reusable against any duration-preserving variant of
+    the same original recording (e.g. a pitch-shifted copy) with
+    identical cut points."""
+    chunks = [
+        audio[boundaries[i]:boundaries[i + 1]].copy()
+        for i in range(len(boundaries) - 1)
+        if boundaries[i + 1] - boundaries[i] > 200  # drop slivers too short to be a real syllable (< ~5ms)
+    ]
+    syllables = [
+        _declick_loop_seam(_trim_excess_silence_at_edges(chunk, sample_rate), fade_samples=64)
+        for chunk in chunks
+    ]
+    return syllables if syllables else [audio.copy()]
+
+
 def _segment_into_syllables(raw_audio: np.ndarray, sample_rate: int, min_syllable_s: float = 0.12) -> list:
     """
     Splits ONE recorded take (e.g. "Ohoho" or "Lalanana") into its own
@@ -1029,58 +1153,48 @@ def _segment_into_syllables(raw_audio: np.ndarray, sample_rate: int, min_syllabl
     unit if it isn't clearly multi-syllabic or onset detection finds
     nothing usable.
     """
-    import librosa
     if len(raw_audio) == 0:
         return [raw_audio]
-
-    onset_samples = librosa.onset.onset_detect(y=raw_audio, sr=sample_rate, units="samples", backtrack=True)
-    onset_samples = sorted(set(int(s) for s in onset_samples if 0 <= s < len(raw_audio)))
-    if not onset_samples or onset_samples[0] != 0:
-        onset_samples = [0] + onset_samples
-
-    min_gap = int(min_syllable_s * sample_rate)
-    merged = [onset_samples[0]]
-    for s in onset_samples[1:]:
-        if s - merged[-1] >= min_gap:
-            merged.append(s)
-
-    boundaries = merged + [len(raw_audio)]
-    while len(boundaries) > 2 and (boundaries[-1] - boundaries[-2]) < min_gap:
-        boundaries.pop(-2)
-
-    chunks = [
-        raw_audio[boundaries[i]:boundaries[i + 1]].copy()
-        for i in range(len(boundaries) - 1)
-        if boundaries[i + 1] - boundaries[i] > 200  # drop slivers too short to be a real syllable (< ~5ms)
-    ]
-    syllables = [
-        _declick_loop_seam(_trim_excess_silence_at_edges(chunk, sample_rate), fade_samples=64)
-        for chunk in chunks
-    ]
-    return syllables if syllables else [raw_audio.copy()]
+    boundaries = _boundaries_for_syllables(raw_audio, sample_rate, min_syllable_s)
+    return _slice_syllables_at_boundaries(raw_audio, boundaries, sample_rate)
 
 
 def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: str, vocable: str) -> bytes:
     """
     The render path for "one locked word instead of Mix". Pitch is NEVER
-    touched anywhere in this function, by explicit, repeated request --
-    every sample that plays back is byte-for-byte from the original
-    recording, never pitch-shifted or time-stretched.
+    touched anywhere in this function -- every sample that plays back is
+    byte-for-byte from the original recording, never pitch-shifted or
+    time-stretched.
 
-    What this DOES do is make the recording rhythmically follow the
-    song: the recording is split into its own natural syllables (see
-    _segment_into_syllables -- "Ohoho" becomes roughly "Oh" / "ho" /
+    (This function briefly did pitch-shift each note to the song's own
+    detected pitch, by request, to try to make the vocable follow the
+    input's actual melody. That was reverted, also by request: a plain
+    phase-vocoder shift on a short recorded vowel doesn't sound like the
+    same voice singing higher or lower once the shift gets non-trivial,
+    and real melodies routinely need exactly that -- so the tradeoff
+    wasn't worth it for this DSP path. Real melodic pitch-matching that
+    still sounds like one consistent voice needs a trained voice model,
+    which is what the separate "Neural" engine is for. `pitch_method` is
+    accepted here only because callers already pass it; this function
+    itself doesn't use it for anything.)
+
+    What this DOES do is make the recording follow the song's RHYTHM
+    AND DURATION: the recording is split into its own natural syllables
+    (see _segment_into_syllables -- "Ohoho" becomes roughly "Oh" / "ho" /
     "ho" / ... as its own onsets actually fall), and those syllables are
     re-triggered, in order, on the SONG's own real onsets -- its actual
     note attacks -- rather than the recording just looping blindly on
     its own internal clock with no relationship to the performance. A
-    syllable loops on itself (click-free) to sustain through a longer
-    note if the song holds one, and gets cut cleanly to the next
-    syllable the instant the next note starts if the song moves faster
-    than the syllable's own natural length. This is the same idea a
-    producer chopping a vocal sample into an MPC/sampler and triggering
-    the chops on the beat uses -- rhythmic connection to the performance
-    without ever altering the recording's own pitch or timbre.
+    long held note in the song (a long "Ohhhh") holds one syllable for
+    that same long duration -- looping it on itself click-free if it
+    runs out before the note ends -- rather than cutting to a new
+    syllable early, so a long note in the input really does come out as
+    one long, sustained syllable rather than several short ones stitched
+    together. A short, fast note gets cut cleanly to the next syllable
+    the instant the next note starts. This is the same idea a producer
+    chopping a vocal sample into an MPC/sampler and triggering the chops
+    on the beat uses -- rhythmic AND durational connection to the
+    performance, without altering the recording's own pitch or timbre.
 
     Wherever the track isn't singing at all, there's silence (gated by
     the same voice-activity detection as before), and the OUTPUT VOLUME
@@ -1120,23 +1234,26 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
 
     is_voiced_flags = np.zeros(n_frames, dtype=bool)
     for i in range(n_frames):
-        clean, is_voiced = preproc.process(audio[i * frame_size:(i + 1) * frame_size])
+        frame = audio[i * frame_size:(i + 1) * frame_size]
+        clean, is_voiced = preproc.process(frame)
         is_voiced_flags[i] = is_voiced
         if is_voiced:
             amplitude_curve[i] = float(np.sqrt(np.mean(clean.astype(np.float64) ** 2)))
 
     # Contiguous voiced stretches = sung phrases -- but a brief gap
-    # (a breath, a consonant, a word boundary) is NOT the phrase ending;
-    # only sustained silence beyond GAP_TOLERANCE_S is. Treating every
-    # single non-voiced frame as a hard phrase-end was the actual cause
-    # of audible stuttering: real singing has plenty of gaps well under
-    # half a second between words even within one continuous phrase, and
-    # each one was silencing and then restarting the syllable cycle from
-    # scratch. Bridging them keeps the syllable sequence running straight
+    # (a breath, a consonant, a word boundary, even a short instrumental
+    # beat) is NOT the phrase ending; only a real, sustained stop of a
+    # few seconds is. Treating every single non-voiced frame as a hard
+    # phrase-end was the actual cause of audible stuttering: real
+    # singing has plenty of gaps well under a second between words even
+    # within one continuous phrase, and each one was silencing and then
+    # restarting the syllable cycle from scratch. Bridging them (up to
+    # GAP_TOLERANCE_S) keeps the syllable sequence running straight
     # through -- the amplitude-follow below still naturally dips the
     # volume during the gap itself (it's genuinely quiet there), it just
-    # doesn't hard-mute and restart.
-    GAP_TOLERANCE_S = 0.25
+    # doesn't hard-mute and restart for anything short of an actual,
+    # multi-second stop in the singing.
+    GAP_TOLERANCE_S = 2.5
     gap_tolerance_frames = max(1, int(GAP_TOLERANCE_S * sample_rate / frame_size))
 
     phrase_spans = []
@@ -1158,11 +1275,26 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
         phrase_spans.append((start, n_frames * frame_size))
 
     # The song's own real onsets, whole-track, once -- this is the
-    # rhythmic backbone every syllable gets triggered against. Onsets
-    # closer together than ~90ms are merged; that's below any real sung
-    # note's duration and would just be onset-detector noise chattering
-    # the same syllable on and off.
-    MIN_ONSET_GAP_S = 0.09
+    # rhythmic backbone every syllable gets triggered against.
+    #
+    # Onsets closer together than MIN_ONSET_GAP_S are merged. This
+    # matters a lot more than it looks like it should: a real singer
+    # holding one long note (a long "Ohhhh") almost always has some
+    # natural vibrato or amplitude wobble on it, and a generic onset
+    # detector (which just looks for sudden jumps in the spectrum, with
+    # no idea what a "note" is) can easily fire several spurious extra
+    # "onsets" during that single held note, at the vibrato's own rate
+    # (typically every 140-250ms). Every onset advances to the WORD's
+    # next syllable -- so one long held note with a handful of spurious
+    # onsets on it doesn't render as one long syllable at all, it
+    # renders as several different syllables of "lalanana" chopped
+    # together in under a second, which is exactly what reads as "a
+    # totally different person" that fast. Raising this from 90ms to
+    # 180ms sits above typical vibrato/tremolo rates while still well
+    # under a real fast melisma, so a genuinely long, held "Ohhhh"
+    # actually gets rendered as one long, held "Laaaa" instead of being
+    # chattered into pieces by its own vibrato.
+    MIN_ONSET_GAP_S = 0.18
     raw_onsets = librosa.onset.onset_detect(y=audio, sr=sample_rate, units="samples", backtrack=True)
     onsets = sorted(int(o) for o in raw_onsets)
     merged_onsets = []
@@ -1170,7 +1302,35 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
         if not merged_onsets or o - merged_onsets[-1] >= int(MIN_ONSET_GAP_S * sample_rate):
             merged_onsets.append(o)
 
-    FADE_N = 96  # ~2ms at 44.1kHz -- declicks every note-segment boundary regardless of where a syllable got cut
+    # ~7ms equal-power crossfade applied at EVERY syllable/note splice
+    # (see _apply_internal_crossfades for the full reasoning). This
+    # replaces the old FADE_N destructive tail-fade, which forced this
+    # note's own last ~2ms down to true silence at every single note-to-
+    # note handoff -- correct-looking in isolation (no click) but, over
+    # a whole sung phrase, an audible mute-and-recover flutter at the
+    # rate the song changes notes. That flutter is what "very broken,
+    # lots of stops and cracks" was actually describing.
+    XFADE_N = max(24, int(0.007 * sample_rate))
+
+    # BUG: this used to be `sub_idx = note_i`, recomputed FRESH inside
+    # each phrase's own loop -- so note_i started back at 0 every single
+    # time a new phrase began, which means EVERY phrase restarted the
+    # word from its own first syllable ("la"), no matter how far through
+    # "lalanana" the previous phrase had gotten or how short the gap
+    # between them was. That's "why does it start from the start every
+    # time it stops" -- it wasn't a rare edge case, it was happening on
+    # literally every phrase boundary, every time, by construction.
+    #
+    # `global_note_counter` is the fix: ONE counter for the ENTIRE
+    # track, that only ever moves forward, never reset by a phrase
+    # boundary -- only `_ensure_loaded`-equivalent things (a different
+    # vocable entirely) would ever reset it, and this function only
+    # renders one vocable per call, so it never resets at all here. Each
+    # new phrase just continues the same ongoing cycle through the word
+    # exactly where the last phrase left off, the same way a singer
+    # picking a song back up after a breath continues the next word
+    # rather than going back to the first word of the verse.
+    global_note_counter = 0
 
     for (phrase_start, phrase_end) in phrase_spans:
         onsets_in_phrase = [phrase_start] + [o for o in merged_onsets if phrase_start < o < phrase_end]
@@ -1178,30 +1338,59 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
         last_note_i = len(boundaries) - 2
         phrase_actual_end = phrase_end
 
+        # Every place two independently-declicked syllable pieces get
+        # placed directly next to each other -- a note continuing into
+        # the word's next syllable to fill a long held note, OR one note
+        # handing off to the next across the phrase (including the
+        # word wrapping back around to its own first syllable once it's
+        # used the whole thing) -- gets recorded here as an absolute
+        # offset into `robot`, then blended in one pass after the raw
+        # material for this whole phrase is laid down.
+        splice_offsets = []
+
         for note_i in range(len(boundaries) - 1):
             seg_start, seg_end = boundaries[note_i], boundaries[note_i + 1]
-            sub_idx = note_i
+
+            sub_idx = global_note_counter
             syll = syllables[sub_idx % len(syllables)]
             n_syll = len(syll)
             if n_syll == 0:
+                global_note_counter += 1
                 continue
+
+            if note_i > 0:
+                splice_offsets.append(seg_start)
 
             if note_i == last_note_i:
                 # This is the note that was still sounding when the
                 # singer actually stopped -- don't cut it off wherever
                 # the detected phrase end happens to land mid-syllable.
-                # Let THIS ONE syllable finish its own full natural
-                # length first (capped only by the track's own end),
-                # same as a real singer finishing the word they were on
-                # rather than being cut off mid-consonant. If another
-                # phrase starts before this tail finishes, that phrase's
-                # own fill simply overwrites wherever they'd overlap --
-                # an acceptable rare edge case, not a new artifact.
-                seg_end = min(len(robot), seg_start + n_syll)
+                # Let it finish, but BOUNDED -- not "however long this
+                # syllable's own raw material happens to be."
+                #
+                # BUG FIX: this used to be
+                #   seg_end = min(len(robot), seg_start + n_syll)
+                # which is capped ONLY by the total track length. If a
+                # vocable's segmentation ever produces one unusually long
+                # syllable -- or fails to find real syllable boundaries
+                # at all and falls back to treating the WHOLE recording
+                # as one chunk (see _segment_into_syllables' fallback) --
+                # n_syll can be several seconds long. That let the last
+                # note of a phrase bleed straight through however much
+                # real silence came after it: a genuine multi-second gap
+                # in the input just got played over, which is exactly
+                # "sounds like one big loop" and "plays through a 5s
+                # gap of silence." A grace window capped at a few
+                # hundred ms is enough to avoid cutting off mid-
+                # consonant (the actual original goal) without ever
+                # being able to swallow a real pause.
+                grace_n = min(n_syll, int(0.35 * sample_rate))
+                seg_end = min(len(robot), seg_start + grace_n)
                 phrase_actual_end = seg_end
 
             seg_len = seg_end - seg_start
             if seg_len <= 0:
+                global_note_counter += 1
                 continue
 
             pos, filled = 0, 0
@@ -1217,47 +1406,45 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
                 if pos >= n_syll and filled < seg_len:
                     # This syllable's own material is used up but the
                     # note is still held: continue into the WORD'S NEXT
-                    # syllable rather than looping this same chunk again.
-                    # Looping one short/quiet syllable many times to fill
-                    # a long held note is exactly what caused audible
-                    # crackling -- each repeat carries its own tiny
-                    # declick fade (needed for safe self-looping), and a
-                    # short syllable repeated 5-6 times packs that many
-                    # fade transitions into under half a second. Moving
-                    # forward through the word's OWN natural sequence
-                    # instead means a long note is filled with more of
-                    # the actual recording's real material, sounds like
-                    # the word continuing rather than stuttering, and
-                    # only wraps back to repeating from the start if the
+                    # syllable rather than looping this same chunk again
+                    # (see _apply_internal_crossfades' docstring -- this
+                    # splice point gets blended below, same as any
+                    # other). Moving forward through the word's OWN
+                    # natural sequence instead of re-looping one short
+                    # syllable means a long note is filled with more of
+                    # the actual recording's real material, and only
+                    # wraps back to repeating from the start if the
                     # entire word gets used up.
+                    splice_offsets.append(seg_start + filled)
                     sub_idx += 1
                     syll = syllables[sub_idx % len(syllables)]
                     n_syll = len(syll)
                     pos = 0
 
-            # Declick this note segment's own tail -- whether it ended
-            # naturally or was cut off mid-syllable by the next note.
-            # For the LAST segment specifically this is now mostly a
-            # no-op layered on top of that syllable's own already-
-            # declicked natural tail (see _segment_into_syllables), not
-            # a fresh cut -- it only does real work in the rare overlap
-            # case above.
-            fade_n = min(FADE_N, seg_len // 2)
-            if fade_n > 1:
-                ramp = np.linspace(1.0, 0.0, fade_n, dtype=np.float32)
-                robot[seg_end - fade_n:seg_end] *= ramp
+            # Carry forward past every internal advance too (not just a
+            # flat +1) -- if this one note held long enough to eat three
+            # syllables sustaining through it, the NEXT note (whether
+            # it's still in this phrase or the first note of the phrase
+            # after the next gap) picks up from the fourth syllable, not
+            # from wherever a naive +1 would have landed.
+            global_note_counter = sub_idx + 1
+
+        # One crossfade pass over every splice recorded for this phrase.
+        # This is an in-place overwrite of `overlap` samples at each
+        # offset, not an insertion, so nothing about the timeline above
+        # (note boundaries, phrase_actual_end, rhythm sync with the
+        # song) needs to change to account for it.
+        if splice_offsets:
+            _apply_internal_crossfades(robot, splice_offsets, XFADE_N)
 
         # A natural attack at this PHRASE's true start, and a short
-        # release at its (now syllable-complete) true end -- separate
-        # from, and layered on top of, the tight ~2ms declicks above.
-        # Those only exist to stop a digital click at each note-to-note
-        # handoff and are deliberately short so the rhythm stays tight;
-        # the phrase's own start still benefits from a real attack ramp
-        # rather than snapping to full volume instantly. The release is
-        # now short and mostly redundant with the syllable's own natural
-        # tail (since we just let it finish completely above) -- kept
-        # small only to smooth the rare overlap edge case, not to fade
-        # out material that was still mid-word.
+        # release at its (now syllable-complete) true end. The phrase's
+        # own start still benefits from a real attack ramp rather than
+        # snapping to full volume instantly. The release is short and
+        # mostly redundant with the syllable's own natural tail (since
+        # we just let it finish completely above) -- kept small only to
+        # smooth the rare overlap edge case, not to fade out material
+        # that was still mid-word.
         ATTACK_S = 0.05
         RELEASE_S = 0.05
         attack_n = min(int(ATTACK_S * sample_rate), (phrase_actual_end - phrase_start) // 2)
@@ -1268,13 +1455,22 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
             robot[phrase_actual_end - release_n:phrase_actual_end] *= np.linspace(1.0, 0.0, release_n, dtype=np.float32)
 
     if np.any(amplitude_curve > 0):
-        # Wider gain range than the function's own default (0.15-1.6) --
-        # explicitly requested to sound "very similar" to the track's
-        # own loudness shape, so the swells and dips need to actually
-        # read as such rather than being clamped to a narrow band.
+        # BUG FIX (this was the actual audible "song stopping and
+        # starting" the crossfade work didn't touch): min_gain=0.08 here
+        # was LOWER than apply_amplitude_curve_follow's own safe default
+        # of 0.15, and release_ms was left at its default 45ms instead of
+        # the longer value the function's own docstring says this exact
+        # caller should pass. Verified against real audio from this
+        # render: an ordinary ~50ms unvoiced gap (a consonant, a breath --
+        # not a real pause) rode the gain down to ~0.05x reference before
+        # recovering, which is a genuine, clearly audible mute-and-
+        # recover, not "dynamics". min_gain=0.45 + release_ms=110 keeps
+        # that same brief gap at ~0.80x -- a natural dip, not a dropout --
+        # while still letting a real, sustained quiet passage read as
+        # quiet.
         robot = apply_amplitude_curve_follow(
             robot, sample_rate, amplitude_curve=amplitude_curve, frame_hop_s=frame_size / sample_rate,
-            min_gain=0.08, max_gain=2.2,
+            min_gain=0.45, max_gain=1.8, release_ms=110.0,
         )
 
     buf = io.BytesIO()
@@ -3021,7 +3217,7 @@ class _SyllableCycler:
     that, not a replacement for it.
     """
     ATTACK_S = 0.05
-    GAP_TOLERANCE_S = 0.25  # a breath, a consonant, a word boundary -- not a phrase ending; see next_chunk
+    GAP_TOLERANCE_S = 2.5  # a real, sustained stop in the singing -- not a breath, consonant, or word boundary; see next_chunk
 
     def __init__(self):
         self.vocable: str | None = None
@@ -3034,6 +3230,21 @@ class _SyllableCycler:
         self._gain = 1.0
         self._silence_s = 0.0    # elapsed real time since voicing was last seen, for gap-bridging
         self._phrase_env = 0.0   # 0..1 attack/release envelope for the current phrase
+        # Real-time counterpart of the offline renderer's splice
+        # crossfade (see _apply_internal_crossfades) -- the exact same
+        # "two independently-declicked syllables placed next to each
+        # other dip toward silence at the seam" issue applies here too,
+        # it's just spread across live chunk boundaries instead of one
+        # in-memory buffer. `_last_tail` remembers the real last few
+        # samples actually returned so the NEXT call can blend against
+        # them even when the seam falls exactly on a chunk boundary;
+        # None means "nothing to blend against" (fresh word load, or
+        # right after a genuine phrase restart from real silence, where
+        # blending against old, unrelated material would be wrong).
+        self._last_tail: np.ndarray | None = None
+        self._xfade_n = 0
+        self._in_release_tail = False  # True while playing out the current syllable after a genuine phrase end
+        self._release_tail_s = 0.0     # elapsed time spent in that tail, so it can be capped -- see next_chunk
 
     def _ensure_loaded(self, vocable: str):
         if vocable == self.vocable and self.syllables is not None:
@@ -3049,16 +3260,33 @@ class _SyllableCycler:
         self.vocable = vocable
         self.syllable_idx = 0
         self.read_pos = 0
+        self._xfade_n = max(24, int(0.007 * bank.sample_rate))
+        self._last_tail = None  # a different word shares no waveform to blend against
 
     def _read_syllables(self, n_samples: int) -> np.ndarray:
         """Fills n_samples by reading forward through the syllable
         sequence, continuing into the next syllable once the current one
         is used up -- shared by normal playback and the release tail
         below, since a release still needs real recorded material to
-        fade out, not silence."""
+        fade out, not silence.
+
+        FIX: every advance to a new syllable used to just concatenate
+        its (already independently head/tail-declicked) audio directly
+        onto whatever came before, click-free but with a real dip toward
+        silence right at the seam -- see _apply_internal_crossfades'
+        docstring for the full reasoning (this is the live-path
+        counterpart of the exact same fix in the offline single-vocable
+        renderer). Every such seam inside this call is now blended
+        instead of just concatenated; a seam that happens to fall
+        exactly on THIS call's own first sample (the previous call ended
+        precisely at a syllable boundary) is blended against
+        `self._last_tail`, the real audio actually returned last time.
+        """
+        starts_on_fresh_syllable = (self.read_pos == 0)
         out = np.empty(n_samples, dtype=np.float32)
         filled = 0
         guard = 0  # safety: if every syllable somehow ended up empty, bail to silence instead of spinning forever
+        splice_offsets = []
         while filled < n_samples:
             guard += 1
             if guard > len(self.syllables) + 4:
@@ -3078,9 +3306,18 @@ class _SyllableCycler:
                 # Sustaining through a held note past this syllable's own
                 # material: continue into the word's next syllable
                 # rather than looping this one again -- see the offline
-                # renderer's identical spot for the full reasoning.
+                # renderer's identical spot for the full reasoning. This
+                # seam gets crossfaded below, same as every other.
+                splice_offsets.append(filled)
                 self.syllable_idx += 1
                 self.read_pos = 0
+
+        if self._xfade_n > 1:
+            _apply_internal_crossfades(
+                out, splice_offsets, self._xfade_n,
+                prev_tail=self._last_tail if starts_on_fresh_syllable else None,
+            )
+            self._last_tail = out[-min(self._xfade_n, len(out)):].copy()
         return out
 
     def next_chunk(self, vocable: str, is_voiced: bool, onset_id, input_rms: float, n_samples: int, sample_rate: int):
@@ -3111,40 +3348,72 @@ class _SyllableCycler:
             if not self.was_voiced:
                 # Already finished and fully stopped -- true silence.
                 self._gain = 1.0
+                self._in_release_tail = False
                 return None
 
             # A genuine phrase end: don't cut off wherever we happen to
-            # be. Finish the CURRENT syllable's own natural length first
-            # -- full gain, no fade, don't advance or loop it -- and
-            # only actually go silent once it's genuinely done. If
-            # singing resumes before that happens, next_chunk just falls
-            # through to the normal path below on the next call; nothing
-            # here needs undoing since nothing was cut short.
+            # be. Finish the CURRENT syllable a little further -- full
+            # gain, no fade, don't advance or loop it -- rather than
+            # snapping to silence mid-consonant.
+            #
+            # BUG FIX: this used to let the syllable run all the way to
+            # its own natural end with NO cap at all. If a vocable's
+            # segmentation ever produces one long syllable -- or fails
+            # to find real boundaries and falls back to treating the
+            # WHOLE recording as one chunk (see _segment_into_syllables'
+            # fallback) -- that "natural end" can be several seconds
+            # away. That let this tail keep playing straight through
+            # however long the real silence in the input actually was:
+            # a genuine multi-second pause just got played over, which
+            # is exactly "sounds like one big loop" / "plays through a
+            # 5s gap." RELEASE_GRACE_S caps how long this tail is
+            # allowed to run past the real phrase end -- long enough to
+            # avoid an abrupt mid-consonant cutoff (the original goal),
+            # never long enough to swallow an actual pause.
+            RELEASE_GRACE_S = 0.35
+            if not self._in_release_tail:
+                self._in_release_tail = True
+                self._release_tail_s = 0.0
+            self._release_tail_s += n_samples / float(sample_rate)
+
             syll = self.syllables[self.syllable_idx % len(self.syllables)]
             n = len(syll)
-            if self.read_pos < n:
+            if self.read_pos < n and self._release_tail_s <= RELEASE_GRACE_S:
                 take = min(n_samples, n - self.read_pos)
                 out = np.zeros(n_samples, dtype=np.float32)
                 out[:take] = syll[self.read_pos:self.read_pos + take]
                 self.read_pos += take
                 return out * self._gain
             else:
-                # The syllable finished naturally exactly on/before this
-                # call -- now actually stop.
+                # Either the syllable finished naturally, or the grace
+                # window ran out first -- either way, actually stop now.
                 self.was_voiced = False
                 self._gain = 1.0
                 self._phrase_env = 0.0
+                self._in_release_tail = False
                 return None
 
         if not self.was_voiced:
-            # A genuine new phrase (real amplitude silence, sustained
-            # past the gap tolerance, just ended): start the word over
-            # from its own first syllable. _phrase_env is already 0 here
-            # (set when the previous phrase actually finished stopping),
-            # so the attack ramp below starts from true silence.
-            self.syllable_idx = 0
+            # A genuine new phrase (a real, sustained stop of a few
+            # seconds, per GAP_TOLERANCE_S, just ended): keep going
+            # forward through the SAME continuous syllable sequence
+            # instead of jumping back to the word's own first syllable
+            # every time. Resetting to 0 here unconditionally was why
+            # this sounded like it kept starting over from scratch --
+            # syllable_idx is a persistent, ever-advancing counter (see
+            # _ensure_loaded, which resets it only when a genuinely
+            # different WORD gets loaded), so a real gap just advances
+            # it by one, exactly like an ordinary new-note onset would,
+            # rather than snapping it back to the beginning.
+            self.syllable_idx += 1
             self.read_pos = 0
             self._last_onset_id = onset_id
+            # A real silence just ended -- whatever's in _last_tail is
+            # from before that gap, so it isn't something to blend this
+            # phrase's own true attack against. This phrase's own
+            # ATTACK_S ramp (below) is the right way to come in from
+            # true silence.
+            self._last_tail = None
         elif onset_id is not None and onset_id != self._last_onset_id:
             # A new onset within an ongoing phrase: advance to the next
             # syllable, restarted from its own beginning.
@@ -3277,8 +3546,25 @@ def run_local_pipeline(stop_event, input_device: int):
                 # _SyllableCycler. Volume (not pitch) continuously
                 # follows the input's own loudness -- see its docstring.
                 input_rms = float(np.sqrt(np.mean(clean.astype(np.float64) ** 2))) if is_voiced else 0.0
+                # BUG FIX: this referenced `frame_size`, which is never
+                # defined anywhere in this function -- cfg["audio"]
+                # ["frame_size"] was never pulled into a local variable
+                # here (unlike the offline render functions, which do).
+                # That's a NameError on the very first frame processed
+                # with any vocable locked, which propagates all the way
+                # up to this function's own outer try/except and kills
+                # the whole capture/decide/sing loop -- pipeline_running
+                # goes False and the mic pipeline silently stops. This is
+                # what a locked vocable "sounding very broken" on the
+                # local hardware pipeline actually was: not a synthesis
+                # quality problem, the pipeline was crashing outright.
+                # len(clean) is also more correct than the config value
+                # would have been anyway -- it's the real length of the
+                # frame just processed, guaranteed consistent with what
+                # capture actually delivered, rather than assuming it
+                # always matches cfg["audio"]["frame_size"].
                 chunk = syllable_cycler.next_chunk(
-                    harmony._vocable_override, is_voiced, rhythm.latest_onset, input_rms, frame_size,
+                    harmony._vocable_override, is_voiced, rhythm.latest_onset, input_rms, len(clean),
                     cfg["audio"]["sample_rate"],
                 )
                 if chunk is not None:

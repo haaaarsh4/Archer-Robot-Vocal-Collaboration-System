@@ -76,7 +76,8 @@ def apply_pitch_curve_follow(audio: np.ndarray, sample_rate: int, base_hz: float
 
 def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
                                   amplitude_curve: np.ndarray, frame_hop_s: float,
-                                  min_gain: float = 0.15, max_gain: float = 1.6) -> np.ndarray:
+                                  min_gain: float = 0.15, max_gain: float = 1.6,
+                                  attack_ms: float = 15.0, release_ms: float = 45.0) -> np.ndarray:
     """
     Continuously reshapes an already-rendered note's own loudness to track
     the real performance's dynamics across the note -- the amplitude
@@ -103,6 +104,31 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
     so a brief quiet moment inside an otherwise-sung note doesn't fall to
     total silence (that would read as a dropout, not as dynamics) and a
     loud moment doesn't blow past a sane ceiling.
+
+    FIX (was a flat, symmetric moving-average smoother -- see below):
+    smoothing is now an ASYMMETRIC attack/release envelope-follower (the
+    same idea a compressor's detector uses), applied at FRAME rate
+    instead of a box average applied at sample rate. That distinction is
+    what was actually causing an audible "start stop start stop" pumping
+    on real singing. Ordinary word structure -- a consonant, a breath,
+    the closure between two syllables of the SAME word, e.g. every "l" in
+    a run of "la-la-la" -- drives the raw RMS to near-zero for a few tens
+    of milliseconds at a time, even in the middle of one continuous,
+    intentionally-unbroken phrase. The old 30ms symmetric box average
+    barely rounds off a dip that brief (a box filter's response time is
+    on the same order as its own window, and syllables repeat faster than
+    that), so the OUTPUT gain was still riding those same near-silent
+    troughs almost as sharply as the raw RMS did, all the way down to
+    whatever min_gain was configured -- audible as the robot cutting out
+    and snapping back at roughly syllable rate, not as musical dynamics.
+    A slower release (default 45ms here; a caller deliberately chasing
+    syllable-by-syllable dynamics closely, e.g. a raw locked-vocable
+    render, should pass something longer -- see
+    _render_track_single_vocable_offline in server.py, which now also
+    raises its own min_gain floor for the same reason) lets a brief
+    consonant-driven dip get bridged instead of ever fully registering,
+    while a fast attack (default 15ms) keeps the robot responsive to a
+    genuine new swell instead of smearing it out.
     """
     n = len(audio)
     if n == 0 or amplitude_curve.size == 0:
@@ -115,23 +141,31 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
     if reference <= 1e-9:
         return audio  # the whole run measured as silence -- leave it alone rather than dividing by ~0
 
-    frame_times = (np.arange(len(amplitude_curve)) + 0.5) * frame_hop_s
+    frame_gain = np.clip(amplitude_curve / reference, min_gain, max_gain)
+
+    # Envelope-follow at FRAME rate -- cheap (hundreds to a few thousand
+    # elements even for a whole multi-minute track) rather than running a
+    # stateful attack/release loop at per-sample resolution, which would
+    # mean an unvectorizable Python loop over potentially millions of
+    # samples. One analysis frame (frame_hop_s, typically ~10-25ms) is
+    # short enough that following at frame rate instead of sample rate
+    # changes nothing audible, and this is what actually keeps a
+    # whole-track offline render fast.
+    attack_coeff = float(np.exp(-frame_hop_s / max(1e-4, attack_ms / 1000.0)))
+    release_coeff = float(np.exp(-frame_hop_s / max(1e-4, release_ms / 1000.0)))
+    smoothed = np.empty_like(frame_gain)
+    level = float(frame_gain[0])
+    for i in range(len(frame_gain)):
+        target = float(frame_gain[i])
+        coeff = attack_coeff if target > level else release_coeff
+        level = coeff * level + (1.0 - coeff) * target
+        smoothed[i] = level
+    frame_gain = smoothed
+
+    frame_times = (np.arange(len(frame_gain)) + 0.5) * frame_hop_s
     sample_times = np.arange(n) / float(sample_rate)
-    curve = np.interp(sample_times, frame_times, amplitude_curve,
-                       left=amplitude_curve[0], right=amplitude_curve[-1])
-
-    gain = np.clip(curve / reference, min_gain, max_gain)
-
-    # Smooth the gain curve itself a little (short moving average) so the
-    # output follows the performance's actual dynamic SHAPE, not every
-    # single frame-to-frame RMS jitter -- unsmoothed, this reads as a fast
-    # tremolo riding on top of the note rather than a musical swell/fade.
-    smooth_samples = max(1, int(0.03 * sample_rate))
-    if smooth_samples > 1:
-        pad = smooth_samples // 2
-        padded = np.pad(gain, (pad, pad), mode="edge")
-        kernel = np.ones(smooth_samples) / smooth_samples
-        gain = np.convolve(padded, kernel, mode="valid")[:n]
+    gain = np.interp(sample_times, frame_times, frame_gain,
+                      left=frame_gain[0], right=frame_gain[-1])
 
     return (audio * gain).astype(np.float32)
 
