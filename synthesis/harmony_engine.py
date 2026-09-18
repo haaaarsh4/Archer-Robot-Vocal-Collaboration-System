@@ -166,8 +166,34 @@ class HarmonyEngine:
         self._pending_note_frames: int = 0
 
         self._last_good_hz: float | None = None
-        self._gap_frames: int = 0
-        self._max_gap_frames: int = 8
+        # FIX: this was `_gap_frames: int` counted against a
+        # `_max_gap_frames = 8` cap -- at this project's normal frame
+        # settings that's roughly 90ms, a fraction of an ordinary breath
+        # or word-boundary pause in real singing. Once a dropout ran past
+        # that, decide() (below) didn't hold the last real note -- it
+        # snapped the target pitch to self._default_start_hz, a flat,
+        # hardcoded 220Hz completely unrelated to the melody, for as long
+        # as the gap continued. That's a real, audible wrong-note glitch
+        # landing on every ordinary pause in the singing, not just long
+        # ones -- likely a big part of why the output could sound like it
+        # shares nothing with the input: it wasn't just briefly quiet at
+        # each breath, it was briefly singing THE WRONG NOTE.
+        #
+        # Fixed by just holding the last real pitch for as long as
+        # phrase_state keeps reporting "singing" -- no expiring counter,
+        # no fallback pitch. "Start from exactly where it stopped" is
+        # exactly what continuing to hold the last real note IS. Whether
+        # a given pause is short enough to still count as "singing" (and
+        # so gets bridged) or long enough to actually end the phrase is
+        # phrase_state's call, not this engine's -- that's decided by
+        # RhythmAnalyzer.push_frame's own hangover/silence timing
+        # (analysis/rhythm_analyzer.py), which wasn't available to check
+        # while making this change. If short pauses are STILL cutting the
+        # music off after this fix, that file is almost certainly where
+        # the remaining threshold lives, in the same family as this bug.
+        # _default_start_hz below is now used ONLY for true bootstrap (no
+        # real pitch has ever locked in this performance yet), never as a
+        # mid-phrase gap filler.
         # Comfortable mid pitch (A3) used only for the bootstrap case
         # above -- no real pitch has ever locked yet. Not a musical
         # choice, just a reasonable starting point that gets corrected
@@ -213,32 +239,28 @@ class HarmonyEngine:
 
         if archer_hz:
             self._last_good_hz = archer_hz
-            self._gap_frames = 0
             self._pitch_history.append(archer_hz)
             self._key_infer_counter += 1
             if self._key_infer_counter >= self._key_update_interval:
                 self._key_infer_counter = 0
                 self._infer_key()
-        elif (
-            self._last_good_hz is not None
-            and self._gap_frames < self._max_gap_frames
-            and phrase_state == "singing"
-        ):
-            self._gap_frames += 1
+        elif phrase_state == "singing" and self._last_good_hz is not None:
+            # An ordinary pause inside an active phrase (a breath, a
+            # consonant, a brief pitch-tracker dropout) -- hold the last
+            # real pitch exactly as-is rather than touching it. No
+            # counter, no expiry: as long as phrase_state keeps reporting
+            # "singing", this keeps the note going from precisely where
+            # it left off, for however long that takes.
             archer_hz = self._last_good_hz
         elif phrase_state == "singing":
-            # The singer is clearly active but no confident pitch has
-            # EVER locked yet -- the very start of a performance (before
-            # the first successful detection) or a dropout longer than
-            # the brief grace window above. Explicit design choice:
-            # never leave dead air waiting for a perfect reading. Start
-            # on a sensible default pitch now; once real pitch data
-            # arrives it registers as a normal note change through the
-            # usual onset-detection logic below, nothing special-cased.
-            self._gap_frames += 1
+            # True bootstrap only: the singer is clearly active but no
+            # confident pitch has EVER locked yet, e.g. the very start of
+            # a performance before the first successful detection. Never
+            # leave dead air waiting for a perfect reading -- start on a
+            # sensible default pitch now; once real pitch data arrives it
+            # registers as a normal note change through the usual
+            # onset-detection logic below, nothing special-cased.
             archer_hz = self._default_start_hz
-        else:
-            self._gap_frames += 1
 
         key_root_hz = self._key_root_hz()
 
