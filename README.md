@@ -10,7 +10,7 @@ This project is a collaboration between:
 
 - **Sara Diamond** [Sara's website](https://www.linkedin.com/in/sadiamond?originalSubdomain=ca)
 - **Archer Pechawis**, [Archer's website](http://apxo.net/)
-- **Orus Mateo Castaño Suárez**, [Orus's website ??](orusmateo.com)
+- **Orus Mateo Castaño Suárez**, [Orus's website](orusmateo.com)
 - **Harsh Upadhyay**, [Harsh's website](http://www.harshupadhyayy.com/)
 - **Joshua Pothen**, [Joshua's website](https://www.joshuapothen.com/)
 
