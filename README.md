@@ -12,6 +12,7 @@ This project is a collaboration between:
 - **Archer Pechawis**, [Archer's website](http://apxo.net/)
 - **Orus Mateo Castaño Suárez**, [Orus's website ??](??)
 - **Harsh Upadhyay**, [Harsh's website](http://www.harshupadhyayy.com/)
+- **Joshua Pothen**, <Website>
 
 Part of the **Abundant Intelligences** research program. [Abundant Intelligences website, add T'Karonto Pod link]
 
