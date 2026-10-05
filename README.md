@@ -8,10 +8,10 @@ A real time system where a robot listens to a singer and harmonizes back live, u
 
 This project is a collaboration between:
 
-- **Sara**
-- **Archer Pechawis**, lead artist. [Archer's website, add link]
-- **Orus Mateo Castaño Suárez**. [orusmateo.com](https://orusmateo.com)
-- **Harsh Upadhyay**
+- **Sara Diamond** [Sara's website ??](??)
+- **Archer Pechawis**, [Archer's website](http://apxo.net/)
+- **Orus Mateo Castaño Suárez**, [Orus's website ??](??)
+- **Harsh Upadhyay**, [Harsh's website](http://www.harshupadhyayy.com/)
 
 Part of the **Abundant Intelligences** research program. [Abundant Intelligences website, add T'Karonto Pod link]
 
