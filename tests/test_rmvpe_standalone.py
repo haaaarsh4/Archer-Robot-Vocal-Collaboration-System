@@ -46,7 +46,7 @@ def main():
                   f"median {np.median(voiced):.1f} Hz")
             print(f"mean confidence on voiced hops: {conf[f0 > 0].mean():.3f}")
         else:
-            print("No voiced hops detected -- try a louder/cleaner recording, "
+            print("No voiced hops detected, try a louder/cleaner recording, "
                   "or check the file actually contains singing/speech.")
         return
 
@@ -62,15 +62,15 @@ def main():
             continue
         detected = float(np.median(voiced))
         cents_off = 1200 * np.log2(detected / target_hz)
-        status = "OK" if abs(cents_off) < 50 else "FAIL (off by >50 cents -- check for an octave error)"
+        status = "OK" if abs(cents_off) < 50 else "FAIL (off by >50 cents, check for an octave error)"
         print(f"  {target_hz:>6.1f} Hz target -> {detected:>6.1f} Hz detected "
               f"({cents_off:+.0f} cents, confidence {conf[f0>0].mean():.2f})  [{status}]")
         if "FAIL" in status:
             ok = False
 
     print()
-    print("ALL SYNTHETIC TONES OK -- weights + inference are working." if ok
-          else "SOME TONES FAILED -- check model_path points at the real rmvpe.pt "
+    print("ALL SYNTHETIC TONES OK, weights + inference are working." if ok
+          else "SOME TONES FAILED, check model_path points at the real rmvpe.pt "
                "and that it downloaded completely (should be ~172MB).")
 
 

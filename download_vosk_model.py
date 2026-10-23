@@ -13,7 +13,7 @@ if __name__ == "__main__":
         print(f"Already present at {target}, nothing to do.")
     else:
         print(f"Downloading {MODEL_URL} ...")
-        print("This is a much larger download than the old small model (~1.8GB) -- may take a while.")
+        print("This is a much larger download than the old small model (~1.8GB), may take a while.")
         with urllib.request.urlopen(MODEL_URL) as resp:
             data = resp.read()
         print("Unzipping...")

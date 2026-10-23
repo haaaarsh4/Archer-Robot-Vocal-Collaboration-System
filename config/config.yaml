@@ -13,6 +13,16 @@ preprocessing:
 pitch:
   method: yin                      # "yin" | "yinfft" | "rmvpe" 
   confidence_threshold: 0.3
+  # THE ROBOT ASKS A STRICTER QUESTION OF THE DETECTOR THAN THE LIVE PIPELINE
+  # DOES, and this is the threshold it asks it at. confidence_threshold above is
+  # low on purpose (a fraction of a second of lag matters more than a wobble on
+  # a live mic), but on a whole track a reading that weak is usually breath, a
+  # consonant, or a voice buried in the mix -- and following one moves the robot
+  # onto a note nobody sang, which is what "the synthesis falls apart when the
+  # singing is unclear" actually is. Below this, the frame is treated as no new
+  # pitch and the robot holds the note the phrase is on. Raise it for an even
+  # steadier part on a hard-to-track vocal, lower it for a very fast melody.
+  robot_confidence_threshold: 0.45
   min_frequency: 65               
   max_frequency: 1200
   tolerance: 0.15                  
@@ -20,15 +30,15 @@ pitch:
   rmvpe:
     model_path: "assets/rmvpe/rmvpe.pt"   
     prewarm: true                    
-    device: cpu                     # your GPU is a laptop iGPU (Phoenix3/gfx1103, 6 CUs) --
+    device: cpu                     # your GPU is a laptop iGPU (Phoenix3/gfx1103, 6 CUs)
                                      # NOT officially ROCm-supported, and the usual override trick
                                      # is a known hard-hang on this exact chip. Staying on CPU is
-                                     # the right call here, not a fallback -- see quantize_hubert
+                                     # the right call here, not a fallback, see quantize_hubert
                                      # below and torch.set_num_threads in rvc_server.py for the
                                      # actual CPU-side speedups.
     is_half: false                   # fp16 has no benefit on CPU
     context_seconds: 1.0            
-    infer_stride_hops: 4             # keep at 4+ on CPU -- RMVPE's CNN+BiGRU can't keep up with
+    infer_stride_hops: 4             # keep at 4+ on CPU, RMVPE's CNN+BiGRU can't keep up with
                                      # real-time mic audio every single hop without a GPU.
     voicing_threshold: 0.03         
     confidence_threshold: 0.15      
@@ -50,24 +60,50 @@ harmony:
 
 modes:
   octave_direction: -1                   
+  # The interval octave_reinforcement sings, in semitones, continuous rather
+  # than a whole octave only. -12 is one octave below, which is what the panel's
+  # "Octave below" chip means.
+  octave_semitones: -12
+  # The three things a singer does when they sing below themselves, applied to
+  # the octave voice only: keep the vowel bright, narrow the vowel a little, and
+  # let less volume out the lower it goes. Without them the mode is a
+  # pitch-shifted copy of the singer, which is what "it just sounds like the
+  # synthesis got deeper and weird" describes.
+  octave_low_bright_amount: 0.30         # high-shelf lift (brightness units, ~3 dB at a full octave)
+  octave_low_narrow_amount: 0.22         # vowel_colour pull toward the bright/front vowel
+  octave_low_trim_db: 3.0                # level trim at a full octave below the singer
+  octave_low_floor_hz: 170.0             # notes under this get extra trim...
+  octave_low_floor_extra_db: 2.0         # ...up to this much more
   delay_beats: 1.0                       
   drone_divisor: 2                       
+  # === drone_support ===
+  # ONE VOICE, ONE WORD, ONE NOTE, PER PHRASE. The drone opens its mouth once
+  # when a line starts, takes the line's own tonic an octave under the phrase's
+  # register, holds it for the whole line, and stops when the line stops. It
+  # never follows the melody note by note (that is a shadow, not a drone) and it
+  # never re-locks its pitch mid-line.
+  drone_phrase_gap_s: 0.35               # silence this long ends a phrase and releases the pedal
+  drone_hold_beats: 8.0                  # the live engine's top-up interval (offline runs follow the phrase)
+  drone_octaves_below: 1.0               # how far under the phrase's own register the pedal sits
+  drone_min_hz: 70.0                     # hard renderability floor (D2): below this a voice stops being a voice
+  drone_max_hz: 262.0                    # ceiling (C4): a fourth under a line is the closest that still reads as support
+  drone_level_trim_db: 2.5               # a pedal sits UNDER the lead, not beside it
   contour_window: 6                      
   # contour_step_semitones (old key) is still read as a fallback, but the
-  # keys below are what actually shape contour_following now -- it used
+  # keys below are what actually shape contour_following now, it used
   # to just snap between archer_hz and a fixed +/-2 semitones based on a
   # first-vs-last-sample coin flip, which is why it barely sounded
   # different from unison_shadowing. Now it's a continuous, smoothed lean
   # that scales with how much the melody is actually rising or falling.
   contour_lookback_seconds: 0.6          # how much recent singing contour_following looks at to
                                           # judge "is the melody moving." Was previously a 6-SAMPLE
-                                          # window -- since decide() runs once per audio frame
+                                          # window, since decide() runs once per audio frame
                                           # (~23ms at the default frame size), 6 samples was only
-                                          # ~140ms, far too short to see an actual musical phrase --
+                                          # ~140ms, far too short to see an actual musical phrase
                                           # it could only ever see frame-to-frame noise, which is
                                           # why contour used to sound identical to unison.
   contour_move_threshold_semitones: 1.5  # trend magnitude (semitones of real movement across the
-                                          # lookback window) that counts as "the melody is moving" --
+                                          # lookback window) that counts as "the melody is moving"
                                           # crossing this commits the harmony to a step above/below.
   contour_release_threshold_semitones: 0.5  # trend magnitude below which it settles back to unison.
                                           # Deliberately lower than the move threshold (hysteresis)
@@ -75,43 +111,74 @@ modes:
   contour_step_semitones: 2              # the harmony step used once movement is detected (normal case)
   contour_fast_threshold_semitones: 4.0  # a bigger, more urgent run escalates past this...
   contour_fast_step_semitones: 4         # ...to this wider step instead.
-  contour_glide_alpha: 0.22              # 0-1 glide speed easing into/out of the harmony step --
+  contour_glide_alpha: 0.22              # 0-1 glide speed easing into/out of the harmony step
                                           # this is the audible "swoop", not an instant jump.
   # contour_following used to be silently identical to unison_shadowing
   # any time the melody held fairly still, since its pitch step only
   # engages once real movement crosses contour_move_threshold_semitones
   # above (has to work that way under harmony.scale_lock, which rounds
   # pitch to the nearest scale degree and would erase anything subtler
-  # anyway). These drive a SEPARATE, continuous timbral signature --
+  # anyway). These drive a SEPARATE, continuous timbral signature
   # brightness/vowel_color aren't touched by scale_lock, so they can
   # track melodic direction constantly instead of waiting for a
   # threshold: the voice brightens climbing into a rising phrase and
   # warms/darkens easing into a falling one. An EARLIER version of this
   # fix only swung around neutral, which meant a genuinely flat melody
-  # (lean == 0) was STILL silently identical to unison -- see
+  # (lean == 0) was STILL silently identical to unison, see
   # synthesis.contour_baseline_brightness_shift below for the actual
   # fix, and note these values were turned up hard from an initial,
   # more "tasteful" pass once it turned out that pass was inaudible
   # against a real mix. See ModeFunctions._contour_timbre_lean in
   # accompaniment_modes.py and its use in HarmonyEngine.decide.
   contour_trend_scale_semitones: 1.2     # trend magnitude (semitones across the lookback window) that
-                                          # maps to FULL timbral lean (+/-1.0) -- smaller = more sensitive
-                                          # (was 3.0 -- too large a movement was needed to matter at all)
-  contour_timbre_glide_alpha: 0.5        # 0-1 glide speed for the timbral lean -- deliberately faster/
+                                          # maps to FULL timbral lean (+/-1.0), smaller = more sensitive
+                                          # (was 3.0, too large a movement was needed to matter at all)
+  contour_timbre_glide_alpha: 0.5        # 0-1 glide speed for the timbral lean, deliberately faster/
                                           # more reactive than contour_glide_alpha above, since this is
                                           # meant to feel constantly alive rather than swoop into position
                                           # (was 0.35)
-  call_response_semitones: 0             
-  # delayed_response used to be pitch-delay only -- Archer's note sung
+  # === call_and_response ===
+  # The whole mode lives in synthesis/call_response.py, which composes a real
+  # answering phrase (rhythm from the call, arriving on the tonic by step) and
+  # sings it in the robot's own voice with the WORLD vocoder. The old knob here
+  # (call_response_semitones) was deleted with the old implementation: it moved
+  # one held note by a fixed interval, which is not an answer to anything. Every
+  # number the musical judgement rests on is below, and the file's own docstring
+  # explains what each one is for. Leave them alone and the mode sounds like the
+  # design it was built from; tune them by ear if you want it to answer
+  # differently.
+  call_response:
+    phrase_gap_s: 0.34            # a pause this long ends a call (Archer's phrase)
+    release_allowance_s: 0.08     # the singer's own release tail, not detected as voiced
+    gap_beats: 0.50               # how long the robot waits after the call, in beats
+    gap_min_s: 0.22               # ... clamped to this window, so a very fast track
+    gap_max_s: 0.42               # ... and a very slow one both get a usable entry
+    min_room_s: 0.30              # less breathing space than this and there is no answer
+    tail_guard_s: 0.10            # silence left between the end of an answer and the next call
+    min_call_s: 0.30              # shorter than this is a breath, not a phrase
+    room_medium_s: 0.85           # room for a phrase answer rather than a single landing note
+    room_long_s: 1.55             # room to quote the call's own opening and then resolve it
+    resolve_below_semitones: 7.0  # how far under the call's ending a RESOLVING answer sits
+    echo_below_semitones: 4.0     # ... and how far under a call that already closed sits its echo
+    final_note_extend: 1.55       # the closing note is held this much longer than the call's own
+    answer_peak: 0.72             # the rendered answer's own level before the mix
+    takes: [cold, moon, need, remember, snow, shell, voyage, ohoho, lalanana]
+    # The words the answering voice may sing. Each answer picks whichever take's
+    # own length fits the phrase it just composed, so a word written for a short
+    # line is not stretched across a long one, and the answer never reuses the
+    # word it just used. Add names here (matching files in synthesis/samples/
+    # neural/) to give the responder more to say.
+    
+  # delayed_response used to be pitch-delay only, Archer's note sung
   # back late, once, with nothing repeating. These two give it an actual
   # echo (see apply_echo_effect in server.py, used by
   # /api/dsp/render-track and /api/neural/render-track): the whole
   # rendered track gets a real, multi-tap, decaying repeat pass, each
   # tap a bit quieter and a bit darker than the last. Both are
   # overridden per-request by the frontend's Delay/Echo sliders when
-  # present -- these are just the defaults when no override is sent.
+  # present, these are just the defaults when no override is sent.
   delay_echo_ms: 350.0                   # time between repeats, in milliseconds
-  delay_echo_feedback: 0.45              # 0-1, how much of one repeat carries into the next --
+  delay_echo_feedback: 0.45              # 0-1, how much of one repeat carries into the next
                                           # higher means more (and slower-fading) repeats
 
 protocol:
@@ -125,24 +192,24 @@ protocol:
   physical_cue_gpio_pin: null            
 
 synthesis:
-  engine: neural_wavetable     # was "sinusoidal" -- now uses the pre-rendered neural takes
+  engine: neural_wavetable     # was "sinusoidal", now uses the pre-rendered neural takes
                                 # in synthesis/samples/neural/, built by build_vocable_bank.py,
                                 # instead of the pure formant/sine-wave synthesizer. Falls back
                                 # to sinusoidal automatically if that folder is empty.
                                 #
-                                # IMPORTANT re: the female2 swap below -- this engine does NOT
+                                # IMPORTANT re: the female2 swap below, this engine does NOT
                                 # call the RVC sidecar live. It plays back WAV files that were
                                 # already rendered once, ahead of time, by build_vocable_bank.py,
                                 # using whatever model_paths/index_paths were set in config.yaml
                                 # AT THE TIME THAT SCRIPT WAS RUN. Changing model_paths here does
                                 # nothing to files that already exist in synthesis/samples/neural/
-                                # -- they're baked, not regenerated on the fly. See the note below
+                                #, they're baked, not regenerated on the fly. See the note below
                                 # synthesis.neural for what you need to do about that.
 
-  # The "everyday" vocables -- these are what gets picked almost all the
+  # The "everyday" vocables, these are what gets picked almost all the
   # time. HarmonyEngine._choose_vocable() rotates through this list, now
   # matching each word's own measured tone to the melody's register/trend
-  # instead of picking blindly -- see harmony_engine.py's _choose_vocable
+  # instead of picking blindly, see harmony_engine.py's _choose_vocable
   # and _pick_by_melodic_fit for how.
   vocable_set:
     - cold
@@ -155,11 +222,11 @@ synthesis:
     - "welcome to reality"
     - "you know you're going to feel it"
 
-  # The special-occasion vocables -- picked instead of the list above only
+  # The special-occasion vocables, picked instead of the list above only
   # vocable_rare_chance of the time, per NOTE (not per frame). Match these
   # names exactly to your .wav filenames in synthesis/source_takes/ and
   # synthesis/samples/neural/ (minus the .wav). Lalanana/ohoho moved here
-  # from vocable_set above -- they're now the occasional wordless scat
+  # from vocable_set above, they're now the occasional wordless scat
   # break instead of the everyday default.
   vocable_rare_set:
     - Lalanana
@@ -168,24 +235,57 @@ synthesis:
   # 0.02 = 2% chance per new note. That's roughly 1 in every 50 notes sung,
   # so depending on tempo, maybe once every 20-40 seconds of continuous
   # singing. Drop this to 0.005-0.01 if even that feels too frequent once
-  # you hear it live -- it's cheap to tune, just rerun with a new value,
+  # you hear it live, it's cheap to tune, just rerun with a new value,
   # no rebuild needed.
   vocable_rare_chance: 0.02
+
+  #, "one locked word instead of Mix" (DSP single-vocable renderer)
+  # See _render_track_single_vocable_offline in server.py and
+  # synthesis/melody_voice.py. The take is sung back along the track's own
+  # melody and dynamics; these tune how far and how humanly it moves.
+  single_vocable:
+    voice_source: source_take  # which recording is actually sung: "source_take"
+                                  # = the performance as it was originally recorded,
+                                  # in synthesis/source_takes/ (the same voice the
+                                  # input file has); "neural_bank" = the
+                                  # RVC-converted copy in synthesis/samples/neural/,
+                                  # which is a different-sounding voice singing the
+                                  # same performance. The converted copy is still
+                                  # used as the fallback whenever the original take
+                                  # is missing.
+    max_shift_semitones: 12.0   # how far any one note may shift the recording.
+                                  # One octave: past that a shift stops sounding
+                                  # like the same person no matter how carefully
+                                  # it is done, and the part is placed in the
+                                  # octave closest to the recording's own
+                                  # register so notes rarely need to go this far.
+    portamento_ms: 70             # glide time from the previous note's pitch into
+                                  # a legato note, a real singer never jumps
+                                  # straight to a new note mid-phrase.
+    vibrato_depth_cents: 14       # sung vibrato on held notes. Fades in after a
+                                  # note has been held, and scales with how long
+                                  # it is held, so short notes stay straight.
+    vibrato_rate_hz: 5.3          # vibrato speed (the "sung" range is ~4-7 Hz).
+    drift_depth_cents: 6          # slow, shallow pitch wander so a long note is
+                                  # never perfectly, digitally flat.
+    target_rms: 0.12              # output level, measured over the sung part
+                                  # only. Keeps every vocable at the same
+                                  # loudness through the ROBOT VOLUME slider.
 
   crossfade_ms: 30
   ddsp_model_path: null
   timbral_detune_cents: 6                # chorus-style detune used by timbral_thickening mode
   contour_brightness_amount: 0.45        # how far contour_following's continuous timbral lean pushes
                                           # brightness at full deflection (+/- from wherever the Cree
-                                          # phoneme analysis already put it) -- see modes.contour_trend_*
+                                          # phoneme analysis already put it), see modes.contour_trend_*
                                           # above and HarmonyEngine.decide for how the lean itself is
-                                          # computed (was 0.30, turned up hard -- too subtle to notice
+                                          # computed (was 0.30, turned up hard, too subtle to notice
                                           # against a real mix with instruments playing)
-  contour_vowel_color_amount: 0.45       # same idea, for vowel_color -- pulled the OPPOSITE direction from
+  contour_vowel_color_amount: 0.45       # same idea, for vowel_color, pulled the OPPOSITE direction from
                                           # brightness (rising = lower vowel_color = brighter vowel, per
                                           # CREE_PHONEME_PROFILES in phonetic_analysis.py) (was 0.30)
   contour_baseline_brightness_shift: 0.18  # applied to brightness/vowel_color UNCONDITIONALLY, regardless
-                                          # of lean -- without this, a genuinely flat stretch of melody
+                                          # of lean, without this, a genuinely flat stretch of melody
                                           # (lean == 0) meant contour_following's brightness/vowel_color
                                           # were completely untouched, i.e. still silently identical to
                                           # unison_shadowing right when it mattered most. This guarantees
@@ -195,46 +295,97 @@ synthesis:
   vibrato_rate_hz: 5.3                   # sung-vibrato rate on notes held longer than ~0.6s
   vibrato_depth_cents: 12                # sung-vibrato depth in cents
 
+  # === vocal fold vibration ===
+  # The movement in a held note, applied to the FINISHED part in every
+  # accompaniment mode and both engines, so no mode has to grow its own (see
+  # synthesis/vibrato.py for the physics, the measurements and how it is
+  # applied). The panel's "Vocal fold vibration" slider is `amount` below, 0-100.
+  # These are the numbers behind 100%: 130 cents peak-to-peak at 5.4 Hz is a
+  # full, deliberate classical vibrato; the panel's own default of 45 puts an
+  # ordinary trained singer's movement on a held note (~58 cents peak-to-peak).
+  vocal_vibration:
+    rate_hz: 5.4                 # cycles per second (the trained-singer range is 4.5-6.5)
+    rate_jitter_fraction: 0.07   # how much an individual note's own rate may differ
+    extent_cents_at_full: 130.0  # peak-to-peak pitch swing at amount=100
+    onset_s: 0.26                # the folds settle into their oscillation, they are not in it from the first cycle
+    ramp_s: 0.34                 # ...over this long
+    release_s: 0.10              # and let go this quickly when the note does
+    min_note_s: 0.22             # nothing to open up inside a shorter note than this
+    full_depth_note_s: 1.1       # a note held this long gets the full extent
+    drift_cents: 5.0             # slow wander so the oscillation is never exactly periodic
+    drift_rate_hz: 0.33
+    shimmer_fraction: 0.03       # the loudness that rides with the pitch (~0.25 dB at full amount)
+
   neural:
-    enabled: true               # flipped on -- was false, which is why nothing changed before. Requires neural_env/rvc_server.py sidecar running (GET /neural/status to confirm reachable:true)
+    enabled: true               # flipped on, was false, which is why nothing changed before. Requires neural_env/rvc_server.py sidecar running (GET /neural/status to confirm reachable:true)
     sidecar_url: "http://127.0.0.1:8801"
     sidecar_timeout_s: 5.0
     device: cpu                  # confirmed via lspci: Phoenix3/gfx1103 laptop iGPU, not real
                                   # discrete compute silicon, not officially ROCm-supported, and
                                   # the override workaround is a known hard-hang on this exact chip.
-                                  # Staying on CPU -- the real fix is int8 HuBERT quantization
+                                  # Staying on CPU, the real fix is int8 HuBERT quantization
                                   # (rvc_pipeline.py) + correct thread count (rvc_server.py), not
                                   # a GPU that was never going to safely work here.
     is_half: false
     quantize_hubert: false        # was silently always-on for any CPU voice. int8 quantization is a
                                   # real speed win but measurably degrades HuBERT's extracted features
-                                  # -- the official WebUI never quantizes. Off now, since sound
+                                  #, the official WebUI never quantizes. Off now, since sound
                                   # quality is the priority; flip back to true only if you need the
                                   # speed back more than you need this.
     pitch_algo: rmvpe
     index_rate: 0.75
     protect: 0.33
-    transpose_semitones: [0, 0]
+    transpose_semitones: [0, 0, 0]
     filter_radius: 3
     max_latency_warn_s: 0.5
+
+    # === voice clarity, for every trained voice ===
+    # A checkpoint returns its own spectral balance, and a voice trained on
+    # darker material loses the 2-5 kHz band that carries consonants: the
+    # words are there but hard to make out. This stage compares the presence
+    # of the material the model was handed with the presence it came back
+    # with and restores at most presence_max_lift_db of the gap, using a
+    # zero-phase high shelf. It never cuts, so a model that is already bright
+    # is left exactly as it is, and it is the same code for every voice, so
+    # a newly added voice cannot be quietly muddier than the others.
+    # See neural_env/voice_clarity.py and tests/test_voice_clarity.py.
+    clarity:
+      presence_match: true
+      presence_max_lift_db: 3.0   # never more than this, even if the model lost more
+      peak_ceiling: 0.99           # a too-hot take is turned down, never clipped
+
+    # THE ORDER IS THE UI. The panel's voice-model buttons are positional:
+    # index 0 is "Model 1", index 1 is "Model 2", index 2 is "Model 3", and
+    # the page builds its buttons from this list (it asks /neural/status for
+    # `voices_configured`, then names each button after the model file), so a
+    # model added or reordered here shows up in the panel with no page edit.
+    # female3 is the newest trained voice and sits at Model 2, which moved
+    # mi-test (the previous Model 2) to Model 3.
     model_paths:
       - "assets/female2/female2.pth"
+      - "assets/female3/female3.pth"
       - "assets/synthesis_models/mi-test.pth"
+    # Index paths line up with model_paths by position. female3 was trained
+    # without a retrieval index, so its slot is deliberately empty: the sidecar
+    # loads that voice with index_rate 0 and never reads a missing file (an
+    # empty entry never becomes a path). Drop the real .index name in here if
+    # one is ever trained for it.
     index_paths:
       - "assets/female2/female2_added_IVF1701_Flat_nprobe_1_female2_v2.index"
+      - ""
       - "assets/synthesis_models/mi-test_added_IVF1003_Flat_nprobe_1_mi-test_v2.index"
     offline_render_timeout_s: 900  # max wait for the ONE whole-track sidecar call used by
-                                    # the Upload-MP3 panel's Neural (offline render) mode --
+                                    # the Upload-MP3 panel's Neural (offline render) mode
                                     # this isn't a real-time budget, just a safety ceiling so
                                     # a stuck sidecar can't hang the request forever. Raise it
                                     # for longer tracks / slower CPUs.
 
-    # -- Choir/duet neural conversion --
+    #, Choir/duet neural conversion
     # A choir or duet decision sings several simultaneously-detuned
     # voices at once. RMVPE (the sidecar's pitch stage) only ever
     # estimates ONE f0 curve per call, so converting the whole mixed
     # ensemble in a single sidecar call hands it several real pitches at
-    # once and it can only guess at one -- that's what used to make the
+    # once and it can only guess at one, that's what used to make the
     # neural choir sound smeared and mistracked instead of full. Fixed
     # now: each choir/duet voice gets its own individual sidecar call,
     # at its own real (already-detuned) pitch, and the results are mixed
@@ -244,7 +395,7 @@ synthesis:
                                     # sent to the sidecar. The sidecar only processes one
                                     # conversion at a time (see _inference_lock in rvc_server.py),
                                     # so every extra voice adds its own full inference call on
-                                    # top of the last -- fine offline, not fine for anything with
+                                    # top of the last, fine offline, not fine for anything with
                                     # a real-time budget. The lead voice (cents==0) is always
                                     # converted first; any voices past this cap stay pure DSP,
                                     # singing underneath the neural lead as a chorus pad rather
@@ -256,7 +407,7 @@ synthesis:
     distribute_voices_across_choir: true   # when true, and more than one entry is listed in
                                     # model_paths above, harmony voices (everything except the
                                     # lead) round-robin across every loaded voice instead of all
-                                    # singing through the same one -- this is what actually makes
+                                    # singing through the same one, this is what actually makes
                                     # a choir sound like more than one trained voice, rather than
                                     # one voice cloned at several pitches. The lead voice always
                                     # uses whichever voice_index was explicitly requested.
@@ -279,19 +430,91 @@ synthesis:
       reverb_amount: 0.34                # concert-hall amount of wash
       stereo_spread: 1.0
 
+singsong:
+  # === SingSong: instrumental accompaniment from singing ===
+  # Donahue et al., "SingSong: Generating musical accompaniments from singing"
+  # (2023). This is a separate generative system from the voice models above:
+  # it does not re-sing the input, it composes an instrumental to sit under it.
+  #
+  # The published system is a three-stage AudioLM cascade:
+  #   vocal -> 25 Hz semantic codes (w2v-BERT + k-means)
+  #         -> stage 1+2 (T5 encoder-decoder): instrumental semantic + 4 coarse
+  #            SoundStream streams (50 Hz, frame-major, 200 codes/s)
+  #         -> stage 3 (decoder-only): 8 fine SoundStream streams (400 codes/s)
+  #         -> SoundStream decode -> instrumental, mixed with the untouched vocal.
+  #
+  # No weights are shipped and no checkpoint is downloaded. Train them here
+  # with `python -m sing_song.cli train-codec`, `train-kmeans`,
+  # `train-stage12`, `train-fine` (see docs/singsong.md). Until every
+  # `paths` entry exists, GET /singsong/status reports exactly what is missing
+  # and the render endpoint refuses honestly instead of producing noise.
+  enabled: true
+  paths:
+    codec: "checkpoints/singsong/soundstream.pt"
+    stage12: "checkpoints/singsong/stage12.pt"
+    fine: "checkpoints/singsong/fine.pt"
+    semantic_kmeans: "checkpoints/singsong/semantic_kmeans.joblib"
+  semantic:
+    backend: "w2vbert"              # w2vbert | hubert; the paper uses w2v-BERT
+    model_path: "data/singsong/semantic/w2v-bert-2.0"
+    sample_rate: 16000              # waveform/mel sample rate, never the 50 Hz frame rate
+    hidden_layer: 7                 # intermediate layer, as in AudioLM/SingSong
+    native_hz: 50                   # public w2v-BERT/HuBERT checkpoints run at 50 Hz
+    output_hz: 25                   # paper's semantic rate; frames are average-pooled
+    codebook_size: 1024
+    normalize_embeddings: true
+  codec:
+    sample_rate: 16000
+    latent_dim: 128
+    channels: [32, 64, 128, 256]
+    strides: [2, 4, 5, 8]           # 320-sample hop -> exactly 50 Hz at 16 kHz
+    num_quantizers: 12              # 4 coarse + 8 fine, as SoundStream in the paper
+    codebook_size: 1024
+    commitment_loss_weight: 0.25
+    discriminator_fft_sizes: [2048, 1024, 512]
+    discriminator_hops: [512, 256, 128]
+  model:
+    stage12:
+      preset: "base"                # base = t5.1.1.base shape; xl = 3B direction
+    fine:
+      preset: "base"
+  data:
+    corpus: "data/singsong/corpus"
+    token_dir: "data/singsong/tokens"
+    clip_seconds: 10                # the paper's non-overlapping 10 s clips
+    sample_rate: 16000
+    semantic_rate: 25
+    noise_sigma: 0.01               # -40 dBFS; the paper's Noisy/S-SA recipe
+    instrumental_peak_rms_db: -25   # drop clips with a near-silent instrumental
+    vocal_over_instrumental_db: 5   # drop clips where vocals bury the instrumental
+    separation_backend: "demucs"
+    musdb_split: "train"
+  inference:
+    temperature: 0.85               # the paper's sampling temperature
+    top_k: 0                        # 0 = pure temperature sampling, as published
+    window_seconds: 10
+    overlap_seconds: 5              # 50% overlap for long-form generation
+    max_seconds: 120
+    device: "auto"                  # cuda when available, otherwise cpu
+    dtype: "float32"                # use bfloat16 on a GPU for speed
+    seed: 0
+    add_noise: true                 # same sigma as training; required for S-SA
+    mix_vocal: true                 # output is vocal + generated instrumental
+    crossfade_ms: 50
+
 timing:
   response_delay_ms: 70
   max_hold_ms: 4000
 
 cree_tokenizer:
-  enabled: true            # was false -- meaning ALL that pitch/phonetic analysis work
+  enabled: true            # was false, meaning ALL that pitch/phonetic analysis work
                             # (CreeTokenizer.analyze(), phonetic_analysis.py) was being
                             # thrown away every note: vowel_color/nasality/brightness fell
                             # back to a flat 0.5/0/0.5 neutral profile no matter what was
                             # actually being sung, which is a big part of why the robot's
                             # timbre didn't seem to track the input at all. No trained
                             # model_path is set below, so this runs in heuristic mode
-                            # (CreeTokenizer._heuristic_analyze in phonetic_analysis.py) --
+                            # (CreeTokenizer._heuristic_analyze in phonetic_analysis.py)
                             # real MFCC/spectral-centroid features straight from the
                             # singer's own voice, no training required to turn this on.
   model_path: null

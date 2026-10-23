@@ -5,6 +5,11 @@ scipy>=1.11.0
 sounddevice>=0.4.6
 librosa>=0.10.1
 resampy>=0.4.2
+# WORLD vocoder, the engine behind "one word, sung along the track"
+# (synthesis/world_voice.py: it rewrites a recorded take's pitch while keeping
+# its vocal tract and breathiness). Optional at runtime: the single-vocable
+# render degrades to the formant-preserving shifter if this is missing.
+pyworld>=0.3.4
 pyyaml>=6.0.1
 loguru>=0.7.2
 music21>=9.1.0
@@ -15,6 +20,8 @@ python-multipart>=0.0.9
 
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
+# Only needed to train the MySong chord/key classifiers; inference is numpy.
+scikit-learn>=1.4
 sentencepiece>=0.1.99
 morfessor>=2.0.6
 

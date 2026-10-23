@@ -5,7 +5,7 @@ from config.config_loader import get_config
 import librosa
 
 try:
-    import soxr  # noqa: F401 -- if present, librosa.resample can use the higher-quality soxr backend
+    import soxr  # noqa: F401, if present, librosa.resample can use the higher-quality soxr backend
     _HAS_SOXR = True
 except ImportError:
     _HAS_SOXR = False
@@ -128,7 +128,7 @@ class PitchDetector:
     def _load_rmvpe(self):
         if self._rmvpe_stream is not None:
             return
-        from analysis.rmvpe_detector import RMVPEModel  # heavy import (torch) -- kept lazy
+        from analysis.rmvpe_detector import RMVPEModel  # heavy import (torch), kept lazy
 
         model_path = self._rmvpe_cfg.get("model_path", "assets/rmvpe/rmvpe.pt")
         device = self._rmvpe_cfg.get("device", "cpu")
@@ -237,7 +237,7 @@ class PitchDetector:
         hz, conf, is_new = self._rmvpe_stream.push(frame)
 
         self._rmvpe_debug_counter += 1
-        if self._rmvpe_debug_counter % 20 == 0:  # ~4x/sec at 512-sample hops @44.1kHz -- enough to see real numbers, not enough to flood the log
+        if self._rmvpe_debug_counter % 20 == 0:  # ~4x/sec at 512-sample hops @44.1kHz, enough to see real numbers, not enough to flood the log
             logger.debug(
                 f"[rmvpe raw] hz={hz if hz else 0:.1f} conf={conf:.3f} is_new={is_new} "
                 f"(gate: conf>={self._rmvpe_confidence_threshold}, hz in [{self.min_freq:.0f},{self.max_freq:.0f}])"
@@ -247,12 +247,12 @@ class PitchDetector:
             return None, conf
 
         if not is_new:
-            # Cache echo of the last real inference -- _smooth() already
+            # Cache echo of the last real inference, _smooth() already
             # made its decision about this exact reading the moment it
             # first arrived. Re-running it through _smooth() here would
             # let one noisy measurement "confirm" a pending jump against
             # an identical copy of itself, which isn't confirmation at
-            # all -- it defeated the entire point of requiring two
+            # all, it defeated the entire point of requiring two
             # independent readings to agree before accepting a big jump.
             # Just keep repeating whatever's already been committed.
             return self._last_stable_hz, conf
@@ -267,7 +267,7 @@ class PitchDetector:
                 if self._pending_jump_hz is not None:
                     confirm_diff = abs(1200.0 * np.log2(hz / self._pending_jump_hz))
                     if confirm_diff <= self._jump_tolerance_cents:
-                        # Two consecutive frames agree on the new pitch — commit it.
+                        # Two consecutive frames agree on the new pitch, commit it.
                         self._history = [self._pending_jump_hz, hz]
                         self._last_stable_hz = hz
                         self._pending_jump_hz = None

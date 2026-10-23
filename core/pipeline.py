@@ -50,7 +50,7 @@ class Pipeline:
         try:
             self._processing_loop()
         except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt — stopping pipeline")
+            logger.info("KeyboardInterrupt, stopping pipeline")
         finally:
             self.stop()
 

@@ -1,0 +1,25 @@
+# SingSong training / inference dependencies.
+#
+# The live app already installs torch, numpy, scipy, librosa, soundfile and
+# PyYAML.  This file is for a GPU training box where the full system is used:
+#
+#   python -m pip install -r requirements-singsong.txt
+#
+# CUDA torch wheels are platform-specific.  Install the wheel that matches the
+# cluster's CUDA version from https://pytorch.org/get-started/locally/ first if
+# the default PyPI wheel is not the right build for the machine.
+torch>=2.4
+torchaudio>=2.4
+transformers>=4.40
+numpy>=1.26
+scipy>=1.11
+librosa>=0.10
+soundfile>=0.12
+PyYAML>=6.0
+scikit-learn>=1.4
+joblib>=1.3
+faiss-cpu>=1.8
+demucs>=4.0
+tqdm>=4.66
+# Used by tools/fetch_cree_songs.py to download the CC BY Cree corpus.
+yt-dlp>=2025.1

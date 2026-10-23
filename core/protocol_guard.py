@@ -33,7 +33,7 @@ class ProtocolGuard:
         if self._gpio_pin is not None:
             self._init_physical_cue()
 
-        logger.info(f"ProtocolGuard initialized — protocol_enabled={self._enabled}")
+        logger.info(f"ProtocolGuard initialized, protocol_enabled={self._enabled}")
 
     @property
     def enabled(self) -> bool:
@@ -73,7 +73,7 @@ class ProtocolGuard:
         if Button is None:
             logger.warning(
                 "physical_cue_gpio_pin is set but gpiozero is not installed "
-                "(expected on a cloud host) — use the sound cue or the manual "
+                "(expected on a cloud host), use the sound cue or the manual "
                 "/protocol/toggle endpoint instead."
             )
             self._gpio = None
@@ -85,7 +85,7 @@ class ProtocolGuard:
         except Exception as e:
             logger.warning(
                 f"Physical cue unavailable ({e}). This is expected on a cloud "
-                "server (e.g. Render) with no attached hardware — use the sound "
+                "server (e.g. Render) with no attached hardware, use the sound "
                 "cue or the manual /protocol/toggle endpoint instead."
             )
             self._gpio = None

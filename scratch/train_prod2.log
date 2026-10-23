@@ -1,0 +1,26 @@
+  tagger epoch  1/25 loss 2.686 val root 0.391 state 0.346
+  tagger epoch  2/25 loss 2.289 val root 0.431 state 0.403
+  tagger epoch  3/25 loss 2.170 val root 0.461 state 0.434
+  tagger epoch  4/25 loss 2.129 val root 0.446 state 0.428
+  tagger epoch  5/25 loss 2.058 val root 0.466 state 0.446
+  tagger epoch  6/25 loss 2.030 val root 0.471 state 0.452
+  tagger epoch  7/25 loss 1.991 val root 0.469 state 0.449
+  tagger epoch  8/25 loss 1.959 val root 0.474 state 0.443
+  tagger epoch  9/25 loss 1.937 val root 0.476 state 0.452
+  tagger epoch 10/25 loss 1.907 val root 0.485 state 0.461
+  tagger epoch 11/25 loss 1.875 val root 0.488 state 0.461
+  tagger epoch 12/25 loss 1.843 val root 0.494 state 0.461
+  tagger epoch 13/25 loss 1.811 val root 0.489 state 0.465
+  tagger epoch 14/25 loss 1.774 val root 0.489 state 0.466
+  tagger epoch 15/25 loss 1.750 val root 0.497 state 0.475
+  tagger epoch 16/25 loss 1.729 val root 0.489 state 0.464
+  tagger epoch 17/25 loss 1.698 val root 0.490 state 0.471
+  tagger epoch 18/25 loss 1.672 val root 0.492 state 0.470
+  tagger epoch 19/25 loss 1.654 val root 0.495 state 0.470
+  tagger epoch 20/25 loss 1.644 val root 0.491 state 0.470
+  tagger epoch 21/25 loss 1.617 val root 0.491 state 0.468
+  tagger epoch 22/25 loss 1.613 val root 0.492 state 0.468
+  tagger epoch 23/25 loss 1.608 val root 0.495 state 0.471
+  tagger epoch 24/25 loss 1.604 val root 0.496 state 0.473
+  tagger epoch 25/25 loss 1.603 val root 0.496 state 0.472
+REPORT {'epochs': 25, 'best_val_root': 0.49663827879874495, 'best_val_state': 0.474675033617212, 'train_songs': 421, 'val_songs': 37, 'parameters': 798300}

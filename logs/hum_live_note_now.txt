@@ -1,0 +1,204 @@
+ALSA lib pcm_dsnoop.c:567:(snd_pcm_dsnoop_open) unable to open slave
+ALSA lib pcm_dmix.c:1000:(snd_pcm_dmix_open) unable to open slave
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+ALSA lib pcm_oss.c:397:(_snd_pcm_oss_open) Cannot open device /dev/dsp
+ALSA lib pcm_oss.c:397:(_snd_pcm_oss_open) Cannot open device /dev/dsp
+ALSA lib pcm_a52.c:1001:(_snd_pcm_a52_open) a52 is only for playback
+ALSA lib confmisc.c:160:(snd_config_get_card) Invalid field card
+ALSA lib pcm_usb_stream.c:482:(_snd_pcm_usb_stream_open) Invalid card 'card'
+ALSA lib confmisc.c:160:(snd_config_get_card) Invalid field card
+ALSA lib pcm_usb_stream.c:482:(_snd_pcm_usb_stream_open) Invalid card 'card'
+ALSA lib pcm_dmix.c:1000:(snd_pcm_dmix_open) unable to open slave
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+2026-10-11 21:53:08.585 | INFO     | translation.translate_transformer:__init__:32 - Morfessor pre-segmentation enabled for Cree input (matches training config)
+Translation model loaded successfully.
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 4188.43it/s]
+2026-10-11 21:53:37.748 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+2026-10-11 21:53:37.749 | INFO     | core.protocol_guard:__init__:36 - ProtocolGuard initialized, protocol_enabled=True
+2026-10-11 21:53:37.750 | INFO     | synthesis.harmony_engine:__init__:224 - HarmonyEngine ready, default_mode=unison_shadowing, protocol_enabled=True, fusion_mode=False
+2026-10-11 21:53:39.768 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Cold.wav (f0 about 315 Hz, brightness centroid about 1936 Hz)
+2026-10-11 21:53:39.812 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Lalanana.wav (f0 about 336 Hz, brightness centroid about 1897 Hz)
+2026-10-11 21:53:39.826 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Moon.wav (f0 about 400 Hz, brightness centroid about 1728 Hz)
+2026-10-11 21:53:39.841 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Need.wav (f0 about 271 Hz, brightness centroid about 1893 Hz)
+2026-10-11 21:53:39.868 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Ohoho.wav (f0 about 278 Hz, brightness centroid about 2017 Hz)
+2026-10-11 21:53:39.884 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Remember.wav (f0 about 242 Hz, brightness centroid about 2010 Hz)
+2026-10-11 21:53:39.913 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Shell.wav (f0 about 325 Hz, brightness centroid about 1997 Hz)
+2026-10-11 21:53:39.932 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Snow.wav (f0 about 321 Hz, brightness centroid about 1830 Hz)
+2026-10-11 21:53:39.953 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Voyage.wav (f0 about 248 Hz, brightness centroid about 1787 Hz)
+2026-10-11 21:53:40.012 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Welcome to Reality.wav (f0 about 284 Hz, brightness centroid about 2173 Hz)
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded You Know You're Going to Feel it.wav (f0 about 284 Hz, brightness centroid about 2044 Hz)
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'cold' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'lalanana' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'moon' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'need' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'ohoho' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'remember' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'shell' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'snow' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'voyage' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'welcome to reality' has 1 register(s) loaded
+2026-10-11 21:53:40.069 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'you know you're going to feel it' has 1 register(s) loaded
+2026-10-11 21:53:40.084 | INFO     | synthesis.vocable_synthesizer:_init_engine:266 - Neural vocable bank prewarmed from 65Hz to 1200Hz
+2026-10-11 21:53:40.084 | INFO     | synthesis.vocable_synthesizer:_init_engine:269 - Vocable synthesizer engine: neural_wavetable
+2026-10-11 21:53:40.097 | INFO     | synthesis.neural_timbre:_check_sidecar:74 - Neural sidecar reachable at http://127.0.0.1:8801: 2/2 voice(s) loaded and ready.
+/home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+2026-10-11 21:53:44.213 | INFO     | analysis.pitch_detector:__init__:114 - Pitch engine: yin (hop=512, buf=2048, sr=44100, fmin=65 Hz, fmax=1200 Hz)
+2026-10-11 21:53:46.614 | INFO     | analysis.pitch_detector:_load_rmvpe:163 - RMVPE loaded (cold, first time) from 'assets/rmvpe/rmvpe.pt' on cpu (half=False)
+2026-10-11 21:53:46.614 | INFO     | analysis.pitch_detector:set_method:199 - Pitch method switched: yin -> rmvpe
+2026-10-11 21:53:48.186 | DEBUG    | synthesis.neural_timbre:convert:136 - Neural conversion took 3786ms
+2026-10-11 21:53:51.790 | DEBUG    | synthesis.neural_timbre:convert:136 - Neural conversion took 2789ms
+2026-10-11 21:53:54.950 | DEBUG    | synthesis.neural_timbre:convert:136 - Neural conversion took 2371ms
+2026-10-11 21:53:58.101 | DEBUG    | synthesis.neural_timbre:convert:136 - Neural conversion took 2278ms
+2026-10-11 21:53:58.133 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Cold.wav (f0 about 315 Hz, brightness centroid about 1936 Hz)
+2026-10-11 21:53:58.192 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Lalanana.wav (f0 about 336 Hz, brightness centroid about 1897 Hz)
+2026-10-11 21:53:58.216 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Moon.wav (f0 about 400 Hz, brightness centroid about 1728 Hz)
+2026-10-11 21:53:58.235 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Need.wav (f0 about 271 Hz, brightness centroid about 1893 Hz)
+2026-10-11 21:53:58.265 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Ohoho.wav (f0 about 278 Hz, brightness centroid about 2017 Hz)
+2026-10-11 21:53:58.279 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Remember.wav (f0 about 242 Hz, brightness centroid about 2010 Hz)
+2026-10-11 21:53:58.300 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Shell.wav (f0 about 325 Hz, brightness centroid about 1997 Hz)
+2026-10-11 21:53:58.320 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Snow.wav (f0 about 321 Hz, brightness centroid about 1830 Hz)
+2026-10-11 21:53:58.338 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Voyage.wav (f0 about 248 Hz, brightness centroid about 1787 Hz)
+2026-10-11 21:53:58.394 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Welcome to Reality.wav (f0 about 284 Hz, brightness centroid about 2173 Hz)
+2026-10-11 21:53:58.446 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded You Know You're Going to Feel it.wav (f0 about 284 Hz, brightness centroid about 2044 Hz)
+2026-10-11 21:53:58.446 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'cold' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'lalanana' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'moon' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'need' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'ohoho' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'remember' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'shell' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'snow' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'voyage' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'welcome to reality' has 1 register(s) loaded
+2026-10-11 21:53:58.447 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'you know you're going to feel it' has 1 register(s) loaded
+2026-10-11 21:53:58.465 | INFO     | synthesis.vocable_synthesizer:_init_engine:266 - Neural vocable bank prewarmed from 65Hz to 1200Hz
+2026-10-11 21:53:58.465 | INFO     | synthesis.vocable_synthesizer:_init_engine:269 - Vocable synthesizer engine: neural_wavetable
+2026-10-11 21:54:00.577 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Cold.wav (f0 about 315 Hz, brightness centroid about 1936 Hz)
+2026-10-11 21:54:00.609 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Lalanana.wav (f0 about 336 Hz, brightness centroid about 1897 Hz)
+2026-10-11 21:54:00.620 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Moon.wav (f0 about 400 Hz, brightness centroid about 1728 Hz)
+2026-10-11 21:54:00.633 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Need.wav (f0 about 271 Hz, brightness centroid about 1893 Hz)
+2026-10-11 21:54:00.656 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Ohoho.wav (f0 about 278 Hz, brightness centroid about 2017 Hz)
+2026-10-11 21:54:00.670 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Remember.wav (f0 about 242 Hz, brightness centroid about 2010 Hz)
+2026-10-11 21:54:00.694 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Shell.wav (f0 about 325 Hz, brightness centroid about 1997 Hz)
+2026-10-11 21:54:00.712 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Snow.wav (f0 about 321 Hz, brightness centroid about 1830 Hz)
+2026-10-11 21:54:00.731 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Voyage.wav (f0 about 248 Hz, brightness centroid about 1787 Hz)
+2026-10-11 21:54:00.784 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Welcome to Reality.wav (f0 about 284 Hz, brightness centroid about 2173 Hz)
+2026-10-11 21:54:00.828 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded You Know You're Going to Feel it.wav (f0 about 284 Hz, brightness centroid about 2044 Hz)
+2026-10-11 21:54:00.828 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'cold' has 1 register(s) loaded
+2026-10-11 21:54:00.828 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'lalanana' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'moon' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'need' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'ohoho' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'remember' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'shell' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'snow' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'voyage' has 1 register(s) loaded
+2026-10-11 21:54:00.829 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'welcome to reality' has 1 register(s) loaded
+2026-10-11 21:54:00.830 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'you know you're going to feel it' has 1 register(s) loaded
+2026-10-11 21:54:00.837 | INFO     | synthesis.vocable_synthesizer:_init_engine:266 - Neural vocable bank prewarmed from 65Hz to 1200Hz
+2026-10-11 21:54:00.837 | INFO     | synthesis.vocable_synthesizer:_init_engine:269 - Vocable synthesizer engine: neural_wavetable
+2026-10-11 21:54:01.785 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Cold.wav (f0 about 315 Hz, brightness centroid about 1936 Hz)
+2026-10-11 21:54:01.834 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Lalanana.wav (f0 about 336 Hz, brightness centroid about 1897 Hz)
+2026-10-11 21:54:01.857 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Moon.wav (f0 about 400 Hz, brightness centroid about 1728 Hz)
+2026-10-11 21:54:01.882 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Need.wav (f0 about 271 Hz, brightness centroid about 1893 Hz)
+2026-10-11 21:54:01.931 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Ohoho.wav (f0 about 278 Hz, brightness centroid about 2017 Hz)
+2026-10-11 21:54:01.965 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Remember.wav (f0 about 242 Hz, brightness centroid about 2010 Hz)
+2026-10-11 21:54:01.999 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Shell.wav (f0 about 325 Hz, brightness centroid about 1997 Hz)
+2026-10-11 21:54:02.027 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Snow.wav (f0 about 321 Hz, brightness centroid about 1830 Hz)
+2026-10-11 21:54:02.061 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Voyage.wav (f0 about 248 Hz, brightness centroid about 1787 Hz)
+2026-10-11 21:54:02.137 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Welcome to Reality.wav (f0 about 284 Hz, brightness centroid about 2173 Hz)
+2026-10-11 21:54:02.188 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded You Know You're Going to Feel it.wav (f0 about 284 Hz, brightness centroid about 2044 Hz)
+2026-10-11 21:54:02.188 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'cold' has 1 register(s) loaded
+2026-10-11 21:54:02.188 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'lalanana' has 1 register(s) loaded
+2026-10-11 21:54:02.188 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'moon' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'need' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'ohoho' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'remember' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'shell' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'snow' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'voyage' has 1 register(s) loaded
+2026-10-11 21:54:02.189 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'welcome to reality' has 1 register(s) loaded
+2026-10-11 21:54:02.190 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'you know you're going to feel it' has 1 register(s) loaded
+2026-10-11 21:54:02.200 | INFO     | synthesis.vocable_synthesizer:_init_engine:266 - Neural vocable bank prewarmed from 65Hz to 1200Hz
+2026-10-11 21:54:02.200 | INFO     | synthesis.vocable_synthesizer:_init_engine:269 - Vocable synthesizer engine: neural_wavetable
+Sentiment analyzer (RoBERTa) loaded from local files at data/models/sentiment-roberta.
+Sentiment analyzer (VADER, fallback) loaded successfully.
+faster-whisper (small.en, int8, CPU, num_workers=1) loaded from local files at data/models/faster-whisper-small.en.
+faster-whisper (large-v3-turbo, int8, CPU, num_workers=4) loaded from local files at data/models/faster-whisper-large-v3-turbo.
+Vosk streaming model loaded from local files at data/models/vosk-model-en-us-0.22 (instant local live captions enabled).
+Shared HarmonyEngine initialized (sovereignty + mode selection live here).
+Shared VocableSynthesizer initialized and wired to HarmonyEngine.
+NeuralTimbreConverter loaded and enabled.
+Chat router mounted at /api/chat (backend readiness checked lazily on first call).
+Cree morphological analyzer loaded (data/models/crk-descriptive-analyzer.hfstol).
+Checkpoint path: /home/harsh-upadhyay/panns_data/Cnn14_mAP=0.431.pth
+Using CPU.
+PANNs audio-tagging model loaded (per-instrument detection enabled).
+HumConfig in use: breath -32.0 dB (cap -32.0), vibrato 5.3 Hz, note window 0.24 s, pitch method pyin
+Neural sidecar reachable: True
+
+=== live Neural: one note at a time (/api/neural/render) ===
+[startup] RMVPE pre-warmed and ready.
+  220.00 Hz: 1.80 s in 4029 ms  neural_applied=1  centroid 310 Hz  above 2.5 kHz 0.02%  pitch median 0.0 cents (p90 10.0), octave-out 0.0% of 78 frames
+    [ok] holds for the note it answers (220.0 Hz): 1.80 s against the 1.8 s the live loop asks for
+    [ok] trained voice applied (220.0 Hz): X-Neural-Applied=1
+    [ok] is a hum, not a vowel (220.0 Hz): centroid 310 Hz, 0.02% above 2.5 kHz
+    [ok] is on the asked-for note (220.0 Hz): median 0.0 cents, octave-out on 0.0% of frames
+  277.18 Hz: 1.80 s in 2979 ms  neural_applied=1  centroid 366 Hz  above 2.5 kHz 0.04%  pitch median 0.0 cents (p90 23.0), octave-out 0.0% of 78 frames
+    [ok] holds for the note it answers (277.2 Hz): 1.80 s against the 1.8 s the live loop asks for
+    [ok] trained voice applied (277.2 Hz): X-Neural-Applied=1
+    [ok] is a hum, not a vowel (277.2 Hz): centroid 366 Hz, 0.04% above 2.5 kHz
+    [ok] is on the asked-for note (277.2 Hz): median 0.0 cents, octave-out on 0.0% of frames
+  329.63 Hz: 1.80 s in 2571 ms  neural_applied=1  centroid 453 Hz  above 2.5 kHz 0.02%  pitch median 0.0 cents (p90 13.0), octave-out 0.0% of 78 frames
+    [ok] holds for the note it answers (329.6 Hz): 1.80 s against the 1.8 s the live loop asks for
+    [ok] trained voice applied (329.6 Hz): X-Neural-Applied=1
+    [ok] is a hum, not a vowel (329.6 Hz): centroid 453 Hz, 0.02% above 2.5 kHz
+    [ok] is on the asked-for note (329.6 Hz): median 0.0 cents, octave-out on 0.0% of frames
+  control (unison 277.18 Hz, 0.45 s in 2574 ms): centroid 707 Hz  above 2.5 kHz 0.47%
+    [ok] control: the same endpoint stays bright for a sung word: unison centroid 707 Hz / 0.47% above 2.5 kHz vs the hum's 366 Hz / 0.04% on the same note
+
+=== live DSP: one note, then a mid-note top-up (legato) ===
+  220.00 Hz: 1.000 s  centroid 269 Hz  above 2.5 kHz 0.00%  pitch median 10.0 cents, octave-out 0.0%
+    [ok] live DSP note length (220.0 Hz): 1.000 s for the 1.0 s asked for
+    [ok] live DSP hum is dark and closed-mouth (220.0 Hz): centroid 269 Hz, 0.00% above 2.5 kHz
+    [ok] live DSP hum is on the asked-for note (220.0 Hz): median 10.0 cents, octave-out 0.0%
+  277.18 Hz: 1.000 s  centroid 295 Hz  above 2.5 kHz 0.00%  pitch median 10.0 cents, octave-out 0.0%
+    [ok] live DSP note length (277.2 Hz): 1.000 s for the 1.0 s asked for
+    [ok] live DSP hum is dark and closed-mouth (277.2 Hz): centroid 295 Hz, 0.00% above 2.5 kHz
+    [ok] live DSP hum is on the asked-for note (277.2 Hz): median 10.0 cents, octave-out 0.0%
+  329.63 Hz: 1.000 s  centroid 386 Hz  above 2.5 kHz 0.00%  pitch median 10.0 cents, octave-out 0.0%
+    [ok] live DSP note length (329.6 Hz): 1.000 s for the 1.0 s asked for
+    [ok] live DSP hum is dark and closed-mouth (329.6 Hz): centroid 386 Hz, 0.00% above 2.5 kHz
+    [ok] live DSP hum is on the asked-for note (329.6 Hz): median 10.0 cents, octave-out 0.0%
+
+=== live DSP: a HELD note, chunk after chunk ===
+  1.80 s from 3 chunks; worst step at a seam 0.00807 vs the note's own p99.9 step 0.01545; level either side -0.11 / -0.04 dB
+    [ok] a held hum continues across a top-up with no step: seam step 0.00807 against the note's own p99.9 slope 0.01545
+    [ok] a held hum keeps its level across a top-up: level step -0.11 / -0.04 dB across the seams
+    [ok] a held hum stays on its pitch across the top-ups: median 0.0 cents over 1.80 s, octave-out 0.0% of 78 frames
+    [ok] a long held hum is still dark: centroid 375 Hz, 0.00% above 2.5 kHz
+  through the synthesizer's own legato path: worst step at a seam 0.00601 vs its own p99.9 0.01236; pitch median 0.0 cents, octave-out 0.0%
+    [ok] the synthesizer's legato top-up does not click: seam step 0.00601 against its own p99.9 slope 0.01236
+    [ok] the synthesizer's held hum stays on its pitch: median 0.0 cents, octave-out 0.0%
+  through the default live path: worst step at a seam 0.00645 vs p99.9 0.01236; level -0.11 / -0.04 dB
+    [ok] the default live hold path has no step at a top-up: seam step 0.00645 against the signal's own p99.9 slope
+    [ok] the default live hold path keeps its level: level step -0.11 / -0.04 dB across the seams
+
+LIVE NOTE CHECKS PASSED

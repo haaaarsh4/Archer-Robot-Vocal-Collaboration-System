@@ -1,0 +1,54 @@
+# Cree SingSong profile.
+#
+# Use after `python tools/fetch_cree_songs.py --download` and separation.
+# The paired stems are at data/cree_singsong/audio/<id>/{vocals,instrumental}.wav;
+# `train_audio` is a singer-disjoint view containing only split=train tracks.
+#
+#   python -m sing_song.cli --config config/cree.yaml prepare-codec \
+#     --out data/cree_singsong/codec_audio
+#   python -m sing_song.cli --config config/cree.yaml train-codec \
+#     --audio data/cree_singsong/codec_audio \
+#     --out checkpoints/cree/soundstream.pt
+#
+# The current paired set is a smoke-test corpus (0.526 h), not a production
+# fine-tune. Read docs/cree-singsong.md before scaling it.
+
+singsong:
+  enabled: true
+  paths:
+    codec: "checkpoints/cree/soundstream.pt"
+    stage12: "checkpoints/cree/stage12.pt"
+    fine: "checkpoints/cree/fine.pt"
+    semantic_kmeans: "checkpoints/cree/semantic_kmeans.joblib"
+  semantic:
+    model_path: "data/singsong/semantic/w2v-bert-2.0"
+    kmeans_path: "checkpoints/cree/semantic_kmeans.joblib"
+  model:
+    stage12:
+      preset: base
+      gradient_checkpointing: true
+    fine:
+      preset: base
+      gradient_checkpointing: true
+  data:
+    corpus: "data/cree_singsong/train_audio"
+    token_dir: "data/cree_tokens"
+    clip_seconds: 10
+    sample_rate: 16000
+    semantic_rate: 25
+    noise_sigma: 0.01
+    instrumental_peak_rms_db: -25
+    vocal_over_instrumental_db: 5
+    separation_backend: "demucs"
+  inference:
+    temperature: 0.85
+    top_k: 0
+    window_seconds: 10
+    overlap_seconds: 5
+    max_seconds: 120
+    device: "auto"
+    dtype: "float32"
+    seed: 0
+    add_noise: true
+    mix_vocal: true
+    crossfade_ms: 50

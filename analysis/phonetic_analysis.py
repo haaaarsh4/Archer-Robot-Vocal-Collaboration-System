@@ -46,7 +46,7 @@ class CreeTokenizer:
         if self.enabled:
             self._load_model()
         else:
-            logger.info("Cree tokenizer disabled — running in neutral mode")
+            logger.info("Cree tokenizer disabled, running in neutral mode")
 
 
     def _load_model(self):
@@ -58,7 +58,7 @@ class CreeTokenizer:
             return
 
         if _joblib is None:
-            logger.error("joblib is not installed — cannot load Cree model.")
+            logger.error("joblib is not installed, cannot load Cree model.")
             return
 
         try:

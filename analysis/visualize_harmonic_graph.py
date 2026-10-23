@@ -317,7 +317,7 @@ def render_tree(data: dict, args) -> None:
         print("No tones found in this graph file, nothing to draw.")
         return
     if len(tones) < 2:
-        print("Only one tone in this graph — nothing to relate it to yet, "
+        print("Only one tone in this graph, nothing to relate it to yet, "
               "so there's no tree to draw. Feed in more recordings first.")
         return
 
@@ -357,7 +357,7 @@ def render_tree(data: dict, args) -> None:
     draw_title(fig, args.title, args.subtitle)
     draw_background_rings(ax)
 
-    # --- petal boundaries (drawn first, underneath everything else) ---
+    # === petal boundaries (drawn first, underneath everything else) ===
     for petal in petals:
         pts = petal_boundary_points(petal["hub_pos"], petal["satellite_positions"], petal["local_radius"])
         if pts:
@@ -368,19 +368,19 @@ def render_tree(data: dict, args) -> None:
             ax.add_patch(mpatches.Circle(petal["hub_pos"], petal["local_radius"] * 1.6,
                                           fill=False, edgecolor=RING_COLOR, linewidth=1.0, zorder=1))
 
-    # --- edges: center <-> each petal hub ---
+    # === edges: center <-> each petal hub ===
     for petal in petals:
         e = petal["hub_edge_from_center"]
         color = RELATION_COLORS.get(e["type"], MUTED_COLOR)
         draw_glow_edge(ax, positions[center_id], petal["hub_pos"], color, e["weight"], pivot=(0.0, 0.0))
 
-    # --- edges: each petal hub <-> its own satellites ---
+    # === edges: each petal hub <-> its own satellites ===
     for petal in petals:
         for e in petal["satellite_edges"]:
             color = RELATION_COLORS.get(e["type"], MUTED_COLOR)
             draw_glow_edge(ax, petal["hub_pos"], positions[e["other"]], color, e["weight"], pivot=petal["hub_pos"])
 
-    # --- nodes: satellites first, then petal hubs, then center on top ---
+    # === nodes: satellites first, then petal hubs, then center on top ===
     def draw_tone_node(tid, pos, pivot, is_hub):
         tone = tones_by_id[tid]
         hz = tone["reference_hz"]
@@ -428,10 +428,10 @@ def main():
                          help="[ring style] Draw at most this many of the strongest relations")
     parser.add_argument("--max-petals", type=int, default=None,
                          help="[tree style] Cap how many tones connect directly to the center. "
-                              "Default: no cap — draw as many as the data supports.")
+                              "Default: no cap, draw as many as the data supports.")
     parser.add_argument("--max-satellites-per-petal", type=int, default=None,
                          help="[tree style] Cap how many relatives each petal shows. "
-                              "Default: no cap — draw as many as the data supports.")
+                              "Default: no cap, draw as many as the data supports.")
     parser.add_argument("--title", default=None, help="Default: 'Archer's Harmonic Tree' or 'Archer's Harmonic Graph' depending on --style")
     parser.add_argument("--subtitle", default=None,
                          help="Text under the title. Default: none.")

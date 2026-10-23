@@ -1,0 +1,49 @@
+  tagger epoch  1/30 loss 2.685 val root 0.433 state 0.406
+  tagger epoch  2/30 loss 2.361 val root 0.448 state 0.430
+  tagger epoch  3/30 loss 2.255 val root 0.476 state 0.446
+  tagger epoch  4/30 loss 2.193 val root 0.488 state 0.464
+  tagger epoch  5/30 loss 2.145 val root 0.475 state 0.447
+  tagger epoch  6/30 loss 2.102 val root 0.501 state 0.473
+  tagger epoch  7/30 loss 2.077 val root 0.496 state 0.465
+  tagger epoch  8/30 loss 2.060 val root 0.509 state 0.487
+  tagger epoch  9/30 loss 2.016 val root 0.506 state 0.474
+  tagger epoch 10/30 loss 2.010 val root 0.512 state 0.490
+  tagger epoch 11/30 loss 1.984 val root 0.513 state 0.490
+  tagger epoch 12/30 loss 1.953 val root 0.525 state 0.502
+  tagger epoch 13/30 loss 1.932 val root 0.511 state 0.481
+  tagger epoch 14/30 loss 1.917 val root 0.515 state 0.481
+  tagger epoch 15/30 loss 1.894 val root 0.525 state 0.496
+  tagger epoch 16/30 loss 1.870 val root 0.516 state 0.483
+  tagger epoch 17/30 loss 1.854 val root 0.524 state 0.493
+  tagger epoch 18/30 loss 1.818 val root 0.515 state 0.485
+  tagger epoch 19/30 loss 1.810 val root 0.519 state 0.485
+  tagger epoch 20/30 loss 1.793 val root 0.520 state 0.487
+  tagger epoch 21/30 loss 1.772 val root 0.520 state 0.486
+  tagger epoch 22/30 loss 1.757 val root 0.521 state 0.486
+  tagger epoch 23/30 loss 1.736 val root 0.521 state 0.489
+  tagger epoch 24/30 loss 1.730 val root 0.523 state 0.491
+  tagger epoch 25/30 loss 1.737 val root 0.519 state 0.485
+  tagger epoch 26/30 loss 1.718 val root 0.521 state 0.488
+  tagger epoch 27/30 loss 1.719 val root 0.522 state 0.489
+  tagger epoch 28/30 loss 1.703 val root 0.520 state 0.487
+  tagger epoch 29/30 loss 1.717 val root 0.521 state 0.488
+  tagger epoch 30/30 loss 1.713 val root 0.521 state 0.487
+MySong model v1: 409 songs, 15838 chord transitions, 8 durations train=409 dev=49 test=44
+paths: data/mysong/model/mysong.npz (74 KiB)
+top major transitions:
+   Csus4 -> C      -0.207
+   Esus4 -> E      -0.272
+   Dsus4 -> D      -0.272
+    Gaug -> C      -0.330
+       G -> C      -0.471
+   A#dim -> G      -0.479
+       D -> G      -0.518
+   F#aug -> B      -0.520
+      Dm -> G      -0.523
+  C#sus4 -> C#     -0.574
+split: {'train': 409, 'dev': 49, 'test': 44}
+model: data/mysong/model/mysong.npz
+split: {'train': 409, 'dev': 49, 'test': 44}
+classifier: 134583 examples, 52 features, train top-1 0.442 / top-3 0.713
+done
+EXIT:0

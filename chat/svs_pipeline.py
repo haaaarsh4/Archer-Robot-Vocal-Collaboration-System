@@ -25,13 +25,13 @@ class ScratchToSungVoice:
                         voice_index: int | None = None) -> np.ndarray:
         if not self.neural_timbre or not self.neural_timbre.enabled:
             raise RuntimeError(
-                "Neural timbre stage isn't ready — check synthesis.neural.enabled in "
+                "Neural timbre stage isn't ready, check synthesis.neural.enabled in "
                 "config.yaml and that the RVC sidecar (neural_env/rvc_server.py) is running."
             )
         voice_index = self.cfg.default_voice_index if voice_index is None else voice_index
         result = self.neural_timbre.convert_blocking(scratch_audio, sample_rate, voice_index=voice_index)
         if result is None:
-            raise RuntimeError("RVC conversion failed or timed out — see server logs.")
+            raise RuntimeError("RVC conversion failed or timed out, see server logs.")
         return result
 
     def lyrics_and_melody_to_archer(self, lyrics: str, notes: list[dict],
@@ -50,7 +50,7 @@ class ScratchToSungVoice:
         except requests.exceptions.RequestException as e:
             raise RuntimeError(
                 f"DiffSinger sidecar not reachable at {self.cfg.diffsinger_url}: {e}\n"
-                "This path needs DiffSinger set up as its own local service first — see the "
+                "This path needs DiffSinger set up as its own local service first, see the "
                 "module docstring in chat/svs_pipeline.py for the setup pointer. Path A "
                 "(hum your idea, /api/chat/sing) works right now without this."
             ) from e

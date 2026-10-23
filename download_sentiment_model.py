@@ -18,12 +18,12 @@ if __name__ == "__main__":
         tokenizer.save_pretrained(OUT_DIR)
         model.save_pretrained(OUT_DIR)
 
-        print(f"Done -- saved to {OUT_DIR}.")
+        print(f"Done, saved to {OUT_DIR}.")
 
     print(
         "\nRestart server.py and check the startup log for "
         "'Sentiment analyzer (RoBERTa) loaded from local files at "
         f"{OUT_DIR}.' If that model directory is missing or incomplete, "
-        "server.py falls back to VADER automatically -- which one actually "
+        "server.py falls back to VADER automatically, which one actually "
         "ran is reported as \"engine\" in every /api/sentiment response."
     )

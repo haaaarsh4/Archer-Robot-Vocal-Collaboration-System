@@ -12,7 +12,7 @@ class LocalTTS:
         self.voice_path = voice_path
         self._available = voice_path is not None and Path(voice_path).exists()
         if voice_path and not self._available:
-            logger.warning(f"TTS voice not found at '{voice_path}' — spoken replies will be "
+            logger.warning(f"TTS voice not found at '{voice_path}', spoken replies will be "
                            "unavailable until a valid Piper .onnx voice path is configured.")
 
     @property
@@ -21,7 +21,7 @@ class LocalTTS:
 
     def synthesize(self, text: str) -> bytes:
         if not self._available:
-            raise RuntimeError("Local TTS voice not configured — set tts.voice_path in config.yaml")
+            raise RuntimeError("Local TTS voice not configured, set tts.voice_path in config.yaml")
 
         proc = subprocess.run(
             ["piper", "--model", self.voice_path, "--output-raw"],
