@@ -2,6 +2,7 @@
 .venv/
 venv/
 env/
+.testdeps/
 
 # Python cache
 __pycache__/
@@ -12,6 +13,7 @@ data/models/
 assets/rmvpe/
 assets/synthesis_models/
 assets/female2/
+assets/female3/
 
 *.pt
 *.pth
@@ -29,6 +31,17 @@ huggingface/
 synthesis/VocalSet11
 synthesis/source_takes
 synthesis/(DSP) Robot Vocals
+
+# Local model-audition renders (output/model_auditions/)
+output/model_auditions/
+
+# SingSong training artifacts and corpora
+checkpoints/
+data/singsong/
+# Cree recordings are consent-controlled and must stay out of git.
+data/cree_songs/
+data/cree_singsong/
+renders/
 
 # macOS
 .DS_Store

@@ -21,9 +21,9 @@ def apply_pitch_curve_follow(audio: np.ndarray, sample_rate: int, base_hz: float
     Why this exists: a "run" of frames belonging to one sustained note
     only ever gets ONE synthesize() call, at the pitch measured on the
     run's very first frame (see _render_track_offline in server.py).
-    Everything measured on every later frame of that same note -- a
+    Everything measured on every later frame of that same note, a
     singer's natural vibrato, a slow bend into the next phrase, just the
-    ordinary micro-wobble of a real human voice holding a note -- was
+    ordinary micro-wobble of a real human voice holding a note, was
     being thrown away entirely. The note was accurate at the instant it
     started and then went perfectly, robotically flat for its whole
     duration, however long that was. That mismatch between "the exact
@@ -42,7 +42,7 @@ def apply_pitch_curve_follow(audio: np.ndarray, sample_rate: int, base_hz: float
     rendered at), integrated into a warped read position, and the
     buffer is re-read along that warped position.
 
-    `max_cents` bounds how far this is allowed to pull -- it's meant for
+    `max_cents` bounds how far this is allowed to pull, it's meant for
     the natural wobble within a note (typically well under a semitone),
     not for correcting a genuinely wrong onset pitch, which is what note
     re-triggering already handles. A big, sustained deviation gets
@@ -55,7 +55,7 @@ def apply_pitch_curve_follow(audio: np.ndarray, sample_rate: int, base_hz: float
     if n == 0 or pitch_curve_hz.size == 0 or base_hz <= 0:
         return audio
     if pitch_curve_hz.size == 1:
-        return audio  # nothing to follow -- the note never moved
+        return audio  # nothing to follow, the note never moved
 
     frame_times = (np.arange(len(pitch_curve_hz)) + 0.5) * frame_hop_s
     sample_times = np.arange(n) / float(sample_rate)
@@ -80,16 +80,16 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
                                   attack_ms: float = 15.0, release_ms: float = 45.0) -> np.ndarray:
     """
     Continuously reshapes an already-rendered note's own loudness to track
-    the real performance's dynamics across the note -- the amplitude
+    the real performance's dynamics across the note, the amplitude
     counterpart of apply_pitch_curve_follow above.
 
     Why this exists: every note synth.synthesize() renders comes out at
     one fixed loudness (self.volume, plus whatever the envelope/limiter
     already do to it), set once and held for the note's whole duration.
     Everything the real singer's own volume did across that same stretch
-    of time -- swelling into a held note, trailing off at the end of a
+    of time, swelling into a held note, trailing off at the end of a
     phrase, the ordinary breath-driven rise and fall of an actual human
-    voice -- was thrown away entirely. A robot part that sings at the
+    voice, was thrown away entirely. A robot part that sings at the
     same loudness whether the input was a belt or a whisper doesn't read
     as "following" a real performance nearly as much as one that actually
     swells and recedes with it.
@@ -99,31 +99,31 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
     It's normalized against its OWN median rather than some fixed
     absolute loudness, so a steadily-sung note ends up close to unity
     gain throughout and only genuine relative swells/dips in the real
-    performance move the output up or down from there -- this is a
+    performance move the output up or down from there, this is a
     dynamics shape, not a volume control. Clamped to [min_gain, max_gain]
     so a brief quiet moment inside an otherwise-sung note doesn't fall to
     total silence (that would read as a dropout, not as dynamics) and a
     loud moment doesn't blow past a sane ceiling.
 
-    FIX (was a flat, symmetric moving-average smoother -- see below):
+    FIX (was a flat, symmetric moving-average smoother, see below):
     smoothing is now an ASYMMETRIC attack/release envelope-follower (the
     same idea a compressor's detector uses), applied at FRAME rate
     instead of a box average applied at sample rate. That distinction is
     what was actually causing an audible "start stop start stop" pumping
-    on real singing. Ordinary word structure -- a consonant, a breath,
+    on real singing. Ordinary word structure, a consonant, a breath,
     the closure between two syllables of the SAME word, e.g. every "l" in
-    a run of "la-la-la" -- drives the raw RMS to near-zero for a few tens
+    a run of "la-la-la", drives the raw RMS to near-zero for a few tens
     of milliseconds at a time, even in the middle of one continuous,
     intentionally-unbroken phrase. The old 30ms symmetric box average
     barely rounds off a dip that brief (a box filter's response time is
     on the same order as its own window, and syllables repeat faster than
     that), so the OUTPUT gain was still riding those same near-silent
     troughs almost as sharply as the raw RMS did, all the way down to
-    whatever min_gain was configured -- audible as the robot cutting out
+    whatever min_gain was configured, audible as the robot cutting out
     and snapping back at roughly syllable rate, not as musical dynamics.
     A slower release (default 45ms here; a caller deliberately chasing
     syllable-by-syllable dynamics closely, e.g. a raw locked-vocable
-    render, should pass something longer -- see
+    render, should pass something longer, see
     _render_track_single_vocable_offline in server.py, which now also
     raises its own min_gain floor for the same reason) lets a brief
     consonant-driven dip get bridged instead of ever fully registering,
@@ -134,16 +134,16 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
     if n == 0 or amplitude_curve.size == 0:
         return audio
     if amplitude_curve.size == 1:
-        return audio  # only one reading for the whole note -- nothing to follow
+        return audio  # only one reading for the whole note, nothing to follow
 
     voiced = amplitude_curve[amplitude_curve > 0]
     reference = float(np.median(voiced)) if voiced.size else 0.0
     if reference <= 1e-9:
-        return audio  # the whole run measured as silence -- leave it alone rather than dividing by ~0
+        return audio  # the whole run measured as silence, leave it alone rather than dividing by ~0
 
     frame_gain = np.clip(amplitude_curve / reference, min_gain, max_gain)
 
-    # Envelope-follow at FRAME rate -- cheap (hundreds to a few thousand
+    # Envelope-follow at FRAME rate, cheap (hundreds to a few thousand
     # elements even for a whole multi-minute track) rather than running a
     # stateful attack/release loop at per-sample resolution, which would
     # mean an unvectorizable Python loop over potentially millions of
@@ -188,7 +188,7 @@ class VocableSynthesizer:
 
         self._crossfade_samples = int(self.crossfade_ms * self.sample_rate / 1000)
         self._prev_audio: np.ndarray | None = None
-        # Which vocable the last rendered chunk actually was -- lets
+        # Which vocable the last rendered chunk actually was, lets
         # _crossfade tell "the pitch moved within the same word" apart
         # from "we just switched from singing one word to a completely
         # different one", which need very different blending (see
@@ -199,7 +199,7 @@ class VocableSynthesizer:
         # same-word note-to-note transitions. Two unrelated recorded
         # words don't share any waveform structure to align, so a short
         # linear blend between them reads as a hard cut with a slight
-        # dip rather than an actual transition -- a longer, equal-power
+        # dip rather than an actual transition, a longer, equal-power
         # (constant-perceived-loudness) blend gives the ear enough time
         # to register it as one sound handing off to another instead of
         # one stopping and a different one starting.
@@ -214,7 +214,7 @@ class VocableSynthesizer:
         # Cache of the per-voice detune/timing-jitter/formant "fingerprint"
         # for whatever note is currently being sustained, so legato
         # top-ups of the SAME held note reuse it instead of redrawing
-        # fresh randomness every refill -- see _render_ensemble.
+        # fresh randomness every refill, see _render_ensemble.
         self._locked_ensemble_params: tuple | None = None
         self._locked_note_key: tuple | None = None
 
@@ -236,8 +236,8 @@ class VocableSynthesizer:
         actual recorded tone matches the melody's register/trend instead
         of rotating through vocable_set with no regard for what any of
         the words actually sound like. Returns None (not an empty dict)
-        when there's nothing to report -- wrong engine, bank not loaded,
-        or bank failed to load -- so the caller can tell "no data" apart
+        when there's nothing to report, wrong engine, bank not loaded,
+        or bank failed to load, so the caller can tell "no data" apart
         from "loaded, but somehow empty" and fall back cleanly either way.
         """
         if self.engine != "neural_wavetable" or self._neural_bank is None:
@@ -265,7 +265,7 @@ class VocableSynthesizer:
                     self._neural_bank.prewarm_range(fmin, fmax)
                     logger.info(f"Neural vocable bank prewarmed from {fmin}Hz to {fmax}Hz")
                 except Exception as e:
-                    logger.warning(f"Neural vocable bank prewarm failed: {e} — will warm up lazily on first notes")
+                    logger.warning(f"Neural vocable bank prewarm failed: {e}, will warm up lazily on first notes")
         logger.info(f"Vocable synthesizer engine: {self.engine}")
 
     def _load_ddsp_model(self):
@@ -285,7 +285,7 @@ class VocableSynthesizer:
         except ImportError as e:
             logger.error(
                 f"neural_wavetable engine selected but neural_vocable_bank.py couldn't "
-                f"be imported ({e}). Singing is DISABLED (silent) until this is fixed -- "
+                f"be imported ({e}). Singing is DISABLED (silent) until this is fixed, "
                 "not substituting a different-sounding synth engine."
             )
             return
@@ -297,7 +297,7 @@ class VocableSynthesizer:
             logger.error(
                 "neural_wavetable engine selected but no converted samples were found "
                 f"at {samples_dir}. Run synthesis/build_vocable_bank.py first (see its "
-                "docstring). Singing is DISABLED (silent) until this is fixed -- not "
+                "docstring). Singing is DISABLED (silent) until this is fixed, not "
                 "substituting a different-sounding synth engine."
             )
             self._neural_bank = None
@@ -310,7 +310,7 @@ class VocableSynthesizer:
                     f"No samples directory at {samples_dir}. Add WAV files named "
                     "aah.wav, ooo.wav, mmm.wav, hey.wav to synthesis/samples/ for "
                     "wavetable mode. Singing is DISABLED (silent) until this is fixed "
-                    "-- not substituting a different-sounding synth engine."
+                    ", not substituting a different-sounding synth engine."
                 )
                 return
 
@@ -326,26 +326,26 @@ class VocableSynthesizer:
             if not self._wavetable_samples:
                 logger.error(
                     "No wavetable samples loaded. Singing is DISABLED (silent) until "
-                    "this is fixed -- not substituting a different-sounding synth engine."
+                    "this is fixed, not substituting a different-sounding synth engine."
                 )
 
         except Exception as e:
             logger.error(
                 f"Wavetable load error: {e}. Singing is DISABLED (silent) until this "
-                "is fixed -- not substituting a different-sounding synth engine."
+                "is fixed, not substituting a different-sounding synth engine."
             )
 
     def synthesize(self, decision, blocking: bool = False, legato: bool = False, apply_crossfade: bool = True):
         """
         legato=True says "this chunk is a mid-note continuation, not a real
-        note onset or a real note ending" -- see _apply_envelope for why
+        note onset or a real note ending", see _apply_envelope for why
         that matters. Callers doing one-shot renders (offline bounce,
         single-note preview) should leave this False, which is also the
         default so existing call sites don't change behavior.
 
         apply_crossfade=True (the default) blends this call's start
         against whatever the LAST synthesize() call on this instance
-        produced -- correct for the live, one-call-follows-the-next-in-
+        produced, correct for the live, one-call-follows-the-next-in-
         real-time streaming path, where "last call" and "immediately
         before this, on the timeline" are the same thing. They are NOT
         the same thing for an offline batch render that places each
@@ -367,12 +367,24 @@ class VocableSynthesizer:
         if n_samples <= 0:
             return np.zeros(1024, dtype=np.float32)
 
+        # HUMMING IS A VOICE, NOT A VOCABLE. When the engine is humming, none
+        # of the word machinery below runs at all: no vocable is chosen, no
+        # recorded take is looked up, no wavetable or bank is touched, and the
+        # phoneme shaping that turns a vowel into "aah"/"ohh" is skipped, because
+        # a closed mouth has no vowel to shape. The hum renders itself, with its
+        # own source and its own vocal tract (see synthesis/hum_voice.py), so
+        # every caller that can ask this synthesizer for a note -- a live mic
+        # frame, a held note, an offline chunk -- gets the same hum.
+        if getattr(decision, "mode", None) == AccompanimentMode.HUM:
+            return self._render_hum(decision, n_samples, legato=legato,
+                                    apply_crossfade=apply_crossfade)
+
         num_voices = max(1, int(getattr(decision, "num_voices", 1)))
 
         if num_voices <= 1:
             audio = self._render_voice(decision, n_samples, voice_index=0,
                                         f0_hz=decision.target_hz, formant_scale=1.0,
-                                        blocking=blocking)          # <-- ADD blocking
+                                        blocking=blocking)          # ADD blocking
         else:
             audio = self._render_ensemble(decision, n_samples, num_voices,
                                         blocking=blocking, legato=legato)
@@ -387,11 +399,74 @@ class VocableSynthesizer:
         audio = audio * self.volume
         audio = np.tanh(audio * 1.15) / np.tanh(1.15)
 
+        # A MODE'S OWN LEVEL, applied last on purpose. _apply_phoneme_shaping
+        # normalises every rendered note to its own peak, so anything a mode
+        # asked for through its timbre fields would be scaled away before the
+        # note ever reached the mix; a level has to be applied after that
+        # normalisation to survive it. See HarmonyEngine.decide's octave/drone
+        # block for what asks for it (the third low-note rule: less volume as
+        # the harmony goes lower) and HarmonyDecision.level_trim_db.
+        level_trim_db = float(getattr(decision, "level_trim_db", 0.0) or 0.0)
+        if level_trim_db:
+            audio = audio * (10.0 ** (level_trim_db / 20.0))
+
         if apply_crossfade:
             audio = self._crossfade(audio, vocable=getattr(decision, "vocable", None))
             self._prev_audio = audio
             self._prev_vocable = getattr(decision, "vocable", None)
 
+        return audio.astype(np.float32)
+
+    def _render_hum(self, decision, n_samples: int, legato: bool = False,
+                    apply_crossfade: bool = True) -> np.ndarray:
+        """One note of the closed-mouth hum, rendered by the hum voice itself.
+
+        `legato` means the caller is topping up a note that is already sounding
+        rather than starting a new one (the live loop refills a held note every
+        second or two), so the glide only happens at a real note start, and a
+        mid-note top-up continues at the pitch it is already on -- not just at
+        the same pitch but at the same phase, loudness and level, because the
+        top-up carries the note's state (`_hum_state`) into the hum voice. A
+        held note is one continuous mouth, not a row of short ones.
+        """
+        from synthesis.hum_voice import HumConfig, synthesize_hum_note
+
+        cfg = getattr(self, "_hum_cfg", None)
+        if cfg is None:
+            cfg = HumConfig.from_config()
+            self._hum_cfg = cfg
+        target = float(decision.target_hz)
+        prev = None if legato else getattr(self, "_prev_hum_hz", None)
+        # THE NOTE TELLS US WHETHER IT IS HOLDING. `legato` means this chunk
+        # continues the last one (the loop refilling a note); a "sustain"
+        # decision is the engine saying the note is still sounding, so even a
+        # chunk that starts one has more of itself coming and must not fade its
+        # own end out from under the top-up that follows it.
+        sustain = str(getattr(decision, "action", "")).lower() == "sustain"
+        cont = legato or sustain
+        state = getattr(self, "_hum_state", None)
+        if state is None or not cont:
+            state = {}                       # a new note starts its own mouth
+            self._hum_state = state
+        # `legato` still decides the GLIDE (a sustain on a new pitch slides to
+        # it); the state decides whether the mouth itself continues.
+        audio = synthesize_hum_note(target, n_samples, self.sample_rate, cfg=cfg,
+                                    prev_hz=prev, legato=legato, state=state, hold=cont)
+        self._prev_hum_hz = target
+        audio = (np.asarray(audio, dtype=np.float32) * self.volume).astype(np.float32)
+        # A NEW note goes through the same door every other voice does, so the
+        # hand-off from whatever was playing before it is unchanged. A
+        # continuation does not, and must not: _crossfade exists to hide the seam
+        # between two renders that do not know about each other, by blending the
+        # new one's start with the previous one's tail -- but this voice carries
+        # its own phase, level and filter state across the top-up, so its seam is
+        # already exact, and blending the previous tail back in on top of it
+        # would only reintroduce the discontinuity the state exists to remove.
+        if apply_crossfade:
+            if not cont:
+                audio = self._crossfade(audio, vocable="__hum__")
+            self._prev_audio = audio
+            self._prev_vocable = "__hum__"
         return audio.astype(np.float32)
 
     def _render_ensemble(self, decision, n_samples: int, num_voices: int,
@@ -401,23 +476,23 @@ class VocableSynthesizer:
         formant_spread = float(getattr(decision, "formant_spread", 0.1))
         max_jitter_samples = int(jitter_ms * self.sample_rate / 1000)
 
-        # Identifies "the note currently being held" -- pitch, vocable,
+        # Identifies "the note currently being held", pitch, vocable,
         # and the texture parameters that shape it. When a note is truly
         # just continuing (legato=True, same signature as last time),
         # reuse the exact same per-voice detune offsets, jitter shifts,
         # and formant scales as last call instead of redrawing them.
         #
-        # Before this: a held multi-voice note (duet/choir texture --
+        # Before this: a held multi-voice note (duet/choir texture
         # drone_support's whole identity, for instance) got its ensemble
         # re-randomized on every single legato top-up (server.py refills
         # the queue roughly every 1-2s while sustaining). The pitch
         # wasn't moving, but which way each voice leaned in cents, how
         # far its onset was offset, and its formant "size" all silently
-        # reshuffled underneath it -- an otherwise-static pad kept
+        # reshuffled underneath it, an otherwise-static pad kept
         # subtly shimmering/warping every refill instead of holding one
         # stable chord. A genuine new note (legato=False, or the
         # signature actually changed) still draws fresh randomness, same
-        # as before -- this only stops re-rolling a note that hasn't
+        # as before, this only stops re-rolling a note that hasn't
         # actually changed.
         note_key = (round(float(decision.target_hz), 3), decision.vocable, num_voices,
                     round(detune_spread, 2), round(jitter_ms, 2), round(formant_spread, 3))
@@ -452,7 +527,7 @@ class VocableSynthesizer:
 
             voice = self._render_voice(decision, n_samples, voice_index=i,
                                         f0_hz=f0, formant_scale=f_scale,
-                                        blocking=blocking)          # <-- PASS blocking
+                                        blocking=blocking)          # PASS blocking
 
             shift = int(jitter_shifts[i])
             if shift != 0:
@@ -480,7 +555,7 @@ class VocableSynthesizer:
 
     def _render_voice(self, decision, n_samples: int, voice_index: int,
                     f0_hz: float, formant_scale: float,
-                    blocking: bool = False) -> np.ndarray:   # <-- ADD blocking param
+                    blocking: bool = False) -> np.ndarray:   # ADD blocking param
         shifted_f0 = f0_hz
 
         if self.engine == "neural_wavetable":
@@ -488,11 +563,26 @@ class VocableSynthesizer:
                 # ... error handling ...
                 return np.zeros(n_samples, dtype=np.float32)
 
+            # A SUSTAINED note (drone_support) is held, not
+            # re-said: the bank has to give back one continuous vowel for the
+            # whole duration instead of repeating the word to fill it. That
+            # repetition is what a listener heard as the drone dropping out and
+            # starting again every few seconds, see
+            # NeuralVocableBank._fit_length's hold branch.
+            #
+            # The MODE counts, not just the action: an offline run's stored
+            # decision is the one that opened it, and a drone opens with
+            # action='sing' (a real onset) and only continues as 'sustain'
+            # afterward. Keying this on the action alone therefore missed the
+            # drone completely, it was still repeating the word 'cold' every
+            # few seconds under the whole track.
+            hold = (getattr(decision, "action", "") == "sustain"
+                    or decision.mode == AccompanimentMode.DRONE)
             # Use the correct retrieval method based on blocking flag
             if blocking:
-                audio = self._neural_bank.get_blocking(decision.vocable, shifted_f0, n_samples)
+                audio = self._neural_bank.get_blocking(decision.vocable, shifted_f0, n_samples, hold=hold)
             else:
-                audio = self._neural_bank.get(decision.vocable, shifted_f0, n_samples)
+                audio = self._neural_bank.get(decision.vocable, shifted_f0, n_samples, hold=hold)
 
             if audio is not None:
                 return audio
@@ -505,7 +595,7 @@ class VocableSynthesizer:
                 if "__no_wavetable__" not in self._warned_unknown_vocables:
                     self._warned_unknown_vocables.add("__no_wavetable__")
                     logger.error(
-                        "wavetable engine has no samples loaded -- singing is silent "
+                        "wavetable engine has no samples loaded, singing is silent "
                         "until this is fixed (see the startup error above)."
                     )
                 return np.zeros(n_samples, dtype=np.float32)
@@ -516,7 +606,7 @@ class VocableSynthesizer:
                 if "__no_ddsp_model__" not in self._warned_unknown_vocables:
                     self._warned_unknown_vocables.add("__no_ddsp_model__")
                     logger.error(
-                        "ddsp engine has no model loaded -- singing is silent until "
+                        "ddsp engine has no model loaded, singing is silent until "
                         "this is fixed (see the startup error above)."
                     )
                 return np.zeros(n_samples, dtype=np.float32)
@@ -525,13 +615,13 @@ class VocableSynthesizer:
             except Exception as e:
                 if "__ddsp_error__" not in self._warned_unknown_vocables:
                     self._warned_unknown_vocables.add("__ddsp_error__")
-                    logger.error(f"DDSP synthesis failed: {e} -- resting this note "
+                    logger.error(f"DDSP synthesis failed: {e}, resting this note "
                                  "instead of substituting a different-sounding synth voice.")
                 return np.zeros(n_samples, dtype=np.float32)
 
         logger.error(
             f"synthesis.engine={self.engine!r} isn't a recognized engine "
-            "(expected neural_wavetable, wavetable, or ddsp) -- singing is silent."
+            "(expected neural_wavetable, wavetable, or ddsp), singing is silent."
         )
         return np.zeros(n_samples, dtype=np.float32)
 
@@ -567,7 +657,7 @@ class VocableSynthesizer:
             return audio.astype(np.float32)
 
         except Exception as e:
-            logger.error(f"Wavetable synthesis error: {e} -- resting this note")
+            logger.error(f"Wavetable synthesis error: {e}, resting this note")
             return np.zeros(n_samples, dtype=np.float32)
 
     def _apply_envelope(self, audio, legato: bool = False):
@@ -580,9 +670,9 @@ class VocableSynthesizer:
         the one before it by _crossfade(), which does its own 30ms
         fade-out-of-old / fade-in-of-new blend. That's the right place for
         smoothing a real transition. But when a note is just being
-        *continued* -- same pitch, same vocable, singer still holding the
+        *continued*, same pitch, same vocable, singer still holding the
         note, another chunk queued up because the previous one is about to
-        run out (see the sustain handling in server.py's live pipeline) --
+        run out (see the sustain handling in server.py's live pipeline)
         this envelope used to fade the audio down toward silence and back
         up on every single one of those chunks too. Stacked on top of
         _crossfade()'s own fade, that produced two multiplied fades
@@ -590,14 +680,14 @@ class VocableSynthesizer:
         of linearly (audibly faster/deeper), and the new chunk's rise to
         full volume gets smeared out to ~30ms instead of reaching volume
         by 10ms. The audible result is a soft "pulse" or "breath" every
-        time a held note gets topped up -- which, over a multi-second
+        time a held note gets topped up, which, over a multi-second
         sustained note refilled several times, sounds exactly like the
         voice periodically starting and stopping instead of holding one
         continuous tone.
 
         A true onset (a brand new "sing" action) still gets its full
         attack, and a true one-shot render (preview endpoint, offline
-        bounce) still gets its full attack+release -- legato is only
+        bounce) still gets its full attack+release, legato is only
         for the "there is more of this same note coming" case.
         """
         envelope = np.ones(len(audio))
@@ -623,13 +713,13 @@ class VocableSynthesizer:
                 gain_db = (decision.brightness - 0.55) * 10.0
                 audio = self._high_shelf(audio, corner_hz=3200.0, gain_db=gain_db)
             elif decision.brightness < 0.45:
-                # Was boost-only -- brightness had no way to darken the
+                # Was boost-only, brightness had no way to darken the
                 # tone at all, only ever brighten it or do nothing. Fine
                 # when nothing ever pushed brightness DOWN from neutral,
                 # but contour_following now deliberately does exactly
                 # that on a falling phrase (see HarmonyEngine.decide),
                 # and with no cut available that half of its effect would
-                # have been completely silent -- audibly identical to
+                # have been completely silent, audibly identical to
                 # sitting at neutral. Mirrors the boost side: same
                 # corner, same 10x scale, just negative gain (a cut).
                 gain_db = (decision.brightness - 0.45) * 10.0
@@ -637,18 +727,18 @@ class VocableSynthesizer:
 
             # vowel_color has carried a real value through PhonemeProfile
             # -> HarmonyDecision this whole time (0=bright front vowel
-            # like "ee", 1=dark back vowel like "oh/oo" -- see
+            # like "ee", 1=dark back vowel like "oh/oo", see
             # CREE_PHONEME_PROFILES in phonetic_analysis.py) but nothing
-            # here ever actually read it -- it reached this function and
+            # here ever actually read it, it reached this function and
             # was simply never used. brightness's shelf is a broad tilt
             # across everything above ~3.2kHz; this is different and
-            # complementary -- a single resonant peak that actually SLIDES
+            # complementary, a single resonant peak that actually SLIDES
             # in frequency with vowel_color, from a bright ~2400Hz "ee"-
             # ish formant down to a dark ~900Hz "oh/oo"-ish one, which
             # reads as the vowel itself shifting rather than a tone
             # control moving. Skipped near dead-center (0.45-0.55) so an
             # ordinary, unremarkable vowel doesn't get colored for no
-            # reason -- this is for when something (contour_following's
+            # reason, this is for when something (contour_following's
             # continuous lean, or the Cree phoneme classifier itself)
             # has actually pushed it toward one end or the other.
             if abs(decision.vowel_color - 0.5) > 0.05:
@@ -749,7 +839,7 @@ class VocableSynthesizer:
             wet_amount = float(np.clip(wet_amount, 0.0, 1.0))
             return audio * (1 - wet_amount) + wet * wet_amount
         except Exception as e:
-            logger.error(f"Reverb error: {e} — returning dry signal")
+            logger.error(f"Reverb error: {e}, returning dry signal")
             return audio
 
     def _crossfade(self, new_audio: np.ndarray, vocable: str | None = None) -> np.ndarray:
@@ -778,7 +868,7 @@ class VocableSynthesizer:
             # DIFFERENT recorded words has an audible dip in the middle
             # (loudness bottoms out around 0.5+0.5 instead of staying
             # constant), which reads as a little gap between "one sound
-            # stopping" and "another starting" -- exactly the abrupt
+            # stopping" and "another starting", exactly the abrupt
             # jump-cut this exists to avoid. The sin/cos pair keeps
             # combined energy roughly constant throughout the blend.
             t = np.linspace(0, np.pi / 2, overlap_len)

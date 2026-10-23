@@ -1,0 +1,67 @@
+{
+  "analysis": {
+    "duration_seconds": 8.0,
+    "tempo_bpm": 99.384,
+    "beat_offset_seconds": 0.6,
+    "tempo_confidence": 1.0,
+    "tuning_cents": -1.1,
+    "voiced_ratio": 0.554,
+    "key_guess": "Em",
+    "warnings": []
+  },
+  "harmony": {
+    "key": "C",
+    "tonic": 0,
+    "mode": "major",
+    "tempo_bpm": 99.384,
+    "beats_per_bar": 4.0,
+    "score": -153.003,
+    "key_confidence": 0.9251,
+    "key_posterior": {
+      "C": 0.9251,
+      "G": 0.0264,
+      "Cm": 0.0263,
+      "Eb": 0.0073,
+      "Em": 0.0052
+    },
+    "roman": [
+      "I"
+    ],
+    "segments": [
+      {
+        "start_beat": 0.0,
+        "end_beat": 13.0,
+        "chord": "C",
+        "root": 0,
+        "quality": "maj",
+        "bass": null,
+        "confidence": 0.7286,
+        "start_seconds": 0.0,
+        "end_seconds": 7.8483,
+        "alternatives": [
+          {
+            "chord": "C7",
+            "probability": 0.4932
+          },
+          {
+            "chord": "Cmaj7",
+            "probability": 0.0052
+          },
+          {
+            "chord": "C6",
+            "probability": 0.003
+          }
+        ]
+      }
+    ],
+    "warnings": []
+  },
+  "arrangement": {
+    "style": "jazz",
+    "notes": 89,
+    "duration_seconds": 7.848,
+    "tempo_bpm": 99.384,
+    "renderer": "soundfont"
+  },
+  "warnings": []
+}

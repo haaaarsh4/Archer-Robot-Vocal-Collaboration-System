@@ -1,0 +1,140 @@
+ALSA lib pcm_dsnoop.c:567:(snd_pcm_dsnoop_open) unable to open slave
+ALSA lib pcm_dmix.c:1000:(snd_pcm_dmix_open) unable to open slave
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+ALSA lib pcm_oss.c:397:(_snd_pcm_oss_open) Cannot open device /dev/dsp
+ALSA lib pcm_oss.c:397:(_snd_pcm_oss_open) Cannot open device /dev/dsp
+ALSA lib pcm_a52.c:1001:(_snd_pcm_a52_open) a52 is only for playback
+ALSA lib confmisc.c:160:(snd_config_get_card) Invalid field card
+ALSA lib pcm_usb_stream.c:482:(_snd_pcm_usb_stream_open) Invalid card 'card'
+ALSA lib confmisc.c:160:(snd_config_get_card) Invalid field card
+ALSA lib pcm_usb_stream.c:482:(_snd_pcm_usb_stream_open) Invalid card 'card'
+ALSA lib pcm_dmix.c:1000:(snd_pcm_dmix_open) unable to open slave
+Cannot connect to server socket err = No such file or directory
+Cannot connect to server request channel
+jack server is not running or cannot be started
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+JackShmReadWritePtr::~JackShmReadWritePtr - Init not done for -1, skipping unlock
+2026-10-12 09:11:10.473 | INFO     | translation.translate_transformer:__init__:32 - Morfessor pre-segmentation enabled for Cree input (matches training config)
+Translation model loaded successfully.
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:  73%|███████▎  | 146/201 [00:00<00:00, 1459.12it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 1622.28it/s]
+2026-10-12 09:11:40.069 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+2026-10-12 09:11:40.069 | INFO     | core.protocol_guard:__init__:36 - ProtocolGuard initialized, protocol_enabled=True
+2026-10-12 09:11:40.070 | INFO     | synthesis.harmony_engine:__init__:224 - HarmonyEngine ready, default_mode=unison_shadowing, protocol_enabled=True, fusion_mode=False
+2026-10-12 09:11:41.198 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Cold.wav (f0 about 315 Hz, brightness centroid about 1936 Hz)
+2026-10-12 09:11:41.219 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Lalanana.wav (f0 about 336 Hz, brightness centroid about 1897 Hz)
+2026-10-12 09:11:41.226 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Moon.wav (f0 about 400 Hz, brightness centroid about 1728 Hz)
+2026-10-12 09:11:41.236 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Need.wav (f0 about 271 Hz, brightness centroid about 1893 Hz)
+2026-10-12 09:11:41.259 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Ohoho.wav (f0 about 278 Hz, brightness centroid about 2017 Hz)
+2026-10-12 09:11:41.276 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Remember.wav (f0 about 242 Hz, brightness centroid about 2010 Hz)
+2026-10-12 09:11:41.303 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Shell.wav (f0 about 325 Hz, brightness centroid about 1997 Hz)
+2026-10-12 09:11:41.320 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Snow.wav (f0 about 321 Hz, brightness centroid about 1830 Hz)
+2026-10-12 09:11:41.333 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Voyage.wav (f0 about 248 Hz, brightness centroid about 1787 Hz)
+2026-10-12 09:11:41.360 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded Welcome to Reality.wav (f0 about 284 Hz, brightness centroid about 2173 Hz)
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:249 - Neural vocable bank: loaded You Know You're Going to Feel it.wav (f0 about 284 Hz, brightness centroid about 2044 Hz)
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'cold' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'lalanana' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'moon' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'need' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'ohoho' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'remember' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'shell' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'snow' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'voyage' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'welcome to reality' has 1 register(s) loaded
+2026-10-12 09:11:41.384 | INFO     | synthesis.neural_vocable_bank:_load_bases:258 - Neural vocable bank: 'you know you're going to feel it' has 1 register(s) loaded
+2026-10-12 09:11:41.389 | INFO     | synthesis.vocable_synthesizer:_init_engine:266 - Neural vocable bank prewarmed from 65Hz to 1200Hz
+2026-10-12 09:11:41.389 | INFO     | synthesis.vocable_synthesizer:_init_engine:269 - Vocable synthesizer engine: neural_wavetable
+2026-10-12 09:11:41.420 | INFO     | synthesis.neural_timbre:_check_sidecar:74 - Neural sidecar reachable at http://127.0.0.1:8801: 2/2 voice(s) loaded and ready.
+2026-10-12 09:11:44.923 | INFO     | core.preprocessor:__init__:16 - Preprocessor ready, silence threshold: -40 dBFS
+2026-10-12 09:11:44.923 | INFO     | analysis.pitch_detector:__init__:114 - Pitch engine: yin (hop=512, buf=2048, sr=44100, fmin=65 Hz, fmax=1200 Hz)
+2026-10-12 09:11:46.447 | INFO     | analysis.pitch_detector:_load_rmvpe:163 - RMVPE loaded (cold, first time) from 'assets/rmvpe/rmvpe.pt' on cpu (half=False)
+2026-10-12 09:11:46.447 | INFO     | analysis.pitch_detector:set_method:199 - Pitch method switched: yin -> rmvpe
+2026-10-12 09:11:46.448 | WARNING  | analysis.phonetic_analysis:_load_model:54 - Cree tokenizer enabled but no model_path set in config. Using heuristic feature matching until model is ready.
+2026-10-12 09:11:46.448 | INFO     | core.protocol_guard:__init__:36 - ProtocolGuard initialized, protocol_enabled=True
+2026-10-12 09:11:46.448 | INFO     | synthesis.harmony_engine:__init__:224 - HarmonyEngine ready, default_mode=unison_shadowing, protocol_enabled=True, fusion_mode=False
+2026-10-12 09:11:46.449 | INFO     | synthesis.harmony_engine:set_texture:938 - Voice texture pinned to: solo
+2026-10-12 09:11:46.449 | INFO     | synthesis.harmony_engine:set_forced_mode:1020 - Accompaniment mode forced to: solo_humming
+2026-10-12 09:11:46.449 | INFO     | synthesis.harmony_engine:set_contour_brightness_db:1008 - Contour brightness overridden: baseline=+1.8dB, max_brighten=+6.3dB, max_darken=-2.7dB
+2026-10-12 09:12:10.228 | INFO     | core.preprocessor:__init__:16 - Preprocessor ready, silence threshold: -40 dBFS
+2026-10-12 09:12:10.228 | INFO     | analysis.pitch_detector:__init__:114 - Pitch engine: yin (hop=512, buf=2048, sr=44100, fmin=65 Hz, fmax=1200 Hz)
+2026-10-12 09:12:10.228 | INFO     | analysis.pitch_detector:_load_rmvpe:145 - RMVPE: reusing already-loaded model for 'assets/rmvpe/rmvpe.pt' on cpu (warm)
+2026-10-12 09:12:10.228 | INFO     | analysis.pitch_detector:set_method:199 - Pitch method switched: yin -> rmvpe
+2026-10-12 09:12:10.228 | WARNING  | analysis.phonetic_analysis:_load_model:54 - Cree tokenizer enabled but no model_path set in config. Using heuristic feature matching until model is ready.
+2026-10-12 09:12:10.229 | INFO     | core.protocol_guard:__init__:36 - ProtocolGuard initialized, protocol_enabled=True
+2026-10-12 09:12:10.229 | INFO     | synthesis.harmony_engine:__init__:224 - HarmonyEngine ready, default_mode=unison_shadowing, protocol_enabled=True, fusion_mode=False
+2026-10-12 09:12:10.229 | INFO     | synthesis.harmony_engine:set_texture:938 - Voice texture pinned to: solo
+2026-10-12 09:12:10.229 | INFO     | synthesis.harmony_engine:set_forced_mode:1020 - Accompaniment mode forced to: solo_humming
+2026-10-12 09:12:10.230 | INFO     | synthesis.harmony_engine:set_contour_brightness_db:1008 - Contour brightness overridden: baseline=+1.8dB, max_brighten=+6.3dB, max_darken=-2.7dB
+2026-10-12 09:12:29.028 | INFO     | core.preprocessor:__init__:16 - Preprocessor ready, silence threshold: -40 dBFS
+2026-10-12 09:12:29.028 | INFO     | analysis.pitch_detector:__init__:114 - Pitch engine: yin (hop=512, buf=2048, sr=44100, fmin=65 Hz, fmax=1200 Hz)
+2026-10-12 09:12:29.028 | INFO     | analysis.pitch_detector:_load_rmvpe:145 - RMVPE: reusing already-loaded model for 'assets/rmvpe/rmvpe.pt' on cpu (warm)
+2026-10-12 09:12:29.028 | INFO     | analysis.pitch_detector:set_method:199 - Pitch method switched: yin -> rmvpe
+2026-10-12 09:12:29.028 | WARNING  | analysis.phonetic_analysis:_load_model:54 - Cree tokenizer enabled but no model_path set in config. Using heuristic feature matching until model is ready.
+2026-10-12 09:12:29.028 | INFO     | core.protocol_guard:__init__:36 - ProtocolGuard initialized, protocol_enabled=True
+2026-10-12 09:12:29.029 | INFO     | synthesis.harmony_engine:__init__:224 - HarmonyEngine ready, default_mode=unison_shadowing, protocol_enabled=True, fusion_mode=False
+2026-10-12 09:12:29.029 | INFO     | synthesis.harmony_engine:set_texture:938 - Voice texture pinned to: solo
+2026-10-12 09:12:29.029 | INFO     | synthesis.harmony_engine:set_forced_mode:1020 - Accompaniment mode forced to: solo_humming
+2026-10-12 09:12:29.029 | INFO     | synthesis.harmony_engine:set_contour_brightness_db:1008 - Contour brightness overridden: baseline=+1.8dB, max_brighten=+6.3dB, max_darken=-2.7dB
+Sentiment analyzer (RoBERTa) loaded from local files at data/models/sentiment-roberta.
+Sentiment analyzer (VADER, fallback) loaded successfully.
+faster-whisper (small.en, int8, CPU, num_workers=1) loaded from local files at data/models/faster-whisper-small.en.
+faster-whisper (large-v3-turbo, int8, CPU, num_workers=4) loaded from local files at data/models/faster-whisper-large-v3-turbo.
+Vosk streaming model loaded from local files at data/models/vosk-model-en-us-0.22 (instant local live captions enabled).
+Shared HarmonyEngine initialized (sovereignty + mode selection live here).
+Shared VocableSynthesizer initialized and wired to HarmonyEngine.
+NeuralTimbreConverter loaded and enabled.
+Chat router mounted at /api/chat (backend readiness checked lazily on first call).
+Cree morphological analyzer loaded (data/models/crk-descriptive-analyzer.hfstol).
+Checkpoint path: /home/harsh-upadhyay/panns_data/Cnn14_mAP=0.431.pth
+Using CPU.
+PANNs audio-tagging model loaded (per-instrument detection enabled).
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] brought to the level every other mode renders at: RMS 0.100 -> 0.200 (+6.0 dB), peak now 0.74
+
+[DSP (closed-mouth voice straight)] rendered 3.27s in 5.21s at 44100 Hz
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 65 of 563 voiced frames (0.38 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+
+=== DSP (closed-mouth voice straight)
+    rms 0.2001 (source 0.1451)  centroid 398.4 Hz  above 2.5 kHz 0.00%
+    comb matched 95.6%  lag 58.1 ms  median 22.5 cents  p90 69.08  held 2 frames median 35.35  gaps 30.4 dB suboct 100.0%
+    an independent tracker on the output vs the melody: median 27.6 cents, an octave out on 0.0% of frames
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] brought to the level every other mode renders at: RMS 0.100 -> 0.200 (+6.0 dB), peak now 0.74
+
+[Neural voice 0 (female2)] rendered 3.27s in 3.26s at 44100 Hz
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 65 of 563 voiced frames (0.38 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+
+=== Neural voice 0 (female2)
+    rms 0.2001 (source 0.1451)  centroid 398.4 Hz  above 2.5 kHz 0.00%
+    comb matched 95.6%  lag 58.1 ms  median 22.5 cents  p90 69.08  held 2 frames median 35.35  gaps 30.4 dB suboct 100.0%
+    an independent tracker on the output vs the melody: median 27.6 cents, an octave out on 0.0% of frames
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] brought to the level every other mode renders at: RMS 0.100 -> 0.200 (+6.0 dB), peak now 0.74
+
+[Neural voice 1 (mi-test)] rendered 3.27s in 3.04s at 44100 Hz
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 19 of 558 voiced frames (0.11 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+[hum] the voice gate took 65 of 563 voiced frames (0.38 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+
+=== Neural voice 1 (mi-test)
+    rms 0.2001 (source 0.1451)  centroid 398.4 Hz  above 2.5 kHz 0.00%
+    comb matched 95.6%  lag 58.1 ms  median 22.5 cents  p90 69.08  held 2 frames median 35.35  gaps 30.4 dB suboct 100.0%
+    an independent tracker on the output vs the melody: median 27.6 cents, an octave out on 0.0% of frames
+
+ALL PATH CHECKS PASSED

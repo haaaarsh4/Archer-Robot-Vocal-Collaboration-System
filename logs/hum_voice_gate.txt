@@ -1,0 +1,31 @@
+2026-10-12 09:14:24.509 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+
+=== one rule, two implementations (the page's constants)
+    [ok] HUM_VOICE_RATIO_MIN in the page matches HumConfig: page 0.2, server 0.2
+    [ok] HUM_VOICE_BAND_LO_HZ in the page matches HumConfig: page 300.0, server 300.0
+    [ok] HUM_VOICE_BAND_HI_HZ in the page matches HumConfig: page 1500.0, server 1500.0
+    [ok] HUM_VOICE_REF_LO_HZ in the page matches HumConfig: page 60.0, server 60.0
+    [ok] HUM_VOICE_REF_HI_HZ in the page matches HumConfig: page 300.0, server 300.0
+    [ok] the page's hum is gated on that rule: isLikelyVoiceFrame is asked in the live loop and humAudible guards the hum's gain
+
+=== what a drum measures, and what a voice measures
+    frontend/assets/audio/hummingbird.mp3: drum-only stretch 17% of frames pass the gate, the sung stretch 84%
+    [ok] a drum is under the threshold: 17% of the drum's frames read as a voice
+    [ok] a voice is over the threshold: 84% of the sung frames read as a voice
+    [ok] a solo voice is not gated out: 97% of synthesis/source_takes/Lalanana.wav's frames pass; a gate that silences a solo singer would be worse than the drum it is there to stop
+
+=== the render: quiet where there is no voice, there where there is
+[hum] the voice gate took 3223 of 8233 voiced frames (18.73 s) off the melody: no voice-like energy in them, so nothing there to hum along with
+          0s  gate    14%  hum/track  -24.9 dB
+          2s  gate    15%  hum/track  -25.6 dB
+          4s  gate    19%  hum/track  -24.5 dB
+          6s  gate    15%  hum/track  -23.1 dB
+          8s  gate    20%  hum/track  -19.2 dB
+         10s  gate    21%  hum/track  -23.1 dB
+         12s  gate    15%  hum/track  -27.1 dB
+         14s  gate    19%  hum/track  -26.5 dB
+         16s  gate    50%  hum/track   -9.1 dB
+    [ok] over the drums the hum is under the track by more than 12 dB: its loudest such window sits -19.2 dB under
+    [ok] where the voice is, the hum is with it: its loudest window sits +1.9 dB under the track
+
+ALL VOICE-GATE CHECKS PASSED

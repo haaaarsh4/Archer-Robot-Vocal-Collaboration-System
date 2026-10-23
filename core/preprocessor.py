@@ -13,7 +13,7 @@ class Preprocessor:
         self.silence_db       = cfg["preprocessing"]["silence_threshold_db"]
         self._frame_count     = 0
         self._voiced_count    = 0
-        logger.info(f"Preprocessor ready — silence threshold: {self.silence_db} dBFS")
+        logger.info(f"Preprocessor ready, silence threshold: {self.silence_db} dBFS")
 
     def process(self, frame: np.ndarray) -> tuple:
         samples = frame.astype(np.float32)

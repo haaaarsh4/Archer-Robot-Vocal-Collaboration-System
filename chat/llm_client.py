@@ -67,7 +67,7 @@ class LocalLLMClient:
 
         context_block = ""
         if context_chunks:
-            joined = "\n\n---\n\n".join(context_chunks)
+            joined = "\n\n===\n\n".join(context_chunks)
             context_block = f"\n\nContext from your song notes:\n{joined}"
 
         if self.cfg.backend == "ollama":

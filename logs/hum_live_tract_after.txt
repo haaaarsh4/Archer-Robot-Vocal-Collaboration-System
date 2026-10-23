@@ -1,0 +1,28 @@
+2026-10-12 09:20:42.430 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml
+=== the page's live humming voice vs the server's
+    page: open quotient 0.48, 60 harmonics, trim 0.088, tract stages 8
+    server: open quotient 0.48, tract (F1 260.0/60.0, F2 1000.0/480.0, zero 1000.0 at -22.0 dB, tilt -12.0 over 500.0, hf -18.0 at 4000.0, low-pass 2500.0 order 4)
+
+--- the glottal source
+    [ok] the page sings the server's pulse shape: page open quotient 0.48 against the server's 0.48
+    harmonics 1-10, dB rel. the fundamental  page: +0.0 +4.3 +4.9 +2.8 -1.7 -5.7 -5.0 -5.7 -8.9 -10.9
+                                             server: +0.0 +4.3 +4.9 +2.8 -1.7 -5.7 -5.0 -5.7 -8.9 -10.9
+    [ok] the two sources are the same source: worst harmonic difference 0.00 dB over the first 20
+    [ok] the source is a glottal pulse, not a sawtooth: 2nd harmonic +4.3 dB, 3rd +4.9 dB against the fundamental (a sawtooth's would be -6 and -9.5)
+
+--- the murmur's tract
+    Hz         392
+    page      -6.8
+    server    -6.9
+    diff       0.2
+    [ok] the page's tract has the server's shape: worst difference 2.2 dB between 130 and 2000 Hz
+    [ok] one low peak, then a hole: loudest response at 262 Hz, and the best above 1 kHz is -18.3 dB
+
+--- the air
+    [ok] the air sits inside the murmur, not over it: page bands it 250-1200 Hz against the server's 250-1200
+    [ok] the air is as far under the voice as the server's: page -32.0 dB against the server's cap of -32.0 dB
+
+--- the level
+    [ok] the trim matches the voice it replaced: trim 0.088 (the voice this one replaced delivered an rms of 0.503 at 0.30 of a note gain; this chain needs about 0.088 of one)
+
+LIVE HUM TRACT CHECKS PASSED

@@ -15,26 +15,26 @@ class TimingSync:
     background thread. That doesn't work the way it looks like it does:
     sd.play() manages a single global "currently playing" buffer, so
     calling it again while a previous chunk is still sounding stops that
-    chunk immediately and starts the new one from sample zero -- it does
+    chunk immediately and starts the new one from sample zero, it does
     not queue or overlap. That meant every chunk handed to schedule() was
     a hard interruption of whatever was still playing, no matter how
     carefully VocableSynthesizer._crossfade() blended the sample arrays
-    together upstream -- that blended tail never actually reached the
+    together upstream, that blended tail never actually reached the
     speaker, because the chunk it was blended into had already been cut
     off. It also meant the beat-snap delay in the old _compute_play_time
     was applied to every chunk equally, including the sustain "refill"
-    chunks used to keep a held note going (see server.py) -- so a note
+    chunks used to keep a held note going (see server.py), so a note
     that was supposed to be one continuous tone could get an artificial
     gap stuffed into the middle of it while it waited to land on a beat.
 
     Now: a single OutputStream runs continuously once start() is called,
     pulling from a plain list of pending sample arrays (self._pending).
-    schedule() just appends to that list -- a "sustain"/continuation
+    schedule() just appends to that list, a "sustain"/continuation
     chunk lands immediately after whatever's already queued, sample-
     accurate, no interruption, no re-triggered playback. Only a genuine
     new note ("sing", or resuming after the buffer actually ran dry) gets
     the beat-aware response delay, inserted as literal silence samples
-    ahead of it in the same buffer -- so that delay is exact too, instead
+    ahead of it in the same buffer, so that delay is exact too, instead
     of being at the mercy of a playback thread's wake-up jitter.
     """
 
@@ -46,7 +46,7 @@ class TimingSync:
         self.max_hold_ms = cfg["timing"]["max_hold_ms"]
         self.output_device = cfg["audio"]["output_device"]
         # NOTE: volume is already applied once, upstream, in
-        # VocableSynthesizer.synthesize(). Not re-applied here -- the
+        # VocableSynthesizer.synthesize(). Not re-applied here, the
         # original code also read this and never used it, so this isn't
         # a behavior change, just documenting it instead of leaving a
         # silently-dead config read.
@@ -105,13 +105,13 @@ class TimingSync:
                 # Mirrors the old "queue full, drop stale chunk" behavior:
                 # if we're this far behind real-time, queuing more audio
                 # just makes the live performance feel laggier, not better.
-                logger.debug("Playback backlog too large — dropping incoming chunk")
+                logger.debug("Playback backlog too large, dropping incoming chunk")
                 return
 
             # A genuine new note gets the beat-aware response delay. A
             # "sustain" continuation only gets it too if the buffer had
             # actually run dry since the last chunk (a real gap already
-            # happened, so treat it like a fresh attack) -- otherwise it
+            # happened, so treat it like a fresh attack), otherwise it
             # goes straight on the end of what's already queued, with
             # zero added delay, so a held note stays one unbroken tone.
             is_new_onset = (action == "sing") or not self._had_content_last_note
@@ -168,7 +168,7 @@ class TimingSync:
         with self._buffer_lock:
             self._pending.clear()
             self._had_content_last_note = False
-        # No sd.stop() needed -- the stream keeps running and the
+        # No sd.stop() needed, the stream keeps running and the
         # callback above just emits silence once _pending is empty,
         # which is cheaper than tearing down and restarting a stream
         # every time a phrase ends.

@@ -18,6 +18,11 @@ from infer.module.models import (
 )
 
 try:
+    from voice_clarity import apply_voice_clarity
+except ImportError:  # imported as neural_env.rvc_pipeline
+    from neural_env.voice_clarity import apply_voice_clarity
+
+try:
     import faiss
 except ImportError:
     faiss = None  
@@ -77,7 +82,7 @@ class RVCOfflineVoice:
         self.is_half = bool(is_half) and self.device.type == "cuda"
         # Was unconditionally True whenever device == "cpu". int8 dynamic
         # quantization is a real speed win on a weak CPU, but it measurably
-        # degrades the phonetic features HuBERT extracts -- the official
+        # degrades the phonetic features HuBERT extracts, the official
         # WebUI never quantizes. Now opt-in, defaulting to off, since sound
         # quality is the stated priority.
         self.quantized = bool(quantize_hubert) and self.device.type == "cpu"
@@ -139,6 +144,7 @@ class RVCOfflineVoice:
         rms_mix_rate: float = 0.25,
         pad_seconds: float = 1.0,
         filter_radius: int = 3,
+        clarity: dict | None = None,
     ) -> tuple[np.ndarray, int]:
         audio = np.ascontiguousarray(audio, dtype=np.float32)
         audio_16k = _resample_np(audio, sample_rate, 16000)
@@ -190,7 +196,7 @@ class RVCOfflineVoice:
             # A median filter alone kills single-frame pitch-tracking
             # glitches, but it also flattens genuine gradual pitch
             # movement (vibrato, portamento, note-to-note glides) into
-            # short flat plateaus with hard jumps between them -- that
+            # short flat plateaus with hard jumps between them, that
             # staircase shape is exactly what reads as "auto-tuned" or
             # "robotic" instead of sung, even when every individual pitch
             # value is accurate. Savitzky-Golay fits a local polynomial
@@ -206,7 +212,7 @@ class RVCOfflineVoice:
                     f0 = np.clip(f0, 0.0, None)
 
             f0_min, f0_max = 50.0, 1100.0
-            # Diagnostic only -- if a large fraction of the (already
+            # Diagnostic only, if a large fraction of the (already
             # transposed) voiced frames sit outside the model's valid pitch
             # embedding range, they get clamped to the same edge bin below,
             # which sounds exactly like "autotune": many different real
@@ -233,7 +239,7 @@ class RVCOfflineVoice:
 
         if f0_clip_pct > 15.0:
             print(f"[rvc_pipeline] {f0_clip_pct:.0f}% of voiced frames fall outside the model's "
-                  f"50-1100Hz pitch range at this transpose setting (f0_up_key={f0_up_key:+.0f}) -- "
+                  f"50-1100Hz pitch range at this transpose setting (f0_up_key={f0_up_key:+.0f}), "
                   "this will sound flat/robotic for those stretches. Try a different transpose value.")
 
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
@@ -269,5 +275,28 @@ class RVCOfflineVoice:
 
         if rms_mix_rate != 1.0:
             out = _change_rms(audio_16k_for_rms, 16000, out, self.tgt_sr, rms_mix_rate)
+
+        # WHAT EVERY TRAINED VOICE GETS ON THE WAY OUT.
+        #
+        # The model answers with its own spectral balance, and a checkpoint
+        # trained on darker material loses the 2-5 kHz band that carries
+        # consonants. The words are there, but they are hard to make out --
+        # which is the difference between a model that sounds like a singer
+        # and one that sounds like a singer behind a blanket. The stage below
+        # measures the presence of the material the model was handed and
+        # restores at most `presence_max_lift_db` of the gap, with no cut when
+        # the model is already bright enough, then guarantees the result never
+        # leaves above full scale. It is shared by every voice, live chunk and
+        # offline render alike, so one model cannot be quietly muddier than
+        # the next. See neural_env/voice_clarity.py for the measurement and
+        # tests/test_voice_clarity.py for what it is held to.
+        clarity = clarity or {}
+        out = apply_voice_clarity(
+            out, self.tgt_sr,
+            reference=audio, reference_sr=sample_rate,
+            presence_match=bool(clarity.get("presence_match", True)),
+            max_lift_db=float(clarity.get("presence_max_lift_db", 3.0)),
+            ceiling=float(clarity.get("peak_ceiling", 0.99)),
+        )
 
         return out, self.tgt_sr

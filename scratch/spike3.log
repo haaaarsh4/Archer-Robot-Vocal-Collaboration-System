@@ -1,0 +1,17 @@
+Loading weights:   0%|          | 0/1096 [00:00<?, ?it/s]Loading weights:  54%|█████▍    | 595/1096 [00:00<00:00, 5915.69it/s]Loading weights: 100%|██████████| 1096/1096 [00:00<00:00, 7129.19it/s]
+[load] base 0.8s
+[audio] frontend/assets/audio/memory-v2.mp3 34.0s +8.0s rms=0.0415
+
+===== crk-script_latin
+[greedy] 4.7s (0.59x RT) frames=39 vocab=39 (35 letters) mean_conf=0.932
+  RAW : 'inall thōse kwestions a it just okurre to mē an itil bē ēxplaynit farther in the pīace by‐some one machmate'
+  SRO : 'inall thōse kwestions a it just okurre to mē an itil bē ēxplaynit farther in the pīace by‐some one machmate'
+  CANS: 'ᐃᓇᓬᓬ ᐟᐦᐆᓭ ᑵᐢᑎᐅᐣᐢ ᐊ ᐃᐟ juᐢᐟ ᐅᐠuᕒᕒᐁ ᑐ ᒣ ᐊᐣ ᐃᑎᓬ bᐁ ᐁxᑊᓬᐊᕀᓂᐟ fᐊᕒᐟᐦᐁᕒ ᐃᐣ ᐟᐦᐁ ᐲᐊᒉ bᕀ-ᓱᒣ ᐅᓀ ᒪᐨᐦᒪᑌ'
+  ANGL: 'i-nall thoo-say kways-ti-ons a it just o-kur-ray to may an i-til bay ayxp-lay-nit far-thayr in thay pee-a-tsay by-so-may o-nay matsh-ma-tay'
+
+===== crk-script_syllabics
+[greedy] 2.3s (0.28x RT) frames=82 vocab=82 (78 letters) mean_conf=0.893
+  RAW : 'ᐊ   ᐣ ᓬ  ᑲᐢᐣ ᒋᐢᐟ ᑕᕒᐟ  ᐣ ᐃᓬ ᐃᐢᐣᐟ ᐱᑕᕒ ᐣ ᐱᐢ  ᑦ ᐃᐣ ᐢᐟ ᒪᕒᐟᑖᑕ'
+  SRO : 'a   n l  kasn cist tart  n il isnt pitar n pis  ᑦ in st marttâta'
+  CANS: 'ᐊ ᐣ ᓬ ᑲᐢᐣ ᒋᐢᐟ ᑕᕒᐟ ᐣ ᐃᓬ ᐃᐢᐣᐟ ᐱᑕᕒ ᐣ ᐱᐢ ᑦ ᐃᐣ ᐢᐟ ᒪᕒᐟᑖᑕ'
+  ANGL: 'a n l kasn tsist tart n il isnt pi-tar n pis ᑦ in sta mart-taa-ta'

@@ -27,11 +27,11 @@ class STFT(torch.nn.Module):
         between frames).
 
         Keyword Arguments:
-            filter_length {int} -- Length of filters used (default: {1024})
-            hop_length {int} -- Hop length of STFT (restrict to 50% overlap between frames) (default: {512})
-            win_length {[type]} -- Length of the window function applied to each frame (if not specified, it
+            filter_length {int}, Length of filters used (default: {1024})
+            hop_length {int}, Hop length of STFT (restrict to 50% overlap between frames) (default: {512})
+            win_length {[type]}, Length of the window function applied to each frame (if not specified, it
                 equals the filter length). (default: {None})
-            window {str} -- Type of window to use (options are bartlett, hann, hamming, blackman, blackmanharris)
+            window {str}, Type of window to use (options are bartlett, hann, hamming, blackman, blackmanharris)
                 (default: {'hann'})
         """
         super(STFT, self).__init__()
@@ -68,12 +68,12 @@ class STFT(torch.nn.Module):
         """Take input data (audio) to STFT domain.
 
         Arguments:
-            input_data {tensor} -- Tensor of floats, with shape (num_batch, num_samples)
+            input_data {tensor}, Tensor of floats, with shape (num_batch, num_samples)
 
         Returns:
-            magnitude {tensor} -- Magnitude of STFT with shape (num_batch,
+            magnitude {tensor}, Magnitude of STFT with shape (num_batch,
                 num_frequencies, num_frames)
-            phase {tensor} -- Phase of STFT with shape (num_batch,
+            phase {tensor}, Phase of STFT with shape (num_batch,
                 num_frequencies, num_frames)
         """
         input_data = F.pad(
@@ -100,13 +100,13 @@ class STFT(torch.nn.Module):
         by the ```transform``` function.
 
         Arguments:
-            magnitude {tensor} -- Magnitude of STFT with shape (num_batch,
+            magnitude {tensor}, Magnitude of STFT with shape (num_batch,
                 num_frequencies, num_frames)
-            phase {tensor} -- Phase of STFT with shape (num_batch,
+            phase {tensor}, Phase of STFT with shape (num_batch,
                 num_frequencies, num_frames)
 
         Returns:
-            inverse_transform {tensor} -- Reconstructed audio given magnitude and phase. Of
+            inverse_transform {tensor}, Reconstructed audio given magnitude and phase. Of
                 shape (num_batch, num_samples)
         """
         cat = torch.cat(
@@ -134,10 +134,10 @@ class STFT(torch.nn.Module):
         """Take input data (audio) to STFT domain and then back to audio.
 
         Arguments:
-            input_data {tensor} -- Tensor of floats, with shape (num_batch, num_samples)
+            input_data {tensor}, Tensor of floats, with shape (num_batch, num_samples)
 
         Returns:
-            reconstruction {tensor} -- Reconstructed audio given magnitude and phase. Of
+            reconstruction {tensor}, Reconstructed audio given magnitude and phase. Of
                 shape (num_batch, num_samples)
         """
         self.magnitude, self.phase = self.transform(input_data, return_phase=True)

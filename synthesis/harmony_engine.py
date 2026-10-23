@@ -40,6 +40,13 @@ class HarmonyDecision:
     timing_jitter_ms: float = 0.0
     formant_spread   : float = 0.0
     reverb_amount    : float = 0.08
+    # A per-note level in dB, applied by the synthesizer AFTER the render and
+    # its own peak normalisation (see VocableSynthesizer.synthesize), because
+    # that normalisation would otherwise erase any loudness a mode asked for
+    # through its timbre fields. This is what carries the third low-note rule
+    # (less volume as the harmony goes lower) and puts a held pedal under the
+    # lead rather than beside it.
+    level_trim_db    : float = 0.0
 
 
 class HarmonyEngine:
@@ -65,6 +72,10 @@ class HarmonyEngine:
         self.mode_selector = AccompanimentModeSelector(cfg)
         self.mode_functions = ModeFunctions(cfg)
         self.ctx = MusicalContext()
+        # How long the pitched frames have to go quiet before the next one counts
+        # as a new phrase. The drone is the mode that reads this (one held note
+        # per phrase, see ModeFunctions.drone).
+        self.ctx.phrase_gap_s = float((cfg.get("modes", {}) or {}).get("drone_phrase_gap_s", 0.35))
         self._fusion_third_semitones = harmony_cfg.get("fusion_third_semitones", 4)
 
         self.texture_params = TextureParams(cfg)
@@ -72,12 +83,12 @@ class HarmonyEngine:
 
         synth_cfg = cfg.get("synthesis", {})
         self._vocable_common = synth_cfg.get("vocable_set", ["aah", "ooo", "mmm", "hey"])
-        # Dedicated close chorus-detune for timbral_thickening -- see the
+        # Dedicated close chorus-detune for timbral_thickening, see the
         # fix in decide() below. Separate from any texture's own
         # detune_spread_cents, which is a wider, ensemble-oriented spread
         # meant for a duet/choir, not a single "thicker" voice.
         self._timbral_detune_cents = float(synth_cfg.get("timbral_detune_cents", 6.0))
-        # Drone's own narrow detune -- a soft, slow beating between two
+        # Drone's own narrow detune, a soft, slow beating between two
         # voices holding the same low note, not the wider chorus-y
         # spread the DUET texture uses for a moving melodic line.
         self._drone_detune_cents = float(synth_cfg.get("drone_detune_cents", 3.0))
@@ -85,17 +96,17 @@ class HarmonyEngine:
         # ModeFunctions._contour_timbre_lean) is allowed to push
         # brightness/vowel_color at full deflection. Kept as separate
         # knobs since brightness and vowel_color aren't the same
-        # perceptual axis -- brightness alone reads as "louder overtones",
+        # perceptual axis, brightness alone reads as "louder overtones",
         # while also nudging vowel_color toward the bright end (see decide()
         # below) is what actually makes it sound like the vowel itself is
         # shifting (toward "ee"/"ah" rising, toward "oh"/"oo" falling),
-        # not just a tone-control sweep. Deliberately large (was 0.30) --
+        # not just a tone-control sweep. Deliberately large (was 0.30)
         # a subtle EQ nudge disappears against a real mix; this needs to
         # be unmistakable, not tasteful.
         #
         # Split into _up/_down pairs (rather than one symmetric amount)
-        # so the frontend's Max brighten / Max darken sliders -- two
-        # independent controls -- can actually produce an asymmetric
+        # so the frontend's Max brighten / Max darken sliders, two
+        # independent controls, can actually produce an asymmetric
         # swing. Config only has one value each for backward
         # compatibility (a config-only setup with no frontend override
         # has no reason to want asymmetry), so both directions default
@@ -107,20 +118,20 @@ class HarmonyEngine:
         self._contour_brightness_amount_down = _contour_brightness_default
         self._contour_vowel_color_amount_up = _contour_vowel_color_default
         self._contour_vowel_color_amount_down = _contour_vowel_color_default
-        # Applied UNCONDITIONALLY, regardless of lean -- see decide()'s
+        # Applied UNCONDITIONALLY, regardless of lean, see decide()'s
         # CONTOUR block. Without this, lean == 0 (a genuinely flat
         # melody) meant brightness/vowel_color were completely
         # untouched, i.e. still silently identical to unison right when
         # it mattered most. This guarantees contour_following's resting
         # tone is already distinguishable before any movement happens at
-        # all -- an always-on identity, not one that only shows up when
+        # all, an always-on identity, not one that only shows up when
         # the melody cooperates.
         self._contour_baseline_brightness_shift = float(synth_cfg.get("contour_baseline_brightness_shift", 0.18))
         self._default_vocable_name = next(
             (v for v in self._vocable_common if "oh" in v.lower()),
             (self._vocable_common[0] if self._vocable_common else "aah"),
         )
-        # Dedicated vocable for drone_support -- a held grounding tone
+        # Dedicated vocable for drone_support, a held grounding tone
         # wants one consistent, smooth, closed-mouth-ish sound (a hum or
         # "ohh"), not whatever's rotating through vocable_set for the
         # melodic line above it. Configurable via synthesis.drone_vocable;
@@ -134,7 +145,7 @@ class HarmonyEngine:
 
         # How many notes a single chosen vocable is allowed to carry on
         # for before a fresh pick is forced even without a rest in
-        # between -- see the "word_overstayed" check in decide() below.
+        # between, see the "word_overstayed" check in decide() below.
         # Purely a variety safety valve for an unusually long unbroken
         # phrase; ordinary phrase-to-phrase changes are driven by actual
         # rests, not this counter.
@@ -142,12 +153,12 @@ class HarmonyEngine:
         self._notes_since_vocable_change: int = 0
         # The word actually picked last time, purely so _choose_vocable
         # can avoid handing back the exact same word twice in a row when
-        # it has any other reasonable option -- see _pick_by_melodic_fit.
+        # it has any other reasonable option, see _pick_by_melodic_fit.
         self._last_used_vocable: str | None = None
         self._vocable_rng = np.random.default_rng()
         # When set (see set_vocable_override), _choose_vocable always
         # returns this exact word and every rotation/brightness-matching
-        # priority below is skipped -- this is what backs the frontend's
+        # priority below is skipped, this is what backs the frontend's
         # "pick one word instead of Mix" picker for DSP mode.
         self._vocable_override: str | None = None
 
@@ -167,25 +178,25 @@ class HarmonyEngine:
 
         self._last_good_hz: float | None = None
         # FIX: this was `_gap_frames: int` counted against a
-        # `_max_gap_frames = 8` cap -- at this project's normal frame
+        # `_max_gap_frames = 8` cap, at this project's normal frame
         # settings that's roughly 90ms, a fraction of an ordinary breath
         # or word-boundary pause in real singing. Once a dropout ran past
-        # that, decide() (below) didn't hold the last real note -- it
+        # that, decide() (below) didn't hold the last real note, it
         # snapped the target pitch to self._default_start_hz, a flat,
         # hardcoded 220Hz completely unrelated to the melody, for as long
         # as the gap continued. That's a real, audible wrong-note glitch
         # landing on every ordinary pause in the singing, not just long
-        # ones -- likely a big part of why the output could sound like it
+        # ones, likely a big part of why the output could sound like it
         # shares nothing with the input: it wasn't just briefly quiet at
         # each breath, it was briefly singing THE WRONG NOTE.
         #
         # Fixed by just holding the last real pitch for as long as
-        # phrase_state keeps reporting "singing" -- no expiring counter,
+        # phrase_state keeps reporting "singing", no expiring counter,
         # no fallback pitch. "Start from exactly where it stopped" is
         # exactly what continuing to hold the last real note IS. Whether
         # a given pause is short enough to still count as "singing" (and
         # so gets bridged) or long enough to actually end the phrase is
-        # phrase_state's call, not this engine's -- that's decided by
+        # phrase_state's call, not this engine's, that's decided by
         # RhythmAnalyzer.push_frame's own hangover/silence timing
         # (analysis/rhythm_analyzer.py), which wasn't available to check
         # while making this change. If short pauses are STILL cutting the
@@ -195,7 +206,7 @@ class HarmonyEngine:
         # real pitch has ever locked in this performance yet), never as a
         # mid-phrase gap filler.
         # Comfortable mid pitch (A3) used only for the bootstrap case
-        # above -- no real pitch has ever locked yet. Not a musical
+        # above, no real pitch has ever locked yet. Not a musical
         # choice, just a reasonable starting point that gets corrected
         # the instant real pitch data arrives.
         self._default_start_hz: float = 220.0
@@ -211,7 +222,7 @@ class HarmonyEngine:
         self._t0 = time.monotonic()
 
         logger.info(
-            f"HarmonyEngine ready — default_mode={self.mode_selector.default_mode.value}, "
+            f"HarmonyEngine ready, default_mode={self.mode_selector.default_mode.value}, "
             f"protocol_enabled={self.protocol.enabled}, fusion_mode={self.mode_selector.fusion_mode}"
         )
 
@@ -246,7 +257,7 @@ class HarmonyEngine:
                 self._infer_key()
         elif phrase_state == "singing" and self._last_good_hz is not None:
             # An ordinary pause inside an active phrase (a breath, a
-            # consonant, a brief pitch-tracker dropout) -- hold the last
+            # consonant, a brief pitch-tracker dropout), hold the last
             # real pitch exactly as-is rather than touching it. No
             # counter, no expiry: as long as phrase_state keeps reporting
             # "singing", this keeps the note going from precisely where
@@ -256,7 +267,7 @@ class HarmonyEngine:
             # True bootstrap only: the singer is clearly active but no
             # confident pitch has EVER locked yet, e.g. the very start of
             # a performance before the first successful detection. Never
-            # leave dead air waiting for a perfect reading -- start on a
+            # leave dead air waiting for a perfect reading, start on a
             # sensible default pitch now; once real pitch data arrives it
             # registers as a normal note change through the usual
             # onset-detection logic below, nothing special-cased.
@@ -274,7 +285,7 @@ class HarmonyEngine:
             beat_duration_s=beat_duration_s,
             key_root_hz=key_root_hz,
             phrase_just_ended=phrase_just_ended,
-            octave_shift_semitones=octave_shift,  # <-- ADD THIS
+            octave_shift_semitones=octave_shift,  # ADD THIS
         )
 
         is_protocol_sensitive = (
@@ -314,9 +325,9 @@ class HarmonyEngine:
             octave_shift = self._synthesizer._octave_shift_semitones
             if octave_shift != 0:
                 # octave_shift is in SEMITONES (see /harmony/octave-shift in
-                # server.py and set_octave_shift below) -- 12 semitones per
+                # server.py and set_octave_shift below), 12 semitones per
                 # octave, not 1200 (that's cents). Dividing by 1200 made this
-                # knob almost inaudible on its own -- a +/-24 semitone request
+                # knob almost inaudible on its own, a +/-24 semitone request
                 # only moved pitch by a few cents.
                 target_hz = target_hz * (2 ** (octave_shift / 12.0))
 
@@ -327,7 +338,7 @@ class HarmonyEngine:
         if action == "sing":
             if mode == AccompanimentMode.DRONE:
                 # A grounding drone should always sound like one smooth,
-                # steady "ohh" underneath the phrase -- not whatever
+                # steady "ohh" underneath the phrase, not whatever
                 # rhythmic syllable happens to be rotating through
                 # vocable_set (Lalanana/ohoho by default), which is
                 # tuned for a moving melodic line, not a note held for
@@ -338,7 +349,7 @@ class HarmonyEngine:
                 self._locked_vocable = self._drone_vocable_name
                 self._notes_since_vocable_change = 0
             elif self._last_good_hz is None:
-                # Bootstrap note -- no real pitch detection has landed
+                # Bootstrap note, no real pitch detection has landed
                 # yet, we're singing on the default pitch above. Open
                 # with the requested default vocable rather than
                 # whatever an empty pitch_history rotation would pick.
@@ -348,7 +359,7 @@ class HarmonyEngine:
                 # A held musical phrase should carry ONE vocable through
                 # it, the way a real backing vocalist rides one syllable
                 # across a phrase instead of switching words on every
-                # new note -- so a fresh word is only actually picked at
+                # new note, so a fresh word is only actually picked at
                 # a genuine phrase START (self._locked_vocable is None,
                 # meaning the last thing that happened before this note
                 # was a rest) or once a single word has already carried
@@ -387,19 +398,19 @@ class HarmonyEngine:
 
         if mode == AccompanimentMode.TIMBRAL:
             # Timbral thickening's whole identity is a second, closely
-            # detuned copy of the SAME note -- with only one voice there's
+            # detuned copy of the SAME note, with only one voice there's
             # nothing to detune against, so it was audibly indistinguishable
             # from unison_shadowing (see ModeFunctions.timbral(), which
-            # returns the exact same pitch as unison on purpose -- this is
+            # returns the exact same pitch as unison on purpose, this is
             # meant to thicken, not harmonize). Guarantee a doubled voice
             # here regardless of whatever Voice Texture the person has
-            # picked -- Solo would otherwise silently erase this mode's
-            # whole character -- and use the mode's own tight, deliberately
+            # picked, Solo would otherwise silently erase this mode's
+            # whole character, and use the mode's own tight, deliberately
             # narrow detune (synthesis.timbral_detune_cents in config.yaml,
             # previously read from config but never actually applied
             # anywhere) instead of the chosen texture's generic, wider,
             # ensemble-oriented spread. Thickening should sound like one
-            # warmer, fuller voice, not a small crowd -- so jitter and
+            # warmer, fuller voice, not a small crowd, so jitter and
             # reverb are capped even if a bigger texture (e.g. Choir) is
             # selected, and a touch of formant spread is guaranteed so the
             # second layer reads as a second voice, not just a pitch-
@@ -412,16 +423,16 @@ class HarmonyEngine:
 
         if mode == AccompanimentMode.DRONE:
             # A grounding drone should be warm and rock-still, not a
-            # moving ensemble -- guaranteed doubling here regardless of
+            # moving ensemble, guaranteed doubling here regardless of
             # whatever Voice Texture is selected (Solo would otherwise
             # leave it as one thin low note), but with the drone's OWN
             # tight, deliberately narrow detune (a soft, slow beating
-            # like a tanpura or two singers holding the same low note --
+            # like a tanpura or two singers holding the same low note
             # not the wider chorus-y spread meant for a moving melodic
             # duet/choir). Jitter is capped very low: on a note that's
             # sustained for many seconds, even a small per-voice onset
             # offset reads as a slow drift rather than natural ensemble
-            # looseness. Reverb gets a boost -- a drone should feel like
+            # looseness. Reverb gets a boost, a drone should feel like
             # it's sitting in the room underneath everything else, not
             # close-mic'd like the lead melodic voice.
             num_voices = max(2, num_voices)
@@ -433,21 +444,21 @@ class HarmonyEngine:
         if mode == AccompanimentMode.CONTOUR:
             # contour_following's discrete harmony step (see
             # ModeFunctions.contour) only engages once real melodic
-            # movement crosses a threshold -- it has to work that way
+            # movement crosses a threshold, it has to work that way
             # under scale_lock, which rounds pitch to the nearest scale
             # degree and would erase anything subtler anyway. The result:
             # whenever a phrase holds fairly still, the mode's target
-            # pitch is EXACTLY archer_hz -- identical output to
+            # pitch is EXACTLY archer_hz, identical output to
             # unison_shadowing, nothing else distinguishing it, for
             # however long the melody stays put (which for a short,
             # mostly-spoken vocal take can be most of it).
             #
             # Brightness/vowel_color aren't touched by scale_lock, so
             # they can track melodic direction continuously instead of
-            # waiting for a threshold crossing -- _contour_timbre_lean
+            # waiting for a threshold crossing, _contour_timbre_lean
             # (-1 falling .. +1 rising) is updated every single call in
             # ModeFunctions.contour. But lean alone still hits EXACTLY
-            # zero whenever the melody is genuinely flat -- and at
+            # zero whenever the melody is genuinely flat, and at
             # lean == 0 the line below is brightness + 0, i.e. still
             # silently identical to unison right when it matters most.
             # self._contour_baseline_brightness_shift fixes that: a
@@ -467,7 +478,7 @@ class HarmonyEngine:
             # Lower vowel_color reads as brighter ("ee"/"ah"-like) per
             # CREE_PHONEME_PROFILES in phonetic_analysis.py (long_i:
             # brightness 0.9/vowel_color 0.0 vs long_o: brightness
-            # 0.4/vowel_color 0.8) -- so rising (lean > 0) should PULL
+            # 0.4/vowel_color 0.8), so rising (lean > 0) should PULL
             # vowel_color down, hence the minus signs here (baseline
             # shift included, mirroring brightness's own baseline).
             vowel_color = float(np.clip(
@@ -475,6 +486,42 @@ class HarmonyEngine:
                 - lean * vowel_color_amount,
                 0.0, 1.0,
             ))
+
+        # ------------------------------------------------------------------
+        # HOW A LOWER HARMONY VOICE IS SUNG, in the two modes where a part sits
+        # away from the singer's own notes: octave_reinforcement (a whole line an
+        # octave down) and drone_support (one held note under a phrase). Both of
+        # these were being rendered as the same voice at a different pitch, and
+        # the same voice at a different pitch is what a listener describes as
+        # "the same thing, but deep and weird" -- it is a pitch-shifted copy, not
+        # a second singer. A singer dropping below themselves does three things
+        # about it, and all three are implemented here rather than left to the
+        # pitch alone:
+        #   1. THE VOWEL STAYS BRIGHT. Down an octave a voice loses its
+        #      presence, so the shelf above ~3.2 kHz is lifted (brightness).
+        #   2. THE VOWEL NARROWS. The formant peak slides toward the front/bright
+        #      end (vowel_color down), which is the mouth getting a little
+        #      narrower on a low note.
+        #   3. THE VOLUME COMES DOWN. The lower the harmony sits, and the lower
+        #      the note is in absolute terms, the less of it there is (a level
+        #      trim the synthesizer applies after its own normalisation, since
+        #      that normalisation would otherwise undo it).
+        # ------------------------------------------------------------------
+        level_trim_db = 0.0
+        if mode == AccompanimentMode.OCTAVE and self.mode_functions.octave_semitones < 0:
+            depth = float(np.clip(abs(self.mode_functions.octave_semitones) / 12.0, 0.0, 1.5))
+            brightness = float(np.clip(
+                brightness + self.mode_functions.octave_low_bright_amount * depth, 0.0, 1.0))
+            vowel_color = float(np.clip(
+                vowel_color - self.mode_functions.octave_low_narrow_amount * depth, 0.0, 1.0))
+            trim = self.mode_functions.octave_low_trim_db * depth
+            floor_hz = self.mode_functions.octave_low_floor_hz
+            if target_hz and floor_hz > 0 and target_hz < floor_hz:
+                trim += float(np.clip((floor_hz - target_hz) / floor_hz, 0.0, 1.0)) \
+                    * self.mode_functions.octave_low_floor_extra_db
+            level_trim_db = -trim
+        elif mode == AccompanimentMode.DRONE:
+            level_trim_db = -self.mode_functions.drone_level_trim_db
 
         decision = HarmonyDecision(
             target_hz=target_hz or 0.0,
@@ -486,6 +533,7 @@ class HarmonyEngine:
             action=action,
             mode=mode,
             mode_note=proposal.note,
+            level_trim_db=level_trim_db if action != "rest" else 0.0,
             texture=texture.value,
             num_voices=num_voices,
             detune_spread_cents=detune_spread_cents,
@@ -522,7 +570,7 @@ class HarmonyEngine:
     def _manual_proposal(self, archer_hz: Optional[float]) -> ModeProposal:
         if archer_hz is None:
             return ModeProposal(AccompanimentMode.UNISON, None, "rest",
-                                 note="manual interval mode — waiting for a pitch")
+                                 note="manual interval mode, waiting for a pitch")
         semitones = self.INTERVALS.get(self._current_interval, 7)
         target = archer_hz * (2 ** (semitones / 12.0))
         return ModeProposal(AccompanimentMode.UNISON, target, "sing",
@@ -531,7 +579,7 @@ class HarmonyEngine:
     # Modes whose entire job is to reproduce a pitch Archer ACTUALLY sang
     # (right now, an octave away, a beat ago, or doubled) rather than to
     # introduce a new harmonic relationship on top of his melody. For all
-    # of these, his own voice is already the ground truth -- there is no
+    # of these, his own voice is already the ground truth, there is no
     # "wrong note" for scale-lock to correct, only a real pitch it can
     # pull the robot away from. Snapping these to the nearest scale
     # degree was the actual reason unison_shadowing (and the others
@@ -562,8 +610,8 @@ class HarmonyEngine:
         # contour_following is only a "new interval" mode while it has
         # actually committed to a step away from unison (see
         # ModeFunctions.contour's hysteresis state machine). While its
-        # state is "unison" its target IS archer_hz, unmodified -- exactly
-        # like unison_shadowing at that moment -- so it deserves the same
+        # state is "unison" its target IS archer_hz, unmodified, exactly
+        # like unison_shadowing at that moment, so it deserves the same
         # exemption for as long as that's true, and only that long.
         if mode == AccompanimentMode.CONTOUR and self.mode_functions._contour_state == "unison":
             is_exact_copy = True
@@ -703,13 +751,13 @@ class HarmonyEngine:
         """
         Picks the next word/syllable to sing. Only actually called at a
         genuine phrase start or after a word has overstayed its welcome
-        (see the caller in decide()) -- never on every note -- so
+        (see the caller in decide()), never on every note, so
         whatever comes back here is going to carry across an entire
         musical phrase, and it needs to earn that.
 
         Priority order:
           0. A forced single-vocable override (see set_vocable_override)
-             -- when the caller has locked this engine to one specific
+             when the caller has locked this engine to one specific
              recorded word (the frontend's "one word, not Mix" picker),
              every single one of the priorities below is skipped
              entirely. This is deliberately checked before even the rare
@@ -718,14 +766,14 @@ class HarmonyEngine:
           1. An occasional deliberate "surprise" word from
              vocable_rare_set, same as before.
           2. If the loaded voice bank can tell us how each word actually
-             SOUNDS (see NeuralVocableBank.vocable_brightness_map --
+             SOUNDS (see NeuralVocableBank.vocable_brightness_map
              measured from the real recordings, not guessed from
              filenames), pick whichever configured word's own natural
              tone best matches where the melody sits right now: a high
              or rising phrase leans toward a brighter-sounding word, a
              low or falling one toward a warmer, rounder one. This is
              the actual fix for words that used to show up with zero
-             relationship to the moment -- "cold" cutting in mid-phrase
+             relationship to the moment, "cold" cutting in mid-phrase
              for no reason was len(pitch_history) % N, a plain counter
              with no idea what any word sounds like or what the melody
              was doing.
@@ -733,7 +781,7 @@ class HarmonyEngine:
              non-neural engine, or the bank hasn't loaded), fall back to
              the old vowel-color split when a real Cree phoneme reading
              is actually available, then to a plain rotation as the last
-             resort -- but never repeating the word already playing.
+             resort, but never repeating the word already playing.
         """
         if self._vocable_override:
             self._last_used_vocable = self._vocable_override
@@ -752,7 +800,7 @@ class HarmonyEngine:
 
         brightness_map = self._synthesizer.get_vocable_brightness_map() if self._synthesizer else None
         # Only worth using if it actually covers something in the
-        # configured word set -- a bank loaded with a totally different
+        # configured word set, a bank loaded with a totally different
         # vocable_set than what's configured now shouldn't silently
         # steer word choice.
         usable_brightness_map = None
@@ -765,7 +813,7 @@ class HarmonyEngine:
 
         if profile is not None and profile.influence >= 0.1:
             # Same four-way split as before, but only ever returns a
-            # word that's actually configured -- this used to hand back
+            # word that's actually configured, this used to hand back
             # "hey"/"aah"/"ooo"/"mmm" unconditionally even if none of
             # them were in vocable_set at all.
             ordered = ["hey", "aah", "ooo", "mmm"]
@@ -787,7 +835,7 @@ class HarmonyEngine:
 
     def _melodic_target_brightness(self, profile: PhonemeProfile) -> float:
         """
-        0 (warm/rounded) .. 1 (bright/forward) -- what the melody
+        0 (warm/rounded) .. 1 (bright/forward), what the melody
         itself is asking for right now, combining two signals:
 
           register: is the current note sitting high or low relative to
@@ -796,7 +844,7 @@ class HarmonyEngine:
           adapts to whoever's actually singing rather than assuming
           everyone's range starts at the same place).
 
-          trend: is the melody climbing or falling right now -- the same
+          trend: is the melody climbing or falling right now, the same
           continuous lean contour_following already uses for its own
           brightness/vowel_color shaping (see ModeFunctions._contour_
           timbre_lean), reused here so a rising phrase pulls toward a
@@ -806,7 +854,7 @@ class HarmonyEngine:
         When a real Cree phoneme reading is actively influencing this
         decision (profile.influence > 0), its own vowel_color reading is
         blended in on top, proportional to how much it's actually
-        influencing everything else -- a genuine linguistic signal about
+        influencing everything else, a genuine linguistic signal about
         the vowel being sung shouldn't be thrown away just because
         there's also a brightness map available now.
         """
@@ -836,7 +884,7 @@ class HarmonyEngine:
         """
         Picks among the words whose measured brightness is close to
         `target`, weighted toward the closest matches but not
-        deterministic -- a real singer doesn't hit the exact same
+        deterministic, a real singer doesn't hit the exact same
         syllable every single time the melody revisits a given register,
         and always picking the single closest match would just trade
         one totally-predictable mechanical pattern (the old rotation)
@@ -906,7 +954,7 @@ class HarmonyEngine:
 
         Also immediately reassigns _locked_vocable so the change takes
         effect on the very next note, rather than waiting for the
-        current phrase to end -- picking a word in the UI should be
+        current phrase to end, picking a word in the UI should be
         heard right away, not queued up behind whatever's already
         playing.
         """
@@ -916,18 +964,18 @@ class HarmonyEngine:
             self._locked_vocable = vocable
             logger.info(f"Vocable locked to single word: '{vocable}' (accompaniment mode selection bypassed)")
         else:
-            logger.info("Vocable override cleared -- back to normal rotation")
+            logger.info("Vocable override cleared, back to normal rotation")
 
     def set_contour_brightness_db(self, baseline_db: float, max_bright_db: float, max_dark_db: float):
         """
         Per-request override for contour_following's three frontend
-        sliders (Contour baseline / Max brighten / Max darken -- see
+        sliders (Contour baseline / Max brighten / Max darken, see
         index.html's demoContourBaselineDb etc.), all specified in dB to
         match what's actually shown in the UI and how the Neural/JS
         engine already works natively.
 
         This engine's own brightness math runs in a 0-1 "brightness"
-        unit space (see PhonemeProfile/HarmonyDecision), not dB -- the
+        unit space (see PhonemeProfile/HarmonyDecision), not dB, the
         conversion below is a deliberately simple, approximately-linear
         mapping (dB / 10.0) that matches the *10.0 scale
         vocable_synthesizer.py's _apply_phoneme_shaping already uses to
@@ -935,20 +983,20 @@ class HarmonyEngine:
         inverse of that formula (which has a small dead zone between
         0.45-0.55 that this doesn't try to reproduce), so the actual
         rendered dB at baseline may land a fraction of a dB off from
-        what's requested -- close enough for tuning by ear, which is the
+        what's requested, close enough for tuning by ear, which is the
         only thing these sliders are for.
 
         max_bright_db is the ABSOLUTE ceiling a full-rising lean reaches
         (matching the UI showing it as e.g. "+10dB", not a delta), so the
         up-swing is (max_bright_db - baseline_db). max_dark_db arrives as
         a positive MAGNITUDE below baseline (the UI shows it as e.g.
-        "-4dB"), so the down-swing is (baseline_db + max_dark_db) -- the
+        "-4dB"), so the down-swing is (baseline_db + max_dark_db), the
         distance from baseline down to that absolute floor. Both clamped
         to >= 0 so an unusual slider combination (baseline set past the
         brighten ceiling, say) can't invert a rising or falling lean into
         pushing brightness the wrong way.
 
-        vowel_color has no separate frontend control -- it mirrors
+        vowel_color has no separate frontend control, it mirrors
         brightness's own amounts directly, moving in lockstep with it
         (see decide()'s CONTOUR block for how the two combine).
         """

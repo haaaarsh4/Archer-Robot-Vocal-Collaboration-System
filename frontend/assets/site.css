@@ -1,0 +1,2587 @@
+/* ============================================================
+   Archer Pechawis, Vocal Collaboration System
+   Light, full bleed design system.
+
+   This file is the redesign layer. It is loaded AFTER the original
+   inline <style> in index.html, so it re-tunes the old tokens and
+   overrides the old chrome while the tool internals keep working.
+   Everything below is site chrome or skin; no tool behaviour lives here.
+   ============================================================ */
+
+/* ========================================================== 1. tokens */
+:root, body.light-mode {
+  --paper:      #e7e5df;   /* the reference's own paper */
+  --paper-2:    #f0efe8;
+  --paper-3:    #dedcd3;
+  --paper-4:    #d2d0c6;
+  --ink:        #1b1917;
+  --ink-2:      #565049;
+  --ink-3:      #8b8479;
+  --line:       rgba(27, 25, 23, 0.14);
+  --line-2:     rgba(27, 25, 23, 0.075);
+
+  --ochre:      #ad4a2a;
+  --ochre-d:    #8f3a1f;
+  --indigo:     #2d3a61;
+  --sage:       #4f6b57;
+  --stage-a:    #c6bdb1;
+  --stage-b:    #8b8174;
+
+  /* re-tune the original tokens so every legacy component re-skins */
+  --bg:         var(--paper);
+  --bg2:        var(--paper-2);
+  --bg3:        var(--paper-3);
+  --border:     var(--line);
+  --text:       var(--ink);
+  --muted:      var(--ink-2);
+  --accent:     var(--ochre);
+  --accent2:    var(--indigo);
+  --green:      #4f6b57;
+  --orange:     #a2611d;
+  --red:        #a5321c;
+
+  --sans:   'Inter Tight', 'Inter', system-ui, -apple-system, 'Noto Sans Canadian Aboriginal', sans-serif;
+  --mono:   'Space Mono', ui-monospace, 'JetBrains Mono', monospace;
+  --sig:    'Mr De Haviland', 'Cormorant Garamond', cursive;
+  --serif:  'Cormorant Garamond', Georgia, serif;
+  /* the home wordmark, and the caption face the reference uses for its small
+     lines, see frontend/fonts/fonts.css for where both come from */
+  --display:    'Amita', 'Cormorant Garamond', cursive;
+  --clearface:  'Clearface ITC', 'Cormorant Garamond', Georgia, serif;
+
+  --r-sm: 8px;
+  --r:    14px;
+  --r-lg: 22px;
+  --shadow-1: 0 1px 2px rgba(38, 30, 20, 0.05), 0 10px 26px rgba(38, 30, 20, 0.06);
+  --shadow-2: 0 20px 60px rgba(38, 30, 20, 0.20);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* the reference's own house curve, their CustomEase `M0,0 C0.6,0 0.1,1 1,1`:
+     slow off the mark, quick to arrive. It carries the open transition and
+     the menu's back ring, which are one and the same curve over there. */
+  --ease-open: cubic-bezier(0.6, 0, 0.1, 1);
+  /* the arrival's own curve: a long exponential settle, which is what makes
+     type look set rather than moved, 84% of the distance is covered in the
+     first quarter of the time and the rest is the landing */
+  --ease-stage: cubic-bezier(0.16, 1, 0.3, 1);
+  /* and their elastic, GSAP's `Elastic.easeOut.config(2, .4)`, as thirty
+     samples: the menu back button's mark settles to size on it. A cubic
+     bezier cannot overshoot past 1 and ring back twice, so the curve is
+     carried as stops rather than as a bezier. */
+  --ease-elastic: linear(0, 1.0284, 1.6584, 1.8708, 1.7668, 1.4948, 1.1923, 0.9527, 0.8169, 0.7823, 0.8197, 0.8917, 0.9657, 1.0208, 1.0494, 1.0537, 1.0419, 1.0232, 1.0053, 0.9928, 0.987, 0.9869, 0.9904, 0.9952, 0.9994, 1.0022, 1.0034, 1.0031, 1.0022, 1);
+  --topbar-h: 66px;
+  --frame-pad: 0px;   /* nothing is inset any more: every page is full bleed */
+  --stage: #07070a;   /* the dark stage used by the About page */
+  --teal:  #0f8d78;
+  /* the teal the dark page's own labels are set in: the deep teal above is a
+     colour on paper, and on black it reads as a smudge */
+  --teal-bright: #3fc9a8;
+}
+
+/* ========================================================== 2. stage */
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  letter-spacing: -0.004em;
+  -webkit-font-smoothing: antialiased;
+  padding: 0;
+  margin: 0;
+}
+body.is-locked { overflow: hidden; }
+/* the home page is exactly one screen tall and never scrolls */
+body.on-home { overflow: hidden; height: 100vh; }
+
+/* full bleed: no sheet, no border, no rounding, no shadow. The paper runs
+   to every edge of the window, exactly as the reference does. */
+#frame {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: none;
+  overflow: clip;
+}
+/* a clean, unbroken sheet: no grid, no frame line, nothing drawn on it */
+#frame > * { position: relative; z-index: 1; }
+
+img { max-width: 100%; display: block; }
+::selection { background: rgba(173, 74, 42, 0.18); }
+
+/* scrollbar */
+* { scrollbar-width: thin; scrollbar-color: var(--paper-4) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--paper-4); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+
+/* ========================================================== 3. topbar */
+.topbar {
+  position: fixed;
+  top: var(--frame-pad);
+  left: var(--frame-pad);
+  right: var(--frame-pad);
+  height: var(--topbar-h);
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 30px;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+/* the bar only appears once a long page has been scrolled */
+.topbar.is-scrolled {
+  border-bottom-color: var(--line-2);
+  background: rgba(240, 236, 228, 0.93);
+  backdrop-filter: blur(14px) saturate(1.05);
+}
+
+/* Three slots, and the middle one is the whole point of the bar: the wordmark
+   with the pipeline's own state under it, centred, so the name sits on the
+   window's centre line on every page and the status reads as a caption to it.
+   The slots stay pinned to their columns, and the first one is deliberately
+   empty: the 1fr either side of the wordmark is what holds it on the centre
+   line, and nothing on the left can pull it off. */
+.sig-block {
+  grid-column: 2; justify-self: center;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.topbar-right { grid-column: 3; justify-self: end; }
+
+.sig-logo {
+  font-family: var(--sig);
+  font-size: 38px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+  user-select: none;
+}
+.sig-logo:hover { opacity: 0.7; }
+
+/* ONE slot under the wordmark, two possible lines.
+
+   The home page wears the system's own name, the line that has stood there
+   since the first version of this page, and every other page wears the
+   pipeline's live state. Both are the same three declarations, taken from the
+   line that was measured off the old page: the mono face at 8.5px, 0.34em of
+   tracking, uppercase, in the third ink, which is 8.05px of advance per
+   character and 6px of cap height, exactly what the old line measured.
+
+   The space between the two words is a real space in the same mono cell that
+   line used, not a flex gap, so "pipeline: connected" and "vocal collaboration
+   system" are spaced the same way; that is why nothing here is a flex box. And
+   there is no dot any more: the words say the state, the line stays a line of
+   type, and it is never coloured, a lamp in the middle of a caption reads as
+   an alarm. */
+.sig-sub, .nav-status {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.34em;
+  text-transform: uppercase; color: var(--ink-3);
+  white-space: nowrap;
+  line-height: 1.7;
+}
+/* home's line is the only one of the two that is on by default; the home rules
+   below swap them over, and nothing else has to know which page it is on */
+.sig-sub { display: none; }
+.nav-status { display: block; }
+
+/* On the home page the bar is the reference's bar: the signature at their own
+   size and height (a 41px box 25px down, on the centre line), the three-bar
+   menu at their corner (26px down, 28px in), and the status line tucked under
+   the signature. Nothing else, no back-to-top, no words to the left. */
+body:has(#page-home.active) .sig-block {
+  position: fixed; top: 25px; left: 50%; transform: translateX(-50%);
+}
+body:has(#page-home.active) .sig-logo { font-size: 55px; line-height: 41px; }
+/* the slot swaps over on the home page and on the artist's own page: the
+   system's name stands on the front door and on the page about the person, and
+   only the pages that report the pipeline wear its state instead. A pipeline
+   line over a biography was a caption for the wrong page, the artist's page
+   has nothing to say about a socket in the back room. */
+body:has(#page-home.active) .sig-sub,
+body:has(#page-about.active) .sig-sub { display: block; }
+body:has(#page-home.active) .nav-status,
+body:has(#page-about.active) .nav-status { display: none; }
+body:has(#page-home.active) .eq-btn { position: fixed; top: 26px; right: 28px; padding: 0; }
+body:has(#page-home.active) .topbar { padding: 0 28px; }
+body:has(#page-home.active) #archer-chat-fab { display: none; }
+
+/* The corner control. Two marks live in one button, and the page decides which
+   one stands in it.
+
+   On the home page it is the reference's own menu toggle: three vertical bars,
+   17px by 28px, hairline weight, each one stepping a couple of pixels when the
+   pointer is on it. On every page behind the home page it is the reference's
+   own close mark instead, the same hairline ring and the same hand-drawn
+   cross the menu panel's back control wears, drawing itself around the cross in
+   half a second on their house curve while the cross settles onto their elastic
+   and it does the job the bars do, opening the menu. Same button, same
+   corner, one mark or the other. */
+.eq-btn {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  height: 28px; padding: 0 6px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.eq-bars { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4.3px; }
+.eq-bars span {
+  display: block; width: 2.6px; height: 24px; border-radius: 1.3px; background: currentColor;
+  transition: transform 0.3s var(--ease), opacity 0.25s;
+}
+.eq-btn:hover .eq-bars span:nth-child(1) { transform: translateY(-3px); }
+.eq-btn:hover .eq-bars span:nth-child(2) { transform: translateY(3px); }
+.eq-btn:hover .eq-bars span:nth-child(3) { transform: translateY(-3px); }
+
+.eq-x-ring, .eq-x-glyph {
+  display: none;
+  position: absolute; inset: 0; margin: auto;
+  pointer-events: none; overflow: visible;
+}
+.eq-x-ring { width: 34px; height: 33px; }
+.eq-x-glyph { width: 34px; height: 33px; transform: scale(1.2); transition: transform 0.75s var(--ease-elastic); }
+.eq-x-glyph path { fill: currentColor; }
+.eq-x-ring path {
+  fill: none; stroke: currentColor; stroke-width: 1.15;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1 1; stroke-dashoffset: -1; opacity: 0;
+  transition: stroke-dashoffset 0.4s var(--ease-open), opacity 0s linear 0.4s;
+}
+.eq-btn:hover .eq-x-ring path,
+.eq-btn:focus-visible .eq-x-ring path {
+  stroke-dashoffset: 0; opacity: 1;
+  transition: stroke-dashoffset 0.5s var(--ease-open), opacity 0s;
+}
+.eq-btn:hover .eq-x-glyph,
+.eq-btn:focus-visible .eq-x-glyph { transform: scale(1); transition: transform 1s var(--ease-elastic); }
+.eq-btn:focus-visible { outline: 1px solid var(--ink-3); outline-offset: 4px; }
+/* the swap: bars on the home page, the close mark on every page behind it.
+   `on-home` is set by the shell on every page change, so nothing here has to
+   ask the URL which page it is looking at. */
+body:not(.on-home) .eq-bars { display: none; }
+body:not(.on-home) .eq-x-ring,
+body:not(.on-home) .eq-x-glyph { display: block; }
+body:not(.on-home) .eq-btn { width: 34px; height: 34px; padding: 0; }
+body.on-about .eq-btn { color: #f2f1ec; }
+
+
+/* ==================================================== 5. menu overlay
+   Two rules hold this together.
+
+   Nothing that carries the frost is faded: an element, or any ancestor of
+   it, at opacity below 1 becomes its own backdrop root, and a
+   `backdrop-filter` inside one has nothing behind it to sample. That is why
+   the glass used to sit perfectly flat and only frost over once the fade was
+   done. So the wrapper hides by visibility, not by opacity, and the veil
+   keeps a constant blur and eases only its tint, the frost is on from the
+   first frame the panel is up, and lifts with the tint on the way out.
+
+   The frost spans the whole window and the panel rides in over it. When the
+   veil only owned the left column and the panel only nudged itself sideways,
+   the two edges pulled apart by exactly that nudge: a strip of sharp,
+   untinted page showed between the blur and the paper, and a strip of bare
+   page moving at its own speed beside a panel reads as a second, slower
+   sidebar. Nothing separates them now, behind the panel is glass, the
+   whole way. */
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  visibility: hidden;
+  /* one beat past the panel's own exit, and no longer than that */
+  transition: visibility 0s linear 0.28s;
+}
+.menu.open { pointer-events: auto; visibility: visible; transition-delay: 0s; }
+.menu-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 20, 16, 0);
+  backdrop-filter: blur(13px) saturate(1.06);
+  transition: background-color 0.2s var(--ease);
+}
+.menu.open .menu-veil { background: rgba(24, 20, 16, 0.42); transition: background-color 0.34s var(--ease); }
+.menu-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 90vw);
+  background: var(--paper);
+  padding: 34px 30px 26px;
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.24s var(--ease), box-shadow 0.24s var(--ease);
+  overflow-y: auto;
+  border-left: 1px solid var(--line-2);
+  box-shadow: -40px 0 70px -44px rgba(24, 20, 16, 0);
+}
+.menu.open .menu-panel {
+  transform: none;
+  box-shadow: -40px 0 70px -44px rgba(24, 20, 16, 0.34);
+  transition: transform 0.5s var(--ease), box-shadow 0.5s var(--ease);
+}
+
+/* the panel's contents walk in behind it, one line at a time: the head
+   first, then each row down the list, then the foot. Their place in that
+   walk is --mi, set on the element; the delay is only paid on the way in,
+   so closing leaves in one clean sweep. */
+.menu-head, .menu-label, .menu-list li, .menu-foot {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.2s var(--ease), transform 0.26s var(--ease);
+}
+.menu.open .menu-head, .menu.open .menu-label, .menu.open .menu-list li, .menu.open .menu-foot {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.34s var(--ease), transform 0.5s var(--ease);
+  transition-delay: calc(var(--mi, 0) * 36ms + 60ms);
+}
+.menu-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; min-height: 52px; }
+.menu-head h2 { font-family: var(--sig); font-size: 27px; font-weight: 400; }
+
+/* The panel's back button, built the way the reference builds its own close
+   control. Two marks on top of each other in a 52px target: a hairline ring
+   and, inside it, the hand-drawn cross. At rest the cross stands a fifth too
+   large and the ring is not there at all; point at the button and the ring
+   draws itself around the cross in half a second while the cross settles to
+   its true size on their elastic, past it, then back, twice, which is the
+   whole of the trick and the reason it feels drawn rather than switched on.
+   Leave and the ring un-draws the other way and the cross swells back out.
+
+   The ring is one path with `pathLength="1"`, so its whole length counts as
+   1 and the draw is a dashoffset from -1 to 0: no measurement, no JS, and it
+   stays exact at any size. Their two moves were one GSAP tween each (drawSVG
+   0% 0% -> 0% 100% on the house curve, and a scale on the elastic); here they
+   are two CSS transitions, on the same curves at the same speeds. */
+.menu-back {
+  position: relative; flex: none;
+  width: 52px; height: 52px; padding: 0;
+  background: transparent; border: none; border-radius: 50%;
+  color: var(--ink); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.menu-back svg {
+  position: absolute; width: 48px; height: 48px;
+  pointer-events: none; overflow: visible;
+}
+.menu-back .mb-ring path {
+  fill: none; stroke: currentColor; stroke-width: 1.15;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: -1;
+  opacity: 0;
+  /* un-drawing: back toward the end of the path over 0.4s, and only then may
+     the ring blink out of existence */
+  transition: stroke-dashoffset 0.4s var(--ease-open), opacity 0s linear 0.4s;
+}
+.menu-back .mb-glyph {
+  fill: currentColor;
+  transform: scale(1.2);
+  transition: transform 0.75s var(--ease-elastic);
+}
+.menu-back:hover .mb-ring path,
+.menu-back:focus-visible .mb-ring path {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transition: stroke-dashoffset 0.5s var(--ease-open), opacity 0s;
+}
+.menu-back:hover .mb-glyph,
+.menu-back:focus-visible .mb-glyph {
+  transform: scale(1);
+  transition: transform 1s var(--ease-elastic);
+}
+.menu-back:focus-visible { outline: 1px solid var(--ink-3); outline-offset: 4px; }
+.menu-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--ink-3);
+  padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-2);
+}
+.menu-list { list-style: none; margin: 0 0 22px; padding: 0; }
+.menu-list button {
+  display: flex; align-items: baseline; gap: 12px; width: 100%;
+  background: transparent; border: none; cursor: pointer;
+  padding: 9px 0; text-align: left; color: var(--ink);
+  border-bottom: 1px solid var(--line-2);
+  transition: padding-left 0.3s var(--ease), color 0.2s;
+}
+.menu-list button:hover { padding-left: 8px; color: var(--ochre); }
+.menu-list .mi-num { font-family: var(--mono); font-size: 9px; color: var(--ink-3); letter-spacing: 0.1em; }
+.menu-list .mi-name { font-size: 19px; font-weight: 500; letter-spacing: -0.02em; }
+.menu-list .mi-note { margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; }
+.menu-foot { margin-top: auto; font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+.menu-foot a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.menu-foot a:hover { border-bottom-color: var(--ink); }
+
+/* ======================================================= 6. pages
+
+   One measure, and the masthead inside it.
+
+   These pages used to be two layouts stacked on top of each other: a masthead
+   stretched the full width of the window with 40px of padding, and sections
+   centred in a column, so the eyebrow, the title and the code line stood 360px
+   to the left of everything under them. The masthead was also two equal
+   columns, which put the deck's own 46ch measure in the middle of a 900px
+   column: the copy began 370px after the title ended and stopped 440px short of
+   the right edge, with a hand's width of empty paper after it.
+
+   Now every block on a tool page, masthead, sections, the rule between them,
+   the demo page's two halves, takes its width from the same two numbers, so
+   the page reads as one column of blocks with a single left edge and a single
+   right edge. The masthead was the last block on these pages still splitting
+   that column in two, a title on the left and the deck pinned to the right
+   edge, and it is one centered column of its own now: 6a below is where that
+   is argued, and why the deck is the only child of it that needs a measure. */
+.page {
+  --page-w: 1180px;
+  --page-pad: 40px;
+  padding-top: calc(var(--topbar-h) + 22px);
+  padding-bottom: 72px;
+}
+.page.active { display: block; }
+/* the filmstrip page: one screen, no padding, nothing under it */
+.page.page-full { padding: 0; }
+.hero, .section, .demo-intro, .demo-layout {
+  max-width: var(--page-w);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ==== 6a. the masthead: one centered column
+   It used to be a two-column editorial masthead, the title in the left
+   column, the deck pinned to the right edge, 420px away from it, with the
+   badges, the waveform and the file line stacked down the left underneath. On
+   every one of the five pages that carry it that read as two unrelated columns
+   with an empty right half: the deck alone on the right with nothing under it,
+   and everything that belongs with the title down the left, so the top of the
+   page said two things in two places and the eye had nowhere to land first.
+   A masthead is one statement, so it is one column now: the eyebrow, the
+   title, the deck, the badges, the waveform and the line under it all share
+   the same axis, and that axis is the page's own center, the one the
+   wordmark in the bar above is already on, and the one the artist's page sets
+   its own opening on. The deck is the only child that needs a measure: set
+   across the full 1180px it would be 140 characters to the line, so it is
+   capped at 64ch and centered with everything else. */
+.hero {
+  display: block;
+  min-height: 0;
+  padding: 46px var(--page-pad) 28px;
+  text-align: center;
+  overflow: visible;
+}
+.hero::before { display: none; }
+/* ==== the label voice
+   Every small line on the site, an eyebrow over a page, a section's kicker,
+   the name of a fact, a step's file, a footer, is one style, and it is the
+   sans in a real weight. It used to be the mono at 9px with a quarter of an em
+   of tracking in the third ink: at that size that much tracking pulls the
+   letterforms apart into a grey smear, which is why the page's own signposts
+   were the hardest thing on it to read. The mono still sets the things that are
+   code (a path, a flag, a value), where its fixed widths are the point. */
+.hero-eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 14px;
+}
+.hero-title {
+  font-size: clamp(30px, 3.4vw, 46px);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.032em;
+  color: var(--ink);
+  margin: 0 auto;
+  max-width: 22ch;
+  /* two lines of a heading with one short line under a long one read as a
+     mistake; this breaks them to a similar length where the browser can */
+  text-wrap: balance;
+}
+.hero-title span {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ochre);
+  letter-spacing: -0.01em;
+}
+.hero-sub {
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  /* 18px off the title, so the deck reads as the sentence under it rather than
+     as a second column of the same masthead */
+  margin: 18px auto 0;
+  /* the full width of the masthead's measure, which is the width of the row of
+     badges under it and of the section paragraphs under those: one measure on
+     the page, so the deck's edges line up with the pills' and with everything
+     below. It was capped at 64ch, which was right while it sat in a column of
+     its own and wrong the moment it was centered, a centered column narrower
+     than the one under it reads as a stray block rather than as the sentence
+     that introduces the page. */
+  max-width: none;
+}
+.hero-badges {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin: 26px auto 0;
+}
+.hero .waveform { height: 34px; gap: 2px; margin: 24px auto 0; justify-content: center; opacity: 0.9; }
+.hero .waveform-bar { width: 2px; background: var(--ochre); }
+
+/* the code line under the masthead: the files the page is about, set in the
+   same small mono as every other label on the page. It used to carry its own
+   inline 11px in the body ink, which no stylesheet could reach and which made
+   it the loudest thing in the masthead. */
+.hero-files {
+  margin: 22px auto 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+
+.badge {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  background: var(--paper-2);
+}
+
+/* ==== 6b. sections */
+.section { padding: 48px var(--page-pad); }
+.section-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+.section-title {
+  font-size: clamp(21px, 2.1vw, 30px);
+  font-weight: 500;
+  line-height: 1.14;
+  letter-spacing: -0.028em;
+  margin-bottom: 12px;
+  color: var(--ink);
+  max-width: 46ch;
+}
+/* A section on a tool page is a small article: a label, a title, then its
+   paragraphs, sometimes with a block of cards in the middle of them. The prose
+   runs the whole measure in one column, the same as the artist's page, and
+   the font is up a size, because fourteen and a half pixels across this width
+   is a line of 150 characters and no one reads that. */
+.section-body { color: var(--ink-2); font-size: 16px; line-height: 1.68; margin-bottom: 26px; max-width: none; }
+/* nothing wastes a line of space at the foot of a block: the section's own
+   padding is the space between one block and the next, and a last paragraph's
+   margin on top of it was doubling that gap on every page */
+.section > :last-child, .hero > :last-child, .demo-intro > :last-child { margin-bottom: 0; }
+/* one rule, the width of the content inside the measure, so it lines up with
+   the text above and below it instead of running 40px past both */
+.divider {
+  border: none; border-top: 1px solid var(--line-2);
+  max-width: calc(var(--page-w) - 2 * var(--page-pad));
+  margin: 0 auto;
+}
+
+/* ==== 6c. legacy panel skin: one hairline treatment for every box */
+.card,
+.pipeline-node,
+.pipeline-node:hover,
+.harmony-card,
+.stat-card,
+.note-box,
+.note-demo,
+.cree-card,
+.cree-output-box,
+.cree-demo-col,
+.sentiment-output-card,
+.step-flow-item,
+.demo-panel-col,
+.note-display,
+.tok-cons,
+[class$="-card"],
+[class$="-box"],
+[class$="-panel"],
+[class$="-col"] {
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-1);
+}
+.pipeline-node::before { background: linear-gradient(90deg, var(--ochre), transparent); }
+.pipeline-node:hover { border-color: rgba(173, 74, 42, 0.3); background: var(--paper-2); }
+.pipeline-connector { color: var(--ink-3); }
+.node-tag { font-family: var(--sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; color: var(--ink-2); }
+.node-title { font-size: 15px; font-weight: 500; letter-spacing: -0.015em; }
+.node-body { font-size: 13px; color: var(--ink-2); line-height: 1.62; }
+.node-pill {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  padding: 3px 9px; background: var(--paper-3); border: 1px solid transparent;
+  border-radius: 999px; color: var(--ink-2);
+}
+.stat-num { font-weight: 500; letter-spacing: -0.03em; }
+.stat-label, .overlay-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+
+/* the rail: a numbered step list, and the one thing on these pages that is not
+   a card.
+
+   It used to be a card: the panel skin was handed out by a list of class-name
+   endings that happened to include `.prose-stage`, so a timeline of five steps
+   came out as five touching rounded boxes with a hairline spine buried inside
+   them, and the section it lived in read as a stack of unrelated panels. A step
+   is a row on the paper now, a numeral in a hairline ring, the line running
+   down from it to the next step, and the prose beside it, and the spine is
+   the only thing drawn. */
+.prose-pipeline { display: flex; flex-direction: column; gap: 0; margin-top: 6px; }
+.prose-stage {
+  display: flex; gap: 26px; align-items: stretch;
+  background: none; border: none; border-radius: 0; box-shadow: none; padding: 0;
+}
+.prose-stage-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 34px; }
+.prose-stage-num {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-2);
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.prose-stage-line { width: 1px; flex: 1; background: var(--line-2); margin: 10px 0 0; min-height: 26px; }
+/* the spine stops at the last step rather than running out under it */
+.prose-stage:last-child .prose-stage-line { display: none; }
+.prose-stage:last-child .prose-stage-content { padding-bottom: 0; }
+/* A step is one column: the file that does the work, the step's own name, and
+   then what it does, in that order, on the page's own measure.
+
+   It was two columns, what the step is on the left, what it does on the right
+   which put a step's title and its own paragraph on either side of a 36px
+   gutter and left the paragraph to find its own left edge 400px away from the
+   number that introduced it. The heading belongs over its own text: a reader
+   following the pipeline downward reads the name of a stage and then what
+   happens in it, in one column, the way the section's own heading and opening
+   paragraph above them already read. The numbered marker and its spine stay
+   where they were, at the left of the block of text: they are the one thing
+   here that is not prose.
+
+   The body is 16px rather than the 14.5px it was set at inside its old column,
+   because it is now the full width of the measure: at 14.5px across 1100px a
+   line is about 130 characters, which is past the point where the eye loses the
+   start of the next line, and 16px is what the section paragraph directly above
+   every one of these steps is set at, so a step's prose now reads as a
+   continuation of it rather than as a footnote in a column. */
+.prose-stage-content {
+  flex: 1; min-width: 0; padding: 4px 0 34px;
+  display: block;
+}
+.prose-stage-file {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  color: var(--ink-2); margin: 2px 0 10px;
+}
+.prose-stage-title {
+  font-size: 21px; font-weight: 500; line-height: 1.18; letter-spacing: -0.024em;
+  color: var(--ink); margin: 0 0 14px;
+}
+.prose-stage-body { font-size: 16px; line-height: 1.68; color: var(--ink-2); margin: 0 0 12px; }
+.prose-stage-body:last-child { margin-bottom: 0; }
+.prose-stage-content > .node-tech { margin: 16px 0 0; }
+.prose-stage-content > .token-anatomy { margin-top: 18px; }
+
+/* one gutter for every grid of cards on a tool page, and one step between the
+   prose above them and the grid itself */
+.cree-grid, .harmony-grid, .sentiment-output-grid, .stat-grid { gap: 20px; }
+.cree-grid, .stat-grid, .sentiment-output-grid, .step-flow { margin-top: 30px; }
+.step-flow { gap: 14px; }
+.step-flow-item { padding: 30px 24px; }
+.note-demo { padding: 36px; margin-top: 32px; }
+
+/* ==== 6d2. the demo page's own two halves, on the same measure as the rest */
+.demo-intro { padding: 46px var(--page-pad) 28px; }
+.demo-layout { padding: 0 var(--page-pad) 20px; gap: 26px; }
+
+/* ==== 6d3. the live demo page: the one page the redesign never reached
+
+   Every other tool page was re-skinned here component by component. This one
+   was not: of the 71 class names its markup carries, 56 had no rule in this
+   file at all and fell through to the pre-redesign sheet in the page head,
+   and another 110 inline styles in the markup were doing the sizes, the greys
+   and the margins one element at a time. The palette itself had already been
+   re-tuned, section 1 above remaps `--muted`, `--bg2`, `--accent`, `--red`
+   which is exactly why the page read as a mix rather than as an old design:
+   hairline cards and ink-filled pills (from rules that did reach it) with
+   11px mono labels, 13px grey body copy and 8px radii inside them.
+
+   Measured on the built page, that came out in three places.
+
+   The panel's rows each started their controls wherever their own label
+   happened to end: Pitch engine at 508px, Sing along with instruments at
+   583px, Voice model at 508px, Neural mode at 616px, Vocable at 488px. Five
+   rows, four left edges, no column anywhere in the panel, a settings list
+   is the one thing on a page that has to line up.
+
+   The two `.demo-panel-col`s had picked up the card skin from section 6c by
+   class-name accident (`[class$="-col"]`) with no padding of their own, so
+   the dashed upload zone and the volume sliders sat flush against a hairline
+   border, and a panel read as boxes inside boxes inside boxes.
+
+   And the masthead was still the old left-aligned one: 76ch of deck in the
+   left half of a 1180px page, with the right half empty down to the panels.
+   The five pages that carry the masthead are one centered column here (6a),
+   and this page says the same thing the same way now.
+
+   So the rest of this section finishes the page in this file's own terms: the
+   same centered masthead as `.hero`, one label column for every row of
+   controls, one radius and one padding for everything inside a panel, and the
+   player, the meters, the note displays and the two small notes drawn in the
+   site's palette and type rather than the old sheet's. The markup keeps every
+   id and every handler it had; what it lost are the inline sizes and greys
+   that were fighting this file. */
+
+/* the masthead: eyebrow, title, deck and the switch, one centered column.
+   The eyebrow keeps its class (the arrival walks `.section-label`), it just
+   loses the rule that used to run off to the right of it, because a rule that
+   runs one way cannot sit over a centered column. */
+.demo-intro { text-align: center; }
+.demo-intro .section-label { justify-content: center; margin-bottom: 16px; }
+.demo-intro .section-label::after { display: none; }
+.demo-intro .section-title {
+  font-size: clamp(30px, 3.4vw, 46px);
+  line-height: 1.04;
+  letter-spacing: -0.032em;
+  text-wrap: balance;
+  max-width: 22ch;
+  margin: 0 auto 0;
+}
+/* the deck is this page's longest sentence and it is centered, so it is the
+   one child that needs a measure of its own: 74ch, which is 4 lines here
+   against the 76ch and 5 lines it had while it was left-aligned */
+.demo-deck {
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  max-width: 74ch;
+  margin: 18px auto 0;
+}
+/* the kill switch, under the deck: the pill is the control and the line under
+   it is the label voice */
+.demo-sovereignty { margin: 30px auto 0; }
+.demo-sovereignty-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.demo-sovereignty-note {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  max-width: 66ch;
+  margin: 14px auto 0;
+}
+/* a live indicator reads as live: the dot is the site's teal, not the old
+   sheet's sage, and the pill's own text carries the state */
+.protocol-btn .protocol-dot { background: var(--teal); }
+.protocol-btn:not(.off) { color: var(--ink); }
+
+/* the panel: one padding, one title voice, one deck voice, and one label
+   column. `--demo-name` is the width of the longest name on the page,
+   `Sing along with instruments:`, and every row gives its name that width, so
+   the controls of five different rows begin on one straight line. */
+.demo-panel { --demo-name: 152px; padding: 42px 40px 46px; }
+.demo-panel-title { font-size: 21px; font-weight: 500; letter-spacing: -0.024em; margin: 0 0 14px; }
+.demo-panel-sub { font-size: 16px; line-height: 1.68; color: var(--ink-2); margin: 0 0 36px; }
+.demo-panel-sub strong { color: var(--ink); font-weight: 600; }
+/* the panel's two halves are layout, not boxes: the card skin comes back off
+   the columns (the boxes inside them are the upload zone and the pickers), and
+   the gutter is one gutter */
+.demo-panel-col { background: none; border: none; border-radius: 0; box-shadow: none; }
+/* one column by default. */
+.demo-panel-body { grid-template-columns: minmax(0, 1fr); gap: 38px; }
+/* BOTH panels' bodies are two columns, and they are the same two columns: the
+   column that does the work on the left, which is the thing you bring in (a
+   file, a microphone), the transport under it and the mix row under that, and
+   the column that describes the voice on the right, which is the voice texture
+   and the note readout under it. It is the arrangement the upload panel has
+   had since the redesign, and the mic panel now takes it too, on the same 420px
+   column and the same 52px gutter, so the two panels' left columns sit on one
+   line and their right columns on another. What used to be here instead is a
+   rule that this body stayed one column because a microphone and the chips
+   that answer it are a sequence, which was true of the ORDER and not of the
+   shape: the sequence reads the same in a 420px column. */
+.demo-panel-body.demo-split { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 52px; align-items: start; }
+/* THE MICROPHONE IN THE DROP TARGET'S SLOT. The same box at the top of the same
+   column, one border lighter and solid where a drop target's is dashed: a
+   dashed hairline is the site's way of saying "put a file here", and a
+   microphone is not a file. Everything inside it is the mic panel's own: the
+   button, the level trough and the status line. */
+.mic-stage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 20px; padding: 46px 24px 38px; margin: 0 0 32px; text-align: center;
+  border: 2px solid rgba(27, 25, 23, 0.22);
+}
+/* the trough is a reading, not a rule across the column: at the box's own width
+   it read as a divider under the button */
+.mic-stage .level-meter { width: 100%; max-width: 260px; }
+/* the transcript is the same block as the upload panel's, in the same place in
+   the same column, so its heading takes the same step above it and its box the
+   same ceiling */
+#demo-mic-ts-section .control-label { margin: 32px 0 18px; }
+#demo-mic-ts-section .cree-output-box { max-height: 200px; }
+
+/* ==== the settings, grouped and set in columns
+
+   A settings list needs a column to line up with, and the first pass at this
+   page gave it one: label at the left edge, control 204px along it. On a
+   panel 1026px wide that put every control's right edge between a third and a
+   half of the way across, so each row was a control against two thirds of
+   empty paper, the same fault the masthead had, one level down. A column is
+   only a column when the thing beside it is there.
+
+   So the settings are one column, one row below the last, and a row is a name
+   and the thing it names.
+
+   This list has had three shapes and the reason it is this one is written in
+   the other two. It began as one column in which each control was sized to its
+   own text, which was right, and which was then "fixed" twice. The first fix
+   gave the label a column and let the control take whatever was left of the
+   row, which filled the paper by making a 505px button out of the word "DSP".
+   The second grouped the settings into two side-by-side rails, which put a list
+   of eight settings into two columns and stopped it being a list at all.
+
+   What the page has now is what it had at the start. The label is as wide as
+   its own words, the control follows it at the control's own width, and
+   nothing stretches to fill a row that does not need it. The two chip lists
+   are the one exception and take the row's leftover width, because eleven
+   vocables and eight modes have to wrap somewhere. */
+/* the list carries the step down to the panel's body: a section boundary reads as
+   a bigger break than a row, so it is twice the row's own step rather than nothing */
+.demo-racks { display: block; margin: 0 0 44px; }
+/* the wrapper the two groups were built in is not a box any more: its rows
+   are the list, so it comes out of the layout and its two groups stack as one
+   run of rows */
+.demo-rail { display: contents; }
+/* Every row wraps, so a note or a status line that has nowhere to go falls to
+   a second line instead of squeezing the control it belongs to. */
+.demo-panel .demo-rail .demo-row { flex-wrap: wrap; align-items: center; gap: 10px 22px; margin: 0 0 22px; }
+/* The name holds the column and the control follows it at the control's own
+   width, on the same line. Both halves of that matter and they were settled in
+   opposite order: the column is what lines the controls up, and the control's
+   own width is what keeps a two-word picker from being stretched across the
+   panel to fill a row it does not need. A name shorter than the column leaves
+   paper between itself and its control, which is the column doing its job. */
+.demo-panel .demo-row > .demo-row-label { flex: 0 0 var(--demo-name); }
+
+/* A segmented control, which is a different object from two buttons side by
+   side. A well answers both of the shapes a two-option control was given
+   before this one, and they failed the same way: two 999px pills across a
+   380px rail were a pair of 186px slabs with two letters floating in each, and
+   the same two pills across a 1026px row were a pair of 505px ones. What makes
+   a wide segment read as stretched rather than as chosen is that nothing says
+   the width is the point.
+
+   So the frame is the control, each segment is one option, and the chosen
+   segment is the only thing carrying the ink. With `grid-auto-columns: auto`
+   the well is exactly as wide as its own options, so its width is visibly the
+   design and not an accident of the grid. */
+.demo-panel .demo-rail .interval-picker,
+.demo-panel .demo-rail .mode-picker,
+.demo-panel .demo-rail .texture-picker {
+  display: grid; grid-auto-flow: column; grid-auto-columns: auto;
+  gap: 3px; margin: 0; padding: 3px;
+  background: var(--paper-3);
+  border: 1px solid var(--line-2);
+  border-radius: 13px;
+  box-shadow: inset 0 1px 2px rgba(27, 25, 23, 0.045);
+}
+.demo-panel .demo-rail .interval-btn,
+.demo-panel .demo-rail .mode-btn,
+.demo-panel .demo-rail .texture-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink-2);
+  padding: 8px 12px; font-size: 12.5px; line-height: 1.3; text-align: center;
+}
+.demo-panel .demo-rail .interval-btn:hover,
+.demo-panel .demo-rail .mode-btn:hover,
+.demo-panel .demo-rail .texture-btn:hover { background: rgba(27, 25, 23, 0.06); color: var(--ink); }
+.demo-panel .demo-rail .interval-btn.active,
+.demo-panel .demo-rail .mode-btn.active,
+.demo-panel .demo-rail .texture-btn.active { background: var(--ink); color: var(--paper); }
+
+/* the two long lists are not segmented controls and must not become one:
+   eleven vocables and eight modes pack and wrap, and a well around a wrapping
+   cloud is a box inside a box. They keep the site's own pill, packed at the
+   rail's left edge, which is the one shape on this page that is allowed to
+   size itself to its own word. */
+#demo-dsp-vocable-picker, #demo-mode-picker, #demo-texture-picker {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; margin: 0;
+}
+/* the chip lists are the one control allowed to take the row's leftover width:
+   eleven words and eight have to wrap somewhere, so they wrap where the row
+   ends rather than at a width of their own */
+#demo-dsp-vocable-picker { flex: 1 1 0%; min-width: 0; }
+#demo-dsp-vocable-picker .interval-btn,
+#demo-mode-picker .mode-btn,
+#demo-texture-picker .texture-btn {
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper-2); color: var(--ink-2);
+  padding: 8px 15px; font-size: 12.5px;
+}
+#demo-dsp-vocable-picker .interval-btn:hover,
+#demo-mode-picker .mode-btn:hover,
+#demo-texture-picker .texture-btn:hover { border-color: var(--ink-3); background: var(--paper-2); color: var(--ink); }
+#demo-dsp-vocable-picker .interval-btn.active,
+#demo-mode-picker .mode-btn.active,
+#demo-texture-picker .texture-btn.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+/* The voice textures are the accompaniment modes' own pills: the same outlined
+   capsule, the same paper, the same ink when chosen, and no well behind them.
+   Three fixed textures were a segmented switch for as long as they were three;
+   a row of words that wraps is a list, and the list of modes directly above has
+   been one since the start. */
+#demo-texture-picker { margin: 0 0 22px; }
+.demo-panel #demo-accompaniment-mode-section,
+.demo-panel #demo-mic-accompaniment-mode-section { margin: 0 0 22px; }
+/* the readout and the line that explains it are one box, and it sits in the
+   right hand column now, which is the width a four-column readout wants:
+   across all 1026px of the panel the arrow sat dead centre with the two notes
+   at either end of a metre of paper */
+
+/* elsewhere in a panel a row is still one line: label, control, note */
+/* one line per row: a wide picker (the eleven vocables) shrinks and wraps
+   inside its own box rather than dropping to a line of its own below the
+   label, which would put its pills back on a second left edge */
+.demo-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 10px 22px; margin: 0 0 22px; }
+.demo-row-label { font-size: 12.5px; line-height: 1.4; color: var(--ink-2); }
+/* the column itself, only where there is a column of rows to line up with;
+   the same label class is also carried by the pitch-engine row the script
+   builds, which appears on two pages that are not this one */
+.demo-row > .demo-row-label { flex: 0 0 190px; }
+.demo-panel .demo-row .interval-picker,
+.demo-panel .demo-row .mode-picker,
+.demo-panel .demo-row .texture-picker { flex: 0 1 auto; min-width: 0; margin: 0; }
+/* that injected row: the picker carries no margin of its own wherever it is
+   used, and the status line is a note rather than a third button */
+.pitch-engine-picker { margin: 0; }
+.pitch-engine-status { font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
+/* a row that is a slider: the two scale ends, the track, the readout */
+.demo-row-track { display: flex; align-items: center; gap: 10px; flex: 0 1 480px; min-width: 200px; }
+/* The pitch shift is the one row in the panel that reads as a measure rather
+   than as a switch, so it takes the row's whole width instead of the 480px a
+   bracketed slider gets: the scale ends sit at the column's own left edge and
+   its far edge, and the readout closes the line. Its note used to stand after
+   the value and is gone, which leaves the track nothing to make room for. */
+#demo-pitch-shift-row .demo-row-track { flex: 1 1 auto; min-width: 0; }
+#demo-pitch-shift-row .demo-readout { text-align: right; }
+/* And so does every setting under an accompaniment mode. Each of those groups
+   (delayed echo, contour following) is a run of value sliders, which are
+   measures rather than switches, so a 480px track floating in the left half of
+   a 1010px row was the same fault the pitch shift had: the scale ends belong at
+   the row's own edges and the readout closes the line at the far one. */
+.demo-group .demo-row-track { flex: 1 1 auto; min-width: 0; }
+.demo-group .demo-readout { text-align: right; }
+.demo-scale { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+.demo-slider { flex: 1; min-width: 80px; accent-color: var(--ochre); cursor: pointer; }
+.demo-slider-fixed { flex: 0 0 auto; width: 140px; accent-color: var(--ochre); cursor: pointer; }
+.demo-readout { font-family: var(--mono); font-size: 12.5px; color: var(--ink); min-width: 56px; }
+/* the line that belongs to the row above it rather than to the row below */
+.demo-note { font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
+/* a group of rows under one name: the echo and contour settings */
+.demo-group { margin: 0 0 8px; }
+.demo-panel .demo-group .control-label { margin: 32px 0 18px; }
+
+/* the panel's own name for a block of controls, in the label voice the rest of
+   the site uses (it was 11px mono with a fifth of an em of tracking, which is
+   the setting that turns a label into a grey smear) */
+.demo-panel .control-label {
+  display: flex; align-items: center; gap: 14px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 18px;
+}
+/* with a hairline running from it to the right edge of its column, which is
+   what this site's own section labels do (6a). In a rail it is the thing that
+   turns a block of chips into a named group instead of the next row down, and
+   it is the one element on this page that uses the rail's full width. */
+.demo-panel .control-label::after {
+  content: ""; flex: 1 1 auto; height: 1px; min-width: 24px;
+  background: var(--line-2);
+}
+.demo-panel .demo-rail .control-label { margin: 32px 0 18px; }
+/* the pickers are rows in this panel, so a picker carries only the step below
+   it, never the old sheet's 24px */
+.demo-panel .mode-picker, .demo-panel .texture-picker, .demo-panel .interval-picker { margin: 0 0 22px; }
+
+/* the upload half: the zone, the buttons, the player and the two mix rows */
+/* a wide, short drop bar: the mark and the two lines side by side in the
+   middle of the panel's whole width, which is how a full-width target reads
+   (stacked in the centre of 1026px it was a small island in a big box) */
+/* a tall dashed target with the mark above the two lines rather than beside
+   them: this is the first thing in its column and the one thing in the panel
+   you are meant to touch, so it is the tallest box in the panel */
+.upload-zone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 54px 24px; margin: 0 0 32px;
+  cursor: pointer; text-align: center;
+}
+/* the well the panel opens with: one step down the paper from the panel, so
+   the drop bar is the single solid object at the top of it and the dashed
+   hairline the site already draws for a drop target is the only line in it.
+   Fully qualified because 6d's `.upload-zone` is defined later in the file. */
+.demo-panel .upload-zone { background: none; border-color: rgba(27, 25, 23, 0.22); }
+.demo-panel .upload-zone:hover,
+.demo-panel .upload-zone.drag-over { background: rgba(173, 74, 42, 0.05); border-color: var(--ochre); }
+.upload-icon { display: flex; justify-content: center; flex: 0 0 auto; color: var(--ink-3); }
+.upload-icon svg { width: 34px; height: 34px; display: block; }
+.upload-text { text-align: center; font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
+.upload-text strong {
+  display: block; font-size: 15px; font-weight: 500;
+  letter-spacing: -0.014em; color: var(--ink); margin-bottom: 6px;
+}
+.upload-text span { display: block; }
+.demo-controls { display: flex; gap: 12px; margin: 32px 0 32px; }
+.demo-controls .btn {
+  /* the two halves of their own column, which is what a play and a stop are:
+     stretched to half of a 1026px panel they were 505px of pill around three
+     words */
+  flex: 1 1 0; padding: 11px 18px; border-radius: 999px;
+  font-size: 13px; font-weight: 500; letter-spacing: -0.005em;
+}
+.demo-controls .btn-primary { background: var(--ink); color: var(--paper); }
+.demo-controls .btn-primary:not(:disabled):hover { background: var(--ochre); }
+.demo-controls .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--ink-2); }
+.demo-controls .btn-ghost:not(:disabled):hover { border-color: var(--ink-3); color: var(--ink); }
+/* a disabled button is a quiet button, not a washed-out coloured one: the old
+   sheet left the primary filled and faded it to 40%, which on paper made a
+   muddy grey pill with white text in it */
+.demo-controls .btn:disabled {
+  background: var(--paper-3); color: var(--ink-3);
+  border-color: transparent; opacity: 1; cursor: default;
+}
+/* the two marks inside the neural-mode pills: they were emoji, which are the
+   only two bits of full colour on the site */
+.btn-mark { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; margin-right: 6px; opacity: 0.8; }
+.audio-player { margin-top: 24px; }
+.audio-waveform { height: 54px; background: var(--paper-3); border: 1px solid var(--line-2); border-radius: var(--r-sm); }
+.wv-bar { background: var(--ink-3); opacity: 0.55; }
+#page-demo #track-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; color: var(--ink-3); }
+.progress-bar-outer { height: 3px; background: var(--paper-4); border-radius: 999px; }
+.progress-bar-inner { background: var(--ink); border-radius: 999px; }
+.audio-time { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+/* the download button was the last indigo gradient on the site, ring and
+   shadow included; here it is the same hairline circle as every other icon */
+.download-icon-btn {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--paper-2); border: 1px solid var(--line);
+  color: var(--ink-2); box-shadow: none;
+}
+.download-icon-btn svg { width: 15px; height: 15px; }
+.download-icon-btn:hover:not(:disabled) { transform: none; border-color: var(--ink-3); color: var(--ink); box-shadow: none; }
+.download-icon-btn:disabled { background: var(--paper-2); color: var(--ink-3); opacity: 0.55; box-shadow: none; }
+/* the two mix rows: the name and the number on one line, the slider under
+   them across the whole column. As a flex line, label, 300px of track, a
+   percentage at the far end, with a 3px trough at 14% alpha, all anyone
+   saw was a lone ochre dot floating in the middle of the column. */
+/* one line: the name, a short track under the hand, and the number, which is
+   how this row read before the redesign and how it reads again now that the
+   trough is actually drawn. A mix control is a knob you reach for, not a
+   measure of how wide the panel is. */
+.volume-row {
+  display: flex; align-items: center;
+  gap: 14px; margin: 0 0 18px;
+}
+.volume-row .volume-slider { flex: 0 1 240px; min-width: 120px; }
+.volume-row .volume-label {
+  flex: 0 0 auto;
+  font-family: var(--sans); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.12em; color: var(--ink-3);
+}
+.volume-row .volume-value { flex: 0 0 auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+/* TRACK VOLUME has no off state to style. It is on the uploaded file itself,
+   decoded and played back exactly as it came in, in every engine and every
+   mode, so the row stays live and the slider always has something to act on.
+   The `.track-off` rules that used to dim it went with the setting they
+   belonged to. */
+/* one slider for the whole page: a 4px trough a quarter of the ink in, and a
+   16px ochre knob with a ring of paper round it. The volume rows were already
+   custom-drawn and the seven value sliders were native, so the same job had
+   two different controls doing it. */
+/* The selector has to be `input[type="range"].x`, not `.x`. Section 6d's own
+   reset says `input[type="range"] { background: transparent }`, and an
+   attribute selector plus a type selector (0,1,1) out-ranks a single class
+   (0,1,0) no matter which one comes later in the file. So the trough this rule
+   draws lost to that reset and every slider on the page rendered as a lone
+   ochre knob with nothing underneath it: the pitch shift, the two mix rows,
+   the echo and the three contour sliders, all of them. One selector's worth of
+   specificity was the whole difference between a track and no track. */
+input[type="range"].volume-slider,
+input[type="range"].demo-slider,
+input[type="range"].demo-slider-fixed {
+  -webkit-appearance: none; appearance: none;
+  height: 5px; border-radius: 999px;
+  background: var(--paper-3);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  cursor: pointer;
+}
+.volume-slider::-webkit-slider-thumb,
+.demo-slider::-webkit-slider-thumb,
+.demo-slider-fixed::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ochre); border: 2px solid var(--paper-2);
+  box-shadow: 0 0 0 1px var(--ochre);
+}
+.volume-slider::-moz-range-thumb,
+.demo-slider::-moz-range-thumb,
+.demo-slider-fixed::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ochre); border: 2px solid var(--paper-2);
+  box-shadow: 0 0 0 1px var(--ochre);
+}
+.volume-slider:disabled, .demo-slider:disabled, .demo-slider-fixed:disabled { opacity: 0.4; cursor: default; }
+
+/* the mic half: the button, the level meter, the two note displays and the
+   arrow between them. The displays keep the old sheet's split, the singer in
+   the sage, the robot in the indigo, the same pair the harmony page's note
+   display uses, the two faces are just sized as one row instead of 72px
+   against 48px. */
+.big-mic-btn { width: 84px; height: 84px; border-width: 1px; background: var(--paper-2); color: var(--ink-2); }
+.big-mic-btn svg { width: 30px; height: 30px; display: block; }
+/* the button used to swap its own glyph by writing an emoji into its text,
+   which cannot carry a line icon: both marks are in the markup and the class
+   the script already toggles decides which one is drawn */
+.big-mic-btn .mic-stop { display: none; }
+.big-mic-btn.recording .mic-icon { display: none; }
+.big-mic-btn.recording .mic-stop { display: block; }
+.big-mic-btn:hover { color: var(--paper); }
+.big-mic-btn.recording { background: rgba(173, 74, 42, 0.10); border-color: var(--ochre); color: var(--ochre-d); animation: mic-ring 1.8s ease-in-out infinite; }
+@keyframes mic-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(173, 74, 42, 0.28); }
+  70%  { box-shadow: 0 0 0 18px rgba(173, 74, 42, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(173, 74, 42, 0); }
+}
+/* the level meter is a meter: a 6px trough you can see, filled sage to ochre */
+.level-meter { height: 6px; border-radius: 999px; background: rgba(27, 25, 23, 0.10); }
+.level-fill { border-radius: 999px; background: linear-gradient(90deg, var(--sage), var(--ochre)); }
+.live-label {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.13em; color: var(--ink-3);
+}
+.live-note-big { font-family: var(--mono); font-size: 54px; font-weight: 400; color: var(--green); min-height: 62px; }
+.live-response-big { font-family: var(--mono); font-size: 46px; font-weight: 400; color: var(--accent2); min-height: 56px; }
+.demo-note-arrow { color: var(--ink-3); font-size: 24px; }
+.status-text { font-size: 12.5px; line-height: 1.5; color: var(--ink-3); min-height: 18px; }
+/* the source/response/confidence row: one fill for every small box on the
+   page, and the confidence readout in the body ink rather than the old grey */
+/* the source / response / confidence readout: three columns on one line, so
+   the arrow sits between two equal halves instead of wherever the first note
+   name happens to end */
+/* FOUR ITEMS ON ONE LINE, SPREAD EDGE TO EDGE: source pitch, the arrow, robot
+   response, confidence. Every earlier cut of this row was a grid of equal
+   columns, and that is what kept putting the arrow in the wrong place: the
+   columns decide where the ARROW goes, and the labels sit wherever their own
+   text puts them inside those columns, so an arrow on the box's centre line can
+   still be 57px from the midpoint of the two labels (one cut) and two labels
+   centred in their halves still pull the source 120px in from the edge (the
+   next one, which is the picture that came back asking for the pair to be
+   aligned the way the rest of the panel is).
+
+   With flex and space-between there are no columns to be wrong: the first item
+   is pinned to the box's left edge, the last to its right edge, and the three
+   gaps that remain are EQUAL by construction. The source label therefore starts
+   at the box's left edge, the confidence label ends at its right edge, and the
+   arrow lands at the exact midpoint between the two labels, which is the one
+   thing this row is asked to show. Nothing here is a magic number, so it holds
+   at every width: measured at 1920 the three gaps are 80.8, 80.9 and 80.8px,
+   the source label runs 938 to 1021.4, the response 1196.4 to 1293.7, the
+   confidence 1374.5 to 1444 and the arrow 1102.2 to 1115.5, so the whitespace
+   either side of the arrow is 80.8px against 80.9px, a tenth of a pixel apart.
+   (The midpoint of the two labels' own CENTRES is 3.5px from the arrow, which is
+   simply the residue of the two labels being 14px different in width; the
+   whitespace is what the eye measures, and that is equal.) */
+.harmony-overlay-note {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  background: var(--paper-3); border-radius: var(--r-sm);
+  padding: 18px 20px; margin-top: 26px;
+}
+.harmony-overlay-note > div:first-child { text-align: left; }
+.harmony-overlay-note > div:last-child { text-align: right; }
+.overlay-singer { font-size: 22px; font-weight: 500; color: var(--green); }
+.overlay-robot { font-size: 22px; font-weight: 500; color: var(--accent2); }
+.overlay-arrow { color: var(--ink-3); font-size: 14px; }
+/* the line under a mode picker: this is the site's own pull treatment
+   (a 2px ochre bar and no box) rather than the old sheet's grey panel with a
+   bar on its left, which read as a second card inside the column */
+.note-explanation {
+  background: none;
+  border: none;
+  border-left: 2px solid var(--ochre);
+  border-radius: 0;
+  padding: 2px 0 2px 20px;
+  margin: 28px 0 0;
+  font-size: 14px;
+  line-height: 1.66;
+  color: var(--ink-2);
+  min-height: 0;
+}
+/* the transcript and sentiment boxes inside this panel are on the panel's own
+   paper-2, so they take the one step down the page's paper-3 has */
+.demo-panel .cree-output-box { background: var(--paper-3); border-color: var(--line-2); }
+/* The sentiment card's two axes are meters, and a meter with no reading in it is
+   a stray line drawn across the card. The old sheet drew a hairline over the
+   emotion row beneath them as well, and a rule between the sentence and the
+   axes above that, so a card waiting on a transcript came to three rules
+   stacked with nothing between them to divide. While the card is waiting it
+   shows its sentence and its badge and none of the three; all three come back
+   the moment there is something for them to measure. */
+.demo-panel .cree-emotion-row { border-top: 0; padding-top: 0; margin-top: 20px; }
+.demo-panel .cree-pipeline-card:has(#demo-translation-out.placeholder) .cree-axis { display: none; }
+/* and the rule that divided the sentence from those axes goes with them: left
+   standing on its own it is the one line in the card, over the badge, with
+   nothing on either side of it to divide. */
+.demo-panel .cree-pipeline-card:has(#demo-translation-out.placeholder) .cree-pipeline-divider { display: none; }
+/* The transcript and the sentiment readout are part of this panel, not
+   something that appears once playback starts: they are on screen from the
+   first frame with their own empty state, so the column under the hand does not
+   grow two blocks the moment a track begins. */
+.demo-panel #demo-ts-section .control-label { margin: 32px 0 18px; }
+#demo-ts-section .cree-output-box { max-height: 200px; }
+.cree-transcript-log { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--ink-2); }
+
+/* the two ends of a demo's exchange are the same box: they used to be centred
+   in their columns instead of stretched, so a step with one more line of text
+   in it stood taller than its partner */
+.note-displays { align-items: stretch; }
+.note-arrow-center { justify-content: center; }
+/* one padding for every panel on these pages */
+.cree-mic-demo { padding: 36px; }
+
+/* the step-flow's numerals and arrows, quiet as the rail's: an ochre ring
+   around an indigo digit made the middle of the page the loudest thing on it */
+.step-flow-circle {
+  width: 38px; height: 38px; margin: 0 auto 18px;
+  background: var(--paper-3); border: 1px solid var(--line); color: var(--ink-2);
+  font-family: var(--mono); font-size: 11px; font-weight: 400;
+}
+.step-flow-tag { margin-bottom: 16px; color: var(--ink-3); }
+.step-flow-title { font-size: 17px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 8px; }
+.step-flow-body { font-size: 13.5px; line-height: 1.62; }
+.step-flow-arrow { font-size: 17px; color: var(--ink-3); }
+
+/* ==== 6d. controls */
+button { font-family: var(--sans); letter-spacing: -0.005em; }
+.mode-btn, .interval-btn, .texture-btn, .protocol-btn, .cree-lang-btn, .cree-chip, .mic-btn, .big-mic-btn {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  /* the voice, explicitly. `button { font-family: var(--sans) }` above was the
+     only thing saying every control on this site is set in the page's sans,
+     and at (0,0,1) it loses to the pre-redesign sheet's `.mode-btn`,
+     `.interval-btn` and `.texture-btn` rules in the page head, which all say
+     the mono. So every picker on every tool page came out in the terminal
+     face, `Concert choir` is 98px of mono at 12.5px and 80px of sans, which
+     is one character's worth of difference between two lines and one. */
+  font-family: var(--sans);
+  font-size: 12.5px;
+  letter-spacing: -0.005em;
+  transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.25s var(--ease);
+}
+.mode-btn:hover, .interval-btn:hover, .texture-btn:hover, .protocol-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+.mode-btn.active, .interval-btn.active, .texture-btn.active, .cree-lang-btn.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+.mic-btn, .big-mic-btn { border-color: var(--ink); background: transparent; color: var(--ink); }
+.mic-btn:hover, .big-mic-btn:hover { background: var(--ink); color: var(--paper); transform: translateY(-1px); }
+
+input, textarea, select {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--ink-3);
+  box-shadow: 0 0 0 3px rgba(27, 25, 23, 0.06);
+}
+input[type="range"] { padding: 0; border: none; background: transparent; accent-color: var(--ochre); }
+.upload-zone {
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--ochre); background: rgba(173, 74, 42, 0.04); }
+code { background: var(--paper-3); color: var(--ochre-d); border-radius: 5px; padding: 1px 5px; font-family: var(--mono); font-size: 0.92em; }
+.tok, .tok-vowel, .tok-cons, .tok-sep, .tok-syllabic { border-radius: 6px; }
+.tok-vowel { background: rgba(173, 74, 42, 0.12); border-color: rgba(173, 74, 42, 0.3); color: var(--ochre-d); }
+
+/* ======================================================= 7. home film */
+/* The home page is the reference's featured strip, rebuilt value for value
+   off their own stylesheet: a plate is 12% of the window height wide and
+   449.2307692308% of that tall, the gap is 10px a side (4px below 375px), the
+   two stagger steps are 3.333% and 7.222% of the window height and land on
+   plates 2/4/7 and 3/6/9, and a plate is a window onto a 24vh-wide piece of
+   art that sits at -25% while the strip is at rest and slides to 0 when a
+   plate takes focus. Focus widens that window to 24vh in place (translate
+   -6vh) and shifts the plates either side of it out by half the growth, which
+   is what the reference animates and what keeps the strip centred. `--vh` is
+   one percent of the window height; script sets it, 1vh is the fallback. */
+.film {
+  --plate-w: calc(var(--vh, 1vh) * 12);
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--paper);
+}
+.film-strip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-flow: row;
+  justify-content: center;
+  align-items: center;
+  min-width: 100%;
+  padding-top: 100px;
+  padding-bottom: calc(0.14667 * var(--vh, 1vh) * 100 + 160px);
+  user-select: none;
+  z-index: 0;
+}
+/* One plate: the box is the resting width, the art inside it is always twice
+   that. The resting window crops it to its middle. */
+.film-card {
+  box-sizing: content-box;
+  margin: 0 4px;
+  flex-shrink: 0;
+  width: var(--plate-w);
+  display: block;
+  position: relative;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transform-origin: center center;
+  -webkit-tap-highlight-color: transparent;
+}
+.film-card::before {
+  content: "";
+  display: block;
+  padding-top: 449.2307692308%;
+  height: 0;
+  pointer-events: none;
+}
+.film-card:nth-child(2), .film-card:nth-child(4), .film-card:nth-child(7) { top: calc(0.03333 * var(--vh, 1vh) * 100); }
+.film-card:nth-child(3), .film-card:nth-child(6), .film-card:nth-child(9) { top: calc(0.07222 * var(--vh, 1vh) * 100); }
+@media (min-width: 375px) { .film-card { margin: 0 5px; } }
+@media (min-width: 992px) { .film-card { margin: 0 10px; } }
+.film-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+  background: #cfcdc2;
+  transition: width 0.6s var(--ease), transform 0.6s var(--ease);
+  will-change: width, transform;
+}
+.film-media {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--vh, 1vh) * 24);
+  height: calc(100% + 2px);
+}
+.film-shot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  transform: translateX(-25%);
+  transition: transform 0.6s var(--ease);
+}
+.film-shot img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  /* at rest a plate is a ghost of itself: nearly colourless and sunk into the
+     paper, the way the reference washes its strip out behind the active plate */
+  /* measured against the reference's own resting strip, which sits at a mean
+     distance of 7.67 from the paper with a median of 6, a 90th percentile of
+     28 and a 99th of 35: this lands ours at 7.5 / 6.2 / 13.6 / 30. The median
+     and the mean are the reference's; the 90th is lower because their plates
+     are photographs with dark pockets where our posters are line drawings. */
+  filter: grayscale(0.75) contrast(0.55) brightness(1.2);
+  opacity: 0.26;
+  transition: filter 0.6s var(--ease), opacity 0.3s linear;
+}
+.film-card.is-before .film-inner { transform: translateX(calc(var(--vh, 1vh) * -6)); }
+.film-card.is-after .film-inner { transform: translateX(calc(var(--vh, 1vh) * 6)); }
+.film-card.is-focus { z-index: 5; }
+.film-card.is-focus .film-inner {
+  z-index: 5;
+  width: calc(var(--vh, 1vh) * 24);
+  transform: translateX(calc(var(--vh, 1vh) * -6));
+}
+.film-card.is-focus .film-shot { transform: translateX(0); }
+.film-card.is-focus img { filter: none; opacity: 1; }
+.film-card:focus-visible .film-inner { outline: 1px solid var(--ink); outline-offset: 4px; }
+
+/* The caption, at the reference's own measurements: a container hung 100px off
+   the foot of the window, and inside it a block whose bottom sits 18px below
+   that container, a 10vh-tall wordmark box (capped at 90px) with the caption
+   line directly under it. At rest the wordmark is the reference's own drawn
+   lettering; a plate under the pointer swaps in our section name inside the
+   same 10vh box, so the caption line never moves. */
+.film-caption {
+  position: absolute;
+  bottom: 100px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* ============================================== the landing arrival
+   The reference's own arrival, rebuilt from its source (`landingAnimateIn`
+   and `transitionSpreadModeIn`, the path it takes when the intro is skipped
+   which is the one the reference's own video shows). Every plate starts
+   life as a sliver at the middle of the row, a hundredth of its width,
+   not quite half its height, and pulled in toward the centre of the row
+   and springs back out to itself where it belongs. The plate in the middle
+   goes first and is alone for a full second; the six around it come a beat
+   later in a sweep, a hair apart. Once the strip is up, the caption rises
+   the reference's own 300px from under the window while the menu bars come
+   down from above and the line under the wordmark settles into its place
+   their `.SelectedWorks-titles` (and `.WorksLink`) move, and their
+   `#MenuToggle` moves, on the same numbers.
+
+   Their numbers, kept exactly. The tween runs 0.8s on their spring,
+   `easeOut.config(1.2, 1)`, an elastic-out, so it overshoots to 1.1206 of
+   the distance at 27.4% of the tween and rings back down to 1 by 65.7%. A
+   cubic-bezier cannot express that, so `plate-in` carries the curve itself
+   in eighteen sampled stops, interpolated linearly, and the transform reads
+   off it: `scaleX` 0.01 -> 1, `scaleY` 0.49 -> 1, and `x` back to zero,
+   all on the same number, which is why each plate is slower to let go the
+   further it had to travel. The sliver is barely seen: their opacity tween
+   is the same curve over 0.24s, so a plate is three-quarters solid in one
+   frame and opaque before its neighbour has moved. The first plate starts
+   at 0.45s, then 1.05s later the pairs start outward from it, 1.05, 1.122,
+   1.23 seconds after that first beat, on their own array. The start offset
+   is `0.7 * l / 10` per step out from the middle, l being the whole span of
+   the row, which is what `--enter-step` is.
+
+   `is-entering` is on the body in the markup, so the first paint is already
+   the sliver, no flash of the finished strip, and script takes it off
+   when the arrival is over. Every animation fills backwards rather than
+   both, so a finished one hands the element straight back to its resting
+   style, exactly as their `clearProps: "all"` does. */
+.film { --enter-step: calc((var(--plate-w) * 7 + 48px) * 0.07); }
+@media (min-width: 375px) { .film { --enter-step: calc((var(--plate-w) * 7 + 60px) * 0.07); } }
+@media (min-width: 992px) { .film { --enter-step: calc((var(--plate-w) * 7 + 120px) * 0.07); } }
+body.is-entering .film-card {
+  will-change: transform;
+  animation:
+    plate-in 0.8s linear var(--enter-beat, 120ms) backwards,
+    plate-fade 0.24s linear var(--enter-beat, 120ms) backwards;
+}
+/* the middle plate first, then the pairs outward from it, a hair apart: 1170,
+   1242 and 1350ms are the reference's own 1.05 / 1.122 / 1.23 seconds measured
+   from the first beat. That beat is theirs too, cut from 450ms to 120ms: their
+   0.45s is a hold while their landing settles, and on a reload it left the
+   window empty for nearly half a second, which reads as a page that failed to
+   load rather than as a page arriving. */
+body.is-entering .film-card:nth-child(1) { --enter-beat: 1350ms; --enter-x: calc(var(--enter-step) * 3); }
+body.is-entering .film-card:nth-child(2) { --enter-beat: 1242ms; --enter-x: calc(var(--enter-step) * 2); }
+body.is-entering .film-card:nth-child(3) { --enter-beat: 1170ms; --enter-x: var(--enter-step); }
+body.is-entering .film-card:nth-child(4) { --enter-beat: 120ms;  --enter-x: 0px; }
+body.is-entering .film-card:nth-child(5) { --enter-beat: 1170ms; --enter-x: calc(var(--enter-step) * -1); }
+body.is-entering .film-card:nth-child(6) { --enter-beat: 1242ms; --enter-x: calc(var(--enter-step) * -2); }
+body.is-entering .film-card:nth-child(7) { --enter-beat: 1350ms; --enter-x: calc(var(--enter-step) * -3); }
+@keyframes plate-in {
+  0%     { transform: translate3d(calc(var(--enter-x, 0px) * 1), 0, 0) scale3d(0.01, 0.49, 1); }
+  4%     { transform: translate3d(calc(var(--enter-x, 0px) * 0.609), 0, 0) scale3d(0.3971, 0.6894, 1); }
+  8%     { transform: translate3d(calc(var(--enter-x, 0px) * 0.3198), 0, 0) scale3d(0.6834, 0.8369, 1); }
+  12%    { transform: translate3d(calc(var(--enter-x, 0px) * 0.1197), 0, 0) scale3d(0.8815, 0.9390, 1); }
+  16%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.008), 0, 0) scale3d(1.0079, 1.0041, 1); }
+  20%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.0805), 0, 0) scale3d(1.0797, 1.0410, 1); }
+  24%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.1135), 0, 0) scale3d(1.1124, 1.0579, 1); }
+  27.4%  { transform: translate3d(calc(var(--enter-x, 0px) * -0.1206), 0, 0) scale3d(1.1194, 1.0615, 1); }
+  32%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.1116), 0, 0) scale3d(1.1105, 1.0569, 1); }
+  38%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.0849), 0, 0) scale3d(1.0841, 1.0433, 1); }
+  45%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.0511), 0, 0) scale3d(1.0506, 1.0261, 1); }
+  52%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.0247), 0, 0) scale3d(1.0245, 1.0126, 1); }
+  60%    { transform: translate3d(calc(var(--enter-x, 0px) * -0.0065), 0, 0) scale3d(1.0065, 1.0033, 1); }
+  65.7%  { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+  72%    { transform: translate3d(calc(var(--enter-x, 0px) * 0.0032), 0, 0) scale3d(0.9969, 0.9984, 1); }
+  80%    { transform: translate3d(calc(var(--enter-x, 0px) * 0.0037), 0, 0) scale3d(0.9964, 0.9981, 1); }
+  90%    { transform: translate3d(calc(var(--enter-x, 0px) * 0.0023), 0, 0) scale3d(0.9977, 0.9988, 1); }
+  100%   { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+}
+@keyframes plate-fade {
+  0%        { opacity: 0; }
+  10%       { opacity: 0.79; }
+  15%       { opacity: 0.98; }
+  20%, 100% { opacity: 1; }
+}
+body.is-entering .film-caption {
+  animation: caption-rise 1.5s cubic-bezier(0.6, 0, 0.1, 1) 1.5s backwards;
+}
+@keyframes caption-rise {
+  from { transform: translateY(300px); }
+  to   { transform: translateY(0); }
+}
+body.is-entering .eq-btn {
+  animation: bar-drop 1.5s cubic-bezier(0.6, 0, 0.1, 1) 1.5s backwards;
+}
+@keyframes bar-drop {
+  from { transform: translateY(-100px); }
+  to   { transform: translateY(0); }
+}
+/* the line under the wordmark arrives with the caption, and it does not fade
+   in from nothing: it is only ever 12px low, so a frame caught mid-arrival
+   still shows the line where the line belongs. Hiding it until its beat left
+   an empty slot on a line of its own, the reference's own 300px was for a
+   link at the foot of their window, not for a caption under a wordmark. */
+body.is-entering .sig-sub,
+body.is-entering .nav-status {
+  animation: line-rise 1.5s cubic-bezier(0.6, 0, 0.1, 1) 1.5s backwards;
+}
+@keyframes line-rise {
+  from { transform: translateY(12px); }
+  to   { transform: translateY(0); }
+}
+
+/* ==== the front door's arrival on the way back
+   The other half of the close, and the half that is easy to leave out: the
+   paper lifting is not the arrival, the row is. The reference's own close does
+   not stop at the paper, in their recording the row is *not there* when the
+   paper is reached (their band reads 0.2 to 0.5 of their paper at 2.20s and
+   2.28s, which is nothing) and then resolves in place over the half second
+   that follows, every plate legibly there by 2.90s.
+
+   Without this the move reads as paper, a hold, and then a finished front
+   door that snapped into place under it, which is what a fade of the paper
+   over an already-arrived row is: at the slow end of the lift curve nine
+   tenths of the row's appearance happens in the last 150ms, so nobody sees a
+   row arrive, they see a page turn up. So the plates resolve themselves, from
+   nothing, and the paper is out of the way early enough to watch it happen.
+
+   The order is their own, read off the recording slot by slot: the two outer
+   plates are first, the pairs step inward, and the middle plate of the row
+   the one a hand would reach for, is last. Their own curve carries it,
+   `cubic-bezier(0.22, 1, 0.36, 1)`, which is quick off the mark and spends the
+   rest of the move settling, so a plate is most of the way there in the first
+   quarter of its own half second and then comes to rest. Nothing moves but
+   opacity: their plates resolve where they stand, and a row that slides as it
+   arrives is a different move from the one in the recording. The wait before
+   the first plate is the paper's own beat, and script writes it, the one
+   number lives with the rest of the close's timings in `closeToHome`, and this
+   is only its fallback. */
+body.is-returning #page-home .film-card {
+  animation: plate-up 460ms cubic-bezier(0.22, 1, 0.36, 1)
+    calc(var(--return-wait, 220ms) + var(--return-step, 0ms)) both;
+}
+body.is-returning #page-home .film-card:nth-child(1),
+body.is-returning #page-home .film-card:nth-child(7) { --return-step: 0ms; }
+body.is-returning #page-home .film-card:nth-child(2),
+body.is-returning #page-home .film-card:nth-child(6) { --return-step: 45ms; }
+body.is-returning #page-home .film-card:nth-child(3),
+body.is-returning #page-home .film-card:nth-child(5) { --return-step: 90ms; }
+body.is-returning #page-home .film-card:nth-child(4) { --return-step: 135ms; }
+/* the caption is not a plate and does not step: it comes up behind the row, on
+   one beat, the way it does on a fresh load, the row first, the name after */
+body.is-returning #page-home .film-caption {
+  animation: plate-up 520ms cubic-bezier(0.22, 1, 0.36, 1)
+    calc(var(--return-wait, 220ms) + 180ms) both;
+}
+@keyframes plate-up { from { opacity: 0; } to { opacity: 1; } }
+.film-titleblock {
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+.film-artbox {
+  height: calc(0.1 * var(--vh, 1vh) * 100);
+  max-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.film-art {
+  display: block;
+  height: calc(0.1 * var(--vh, 1vh) * 100);
+  max-height: 90px;
+  width: auto;
+  fill: var(--ink);
+}
+.film-title {
+  display: none;
+  font-family: var(--display);
+  font-weight: 400;
+  /* the reference's drawn wordmarks stand about 57px inside an 81px box at
+     this window height; Amita's ink is as tall as its em, so 7vh is the size
+     that stands to the same height, capped the way their max-height caps it */
+  font-size: min(7vh, 63px);
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--ink);
+  margin: 0;
+}
+.film.on-plate .film-art { display: none; }
+.film.on-plate .film-title { display: block; }
+.film-title .lt { display: inline-block; opacity: 0; transform: translateY(0.22em); }
+.film-title.writing .lt {
+  animation: lt-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--i) * 18ms);
+}
+.film-title.settled .lt { opacity: 1; transform: none; }
+@keyframes lt-in { to { opacity: 1; transform: none; } }
+.film-song {
+  font-family: var(--clearface);
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: 1px;
+  color: var(--ink);
+  transition: opacity 0.3s ease;
+}
+
+/* the two elements the open transition builds (see openSectionIndex in
+   site.js), and nothing else: no shadow, no rounding, no frame, the
+   reference's move is a plate blown up until it is the window, so the plate is
+   the whole of it. Both are pinned to the window's top left corner and animate
+   their `transform`, which is how the reference drives them too: one scale and
+   one translate is a cheaper, smoother thing for the compositor than six
+   animating box properties, and the lift and the sheet then carry the same
+   numbers and can never drift apart. */
+.film-sheet {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 320;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: top left;
+  will-change: transform, opacity;
+}
+.film-lift {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 330;
+  overflow: hidden;
+  pointer-events: none;
+  transform-origin: top left;
+  will-change: transform, opacity;
+}
+/* the plates of the row keep moving while the plate is lifted, so the strip
+   itself only stands down for the pointer */
+.film.is-leaving .film-card { pointer-events: none; }
+
+/* the other half of the move, and the one the reference uses for coming back:
+   a sheet of the page's own paper over the whole window. Nothing slides and
+   nothing is scaled; the screen becomes paper and then hands the front door
+   back. It is a sheet rather than an opacity on the leaving page because an
+   opacity would have to fight every transform, filter and compositing layer
+   that page has built, and on the artist's page that includes a playing
+   take's own layers, while one element over the top of all of them cannot be
+   defeated by anything underneath it. The paper is the paper the pages are
+   already painted on, so the moment it is opaque there is no seam to see: the
+   wash reads as the page dissolving rather than as a sheet coming down. It
+   covers the bar as well, because in the reference the section's own title
+   leaves with the section it belongs to: for one beat the whole window is one
+   sheet of paper.
+
+   That means over the top of everything, including the app's own floating chat
+   control (z 9999), which is at the foot of the window on every page but the
+   front door: left above the paper it spent the second half of the move as a
+   green bubble sitting on blank paper and then blinked out when the front door
+   arrived. Under the paper it leaves with everything else and nothing has to be
+   faded separately. */
+.paper-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--paper);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* =============================== 8. the scroll-lit lead sentence
+   One big sentence whose words light up as it is scrolled through.
+   The About page is where it lives now. */
+.word-lead {
+  font-size: clamp(23px, 2.9vw, 40px);
+  line-height: 1.24;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin: 0;
+}
+.word-lead .w { transition: color 0.5s ease, opacity 0.5s ease; opacity: 0.42; }
+.word-lead .w.on { opacity: 1; color: var(--ink); }
+.word-lead .chip {
+  display: inline-block; vertical-align: -0.16em;
+  width: 1.5em; height: 0.86em; border-radius: 999px; overflow: hidden; margin: 0 0.12em;
+  opacity: 0.5; transition: opacity 0.5s ease;
+}
+.word-lead .chip.on { opacity: 1; }
+.word-lead .chip img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ======================================================= 9. list rows */
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows-head {
+  display: grid; grid-template-columns: 54px 44px minmax(0, 1.5fr) minmax(0, 0.85fr) 84px;
+  gap: 14px; align-items: center;
+  padding: 12px 14px; border-bottom: 1px solid var(--line-2);
+  font-family: var(--sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2);
+}
+.rows li.row {
+  display: grid; grid-template-columns: 54px 44px minmax(0, 1.5fr) minmax(0, 0.85fr) 84px;
+  gap: 14px; align-items: center;
+  padding: 12px 14px; border-radius: 12px;
+  border-bottom: 1px solid var(--line-2);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s, transform 0.3s var(--ease);
+}
+.rows li.row:last-child { border-bottom-color: transparent; }
+.rows li.row:hover { background: rgba(27, 25, 23, 0.04); }
+.rows li.row:hover .row-title { transform: translateX(3px); }
+/* the ring the row is played from: a real button rather than a numbered
+   stamp, one glyph swapped for the other inside it, and a hairline of the
+   row it belongs to lit underneath as the take runs */
+.row-play {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-2);
+  background: transparent; padding: 0; cursor: pointer; appearance: none;
+  flex: none; text-decoration: none;
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease);
+}
+.row-play svg { width: 20px; height: 20px; display: block; }
+.row-play .rp-play, .row-play .rp-pause { fill: currentColor; }
+.row-play .rp-pause, .rows li.row.sounding .row-play .rp-play { display: none; }
+.rows li.row.sounding .row-play .rp-pause { display: block; }
+.rows li.row:hover .row-play { border-color: var(--ink); color: var(--ink); }
+.rows li.row::after {
+  content: ''; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 1.5px;
+  background: var(--teal); transform: scaleX(var(--p, 0)); transform-origin: left center;
+  opacity: 0; transition: opacity 0.3s;
+}
+.rows li.row.playing::after { opacity: 1; }
+.row-thumb { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; }
+.row-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.row-title { font-size: 15px; font-weight: 500; letter-spacing: -0.015em; transition: transform 0.35s var(--ease); }
+.row-sub, .row-year { font-size: 12.5px; color: var(--ink-2); }
+/* a row whose work has both a recording and a video keeps the recording on the
+   ring and puts the video here, on the row's own line of type, rather than
+   growing the row a cell of its own */
+.row-watch { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(27, 25, 23, 0.32); }
+.row-watch:hover { color: var(--ink); border-bottom-color: currentColor; }
+.row-year { font-family: var(--sans); font-size: 12.5px; font-weight: 500; text-align: right; color: var(--ink-2); }
+.rows .is-hidden { display: none; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.chips .chip-tab {
+  border: 1px solid var(--line); background: transparent; border-radius: 999px;
+  padding: 6px 13px; font-size: 12px; color: var(--ink-2); cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.chips .chip-tab:hover { border-color: var(--ink-3); color: var(--ink); }
+.chips .chip-tab.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* the row a work plate lands on when it opens the About page */
+.rows li.row { transition: background 0.3s ease, box-shadow 0.3s ease; }
+.rows li.row.is-found { background: rgba(173, 74, 42, 0.10); box-shadow: inset 3px 0 0 var(--ochre); }
+
+/* =================================================== 10. content pages */
+.plate {
+  position: relative;
+  margin: 0 40px 8px;
+  border-radius: var(--r);
+  overflow: hidden;
+  height: min(46vh, 420px);
+  background: var(--paper-3);
+}
+.plate img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; }
+.plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(20, 15, 10, 0.52) 0%, rgba(20, 15, 10, 0.12) 26%, transparent 52%);
+}
+.plate-cap {
+  position: absolute; left: 20px; bottom: 16px; right: 20px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  color: #f4efe6;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+}
+.prose { max-width: 74ch; }
+.prose p { font-size: 15px; line-height: 1.72; color: var(--ink-2); margin-bottom: 16px; }
+.prose p.big { font-size: clamp(19px, 2.1vw, 26px); line-height: 1.44; letter-spacing: -0.022em; color: var(--ink); }
+.prose h3 { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; margin: 30px 0 10px; }
+/* Emphasis inside body copy is the sans italic, not the serif italic. The
+   serif italic on this site is Cormorant Garamond, a display face with a small
+   x-height and a lot of contrast: at the 15 and 19px the paragraphs are set in,
+   a name in it read as a smudge rather than as a phrase being pointed at. The
+   sans italic is the same family as the sentence around it, so the words stay
+   as legible as their neighbours and the emphasis is carried by the slant and
+   the brighter ink. The pull quotes keep the serif italic: at 38px that face
+   is exactly what it is for, so the split is display against text, not one
+   face for everything. */
+.prose em { font-family: var(--sans); font-style: italic; }
+.prose a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.prose a:hover { border-bottom-color: var(--ink); }
+.pull {
+  font-family: var(--serif); font-style: italic;
+  font-size: clamp(21px, 2.5vw, 33px); line-height: 1.34; color: var(--ink);
+  border-left: 2px solid var(--ochre); padding-left: 22px; margin: 34px 0;
+  max-width: 46ch;
+}
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 30px 0 6px; }
+.fact { border-top: 1px solid var(--line); padding-top: 12px; }
+.fact dt { font-family: var(--sans); font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); margin-bottom: 6px; }
+.fact dd { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--ink); }
+.fact.wide { grid-column: span 2; }
+.yearlist { list-style: none; margin: 0; padding: 0; }
+.yearlist li {
+  display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 16px;
+  padding: 13px 0; border-bottom: 1px solid var(--line-2);
+}
+.yearlist li:last-child { border-bottom: none; }
+.yearlist .yr { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em; padding-top: 3px; }
+.yearlist .ttl { font-size: 15px; font-weight: 500; letter-spacing: -0.015em; }
+.yearlist .sub { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 46px; }
+.contact-list { list-style: none; margin: 0; padding: 0; }
+.contact-list a {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+  padding: 16px 0; border-bottom: 1px solid var(--line-2);
+  text-decoration: none; color: var(--ink);
+  transition: padding-left 0.35s var(--ease);
+}
+.contact-list a:hover { padding-left: 8px; }
+.contact-list .cl-name { font-size: 19px; font-weight: 500; letter-spacing: -0.02em; }
+.contact-list .cl-note { font-family: var(--sans); font-size: 12.5px; font-weight: 500; letter-spacing: 0.005em; color: var(--ink-2); }
+.info-card {
+  border: 1px solid var(--line-2); border-radius: var(--r); background: var(--paper-2);
+  padding: 18px; box-shadow: var(--shadow-1);
+}
+.info-card .ic-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.info-card .ic-head b { font-size: 14px; font-weight: 500; }
+.info-card .ic-head span { font-family: var(--mono); font-size: 9px; color: var(--ink-3); }
+.info-row {
+  border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+  background: var(--paper);
+}
+.info-row dt { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+.info-row dd { margin: 3px 0 0; font-size: 13.5px; }
+
+/* ===================================================== 11. footer */
+/* the foot of a tool page sits inside the same measure as the page above it,
+   with the rule over it the width of the content rather than the window */
+footer {
+  max-width: var(--page-w);
+  margin: 44px auto 0;
+  padding: 32px var(--page-pad) 0;
+  border-top: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+/* the original one-line footers on the tool pages: one link at the left, and
+   nothing else. The system's own name used to sit over it on every one of these
+   pages, the same eleven words repeated at the foot of six pages, saying what
+   the site already says in the bar at the top of every one of them. The source
+   link is the only thing a foot has to do, so it is the only thing left. */
+footer > a {
+  align-self: flex-start;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* masthead settles in when a page opens */
+.page-enter .page.active > *:nth-child(1) { animation: mast-in 0.72s var(--ease) both; }
+.page-enter .page.active > *:nth-child(2) { animation: mast-in 0.72s var(--ease) 0.07s both; }
+
+/* ==== the arrival, staged
+   Everything from the hero down arrives as it comes up the screen, and it
+   arrives in reading order. Type is not faded in: script measures where each
+   block's lines broke and rebuilds the block as one masked line per line it
+   already printed, so a line can be pulled up out of the line above it, printed
+   into place, and brought into focus as it lands, the words are set rather
+   than summoned, which is the difference between a page that looks assembled
+   and a page that looks like it faded up. Everything that is not type, a
+   card, a grid of facts, a set of links, the rules between blocks, lifts in
+   behind the type with a hair of scale on the way, and a set of things lifts
+   one after another rather than as a slab.
+
+   The mark is carried by the block itself (see the unit rules below), so a
+   paragraph arrives when that paragraph comes up the screen and never while it
+   is still below the fold.
+
+   Both the reveal and its reversal are animation-only, nothing here is hidden
+   at rest, so a page whose script never ran is simply a page, and the mask
+   wrappers only exist because script built them. */
+.stage .ln {
+  display: block;
+  /* the mask is the line box, and the clipping is taken a hair past it: a
+     descender that sits low in a face like Cormorant would otherwise be cut by
+     its own line, and padding here would push every line of every paragraph
+     down the page. `overflow: clip` with a margin is the one form that clips
+     without adding anything to the layout, where it is not understood the
+     line box still holds the type, which is what a line box is for. */
+  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 0.1em;
+}
+.stage .ln-i { display: block; }
+/* The states that wait are switched on by one class, and script puts it on at
+   the end of its own work: `html.staged`. Nothing is hidden at rest, so a page
+   whose script never ran, or threw before it got that far, is a finished page
+   with all of its type set rather than a page of invisible paragraphs. */
+/* The selector here carries no more weight than .ln-i itself, on purpose.
+   `html.staged .stage .ln-i` looked right and was a trap: one element deeper
+   than `[data-staged='lines'].on .ln-i`, so the waiting state beat the arrived
+   state wherever the animation was not the thing holding the line up, which
+   is exactly the moment a block settles. The line would print, the block would
+   settle and the waiting rule would take the type away again. A hidden state
+   may never outrank the state that shows it. */
+html.staged .ln-i { opacity: 0; transform: translate3d(0, 112%, 0); }
+[data-staged='lines'].on .ln-i {
+  animation: line-up 1.15s var(--ease-stage) both;
+  animation-delay: calc(var(--b, 0) * 0.07s + var(--i, 0) * var(--s, 0.055s));
+}
+/* a block that was read again while it was mid-arrival (a window that changed
+   shape under it) is left standing rather than played again from the bottom */
+[data-staged='lines'].is-set .ln-i { animation: none; opacity: 1; transform: none; filter: none; }
+/* The line is not faded in, it is printed: it comes up out of the line above it
+   and is simply there. There was a focus pull here, a blur that resolved as the
+   line landed, and it read as damage rather than as focus: the type looked
+   smudged and the words underneath it looked dirty instead of sharp, worst on
+   the small body copy where the blur was largest relative to the letters. Nothing
+   is taken from the arrival by its removal. The rise is the whole move, and the
+   type is legible at every position it passes through. Nothing here filters the
+   line now, so the browser never promotes it to its own blurred layer either: no
+   filter means no compositing cost on the one element on the page that animates
+   most. */
+@keyframes line-up {
+  from { opacity: 0; transform: translate3d(0, 112%, 0); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  46% { opacity: 1; transform: translate3d(0, 0, 0); animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1); }
+  to { opacity: 1; transform: none; }
+}
+/* and the same class hides what is not type, so a block that has not arrived
+   yet is waiting rather than standing there finished. Before this, a card or a
+   fact or a row was already on screen, and then blinked out and lifted the
+   moment it crossed the line: a scroll in which the top block animated and the
+   rest of the page looked done already, which reads as a page that cannot make
+   up its mind. */
+html.staged [data-staged='block'],
+html.staged [data-staged='group'] > *,
+html.staged [data-staged='rows'] > li { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.992); }
+[data-staged='block'].on {
+  animation: block-rise 0.95s var(--ease-stage) both;
+  animation-delay: calc(var(--b, 0) * 0.07s);
+}
+[data-staged='group'].on > * {
+  animation: block-rise 0.95s var(--ease-stage) both;
+  animation-delay: calc(var(--b, 0) * 0.07s + var(--g, 0) * 0.065s);
+}
+[data-staged='rows'].on > li {
+  animation: block-rise 0.85s var(--ease-stage) both;
+  animation-delay: calc(var(--b, 0) * 0.06s + var(--r, 0) * 0.045s);
+}
+@keyframes block-rise {
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.992); }
+  to { opacity: 1; transform: none; }
+}
+/* the rule at the head of a block draws itself across the measure, the way the
+   artist's own rules do, and the copy under it follows the pen */
+.about-kicker::after,
+.section-label::after { transform-origin: left center; }
+html.staged .about-kicker:not(.on)::after,
+html.staged .section-label:not(.on)::after { transform: scaleX(0); }
+.about-kicker.on::after,
+.section-label.on::after { animation: rule-draw 1.15s var(--ease-open) both; }
+hr.divider, [data-staged='rule'] { transform-origin: left center; }
+hr.divider.on, [data-staged='rule'].on { animation: divider-draw 1.1s var(--ease-open) both; }
+@keyframes divider-draw { from { opacity: 0; transform: scaleX(0); } to { opacity: 1; transform: scaleX(1); } }
+@keyframes mast-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+footer .foot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-2);
+}
+footer .foot-grid h4 {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 400; margin-bottom: 8px;
+}
+footer .foot-grid ul { list-style: none; margin: 0; padding: 0; }
+footer .foot-grid li { margin-bottom: 5px; }
+footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+footer a:hover { border-bottom-color: var(--ink); }
+footer .colophon {
+  margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line-2);
+  display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: space-between;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+footer .colophon span { color: var(--ink-3); }
+
+/* ===================================================== 11b. home plate */
+.plate.tall { height: min(56vh, 520px); }
+.plate-cap { text-shadow: 0 1px 12px rgba(20, 16, 10, 0.5); }
+
+/* ===================================================== 12. chat widget */
+#archer-chat-fab {
+  background: var(--ink);
+  border: 1px solid rgba(240, 236, 228, 0.16);
+  color: var(--paper);
+  bottom: calc(var(--frame-pad) + 78px);
+  right: calc(var(--frame-pad) + 18px);
+  width: 50px; height: 50px;
+  box-shadow: 0 12px 30px rgba(30, 24, 16, 0.28);
+}
+#archer-chat-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-2);
+  color: var(--ink);
+}
+.ac-title { font-family: var(--sig); font-size: 22px; }
+.ac-subtitle, .ac-tab, .ac-msg { font-size: 13px; }
+.ac-tab.active { color: var(--ochre-d); border-color: var(--ochre); }
+.ac-iconbtn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* ==================================================== 13. about page */
+/* The one page about the artist follows the dark reference: a black stage
+   with a teal rim, one large centred sentence that lights up as it is
+   scrolled, and the nav sitting in a black pill at the foot of the window. */
+body.on-about { background: var(--stage); }
+body.on-about #frame { background: var(--stage); }
+
+#page-about {
+  position: relative;
+  min-height: 100vh;
+  background: var(--stage);
+  color: #f2f1ec;
+  padding-bottom: 0;
+}
+/* The rim. This stage used to wear a 9px solid teal bezel with a 76px glow
+   inside it and a bright hairline on top, which read as the screen's own frame
+   rather than as part of the page, the one place on the site where a colour
+   shouted. It is a hairline of the same ink the paper pages use, with the
+   faintest teal breathing inside it, so the dark page still has an edge without
+   becoming a lamp. */
+#page-about::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 241, 236, 0.14),
+    inset 0 0 96px 34px rgba(15, 141, 120, 0.07);
+}
+#page-about > * { position: relative; z-index: 1; }
+
+/* ==== the opening screen: one sentence, centred, fading down the page */
+.about-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--topbar-h) + 30px) 5vw 15vh;
+}
+/* ==== the drawn line
+   The artist's page opens on the reference's own move: a hand-drawn stroke
+   that draws itself first, and only then lets the sentence rise under it.
+   The stroke is the reference's own trace (the curl, the wisp knot under it,
+   the long S down the spine) held in a viewBox of that trace's bounding box,
+   so at 8.7vw it is the same shape at the same weight as the page it came
+   from rather than a redrawing of it. It is one dashoffset: pathLength="1" on
+   the path makes the whole outline a single unit, so 1 is nothing drawn and 0
+   is all of it. */
+/* the gap under it is the one number on this page that is pure taste: the
+   stroke's own box ends 7px above its ink, and the sentence needs to stand off
+   the pen rather than run through the last of it. The width is a touch under
+   the reference's own 8.7vw share of the window: at 8.7 the S ran most of the
+   way down the screen and read as a page furrow rather than as a flourish. */
+.about-curve { width: clamp(104px, 7.6vw, 160px); height: auto; aspect-ratio: 350 / 795; margin-bottom: 5vh; }
+.about-curve .curve-pen,
+.about-curve .curve-play {
+  fill: none; stroke: #f2f1ec; stroke-width: 3.5; stroke-linecap: round; opacity: 0.9;
+  stroke-dasharray: 1;
+  /* The pen is drawn at rest. It used to be the other way about, nothing
+     drawn, and only this page's arrival able to draw it, which meant any load
+     in which that class never landed showed the artist's page with no line on
+     it at all, and the sentence alone in the middle of the screen. Now the
+     stroke is simply there and the animation draws it over the top of a line
+     that was already whole. */
+  stroke-dashoffset: 0;
+}
+/* the take's own copy waits for a take: script sets its offset from the song */
+.about-curve .curve-play { stroke-dashoffset: 1; }
+body.page-enter #page-about .about-curve .curve-pen { animation: line-draw 1.15s var(--ease-open) 0.05s both; }
+
+/* ==== the pen is the instrument
+   Once a take is loaded the line stops being only a drawing. A second copy of
+   the same path lies under it in the system's teal and its dashoffset is the
+   take's own position, so the line fills from the top down as the song runs,
+   and the pen is the seek bar: point at it and a marker rides the stroke with
+   the destination's time beside it, click it and the take moves there
+   forward if that is where the point is, back if it is behind. The fat
+   invisible copy underneath is what makes the pen comfortable to hit: three
+   and a half units of hairline is a beautiful target to look at and an
+   impossible one to aim at. */
+.about-curve .curve-play { stroke: var(--teal-bright); opacity: 0; transition: opacity 0.5s ease; }
+.about-curve .curve-hit { fill: none; stroke: rgba(0, 0, 0, 0); stroke-width: 64; pointer-events: stroke; }
+.about-curve .curve-mark {
+  fill: #f2f1ec; stroke: var(--stage); stroke-width: 4;
+  opacity: 0; transition: opacity 0.18s ease;
+}
+body.take-loaded #page-about .about-curve .curve-play { opacity: 0.95; }
+body.take-loaded #page-about .about-curve .curve-hit { cursor: pointer; }
+/* the marker and the time are raised by the pointer itself rather than by the
+   box's own hover, so they follow the hand wherever on the pen it is */
+.about-curve .curve-mark.on { opacity: 1; }
+.curve-time {
+  position: absolute; top: 0; left: 0;
+  font-family: var(--sans); font-size: 12px; font-weight: 500; letter-spacing: 0.08em;
+  color: #f2f1ec; opacity: 0; pointer-events: none; white-space: nowrap;
+  transition: opacity 0.18s ease;
+}
+@keyframes line-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+/* the sentence follows the pen, and the two facts under it follow the sentence */
+body.page-enter #page-about .about-hero .about-lead { animation: hero-rise 0.95s var(--ease) 0.35s both; }
+body.page-enter #page-about .about-hero-foot { animation: hero-rise 0.8s var(--ease) 0.6s both; }
+@keyframes hero-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+
+/* There is deliberately no second stroke anywhere below the hero. One line,
+   above the sentence, and nothing under it: a pen that carried on down the
+   sheet read as a stray rule between the statement and the first chapter
+   rather than as a drawing. */
+
+#page-about .word-lead { color: inherit; text-align: center; }
+#page-about .word-lead .w { opacity: 0.17; }
+#page-about .word-lead .w.on { opacity: 1; color: inherit; }
+#page-about .word-lead .chip { opacity: 0.3; width: 1.75em; height: 0.82em; }
+#page-about .word-lead .chip.on { opacity: 1; }
+
+.about-hero .about-lead {
+  font-size: clamp(27px, 4.2vw, 72px);
+  line-height: 1.07;
+  letter-spacing: -0.035em;
+  font-weight: 400;
+  max-width: min(1080px, 92vw);
+  margin: 0;
+}
+.about-hero-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+  margin-top: 7vh;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(242, 241, 236, 0.66);
+}
+/* two facts, one dot between them, rather than a run of capitals with a gap */
+.about-hero-foot span + span::before {
+  content: '\00b7';
+  margin-right: 20px;
+  color: rgba(242, 241, 236, 0.3);
+}
+
+/* ==== the sections under it */
+/* the essay runs on the same measure as every other page, with the gap between
+   its chapters 72px rather than 88: 176px of paper between two sections read as
+   a page that had lost its place */
+.about-sec { max-width: var(--page-w); margin: 0 auto; padding: 72px var(--page-pad); }
+.about-kicker {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--teal-bright);
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.about-kicker::after { content: ''; flex: 1; height: 1px; background: rgba(242, 241, 236, 0.16); transform-origin: left center; }
+
+/* ==== each chapter arrives the same way the page did
+   The chapter is one of the staged blocks the arrival section describes: its
+   rule draws itself across the measure, its own type comes up line by line
+   behind that rule, and the blocks between the type lift in after them. The
+   only rule here is the one that draws the pen, which is the same keyframe
+   every other rule on the site uses. */
+@keyframes rule-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.about-mid {
+  font-size: clamp(23px, 2.9vw, 43px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  text-align: left;
+  margin: 0 0 48px;
+}
+/* The standfirst over the essay, on the full measure. Display type is the one
+   thing on this page that can carry a long line without tiring the eye, so the
+   sentence that opens a chapter runs the width of the page. */
+.about-standfirst {
+  font-size: clamp(20px, 2.2vw, 29px);
+  line-height: 1.36;
+  letter-spacing: -0.028em;
+  color: #f2f1ec;
+  margin: 0 0 44px;
+}
+
+/* ==== the essay, in one column
+   This page has a 1100px measure. Set at 15.5px, one column of it was 130
+   characters to the line, so the body was capped at 78ch instead, and that
+   left 420px of empty black down the right-hand side of every chapter, which
+   is what made the layout look like it had stopped halfway across. Set at 19px
+   the same column is a designed wide measure rather than a mistake, and the
+   whole page is written in the one block: the chapter reads top to bottom in a
+   single column, and nothing is split into two. */
+#page-about .prose { max-width: none; }
+#page-about .prose p { color: rgba(242, 241, 236, 0.74); font-size: 19px; line-height: 1.6; margin-bottom: 24px; }
+#page-about .prose p.big { color: #f2f1ec; }
+#page-about .prose em { color: rgba(242, 241, 236, 0.9); }
+#page-about .pull {
+  color: #f2f1ec;
+  border-left-color: var(--teal);
+  max-width: none;
+  padding-left: 30px;
+  margin: 52px 0 42px;
+  font-size: clamp(21px, 2.6vw, 38px);
+}
+#page-about .facts {
+  border-top: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 22px;
+  margin: 48px 0 0;
+}
+/* the statement in the music chapter is a left-aligned block like everything
+   else in its column: it wears .word-lead, whose centred rule is the hero's */
+#page-about .about-mid { text-align: left; }
+
+/* ==== the works list
+   Five columns at this page's measure left each work stranded: "Horse" ended
+   460px before "Performance \00b7 also new media", which ended another 80px
+   before the year, so every row read as three islands in a line. A work's form
+   belongs with the work, not in a column of its own: the title now stands over
+   its form as the small mono label the rest of the site uses for a note, and
+   the row is a title block against its year, which is how the Elsewhere list
+   at the foot of the page already read. Same five cells, four columns, one
+   cell per row in the third; nothing in the markup moved. */
+#page-about .rows-head,
+#page-about .rows li.row {
+  grid-template-columns: 46px 44px minmax(0, 1fr) 96px;
+  grid-template-rows: auto auto;
+  column-gap: 20px;
+  row-gap: 3px;
+  align-items: center;
+}
+#page-about .rows-head > :nth-child(1),
+#page-about .rows-head > :nth-child(2),
+#page-about .rows-head > :nth-child(4) { display: none; }
+#page-about .rows-head > :nth-child(3) { grid-column: 3; grid-row: 1 / span 2; }
+#page-about .rows-head > :nth-child(5) { grid-column: 4; grid-row: 1 / span 2; text-align: right; }
+#page-about .row-play { grid-column: 1; grid-row: 1 / span 2; }
+#page-about .row-thumb { grid-column: 2; grid-row: 1 / span 2; }
+#page-about .row-title { grid-column: 3; grid-row: 1; align-self: end; }
+#page-about .row-year { grid-column: 4; grid-row: 1 / span 2; }
+#page-about .row-sub {
+  grid-column: 3; grid-row: 2; align-self: start;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: rgba(242, 241, 236, 0.6);
+}
+#page-about .fact { border-top-color: rgba(242, 241, 236, 0.14); }
+#page-about .fact dt { color: rgba(242, 241, 236, 0.62); }
+#page-about .fact dd { color: #f2f1ec; }
+
+.about-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 36px; }
+.about-links a {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
+  padding: 15px 0; border-bottom: 1px solid rgba(242, 241, 236, 0.13);
+  text-decoration: none; color: #f2f1ec;
+  transition: padding-left 0.35s var(--ease), border-color 0.3s;
+}
+.about-links a:hover { padding-left: 8px; border-bottom-color: rgba(242, 241, 236, 0.4); }
+.about-links .cl-name { font-size: 17px; font-weight: 500; letter-spacing: -0.02em; }
+.about-links .cl-note { font-family: var(--sans); font-size: 12.5px; font-weight: 500; letter-spacing: 0.005em; color: rgba(242, 241, 236, 0.6); }
+
+/* the works list, in the dark */
+#page-about .rows-head { color: rgba(242, 241, 236, 0.62); border-bottom-color: rgba(242, 241, 236, 0.14); }
+#page-about .rows li.row { border-bottom-color: rgba(242, 241, 236, 0.11); }
+#page-about .rows li.row:hover { background: rgba(242, 241, 236, 0.05); }
+#page-about .row-play { border-color: rgba(242, 241, 236, 0.22); color: rgba(242, 241, 236, 0.6); }
+#page-about .rows li.row:hover .row-play { border-color: #f2f1ec; color: #f2f1ec; }
+/* the row that is playing, against the row that is merely hovered: the ring
+   goes teal, the row lifts off the black a little, and the hairline under it
+   is the take's own position, the teal is the bright one, because the deep
+   teal reads as a smudge on a black page */
+#page-about .rows li.row::after { background: var(--teal-bright); }
+/* the playing row is lit from its own play button rather than boxed: a fill
+   that runs from the ring out to nothing leaves no four edges to read as a
+   box dropped over the row */
+#page-about .rows li.row.playing {
+  background: linear-gradient(90deg, rgba(63, 201, 168, 0.16) 0%, rgba(63, 201, 168, 0.06) 46%, rgba(63, 201, 168, 0) 100%);
+}
+#page-about .rows li.row.playing .row-play {
+  border-color: var(--teal-bright); color: var(--teal-bright); background: rgba(63, 201, 168, 0.12);
+}
+#page-about .rows li.row.playing .row-title { transform: translateX(3px); }
+#page-about .row-title { color: #f2f1ec; }
+#page-about .row-sub { color: rgba(242, 241, 236, 0.6); }
+#page-about .row-year { color: rgba(242, 241, 236, 0.62); }
+#page-about .row-watch { border-bottom-color: rgba(242, 241, 236, 0.3); }
+#page-about .row-watch:hover { color: #f2f1ec; border-bottom-color: rgba(242, 241, 236, 0.75); }
+#page-about .row-thumb { opacity: 0.72; }
+#page-about .rows li.row:hover .row-thumb { opacity: 1; }
+#page-about .chips .chip-tab { border-color: rgba(242, 241, 236, 0.22); color: rgba(242, 241, 236, 0.62); }
+#page-about .chips .chip-tab:hover { border-color: rgba(242, 241, 236, 0.5); color: #f2f1ec; }
+#page-about .chips .chip-tab.active { background: #f2f1ec; border-color: #f2f1ec; color: #0a0a0c; }
+#page-about .contact-list a { color: #f2f1ec; border-bottom-color: rgba(242, 241, 236, 0.13); }
+#page-about .contact-list a:hover { border-bottom-color: rgba(242, 241, 236, 0.4); }
+#page-about .contact-list .cl-note { color: rgba(242, 241, 236, 0.6); }
+#page-about .contact-list .cl-name { font-size: 18px; }
+
+.about-foot {
+  max-width: var(--page-w);
+  margin: 0 auto;
+  padding: 40px var(--page-pad) 76px;
+  border-top: 1px solid rgba(242, 241, 236, 0.12);
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 24px;
+  margin-top: 0;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgba(242, 241, 236, 0.55);
+}
+.about-foot > span { color: rgba(242, 241, 236, 0.55); }
+
+/* ==== the chrome, re-skinned for the dark stage */
+/* ==== the bar on the stage, with no lid on it
+   Every other page wears the scrolled bar as a sheet of paper with a rule under
+   it, which is what a light page wants. On the black stage that same rule drew
+   a hard line across the top of the window and, with the window's own edges,
+   read as a box lying over the artist's page. So here the bar keeps no border
+   and no opaque fill at all: a soft scrim behind it fades out well below its
+   own bottom edge, and the page slides under a bar that has no edges to see. */
+body.on-about .topbar.is-scrolled { background: transparent; border-bottom-color: transparent; backdrop-filter: none; }
+body.on-about .topbar.is-scrolled::after {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; height: calc(100% + 26px);
+  background: linear-gradient(180deg, rgba(7, 7, 10, 0.95) 0%, rgba(7, 7, 10, 0.88) 56%, rgba(7, 7, 10, 0) 100%);
+  pointer-events: none;
+  z-index: -1;
+}
+body.on-about .sig-logo { color: #f2f1ec; }
+body.on-about .sig-sub,
+body.on-about .nav-status { color: rgba(242, 241, 236, 0.5); }
+
+body.on-about #archer-chat-fab { background: var(--teal); color: #04120f; border-color: transparent; }
+body.on-about .menu-panel { background: #0c0c10; border-left-color: rgba(242, 241, 236, 0.12); }
+body.on-about .menu-head h2 { color: #f2f1ec; }
+body.on-about .menu-back { color: #f2f1ec; }
+body.on-about .menu-label { color: rgba(242, 241, 236, 0.45); border-bottom-color: rgba(242, 241, 236, 0.12); }
+body.on-about .menu-list button { color: #f2f1ec; border-bottom-color: rgba(242, 241, 236, 0.1); }
+body.on-about .menu-list .mi-num, body.on-about .menu-list .mi-note { color: rgba(242, 241, 236, 0.45); }
+body.on-about .menu-foot { color: rgba(242, 241, 236, 0.55); }
+body.on-about .menu-foot a { color: #f2f1ec; border-bottom-color: rgba(242, 241, 236, 0.25); }
+body.on-about .menu.open .menu-veil { background: rgba(0, 0, 0, 0.6); }
+
+/* =================================================== 13. responsive */
+@media (max-width: 1080px) {
+  /* one column, and less paper either side */
+  .page { --page-pad: 28px; }
+  /* the essay is one column at every width now, so there is nothing to fold
+     into a single column at this breakpoint any more */
+  .about-links { grid-template-columns: 1fr; }
+  /* the masthead is one column at every width now, so there is nothing to turn
+     into one here */
+  /* a step is one column at every width now, so the narrow case is the same
+     layout with less paper either side of it */
+  .two-col { grid-template-columns: 1fr; gap: 22px; }
+  /* the demo page's label column narrows with the paper, and its two halves
+     stack: at this width the second column is 316px and the readout in it has
+     four columns of its own to fit */
+  .demo-panel { padding: 30px 28px 32px; }
+  .demo-row > .demo-row-label { flex-basis: 168px; }
+  /* The upload panel's two halves fold into one column here, at the same
+     breakpoint the rest of the page's two-column blocks do. It has to be
+     written as `.demo-panel-body.demo-split` as well as on its own: the split
+     rule is two classes and this one is one, so on its own it loses, and a
+     420px column beside a 1fr column does not fit a 324px panel. */
+  .demo-panel-body,
+  .demo-panel-body.demo-split { grid-template-columns: minmax(0, 1fr); gap: 38px; }
+  /* the settings list is one column at every width now, and a row is a name
+     and the thing it names at every width, so there is nothing to fold into
+     one here */
+}
+@media (max-width: 760px) {
+  :root { --frame-pad: 0px; --topbar-h: 58px; }
+  body { background: var(--paper); }
+  #frame { margin: 0; border-radius: 0; box-shadow: none; min-height: 100vh; }
+  .topbar { border-radius: 0; }
+  .sig-logo { font-size: 24px; }
+  /* the line under the wordmark stays on a phone, it is the page's own name
+     and at 0.2em of tracking the whole of it still fits a 390px window */
+  .sig-sub, .nav-status { letter-spacing: 0.2em; }
+  /* the strip scrolls sideways on a phone rather than squeezing ten plates,
+     with the reference's smaller stagger and its 40px caption */
+  .film-strip {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: 90px 44px 60px;
+  }
+  .film-strip::-webkit-scrollbar { display: none; }
+  .film-card { scroll-snap-align: center; }
+  /* on a phone the strip is a scroller rather than a centred row, so the
+     plates grow in place instead of being pulled toward a middle that is not
+     on the screen (the beats still cascade from the middle outward) */
+  .film { --enter-step: 0px; }
+  .film-card:nth-child(2), .film-card:nth-child(4), .film-card:nth-child(7) { top: calc(0.0125 * var(--vh, 1vh) * 100); }
+  .film-card:nth-child(3), .film-card:nth-child(6), .film-card:nth-child(9) { top: calc(0.02188 * var(--vh, 1vh) * 100); }
+  .film-caption { bottom: 40px; }
+  .film-titleblock { bottom: -14px; }
+  .film-artbox { height: 35px; }
+  .film-art { height: 35px; }
+  .film-title { font-size: 28px; }
+  .film-song { font-size: 13px; line-height: 17px; letter-spacing: 1.2px; }
+  body:has(#page-home.active) .sig-logo { font-size: 34px; }
+  .section { padding: 44px 20px; }
+  .page { --page-pad: 20px; }
+  .hero, .demo-intro { padding: 34px var(--page-pad) 22px; }
+  .section { padding: 38px var(--page-pad); }
+  /* on a phone a control row is the label over its controls rather than two
+     columns: 190px of label beside a picker inside a 350px panel leaves the
+     controls about one pill wide */
+  .demo-panel { padding: 28px 22px 30px; }
+  .demo-panel-sub { margin-bottom: 28px; }
+  .demo-panel-body { gap: 26px; }
+  /* on a phone the name goes over the thing it names: a label and a control
+     sharing a 320px line leaves the control about one word wide */
+  .demo-panel .demo-row > .demo-row-label { flex: 1 1 100%; }
+  /* and the note readout stacks there, because four items spread across a 284px
+     box would be four labels with nothing between them. In one column the fixed
+     order is the reading order, the arrow centred between the two rows it
+     separates, and the confidence last */
+  .harmony-overlay-note { flex-direction: column; align-items: flex-start; padding: 18px 20px; }
+  .harmony-overlay-note > div:last-child { text-align: left; }
+  .harmony-overlay-note .overlay-arrow { align-self: center; }
+  .demo-row { flex-wrap: wrap; gap: 10px 16px; margin-bottom: 20px; }
+  .demo-row > .demo-row-label { flex: 1 1 100%; }
+  .demo-row-track { flex: 1 1 100%; }
+  .demo-deck { font-size: 14.5px; }
+  .hero-title { max-width: 24ch; }
+  .prose-stage { gap: 18px; }
+  .prose-stage-content { padding-bottom: 26px; }
+  .plate { margin: 0 20px 8px; }
+  .rows-head { display: none; }
+  .rows li.row { grid-template-columns: 40px 44px minmax(0, 1fr); }
+  .rows li.row .row-sub, .rows li.row .row-year { display: none; }
+  footer { padding: 32px 20px 26px; }
+  #archer-chat-fab { bottom: 78px; right: 14px; }
+  .about-hero { padding: calc(var(--topbar-h) + 18px) 22px 12vh; }
+  .about-hero .about-lead { font-size: clamp(24px, 6.6vw, 40px); }
+  .about-curve { width: clamp(92px, 20vw, 124px); margin-bottom: 4vh; }
+  .about-hero-foot { font-size: 12px; }
+  /* the two facts are on two lines here, so the dot between them has nothing
+     to sit between and would only open the second line as a stray mark */
+  .about-hero-foot span + span::before { content: none; }
+  .about-sec { padding: 56px 22px; }
+  .about-foot { padding: 28px 22px 96px; }
+  .about-mid { font-size: clamp(19px, 5.4vw, 27px); }
+  .about-standfirst { font-size: clamp(19px, 5.2vw, 26px); margin-bottom: 32px; }
+  #page-about .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* on a phone the thumbnail goes and the year keeps its corner; the form
+     stays under its title, which is where it lives on every other width */
+  #page-about .rows-head,
+  #page-about .rows li.row { grid-template-columns: 34px minmax(0, 1fr) 74px; }
+  #page-about .row-thumb { display: none; }
+  #page-about .row-title { grid-column: 2; grid-row: 1; }
+  #page-about .row-sub { grid-column: 2; grid-row: 2; display: block; }
+  #page-about .row-year { grid-column: 3; grid-row: 1 / span 2; display: block; }
+  #page-about .row-play { grid-column: 1; grid-row: 1 / span 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; transition-delay: 0s !important; }
+  .film-title .lt { opacity: 1; transform: none; }
+  .word-lead .w, .word-lead .chip { opacity: 1; color: var(--ink); }
+  #page-about .word-lead .w { opacity: 1; color: #f2f1ec; }
+}

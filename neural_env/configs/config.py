@@ -5,8 +5,8 @@ Minimal stand-in for the original RVC-Project's configs/config.py. Only the
 two attributes actually imported by infer/rmvpe.py and infer/audio.py are
 provided: infer_device and infer_dtype. The original file runs GPU
 auto-detection/VRAM-based half-precision benchmarking logic that has no
-purpose here -- this sidecar is pinned to CPU (see synthesis.neural.device
-in the main app's config.yaml) -- so both are simply hardcoded.
+purpose here, this sidecar is pinned to CPU (see synthesis.neural.device
+in the main app's config.yaml), so both are simply hardcoded.
 """
 import torch
 

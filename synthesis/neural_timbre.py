@@ -23,7 +23,7 @@ class NeuralTimbreConverter:
 
         # How many voices in a choir/duet get individually re-skinned
         # through the sidecar in a live, real-time call. None means no
-        # cap (convert every voice) -- fine for an offline whole-track
+        # cap (convert every voice), fine for an offline whole-track
         # render, not fine for anything with a latency budget, since the
         # sidecar processes one conversion at a time (see convert_stems).
         raw_cap = ncfg.get("max_ensemble_voices", 2)
@@ -32,21 +32,30 @@ class NeuralTimbreConverter:
         # When true, and more than one voice is listed in model_paths,
         # harmony stems (everything except the lead) round-robin across
         # every loaded voice instead of all singing through the same one
-        # -- this is what actually makes a neural choir sound like more
+        #, this is what actually makes a neural choir sound like more
         # than one trained voice repeated at different pitches.
         self.distribute_voices_across_choir = bool(ncfg.get("distribute_voices_across_choir", True))
 
+        # `enabled` answers "is this converter usable right now" and is turned
+        # off whenever the sidecar cannot be reached, so it cannot also be the
+        # record of what the config asked for: `_configured` is that record, and
+        # it is what a later successful probe switches back on.
+        self._configured = bool(self.enabled)
         self._reachable = False
+        self._probe_error: str | None = None
+        self._last_probe_s = 0.0
+        self._probe_lock = threading.Lock()
         self._call_count = 0
         self._live_lock = threading.Lock()
         self._track_lock = threading.Lock()
 
-        if self.enabled:
-            self._check_sidecar()
+        if self._configured:
+            self.refresh_sidecar_state(min_interval_s=0.0)
         else:
-            logger.info("NeuralTimbreConverter disabled — pipeline runs on pure DSP output.")
+            logger.info("NeuralTimbreConverter disabled, pipeline runs on pure DSP output.")
 
-    def _check_sidecar(self):
+    def _check_sidecar(self) -> bool:
+        """One probe of the sidecar's /health. Returns whether it is usable."""
         try:
             resp = requests.get(f"{self.sidecar_url}/health", timeout=self.timeout_s)
             resp.raise_for_status()
@@ -54,24 +63,66 @@ class NeuralTimbreConverter:
             loaded = status.get("voices_loaded", 0)
             configured = status.get("voices_configured", 0)
             if loaded == 0:
+                self._probe_error = (f"sidecar reachable at {self.sidecar_url} but has "
+                                     f"0/{configured} voices loaded")
                 logger.warning(
                     f"Neural sidecar at {self.sidecar_url} is reachable but has 0/{configured} "
-                    "voices loaded — falling back to DSP output."
+                    "voices loaded, falling back to DSP output."
                 )
-                self.enabled = False
-                return
-            self._reachable = True
+                return False
+            self._probe_error = None
             logger.info(f"Neural sidecar reachable at {self.sidecar_url}: "
                        f"{loaded}/{configured} voice(s) loaded and ready.")
+            return True
         except requests.exceptions.RequestException as e:
-            logger.error(f"Neural sidecar not reachable at {self.sidecar_url}: {e}")
-            self.enabled = False
+            self._probe_error = str(e)
+            logger.warning(f"Neural sidecar not reachable at {self.sidecar_url}: {e}")
+            return False
+
+    def refresh_sidecar_state(self, min_interval_s: float = 2.0) -> bool:
+        """Re-probe the sidecar, so a slow start is not a permanent verdict.
+
+        The probe used to run exactly once, in the constructor. That is fine on
+        the documented path -- `start.command` waits for the sidecar's /health
+        before it starts this server -- and wrong on the hand-run one: `python
+        server.py` starts both at the same time, so the single probe lands while
+        the sidecar is still loading its voices. The converter then disabled
+        itself for the life of the process: /neural/status kept answering
+        `enabled: false`, the page kept saying *neural sidecar not reachable*,
+        and the sidecar's own log showed healthy /health replies the whole time.
+        Nothing but a restart could clear it, which is not a state this should
+        have. A probe that can be repeated is the fix, and the two-second floor
+        keeps a page polling status from becoming a health-check loop.
+
+        Returns whether the converter is usable after the probe.
+        """
+        if not self._configured:
+            return False
+        with self._probe_lock:
+            now = time.time()
+            if self._reachable and now - self._last_probe_s < min_interval_s:
+                return True
+            self._last_probe_s = now
+            self._reachable = self._check_sidecar()
+            self.enabled = bool(self._configured and self._reachable)
+            return self._reachable
 
     def convert(self, audio: np.ndarray, sample_rate: int, target_hz: float,
                 voice_index: int = 0, pad_seconds: float | None = None,
                 transpose_semitones: float | None = None) -> np.ndarray:
         if not self.enabled or not self._reachable:
-            return audio
+            # A sidecar that came up after this server did is picked up here, so
+            # a page that was told "not reachable" starts working on its next
+            # Play instead of needing a restart. The two-second floor inside
+            # refresh_sidecar_state is what keeps a real-time path from probing
+            # on every chunk.
+            if self._configured:
+                self.refresh_sidecar_state()
+        if not self.enabled or not self._reachable:
+            if self._configured:
+                self.refresh_sidecar_state()
+            if not self.enabled or not self._reachable:
+                return audio
 
         if not self._live_lock.acquire(blocking=False):
             return audio
@@ -86,7 +137,7 @@ class NeuralTimbreConverter:
             return result
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 503:
-                logger.debug("Neural sidecar busy — using DSP audio.")
+                logger.debug("Neural sidecar busy, using DSP audio.")
             else:
                 logger.error(f"Neural sidecar returned an error: {e}")
             return audio
@@ -127,7 +178,7 @@ class NeuralTimbreConverter:
         Runs each choir/duet voice stem through the sidecar individually,
         instead of mixing the whole ensemble down first and running one
         conversion pass over the mix. RVC's pitch stage (RMVPE) estimates
-        a single f0 curve per call -- handing it several simultaneous,
+        a single f0 curve per call, handing it several simultaneous,
         deliberately-detuned pitches at once doesn't produce a richer
         result, it produces a mistracked pitch curve and smeared timbre,
         because the model was never built to separate overlapping voices.
@@ -137,7 +188,7 @@ class NeuralTimbreConverter:
         Returns a new list of stems, same shape as the input, with
         "audio" replaced wherever a conversion was attempted and
         succeeded. Any stem beyond max_voices, or where conversion fails
-        or the sidecar isn't reachable, keeps its original DSP audio --
+        or the sidecar isn't reachable, keeps its original DSP audio
         so a choir always degrades to "fewer voices are neurally-voiced,
         the rest are DSP" rather than to silence or an error. The input
         list itself is never mutated.
@@ -146,7 +197,7 @@ class NeuralTimbreConverter:
         picking the ones closest to the lead (cents nearest zero) first.
         Leave it unset to use synthesis.neural.max_ensemble_voices from
         config.yaml (meant for anything with a real-time budget, since
-        the sidecar only ever processes one conversion at a time -- see
+        the sidecar only ever processes one conversion at a time, see
         _inference_lock in rvc_server.py). Pass max_voices=None explicitly
         to convert every stem regardless of that config value, which is
         the right call for an offline whole-track render where time isn't
@@ -158,10 +209,12 @@ class NeuralTimbreConverter:
         actually chose for this performance. Harmony stems round-robin
         across every voice in synthesis.neural.model_paths when
         distribute_voices_across_choir is on and more than one is
-        configured (see __init__) -- that's what gives a choir more than
+        configured (see __init__), that's what gives a choir more than
         one distinct trained timbre instead of one voice cloned at
         several pitches.
         """
+        if self._configured and not self._reachable:
+            self.refresh_sidecar_state()
         if not self.enabled or not self._reachable or not stems:
             return stems
 
@@ -170,7 +223,7 @@ class NeuralTimbreConverter:
 
         ordered = sorted(range(len(stems)), key=lambda i: abs(stems[i].get("cents", 0.0)))
         if max_voices is not None:
-            # max(0, ...), not max(1, ...) on purpose -- 0 is a legitimate,
+            # max(0, ...), not max(1, ...) on purpose, 0 is a legitimate,
             # explicit choice (see neural_voice_count in server.py): "use
             # the Neural engine, but this ensemble stays entirely DSP."
             # That's different from disabling the neural stage outright,
@@ -179,7 +232,7 @@ class NeuralTimbreConverter:
             # nothing and every stem keeps its original DSP audio.
             ordered = ordered[:max(0, int(max_voices))]
 
-        out = [dict(s) for s in stems]  # shallow copy -- caller's original stems are left untouched
+        out = [dict(s) for s in stems]  # shallow copy, caller's original stems are left untouched
         harmony_rank = 0
 
         for i in ordered:
@@ -206,7 +259,7 @@ class NeuralTimbreConverter:
                 )
                 # convert() degrades silently to returning the input audio
                 # unchanged on any failure/busy/disabled state (see its
-                # own docstring) -- treat that the same as "didn't convert"
+                # own docstring), treat that the same as "didn't convert"
                 # here rather than mixing the same audio in twice.
                 converted = None if result is audio else result
 
@@ -265,7 +318,7 @@ def _fit_length(audio: np.ndarray, n_samples: int) -> np.ndarray:
     """
     Pads or trims audio to exactly n_samples. The sidecar resamples
     internally (project rate -> 16kHz -> back), so a converted stem can
-    come back a handful of samples off from what went in -- this keeps
+    come back a handful of samples off from what went in, this keeps
     it aligned with the other stems before VocableSynthesizer.combine_stems()
     mixes them back together.
     """

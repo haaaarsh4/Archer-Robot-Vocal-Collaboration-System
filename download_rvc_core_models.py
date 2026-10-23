@@ -32,7 +32,7 @@ def _download(url: str, dest: str):
 if __name__ == "__main__":
     for url, dest, size_hint in FILES:
         if os.path.exists(dest):
-            print(f"Already present: {dest} -- skipping.")
+            print(f"Already present: {dest}, skipping.")
             continue
         print(f"Downloading {os.path.basename(dest)} ({size_hint}) from {url}")
         try:
@@ -44,9 +44,9 @@ if __name__ == "__main__":
 
     print(
         "\nDone. rmvpe.pt's location (assets/rmvpe/rmvpe.pt) matches "
-        "pitch.rmvpe.model_path in config.yaml exactly -- no further setup needed for that one.\n"
+        "pitch.rmvpe.model_path in config.yaml exactly, no further setup needed for that one.\n"
         "hubert_base.pt is saved to assets/hubert/hubert_base.pt, the conventional RVC "
         "location. rvc_pipeline.py loads it via infer.hubert.load_hubert_model(), which "
-        "does not take an explicit path -- if that module has a different hardcoded path "
+        "does not take an explicit path, if that module has a different hardcoded path "
         "baked in, move (or symlink) the file there instead."
     )

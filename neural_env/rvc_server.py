@@ -13,7 +13,40 @@ def _patched_torch_load(*args, **kwargs):
 torch.load = _patched_torch_load
 
 import os as _os
-torch.set_num_threads(max(1, (_os.cpu_count() or 4) - 2))
+
+#---------------------------------------------------------------------------
+# HOW MANY THREADS, and this is the single number that decides whether Live
+# mode can keep up with the track at all.
+#
+# It used to be cpu_count - 2, on the reasoning that most of the machine is
+# the right answer for a neural net. Measured on a 16-core machine converting
+# the SAME 8 s chunk (the length the page streams), torch's own conversion
+# time was:
+#
+#     threads=4   7.72s   0.97x real time
+#     threads=6   6.74s   0.84x
+#     threads=8   7.10s   0.89x
+#     threads=10  6.92s   0.87x
+#     threads=14  8.84s   1.11x   <- what cpu_count - 2 was doing here
+#
+# More threads than cores' worth of real parallelism makes it SLOWER: this
+# model is a stack of small conv1d layers whose per-op work is too small to
+# pay for the thread pool's own coordination, so the extra threads spin and
+# contend (and that is before the app server and the browser are on the same
+# machine). At 1.11x the conversion can never out-run playback, so the streamed
+# line falls behind, the page skips a phrase to catch up, and the listener
+# hears the robot drop out -- the interruption is a thread count, not a
+# scheduling bug. At 0.84-0.89x the line stays ahead of the track.
+#
+# Half the cores, capped at 8, which sits in the flat part of that curve
+# without depending on this machine's exact core count. RVC_TORCH_THREADS
+# overrides it for anyone who wants to re-measure on their own hardware.
+_threads = int(_os.environ.get("RVC_TORCH_THREADS") or 0)
+if _threads <= 0:
+    _threads = max(4, min(8, (_os.cpu_count() or 8) // 2))
+torch.set_num_threads(_threads)
+print(f"[rvc] torch using {_threads} thread(s) of {_os.cpu_count()} cores "
+      f"(RVC_TORCH_THREADS overrides)")
 
 import numpy as np
 import soundfile as sf
@@ -84,6 +117,15 @@ def _load_voices():
     rms_mix_rate = float(ncfg.get("rms_mix_rate", 0.25))
     pad_seconds = float(ncfg.get("pad_seconds", 1.0))
     filter_radius = int(ncfg.get("filter_radius", 3))
+    # The post-conversion clarity stage every voice shares (see
+    # voice_clarity.py). Read once here and handed to each conversion, so the
+    # behaviour is identical for a live chunk and a whole-track render.
+    clarity_cfg = ncfg.get("clarity", {}) or {}
+    clarity = {
+        "presence_match": bool(clarity_cfg.get("presence_match", True)),
+        "presence_max_lift_db": float(clarity_cfg.get("presence_max_lift_db", 3.0)),
+        "peak_ceiling": float(clarity_cfg.get("peak_ceiling", 0.99)),
+    }
 
     if device not in ("cpu", "") and not torch.cuda.is_available():
         print(f"[WARN] config.yaml requests synthesis.neural.device={device!r}, but "
@@ -93,7 +135,7 @@ def _load_voices():
         is_half = False
 
     if not _model_paths:
-        print("[WARN] No synthesis.neural.model_paths configured in config.yaml — "
+        print("[WARN] No synthesis.neural.model_paths configured in config.yaml, "
               "sidecar will start with zero voices loaded.")
         return
 
@@ -109,7 +151,7 @@ def _load_voices():
 
     for i, model_path in enumerate(_model_paths):
         if not os.path.exists(model_path):
-            print(f"[ERROR] Voice {i}: model file not found at '{model_path}' — skipping.")
+            print(f"[ERROR] Model {i + 1} (voice {i}): model file not found at '{model_path}', skipping.")
             _voices.append(None)
             _load_errors.append(f"model not found: {model_path}")
             _voice_params.append(None)
@@ -128,14 +170,15 @@ def _load_voices():
                 "rms_mix_rate": rms_mix_rate,
                 "pad_seconds": pad_seconds,
                 "filter_radius": filter_radius,
+                "clarity": dict(clarity),
             })
             has_index = "with index" if voice.index is not None else "no index"
-            print(f"[OK] Voice {i} loaded: {model_path} ({has_index}, version={voice.version}, "
+            print(f"[OK] Model {i + 1} (voice {i}) loaded: {model_path} ({has_index}, version={voice.version}, "
                   f"f0={bool(voice.if_f0)}, tgt_sr={voice.tgt_sr}, transpose={transpose:+.0f}) on {device} "
                   f"(half={voice.is_half}, hubert_quantized={voice.quantized})")
             _warm_up_voice(i, voice, index_rate, protect, rms_mix_rate, pad_seconds)
         except Exception as e:
-            print(f"[ERROR] Voice {i} failed to load ({model_path}): {e}")
+            print(f"[ERROR] Model {i + 1} (voice {i}) failed to load ({model_path}): {e}")
             _voices.append(None)
             _load_errors.append(str(e))
             _voice_params.append(None)
@@ -149,12 +192,15 @@ def _warm_up_voice(index, voice, index_rate, protect, rms_mix_rate, pad_seconds)
             dummy, 16000, _rmvpe,
             f0_up_key=0.0, index_rate=index_rate, protect=protect,
             rms_mix_rate=rms_mix_rate, pad_seconds=min(pad_seconds, 0.3),
+            # Warming the graph is the point; the clarity stage on a noise
+            # burst would only add time to startup.
+            clarity={"presence_match": False},
         )
         elapsed_ms = (time.perf_counter() - start) * 1000
         _warmup_ms[index] = round(elapsed_ms, 1)
-        print(f"[OK] Voice {index} warmed up in {elapsed_ms:.0f}ms")
+        print(f"[OK] Model {index + 1} (voice {index}) warmed up in {elapsed_ms:.0f}ms")
     except Exception as e:
-        print(f"[WARN] Voice {index} warm-up failed (non-fatal): {e}")
+        print(f"[WARN] Model {index + 1} (voice {index}) warm-up failed (non-fatal): {e}")
 
 
 @app.on_event("startup")
@@ -182,6 +228,7 @@ def health():
                 "model_path": _model_paths[i] if i < len(_model_paths) else None,
                 "model_fingerprint": os.path.basename(_model_paths[i]) if i < len(_model_paths) else None,
                 "transpose_semitones": _voice_params[i]["transpose_semitones"] if _voice_params[i] else None,
+                "clarity": _voice_params[i].get("clarity") if _voice_params[i] else None,
             }
             for i, v in enumerate(_voices)
         ],
@@ -219,6 +266,7 @@ def _run_conversion(voice, audio, in_sr, params, pad_seconds_override, transpose
             rms_mix_rate=params["rms_mix_rate"],
             pad_seconds=pad_seconds,
             filter_radius=params["filter_radius"],
+            clarity=params.get("clarity"),
         )
         elapsed_ms = (time.perf_counter() - start) * 1000
         return converted, out_sr, elapsed_ms
@@ -238,13 +286,27 @@ async def convert(
     if not _voices:
         return JSONResponse({"error": "no voices loaded"}, status_code=503)
 
-    voice = _voices[voice_index % len(_voices)]
+    # AN OUT-OF-RANGE INDEX IS AN ERROR, NOT THE NEXT VOICE ALONG. This used to
+    # be `_voices[voice_index % len(_voices)]`, which is how a panel that still
+    # offered a model the sidecar had not loaded (a stale sidecar, or a main app
+    # whose config.yaml has more entries than the running sidecar) could ask for
+    # Model 3 and be answered by Model 1 -- audibly the wrong voice, with no
+    # error anywhere. Refusing is the honest answer, and the page now disables a
+    # slot the running sidecar does not have.
+    if voice_index < 0 or voice_index >= len(_voices):
+        return JSONResponse(
+            {"error": f"voice_index {voice_index} is out of range: this sidecar loaded "
+                      f"{len(_voices)} voice(s). Restart neural_env/rvc_server.py after "
+                      "changing synthesis.neural.model_paths in config.yaml."},
+            status_code=400,
+        )
+    voice = _voices[voice_index]
     if voice is None:
         return JSONResponse(
             {"error": f"voice {voice_index} failed to load at startup, see /health"},
             status_code=503,
         )
-    params = _voice_params[voice_index % len(_voices)]
+    params = _voice_params[voice_index]
 
     try:
         raw = await file.read()

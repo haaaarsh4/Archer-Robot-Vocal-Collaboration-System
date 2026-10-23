@@ -46,7 +46,7 @@ def extract_sentence_pairs(cr_path: Path, en_path: Path) -> List[Tuple[str, str]
 
     logger.warning(
         f"Line count mismatch in {cr_path.name} ({len(cr_lines)} cr / "
-        f"{len(en_lines)} en) — running sentence alignment instead of "
+        f"{len(en_lines)} en), running sentence alignment instead of "
         f"line-by-line zip"
     )
     return align_sequences(cr_lines, en_lines, band=200)

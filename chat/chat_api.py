@@ -138,7 +138,7 @@ def chat(req: ChatRequest):
             tts = _get_tts()
             if not tts.available:
                 response["audio_error"] = (
-                    "Text-to-speech voice not configured — set tts.voice_path in config.yaml. "
+                    "Text-to-speech voice not configured, set tts.voice_path in config.yaml. "
                     "Returning text only."
                 )
             else:
@@ -148,7 +148,7 @@ def chat(req: ChatRequest):
         return response
 
     except RuntimeError as e:
-        # backend not reachable, etc -- a clear message rather than a 500 stack trace
+        # backend not reachable, etc, a clear message rather than a 500 stack trace
         return JSONResponse({"error": str(e)}, status_code=503)
     except Exception as e:
         logger.error(f"[chat error] {e}")
@@ -168,7 +168,7 @@ async def sing_from_scratch_vocal(
 
     if neural_timbre is None:
         return JSONResponse(
-            {"error": "Neural timbre stage not loaded on the server — check startup logs."},
+            {"error": "Neural timbre stage not loaded on the server, check startup logs."},
             status_code=503,
         )
 
@@ -206,7 +206,7 @@ def sing_from_lyrics(req: SingFromLyricsRequest):
 
     if neural_timbre is None:
         return JSONResponse(
-            {"error": "Neural timbre stage not loaded on the server — check startup logs."},
+            {"error": "Neural timbre stage not loaded on the server, check startup logs."},
             status_code=503,
         )
 
