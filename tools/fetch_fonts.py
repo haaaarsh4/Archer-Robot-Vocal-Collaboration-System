@@ -14,6 +14,7 @@ Usage:  .venv/bin/python tools/fetch_fonts.py
 
 from __future__ import annotations
 
+import base64
 import re
 import sys
 import urllib.request
@@ -48,7 +49,7 @@ EXTRA_CSS = """/* ==== Amita: the display face for the home page wordmark. Of ev
   font-family: 'Amita';
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
   src: url(amita-400.woff2) format('woff2');
 }
 
@@ -121,12 +122,32 @@ def main() -> int:
             target.write_bytes(fetch(url))
             downloaded += 1
 
-        local = re.sub(
-            r"url\(https://[^)]+\.woff2\)",
-            f"url({name})",
-            block,
-        )
-        out_css.append(f"/* {subset} */")
+        # The signature is the first thing drawn on the page. A separate font
+        # request, even a preloaded one, can lose the race against first paint
+        # and leave a serif standing where the script belongs. So the latin
+        # file is carried inside this stylesheet as a data URI: it is part of
+        # the CSS the page is already waiting for, and there is no second
+        # request that can arrive late. `block` keeps the fallback invisible
+        # in the one case where the browser still has to decode it.
+        inline_signature = family == "Mr De Haviland" and subset == "latin"
+        if family == "Mr De Haviland":
+            block = block.replace("font-display: swap", "font-display: block")
+
+        if inline_signature:
+            data = base64.b64encode(target.read_bytes()).decode("ascii")
+            local = re.sub(
+                r"url\(https://[^)]+\.woff2\)",
+                f"url(data:font/woff2;base64,{data})",
+                block,
+            )
+            out_css.append("/* the signature face, inline so first paint already has it */")
+        else:
+            local = re.sub(
+                r"url\(https://[^)]+\.woff2\)",
+                f"url({name})",
+                block,
+            )
+            out_css.append(f"/* {subset} */")
         out_css.append(local)
         out_css.append("")
 

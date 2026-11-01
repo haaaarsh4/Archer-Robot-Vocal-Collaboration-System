@@ -1,0 +1,862 @@
+/* ============================================================
+   The paper layer.
+
+   Every reading page on the site (everything except the home film
+   strip, the artist page and the live demo) is a centred column of
+   white cards on the site's own paper, the shape the SingSong
+   supplement uses: one title, then one card per idea, audio examples
+   in labelled rows.  The fonts, inks and accents are this site's own,
+   so the pages read as the same publication rather than a pasted-in
+   template.
+
+   Loaded after site.css. Nothing here touches #page-demo, #page-about
+   or #page-home.
+   ============================================================ */
+
+.page.paper {
+  --pw: 1110px;
+  --pc: #f8f6f0;
+  --pc-2: #f2efe7;
+  padding: 96px 28px 90px;
+  background:
+    radial-gradient(1200px 520px at 50% -160px, rgba(255,255,255,0.55), transparent 70%),
+    var(--paper);
+}
+
+.paper-wrap { max-width: var(--pw); margin: 0 auto; }
+
+/* ---------------------------------------------------------- masthead */
+.paper-head {
+  text-align: center;
+  padding: 18px 10px 46px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.paper-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 20px;
+}
+.paper-title {
+  font-size: clamp(38px, 4.8vw, 62px);
+  font-weight: 500;
+  line-height: 1.01;
+  letter-spacing: -0.038em;
+  margin: 0 auto;
+  max-width: 20ch;
+  text-wrap: balance;
+  color: var(--ink);
+}
+.paper-title em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ochre);
+  letter-spacing: -0.012em;
+}
+.paper-deck {
+  font-size: 17.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  margin: 24px auto 0;
+  max-width: 64ch;
+}
+.paper-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 30px auto 0;
+}
+.paper-meta span {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-2);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 13px;
+}
+
+/* ---------------------------------------------------------- cards */
+.paper-card {
+  background: var(--pc);
+  border: 1px solid rgba(27, 25, 23, 0.085);
+  border-radius: 22px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 2px rgba(38, 30, 20, 0.04),
+    0 26px 70px rgba(38, 30, 20, 0.075);
+  padding: 58px 64px;
+  margin: 0 0 26px;
+}
+.paper-card--tight { padding: 38px 44px; }
+.paper-card--dark {
+  background: #0b1120;
+  border-color: rgba(120, 160, 255, 0.16);
+  box-shadow: 0 30px 80px rgba(8, 12, 24, 0.25);
+  color: #e8edf7;
+}
+.paper-card--dark .paper-h2, .paper-card--dark .paper-lede { color: #f2f5fb; }
+.paper-card--dark .paper-p, .paper-card--dark .paper-caption { color: #9fb0cc; }
+
+.paper-num {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 17px;
+}
+.paper-num::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+.paper-num b { color: var(--ochre); font-weight: 400; }
+
+.paper-h2 {
+  font-size: clamp(27px, 2.9vw, 38px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.034em;
+  margin: 0 0 16px;
+  text-wrap: balance;
+  color: var(--ink);
+}
+.paper-h3 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.3;
+  margin: 0 0 8px;
+}
+.paper-lede {
+  font-size: 18.5px;
+  line-height: 1.62;
+  color: var(--ink);
+  margin: 0 0 22px;
+}
+.paper-p {
+  font-size: 16px;
+  line-height: 1.72;
+  color: var(--ink-2);
+  margin: 0 0 18px;
+}
+.paper-p:last-child { margin-bottom: 0; }
+.paper-p strong, .paper-lede strong { color: var(--ink); font-weight: 600; }
+.paper-p a, .paper-lede a { color: var(--ochre); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.paper-p code, .paper-lede code, .paper-list code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: rgba(27, 25, 23, 0.055);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--ink);
+}
+.paper-quiet { font-size: 14px; color: var(--ink-3); }
+.paper-rule { border: 0; border-top: 1px solid var(--line-2); margin: 34px 0; }
+
+.paper-list {
+  margin: 6px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+.paper-list li {
+  position: relative;
+  padding-left: 20px;
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.66;
+  color: var(--ink-2);
+}
+.paper-list li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ochre);
+  opacity: 0.75;
+}
+.paper-list strong { color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------- grids */
+.paper-grid { display: grid; gap: 18px; }
+.paper-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.paper-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.paper-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.paper-tile {
+  background: var(--pc);
+  border: 1px solid rgba(27, 25, 23, 0.08);
+  border-radius: 16px;
+  padding: 26px 28px;
+}
+.paper-card .paper-tile { background: #fffdf8; }
+.paper-tile .paper-h3 { font-size: 17px; }
+.paper-tile .paper-p { font-size: 14.5px; line-height: 1.64; margin-bottom: 0; }
+.paper-tile .paper-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ochre);
+  margin-bottom: 10px;
+}
+
+.paper-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line-2);
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 26px 0;
+}
+.paper-stat { background: var(--pc); padding: 22px 24px; }
+.paper-stat b {
+  display: block;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.paper-stat span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------- figures */
+.paper-figure { margin: 28px 0 0; }
+.paper-figure img, .paper-figure svg { display: block; width: 100%; height: auto; border-radius: 12px; }
+.paper-caption {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  margin: 12px 0 0;
+}
+.paper-caption b { color: var(--ink-2); font-weight: 600; }
+
+/* the dark plates: a printed diagram, not a screenshot */
+.plate {
+  background: #0b1120;
+  border: 1px solid rgba(120, 160, 255, 0.18);
+  border-radius: 16px;
+  padding: 26px 24px 18px;
+  overflow: hidden;
+}
+/* site.css gives .plate a fixed 420px height for the cover photographs on the
+   old pages. A diagram is not a photograph: it must keep its own aspect ratio,
+   or the bottom of a tall drawing and its caption are cut off. The reading
+   pages use a plate only for diagrams, so height follows the drawing here. */
+.page.paper .plate { height: auto; }
+.plate svg { display: block; width: 100%; height: auto; }
+.plate-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6f86aa;
+  margin-top: 14px;
+  border-top: 1px solid rgba(120, 160, 255, 0.14);
+  padding-top: 12px;
+}
+
+/* ---------------------------------------------------------- tables */
+.paper-table-wrap { overflow-x: auto; margin: 24px 0 0; }
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.paper-table th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--ink-3);
+  padding: 0 16px 10px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: bottom;
+}
+.paper-table td {
+  padding: 13px 16px 13px 0;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--ink-2);
+  vertical-align: top;
+}
+.paper-table td:first-child { color: var(--ink); font-weight: 500; }
+.paper-table tr:last-child td { border-bottom: 0; }
+.paper-table .num { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.paper-table code { font-family: var(--mono); font-size: 0.88em; color: var(--ink); }
+
+/* audio examples, laid out the way the SingSong supplement lays them out:
+   one row per version, one column per example, native players so the
+   comparison is about the sound and not about a custom widget */
+.audio-matrix { overflow-x: auto; margin: 26px 0 0; }
+.audio-matrix table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.audio-matrix th {
+  width: 158px;
+  text-align: left;
+  vertical-align: middle;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 12px 18px 12px 0;
+  border-top: 1px solid var(--line-2);
+}
+.audio-matrix td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--line-2);
+  vertical-align: middle;
+}
+.audio-matrix tr:first-child th, .audio-matrix tr:first-child td { border-top: 0; }
+.audio-matrix tr.is-highlight th { color: var(--ochre); }
+.audio-matrix tr.is-highlight th::before {
+  content: '';
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--ochre);
+  margin-right: 7px;
+  vertical-align: 2px;
+}
+.audio-matrix audio { width: 216px; max-width: 100%; height: 34px; display: block; }
+.audio-matrix .audio-name {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin: 7px 0 0;
+  max-width: 216px;
+}
+.audio-matrix .audio-name b { color: var(--ink); font-weight: 500; display: block; }
+
+/* ---------------------------------------------------------- demos */
+.paper-demo {
+  background: #fffdf8;
+  border: 1px solid rgba(27, 25, 23, 0.1);
+  border-radius: 16px;
+  padding: 30px 32px;
+  margin: 28px 0 0;
+}
+.paper-demo--dark {
+  background: #0e1526;
+  border-color: rgba(120, 160, 255, 0.18);
+  color: #e8edf7;
+}
+.paper-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.paper-demo-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.paper-demo-title span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 5px;
+}
+.paper-demo--dark .paper-demo-title span { color: #7d90b3; }
+
+/* The Cree widgets came over from the tool pages, where every column, output
+   box and pipeline card carried its own hairline, fill and shadow. Dropped
+   inside a .paper-demo, which is already a card, those skins stacked three
+   deep and the inner boxes had no padding to hold their own controls away
+   from their edges. On the paper layer the demo is the card. The two columns
+   are plain labelled areas on it, and only the fields themselves (the text
+   area, the waveform, the transcript and the output) carry a hairline. */
+.paper-demo .cree-mic-demo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+/* the pitch-engine control is a label and a segmented pair; without a gap the
+   label sits against the first button. It also wraps on a narrow window rather
+   than letting the pair run off the card. */
+#arch-pitch-engine, #harmony-pitch-engine {
+  gap: 18px clamp(14px, 2vw, 22px);
+  flex-wrap: wrap;
+}
+#arch-pitch-engine .pitch-engine-picker,
+#harmony-pitch-engine .pitch-engine-picker {
+  margin-bottom: 0;
+}
+
+/* the demo head above already names the model; the widget's own copy of that
+   title would say it twice. Its status line stays, as the one live readout. */
+.paper-demo .cree-mic-header {
+  justify-content: flex-end;
+  margin: 0 0 18px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.paper-demo .cree-mic-title { display: none; }
+.paper-demo .cree-mic-status {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+.paper-demo .cree-dialect-row {
+  margin: 0 0 20px;
+  padding: 0 0 16px;
+  gap: 14px;
+}
+.paper-demo .cree-dialect-sel {
+  max-width: none;
+  padding: 8px 14px;
+  background: var(--pc-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.paper-demo .cree-dialect-hint {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink-3);
+}
+.paper-demo .cree-demo-layout {
+  align-items: start;
+  gap: 26px;
+  margin-bottom: 0;
+}
+.paper-demo .cree-demo-col {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  gap: 12px;
+  min-width: 0;
+}
+.paper-demo .cree-demo-col-label {
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+}
+
+/* the fields: one hairline each, no shadow. */
+.paper-demo .cree-syllabics-input,
+.paper-demo .cree-output-box,
+.paper-demo .cree-waveform,
+.paper-demo .cree-pipeline-card {
+  background: var(--pc-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: none;
+}
+.paper-demo .cree-syllabics-input {
+  flex: 0 0 auto;
+  min-height: 132px;
+  padding: 14px 16px;
+  resize: vertical;
+  line-height: 1.62;
+}
+.paper-demo .cree-syllabics-input:focus {
+  border-color: var(--ink-3);
+  box-shadow: 0 0 0 3px rgba(27, 25, 23, 0.06);
+}
+.paper-demo .cree-output-box {
+  flex: 0 0 auto;
+  min-height: 132px;
+  padding: 16px 18px;
+  justify-content: flex-start;
+}
+.paper-demo .cree-transcript-log {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.paper-demo .cree-waveform {
+  width: 100%;
+  height: 72px;
+  padding: 12px 16px;
+}
+.paper-demo .cree-pipeline-card {
+  padding: 18px;
+}
+
+/* a control, not a lit panel in the old purple. */
+.paper-demo .cree-mic-trigger {
+  padding: 9px 18px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  color: var(--paper);
+  font-size: 12.5px;
+  letter-spacing: -0.005em;
+}
+.paper-demo .cree-mic-trigger:hover {
+  background: var(--ochre);
+  border-color: var(--ochre);
+  color: var(--paper);
+  transform: none;
+}
+.paper-demo .cree-mic-trigger .cmt-dot { background: currentColor; }
+.paper-demo .cree-mic-trigger.active {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+.paper-demo .cree-mic-trigger.active .cmt-dot { background: var(--red); }
+/* the word check writes into this line only when there is something to say;
+   empty, it was still taking a line of height under the input. */
+.paper-demo #mt-word-validation:empty { display: none; }
+.paper-demo .cree-lang-pill {
+  padding: 6px 12px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  letter-spacing: -0.005em;
+}
+.paper-demo .cree-lang-pill.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* the LED readout is a footer on the demo, not another card. */
+.paper-demo .cree-led-row {
+  margin-top: 24px;
+  padding: 18px 0 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+/* The pitch and harmony demos carried a second panel of their own inside the
+   paper card: the same double frame, one size smaller. The demo card is the
+   frame here too. Its own heading is already above the controls, so the inner
+   copy of that heading goes; the microphone control stays, on the right of a
+   hairline, where the live readout would be. */
+.paper-demo .note-demo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.paper-demo .note-demo-header {
+  justify-content: flex-end;
+  margin: 0 0 20px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.paper-demo .note-demo-title { display: none; }
+.paper-demo .note-box {
+  background: var(--pc-2);
+  border-color: var(--line);
+  box-shadow: none;
+}
+.paper-demo .note-box.active-singer,
+.paper-demo .note-box.active-robot { box-shadow: none; }
+
+/* one microphone control across every live demo, at the size of the other
+   controls on the page rather than the tool pages' large outline button. */
+.paper-demo .mic-btn {
+  padding: 9px 18px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12.5px;
+  letter-spacing: -0.005em;
+}
+.paper-demo .mic-btn:hover {
+  background: var(--ochre);
+  border-color: var(--ochre);
+  color: var(--paper);
+  transform: none;
+}
+.paper-demo .mic-btn .mic-dot { background: currentColor; }
+.paper-demo .mic-btn.active {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+.paper-demo .mic-btn.active .mic-dot { background: var(--red); }
+
+/* The mode selector steps down one column: three context rows, then the
+   answer. It used to sit in two columns, which made the rows look cramped and
+   left the answer floating beside them. */
+.hs-demo { padding: 36px 40px 32px; }
+.hs-head { text-align: center; }
+.hs-stage {
+  max-width: 780px;
+  margin: 12px auto 0;
+  border-top: 1px solid var(--line-2);
+}
+.hs-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.hs-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+}
+.hs-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.hs-chips .paper-chip { padding: 8px 15px; font-size: 13px; }
+.hs-result { max-width: 780px; margin: 26px auto 0; }
+.hs-result-label {
+  display: block;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+.hs-result .paper-readout {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.62;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  padding: 18px 22px;
+  text-align: left;
+}
+.hs-result .paper-readout b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--ochre);
+  margin-bottom: 6px;
+}
+.hs-note {
+  max-width: 780px;
+  margin: 16px auto 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink-3);
+}
+.hs-note code { font-family: var(--mono); font-size: 0.9em; color: var(--ink-2); }
+
+.paper-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.paper-row-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: 4px;
+}
+.paper-chip {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--pc);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.paper-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.paper-chip.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.paper-btn {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+}
+.paper-btn:hover { background: var(--ochre); border-color: var(--ochre); }
+.paper-btn:disabled { opacity: 0.45; cursor: default; }
+.paper-btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.paper-btn.ghost:hover { border-color: var(--ink); background: transparent; }
+
+.paper-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0 10px;
+}
+.paper-tab {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.paper-tab:hover { border-color: var(--ink-3); color: var(--ink); }
+.paper-tab.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.paper-input, .paper-select {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 13px;
+  width: 100%;
+}
+.paper-input:focus, .paper-select:focus { outline: 2px solid rgba(173, 74, 42, 0.28); outline-offset: 1px; }
+.paper-readout {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  background: var(--pc-2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-height: 46px;
+  white-space: pre-wrap;
+}
+.paper-readout b { color: var(--ink); font-weight: 400; }
+.paper-demo--dark .paper-readout { background: #131c30; color: #b9c7de; }
+.paper-demo--dark .paper-readout b { color: #fff; }
+
+.paper-note {
+  border-left: 2px solid var(--ochre);
+  padding: 2px 0 2px 18px;
+  margin: 22px 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.paper-note b { color: var(--ink); }
+
+.paper-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  margin: 0 6px 6px 0;
+}
+
+/* ---------------------------------------------------------- stack table */
+.stack-row {
+  display: grid;
+  grid-template-columns: 190px 1fr 1fr;
+  gap: 22px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line-2);
+  align-items: start;
+}
+.stack-row:first-child { border-top: 0; }
+.stack-name { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.stack-name span { display: block; font-family: var(--mono); font-size: 10px; color: var(--ink-3); font-weight: 400; margin-top: 4px; }
+.stack-why { font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+.stack-buys { font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+.stack-buys b { color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------- footer */
+.paper-foot {
+  max-width: var(--pw);
+  margin: 10px auto 0;
+  padding: 30px 10px 0;
+  border-top: 1px solid var(--line-2);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+.paper-foot a { color: var(--ink-2); }
+.paper-foot a:hover { color: var(--ochre); }
+
+/* ---------------------------------------------------------- responsive */
+@media (max-width: 900px) {
+  .page.paper { padding: 78px 18px 70px; }
+  .paper-card { padding: 38px 30px; border-radius: 18px; }
+  .paper-card--tight { padding: 28px 24px; }
+  .paper-grid.two, .paper-grid.three, .paper-grid.four { grid-template-columns: 1fr; }
+  .stack-row { grid-template-columns: 1fr; gap: 8px; }
+  .paper-title { font-size: clamp(34px, 10vw, 52px); }
+  .paper-deck { font-size: 16px; }
+  .audio-matrix th { width: 112px; }
+  .audio-matrix audio { width: 190px; }
+}
+@media (max-width: 600px) {
+  .page.paper { padding: 70px 12px 60px; }
+  .paper-card { padding: 30px 22px; }
+  .paper-demo { padding: 22px 18px; }
+  .hs-demo { padding: 26px 18px 24px; }
+  .paper-stats { grid-template-columns: 1fr 1fr; }
+  .paper-h2 { font-size: 26px; }
+  .paper-lede { font-size: 17px; }
+}

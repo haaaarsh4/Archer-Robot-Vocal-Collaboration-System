@@ -23,9 +23,13 @@ from typing import Any
 import numpy as np
 
 from mysong.accompaniment import (
+    BAND_OFFSET_DB,
+    DEFAULT_BAND,
     Arrangement,
     ArrangementStyle,
     arrange,
+    band_placement_gain_db,
+    level_band_stem,
     mix_with_vocal,
     render_arrangement,
 )
@@ -43,6 +47,18 @@ class SongProject:
     mix: np.ndarray
     sample_rate: int
     vocal: np.ndarray | None = None
+    #: The generated band as it sits in the mix (padded to the take's beat
+    #: grid, before the voice is added).  Kept because the app plays the band
+    #: under the untouched take as two sources instead of rendering it twice.
+    backing: np.ndarray | None = None
+    #: The same band written at the app's one reference level, which is what the
+    #: page's ROBOT VOLUME player actually uses (``backing`` keeps the
+    #: renderer's own level for the CLI and for the WAV stems on disk).
+    band_stem: np.ndarray | None = None
+    #: How far the stem has to come down to sit ``BAND_OFFSET_DB`` under this
+    #: take, in dB.  Always negative for a real recording; the page applies it
+    #: together with the ROBOT VOLUME slider, so the two sources are the mix.
+    band_placement_db: float = 0.0
     paths: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     renderer: str = "auto"
@@ -145,7 +161,8 @@ def create_song(
     sample_rate: int = 44100,
     mix_vocal: bool = True,
     vocal_gain_db: float = 0.0,
-    duck_db: float = 3.0,
+    band_gain_db: float = 0.0,
+    duck_db: float = 6.0,
     count_in: bool = False,
     render: bool = True,
     backend: str = "pyin",
@@ -194,7 +211,7 @@ def create_song(
 
     arrangement = arrange(
         harmony,
-        style=arrangement_style or "pop",
+        style=arrangement_style or DEFAULT_BAND,
         melody=analysis.notes,
     )
     arrangement.sample_rate = sample_rate
@@ -208,6 +225,10 @@ def create_song(
     # lands on the recording's first beat, then place the vocal at zero.  The
     # voice is never stretched to fit the grid.
     lead_in = max(0.0, float(analysis.tempo.beat_offset))
+    # The band's own trim (a dense band sits further back) is part of where the
+    # band belongs, so it applies to the rendered mix and to the level the page
+    # plays the band at -- otherwise the download and the panel would disagree.
+    band_offset = BAND_OFFSET_DB + float(band_gain_db) + float(arrangement.style.level_db)
     if render:
         if lead_in > 0:
             pad = np.zeros((int(round(lead_in * sample_rate)), 2), dtype=np.float32)
@@ -219,6 +240,7 @@ def create_song(
                 sample_rate=sample_rate,
                 offset_seconds=0.0,
                 vocal_gain_db=vocal_gain_db,
+                band_offset_db=band_offset,
                 duck_db=duck_db,
             )
             if mix_vocal
@@ -226,6 +248,19 @@ def create_song(
         )
     else:
         mixed = backing
+
+    band_stem = level_band_stem(backing) if render else None
+    # No ``band_gain_db`` here: that is the panel's ROBOT VOLUME, applied to the
+    # player, and baking it in as well would count the slider twice.
+    placement_db = (
+        band_placement_gain_db(
+            vocal,
+            sample_rate=sample_rate,
+            band_offset_db=BAND_OFFSET_DB + float(arrangement.style.level_db),
+        )
+        if render
+        else 0.0
+    )
 
     warnings = list(analysis.warnings) + list(harmony.warnings)
     if count_in:
@@ -237,6 +272,9 @@ def create_song(
         mix=mixed,
         sample_rate=sample_rate,
         vocal=vocal,
+        backing=backing if render else None,
+        band_stem=band_stem,
+        band_placement_db=placement_db,
         warnings=warnings,
         renderer=renderer,
     )

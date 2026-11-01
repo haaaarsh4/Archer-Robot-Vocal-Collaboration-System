@@ -1,0 +1,20 @@
+# Requirements for Cree_LLM_Training.ipynb.
+#
+# The notebook installs these itself on Colab. Install them into a separate
+# environment if you run the cells locally:
+#
+#   python -m venv --system-site-packages training/.venv
+#   training/.venv/bin/pip install -r training/requirements-cree.txt
+#
+# torch is deliberately not pinned: install the build that matches your CUDA
+# driver first (Colab already has one), then the rest.
+transformers>=4.46,<6
+peft>=0.13
+datasets>=3
+accelerate>=1.0
+bitsandbytes>=0.44; platform_system != "Darwin"
+sentencepiece>=0.2
+sacrebleu>=2.4
+matplotlib>=3.8
+pandas>=2.0
+psutil>=5.9

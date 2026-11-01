@@ -1,0 +1,173 @@
+<div id="page-singsong" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">SingSong</p>
+    <h1 class="paper-title">A band that <em>listens</em> before it plays</h1>
+    <p class="paper-deck">SingSong takes a finished vocal and composes an instrumental around it. Not a backing track chosen from a library: a sequence generated to follow the performance. This is a paper-faithful implementation of Google Research and IRCAM's 2023 system, built from the token model up.</p>
+    <div class="paper-meta"><span>semantic · coarse · fine</span><span>16 kHz SoundStream</span><span>10 s windows, 50% overlap</span><span>separate from RVC</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The idea</p>
+    <h2 class="paper-h2">Predict codes, not waveforms</h2>
+    <p class="paper-lede">Generating ten seconds of 16 kHz audio sample by sample is a sequence of 160,000 decisions. Predicting a structured code sequence for the same ten seconds is a sequence of a few thousand. SingSong's central move is to make the second problem stand in for the first.</p>
+    <p class="paper-p">A neural audio codec turns the instrumental into discrete tokens at three time scales. A semantic encoder describes what the vocal is doing at 25 tokens per second. A coarse codec describes the body of the instrumental at 200 codes per second. A fine codec adds the top end at 400 codes per second. The model learns the conditional distribution of those codes given the vocal, and the codec turns the result back into sound.</p>
+    <p class="paper-p">The factorization is the architecture:</p>
+    <div class="paper-readout" style="font-family:var(--mono);font-size:13px;line-height:1.9">P(Sem(y), Coarse(y) | Feats(x)) =
+  P(Fine(y) | Coarse(y))
+  · P(Coarse(y) | Sem(y), Feats(x))
+  · P(Sem(y) | Feats(x))</div>
+    <p class="paper-p" style="margin-top:18px">The first two factors are one T5-style encoder–decoder. It reads 250 semantic tokens of the vocal for a ten-second clip and emits 2,250 tokens: 250 semantic tokens for the instrumental, then 2,000 coarse tokens. The third factor is a decoder-only transformer that reads the 2,000 coarse tokens as a prefix and emits 4,000 fine tokens. Each stage can be trained, evaluated and sampled on its own.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> The token layout</p>
+    <h2 class="paper-h2">Three rates, three vocabularies, one sequence</h2>
+    <p class="paper-lede">The vocabularies are not shared. Semantic, coarse and fine tokens each have their own range, and each position in the output has a mask that makes every token outside its range impossible. That is how one decoder can emit a structured sequence without a separate head for every stream.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 430" role="img" aria-label="SingSong token layout for a ten second clip">
+          <defs><marker id="ss-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="430" fill="#0b1120"/>
+          <text x="50" y="50" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="22" font-weight="600">Ten seconds, factorized</text>
+          <text x="50" y="72" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">STAGE 1+2 → STAGE 3 → CODEC</text>
+
+          <g font-family="Inter Tight, sans-serif">
+            <rect x="50" y="104" width="210" height="96" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="155" y="132" fill="#e8edf7" font-size="12" text-anchor="middle">vocal feats(x)</text>
+            <text x="155" y="155" fill="#8195b8" font-size="9.5" text-anchor="middle">250 semantic tokens</text>
+            <text x="155" y="173" fill="#8195b8" font-size="9.5" text-anchor="middle">25 Hz · 10 s</text>
+            <text x="155" y="191" fill="#8195b8" font-size="9.5" text-anchor="middle">w2v-BERT / HuBERT</text>
+
+            <rect x="316" y="104" width="250" height="96" rx="7" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="441" y="132" fill="#dbe6ff" font-size="12" text-anchor="middle">stage 1+2 output</text>
+            <text x="441" y="155" fill="#8fa6ce" font-size="9.5" text-anchor="middle">sem 250 + coarse 2,000</text>
+            <text x="441" y="173" fill="#8fa6ce" font-size="9.5" text-anchor="middle">2,250 tokens total</text>
+            <text x="441" y="191" fill="#8fa6ce" font-size="9.5" text-anchor="middle">one T5 encoder–decoder</text>
+
+            <rect x="622" y="104" width="210" height="96" rx="7" fill="#232a4d" stroke="#5a64a8"/>
+            <text x="727" y="132" fill="#dfe3ff" font-size="12" text-anchor="middle">stage 3 output</text>
+            <text x="727" y="155" fill="#9ba3d6" font-size="9.5" text-anchor="middle">fine 4,000</text>
+            <text x="727" y="173" fill="#9ba3d6" font-size="9.5" text-anchor="middle">decoder-only</text>
+            <text x="727" y="191" fill="#9ba3d6" font-size="9.5" text-anchor="middle">coarse as prefix</text>
+
+            <rect x="868" y="104" width="162" height="96" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="949" y="132" fill="#e8edf7" font-size="12" text-anchor="middle">decode</text>
+            <text x="949" y="155" fill="#8195b8" font-size="9.5" text-anchor="middle">SoundStream</text>
+            <text x="949" y="173" fill="#8195b8" font-size="9.5" text-anchor="middle">12 RVQ books</text>
+            <text x="949" y="191" fill="#8195b8" font-size="9.5" text-anchor="middle">16 kHz mono</text>
+
+            <path d="M260 152 H316" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#ss-arrow)"/>
+            <path d="M566 152 H622" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#ss-arrow)"/>
+            <path d="M832 152 H868" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#ss-arrow)"/>
+
+            <!-- token strip -->
+            <text x="50" y="256" fill="#8195b8" font-size="9.5" letter-spacing="1.5">THE SEQUENCE THE MODEL ACTUALLY SEES</text>
+            <rect x="50" y="272" width="250" height="34" rx="4" fill="#1f2c4f" stroke="#4265a0"/>
+            <text x="175" y="294" fill="#bcd0f5" font-size="9.5" text-anchor="middle">semantic 250</text>
+            <rect x="300" y="272" width="420" height="34" rx="4" fill="#24325a" stroke="#5a64a8"/>
+            <text x="510" y="294" fill="#d6def7" font-size="9.5" text-anchor="middle">coarse 2,000 · 4 books × 500 frames</text>
+            <rect x="720" y="272" width="310" height="34" rx="4" fill="#2c2a5c" stroke="#726fc0"/>
+            <text x="875" y="294" fill="#e1def7" font-size="9.5" text-anchor="middle">fine 4,000 · 8 books × 500 frames</text>
+
+            <text x="50" y="344" fill="#8195b8" font-size="9.5">Each output position carries a mask over the full vocabulary: semantic, coarse and fine ranges are disjoint, so an impossible token is set to −inf before sampling.</text>
+            <text x="50" y="366" fill="#8195b8" font-size="9.5">The codec is trained here, not downloaded: multi-scale mel + RVQ commitment + STFT hinge GAN + feature matching.</text>
+          </g>
+          <text x="50" y="410" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. G1 · FACTORIZED TOKENS · 10 S CLIP</text>
+        </svg>
+        <div class="plate-foot"><span>Figure G1 · token layout</span><span>sing_song/tokens.py</span></div>
+      </div>
+    </figure>
+
+    <div class="paper-demo" style="margin-top:28px">
+      <div class="paper-demo-head"><h3 class="paper-demo-title">Token calculator<span>choose a clip length and see what the model has to predict</span></h3></div>
+      <div class="paper-row"><span class="paper-row-label">Clip</span>
+        <button class="paper-chip" data-sec="5" onclick="ssLen(5, this)">5 s</button>
+        <button class="paper-chip is-on" data-sec="10" onclick="ssLen(10, this)">10 s</button>
+        <button class="paper-chip" data-sec="30" onclick="ssLen(30, this)">30 s</button>
+      </div>
+      <div class="paper-stats" id="ss-stats" style="margin:18px 0 0">
+        <div class="paper-stat"><b id="ss-sem">250</b><span>semantic input</span></div>
+        <div class="paper-stat"><b id="ss-stage12">2,250</b><span>stage 1+2 tokens</span></div>
+        <div class="paper-stat"><b id="ss-fine">4,000</b><span>stage 3 fine tokens</span></div>
+        <div class="paper-stat"><b id="ss-samples">400,000</b><span>audio samples avoided</span></div>
+      </div>
+      <p class="paper-quiet" style="margin-top:12px">At 16 kHz, ten seconds is 160,000 samples. The factorized sequence is 6,250 tokens for the same span, and it is the sequence the model is trained to predict.</p>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> The model</p>
+    <h2 class="paper-h2">T5 for the structure, a decoder for the detail</h2>
+    <p class="paper-lede">Stage 1+2 is a T5-style encoder–decoder trained with teacher forcing and cross-entropy on every target code. It reads the vocal's semantic tokens and writes the instrumental's semantic and coarse tokens. Stage 3 is a decoder-only transformer that reads the coarse prefix and writes the fine tokens.</p>
+    <p class="paper-p">Both stages use fixed sinusoidal positional encodings rather than T5's relative bias, pre-RMSNorm, gated GEGLU feed-forwards and tied output embeddings. Dropout is 0.1. Sampling uses a temperature of 0.85 with no top-k by default, and every invalid vocabulary subset is masked to negative infinity at each position. The base shape follows <code>t5.1.1.base</code>; the code supports the XL shape, though the published 3B run is a cluster job, not a laptop job.</p>
+    <p class="paper-p">The default long-form scheduler generates each ten-second window independently and crossfades with a complementary 50% overlap. The paper describes prompting the decoder with the previous five seconds; that path is implemented as an option for a checkpoint trained with the continuation objective, but it is out of distribution for a model trained on ten-second block layouts. The code states the choice rather than inventing a prompt and hoping.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> The data</p>
+    <h2 class="paper-h2">What it takes to teach a model to arrange</h2>
+    <p class="paper-lede">The published system used a very large private corpus. This implementation trains on what can be downloaded and licensed: MUSDB18-HQ for the general model, and a small, attributed Cree singing corpus for the adaptation.</p>
+    <p class="paper-p">Training pairs are vocal and instrumental stems, not mixtures. The pipeline accepts a stem layout directly, or a folder of mixtures with <code>prepare --separate</code>, which runs Demucs two-stem separation and refuses to train on a mixture as if it were an instrumental. Clips are filtered before tokenisation: an instrumental whose peak RMS is below −25 dBFS is dropped, and so is a pair whose vocal is 5 dB louder than its instrumental.</p>
+    <p class="paper-p">The paper's most important data choice is also implemented: white noise at σ = 0.01 is added to the vocal before feature extraction, at training and inference, and the vocal is represented only by semantic codes, never by its coarse codes. Separation artifacts in a “vocal” stem can otherwise teach the model to reconstruct the instrumental from the artifacts and then fail on a clean vocal. The noise and the semantic-only conditioning are the paper's fix, and this implementation follows it.</p>
+
+    <div class="paper-stats">
+      <div class="paper-stat"><b>2.196 h</b><span>CC BY Cree singing, 27 recordings</span></div>
+      <div class="paper-stat"><b>0.526 h</b><span>Demucs paired stems, 12 tracks</span></div>
+      <div class="paper-stat"><b>16 kHz</b><span>codec sample rate</span></div>
+      <div class="paper-stat"><b>10 s</b><span>training clip</span></div>
+    </div>
+    <p class="paper-caption">The Cree corpus is downloaded by <code>tools/fetch_cree_songs.py</code>, which records attribution, source URL, licence and split for every track. The Archer recordings on this site are not training data: they are mixed masters without confirmed training permission, and the repository does not treat a public listen as a training licence.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> The contract</p>
+    <h2 class="paper-h2">Tests that would catch a silent shape error</h2>
+    <p class="paper-lede">A token model can be subtly wrong for a long time: the loss goes down, the samples come out, and the vocabulary offsets are off by one. The test suite checks the contract directly, with large randomised samples rather than one hand-written clip.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Check</th><th>Sample</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Vocabulary round trip</td><td>750,000 token ids across all three ranges</td><td>0 failures</td></tr>
+          <tr><td>Per-position masks</td><td>270,000 positions</td><td>0 violations</td></tr>
+          <tr><td>Stage 1+2 vocabulary</td><td>5,122 ids</td><td>exact</td></tr>
+          <tr><td>Stage 1+2 positions</td><td>2,250 per 10 s clip</td><td>exact</td></tr>
+          <tr><td>Fine vocabulary</td><td>8,194 ids</td><td>exact</td></tr>
+          <tr><td>Fine positions</td><td>4,000 per 10 s clip</td><td>exact</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-caption">The suite builds random sequences at every boundary, encodes and decodes them, and asserts that an invalid token can never be sampled at a position whose mask excludes it. The counts are the contract from the paper; the test is what keeps the implementation honest about them.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> Using it</p>
+    <h2 class="paper-h2">Train once, render a vocal whenever</h2>
+    <p class="paper-lede">Training is the deliverable. The code is the full recipe, and a run you own produces four artefacts: the codec, the semantic k-means, stage 1+2 and stage 3. Once those exist, the app exposes the renderer in the Live Demo's SingSong panel and the same page reports which stages are loaded.</p>
+    <p class="paper-p">The CLI covers the whole path: <code>prepare-codec</code>, <code>train-codec</code>, <code>train-kmeans</code>, <code>prepare</code>, <code>train-stage12</code>, <code>train-fine</code>, and <code>render</code>. <code>status</code> reports the state of every artefact and exits non-zero until a run is complete, which is the first command to run on a new machine. The training runbook, including VRAM expectations and resume behaviour, is in <code>docs/singsong-training.md</code>.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">SingSong in the app<span>upload a vocal and generate a band around it</span></h3>
+        <button class="paper-btn" onclick="showUploadTool('singsong')">Open the SingSong panel</button>
+      </div>
+      <div class="paper-readout" id="ss-status">Checking the renderer on this machine…</div>
+      <p class="paper-quiet" style="margin-top:10px">The panel lives in the Live Demo page, next to MySong. It accepts a vocal file and returns a mix, a band-only stem, or both. The status line above reports whether the trained artefacts and the Python environment are present on this machine.</p>
+    </div>
+  </section>
+
+  <section class="paper-card paper-card--tight">
+    <p class="paper-num"><b>07</b> The distinction</p>
+    <h2 class="paper-h2" style="font-size:26px">SingSong composes. RVC re-sings.</h2>
+    <p class="paper-p">These are often confused because both are “AI music” features in the same app. They solve different problems. SingSong listens to a vocal and writes an instrumental that did not exist. RVC takes a performance that already exists and changes its timbre. The first is generation, the second is conversion, and neither one is a fallback for the other.</p>
+    <p class="paper-p"><a href="#" onclick="showPage('synthesis'); return false;">Read how RVC works →</a></p>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

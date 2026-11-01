@@ -1,0 +1,208 @@
+<div id="page-synthesis" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">Vocable synthesis</p>
+    <h1 class="paper-title">A voice built from <em>vowels</em>, not words</h1>
+    <p class="paper-deck">The robot does not speak Cree. It sings vocables: open vowels shaped like the ones Archer uses, pitched to the note the harmony engine chose, and optionally re-skinned through a synthetic voice model. This page follows that sound from a bank of recordings to the speaker.</p>
+    <div class="paper-meta"><span>three engines</span><span>formant shaping</span><span>solo · duet · choir</span><span>neural conversion, per stem</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The material</p>
+    <h2 class="paper-h2">Why a vowel, and not a word</h2>
+    <p class="paper-lede">A vocable is a sung syllable that carries no dictionary meaning: <em>aah</em>, <em>ohh</em>, <em>mmm</em>. It is the oldest thing a voice can do with a melody, and it is the right unit here for two reasons.</p>
+    <p class="paper-p"><strong>It stays out of the language's way.</strong> Archer's practice is grounded in Cree singing, and the project includes real Cree translation and sentiment tools elsewhere. The robot's voice is not one of them. Making it sing recognizable Cree words would put a synthetic speaker inside a language conversation it has no standing in. A vocable can echo the resonance of Cree vowels without claiming to pronounce them.</p>
+    <p class="paper-p"><strong>It is the smallest unit that can be shaped musically.</strong> A vowel has a pitch, a loudness, an attack and a spectral envelope, and every one of those can be controlled independently. A word brings consonants, timing and meaning, and every one of those would have to be modelled before a single note could be sung. The vocable keeps the problem at the size of the voice.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> Three engines</p>
+    <h2 class="paper-h2">The same decision, rendered three ways</h2>
+    <p class="paper-lede">The harmony engine emits a note, a vowel, a texture and an action. What turns that into samples is a separate choice, set once in <code>config.yaml</code>. The three engines trade realism against latency, and the default is the one that keeps a live performance live.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Engine</th><th>What it plays</th><th>Cost per note</th><th>Why choose it</th></tr></thead>
+        <tbody>
+          <tr><td><code>neural_wavetable</code><br><span class="paper-quiet">default</span></td><td>A short take already converted through the trained voice once, offline, then pitch-shifted to the target note.</td><td>One cached lookup and a resample.</td><td>Neural timbre at live speed. No network call on the hot path. The cache is keyed by the nearest semitone, so a repeated note is free.</td></tr>
+          <tr><td><code>wavetable</code></td><td>A single recorded take per vowel, pitch-shifted live.</td><td>One resample.</td><td>Simple and predictable, with no neural dependency at all. Useful for testing the rest of the chain without a model.</td></tr>
+          <tr><td><code>sinusoidal</code></td><td>A source built from four stacked formant resonances, synthesised from scratch.</td><td>Four filters per note.</td><td>No files to lose, no model to install, and every parameter is inspectable. It is the reference implementation of the vowel.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="paper-note"><b>No silent engine swap.</b> If the selected wavetable engine cannot find its files, that note is silent. It does not quietly switch to a different-sounding engine, because a wrong voice arriving unannounced is worse than an honest gap.</div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> The bank</p>
+    <h2 class="paper-h2">Pay for the neural network once, not on every note</h2>
+    <p class="paper-lede">A live neural conversion takes about two and a half seconds on this machine. A note lasts a fraction of that. Running the model per note would make the robot late for every phrase, so the bank inverts the problem: convert a small set of takes ahead of time, then shift them at runtime.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 360" role="img" aria-label="Offline bank build and runtime pitch-shift cache">
+          <defs><marker id="s-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="360" fill="#0b1120"/>
+          <text x="50" y="50" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="22" font-weight="600">Offline build, online lookup</text>
+          <text x="50" y="72" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">THE HOT PATH NEVER TOUCHES THE MODEL</text>
+
+          <g font-family="Inter Tight, sans-serif" font-size="10.5">
+            <rect x="50" y="108" width="150" height="66" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="125" y="135" fill="#e8edf7" text-anchor="middle">source takes</text>
+            <text x="125" y="155" fill="#8195b8" font-size="9" text-anchor="middle">one per vowel</text>
+
+            <rect x="244" y="108" width="160" height="66" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="324" y="135" fill="#e8edf7" text-anchor="middle">RVC conversion</text>
+            <text x="324" y="155" fill="#8195b8" font-size="9" text-anchor="middle">offline, not per note</text>
+
+            <rect x="448" y="108" width="160" height="66" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="528" y="135" fill="#e8edf7" text-anchor="middle">bank on disk</text>
+            <text x="528" y="155" fill="#8195b8" font-size="9" text-anchor="middle">synthesis/samples/neural</text>
+
+            <rect x="652" y="108" width="170" height="66" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="737" y="135" fill="#dbe6ff" text-anchor="middle">nearest-semitone cache</text>
+            <text x="737" y="155" fill="#8fa6ce" font-size="9" text-anchor="middle">in memory, per vowel</text>
+
+            <rect x="866" y="108" width="160" height="66" rx="6" fill="#232a4d" stroke="#5a64a8"/>
+            <text x="946" y="135" fill="#dfe3ff" text-anchor="middle">note out</text>
+            <text x="946" y="155" fill="#9ba3d6" font-size="9" text-anchor="middle">scheduled or streamed</text>
+
+            <path d="M200 141 H244" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#s-arrow)"/>
+            <path d="M404 141 H448" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#s-arrow)"/>
+            <path d="M608 141 H652" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#s-arrow)"/>
+            <path d="M822 141 H866" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#s-arrow)"/>
+
+            <rect x="50" y="230" width="300" height="62" rx="6" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="200" y="254" fill="#e0a06a" text-anchor="middle">build_vocable_bank.py</text>
+            <text x="200" y="274" fill="#8195b8" font-size="9" text-anchor="middle">runs when a voice changes, not during a performance</text>
+
+            <rect x="404" y="230" width="300" height="62" rx="6" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="554" y="254" fill="#e0a06a" text-anchor="middle">cache key</text>
+            <text x="554" y="274" fill="#8195b8" font-size="9" text-anchor="middle">(vowel, nearest MIDI note) → sample</text>
+
+            <rect x="758" y="230" width="268" height="62" rx="6" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="892" y="254" fill="#e0a06a" text-anchor="middle">repeat a note</text>
+            <text x="892" y="274" fill="#8195b8" font-size="9" text-anchor="middle">zero additional work after the first time</text>
+          </g>
+          <text x="50" y="336" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. S1 · VOCABLE BANK</text>
+        </svg>
+        <div class="plate-foot"><span>Figure S1 · bank pipeline</span><span>offline cost, online cache</span></div>
+      </div>
+    </figure>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/vocable-timbre.svg?v=1" alt="Spectral envelope error of the neural bank against the naive pitch shift" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure S2 · 64 rendered vocables.</b> The bank's envelope error is 11.8 dB against the naive shifter's 14.2 dB, a 17.2% reduction in spectral distance. The bank is not a perfect copy; it is a closer one, and it is measured on the same vowels at the same pitches.</figcaption>
+    </figure>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/vocable-pitch.svg?v=1" alt="Pitch accuracy of the neural bank across rendered vocables" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure S3 · pitch after shifting.</b> 85.9% of bank renders land within 50 cents of the requested note, with a median error of 12.8 cents. Pitch shifting always spends a little accuracy to gain timbre; the bank's job is to keep that spend small enough to stay in tune.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> The vowel</p>
+    <h2 class="paper-h2">Formants are the shape of the mouth</h2>
+    <p class="paper-lede">A vowel is not a frequency. It is a pattern of resonances: peaks in the spectrum that the throat and mouth impose on whatever the vocal folds are doing. The first two peaks, F1 and F2, do most of the work. Move them and <em>aah</em> becomes <em>ee</em> without changing the pitch at all.</p>
+    <p class="paper-p">The synthesizer treats the vowel as a small set of targets, not a recording. F1 and F2 are blended toward the active phoneme's values, a high shelf adds brightness, and a notch-and-peak pair shapes nasality. The singer's own MFCCs and spectral centroid drive those targets in heuristic mode, with an influence of 0.6, so the robot's mouth follows the singer's mouth rather than sitting at a neutral midpoint.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Formant laboratory<span>a source–filter voice, built live in the browser</span></h3>
+        <button class="paper-btn" id="fs-play" onclick="fsPlay()">Play vowel</button>
+      </div>
+      <div class="paper-row">
+        <span class="paper-row-label">Vowel</span>
+        <button class="paper-chip is-on" data-vowel="a" onclick="fsVowel('a', this)">aah</button>
+        <button class="paper-chip" data-vowel="e" onclick="fsVowel('e', this)">eh</button>
+        <button class="paper-chip" data-vowel="i" onclick="fsVowel('i', this)">ee</button>
+        <button class="paper-chip" data-vowel="o" onclick="fsVowel('o', this)">oh</button>
+        <button class="paper-chip" data-vowel="u" onclick="fsVowel('u', this)">oo</button>
+      </div>
+      <div class="paper-grid two" style="gap:22px; margin-top:4px">
+        <div>
+          <div class="paper-row"><span class="paper-row-label">Pitch</span><input class="paper-select" id="fs-pitch" type="range" min="98" max="330" value="146" oninput="fsUpdate()"><span class="paper-readout" id="fs-pitch-out" style="min-height:0;padding:6px 10px">D3 · 146.8 Hz</span></div>
+          <div class="paper-row"><span class="paper-row-label">Brightness</span><input class="paper-select" id="fs-bright" type="range" min="0" max="100" value="50" oninput="fsUpdate()"><span class="paper-readout" id="fs-bright-out" style="min-height:0;padding:6px 10px">0.50</span></div>
+          <div class="paper-row"><span class="paper-row-label">Nasality</span><input class="paper-select" id="fs-nasal" type="range" min="0" max="100" value="0" oninput="fsUpdate()"><span class="paper-readout" id="fs-nasal-out" style="min-height:0;padding:6px 10px">0.00</span></div>
+        </div>
+        <div>
+          <div class="paper-readout" id="fs-readout">F1 730 Hz · F2 1090 Hz
+A bright, open vowel. The first formant sits high, the second close enough to it to keep the sound round.</div>
+          <canvas id="fs-canvas" width="420" height="120" style="width:100%;height:120px;margin-top:12px;border-radius:8px;background:#0b1120"></canvas>
+        </div>
+      </div>
+      <p class="paper-caption" style="margin-top:14px">This is a browser model of the same source–filter idea: a sawtooth source through three bandpass formants, with a vibrato LFO. It is deliberately simple enough to hear each control separately. The Python engine adds the bank, the phoneme tracking and the ensemble.</p>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> The ensemble</p>
+    <h2 class="paper-h2">Several voices, not one voice turned up</h2>
+    <p class="paper-lede">A choir preset is not a louder solo. It is several independently rendered layers, each with its own small detune, onset jitter and vocal-tract scale, mixed together and sent through a short algorithmic reverb. The differences are what the ear reads as separate people.</p>
+    <p class="paper-p">The texture is chosen per mode. Unison defaults to choir, octave to duet, delayed response and call-and-response to solo, contour and drone to duet. The parameters live in <code>synthesis.texture</code>: voice count, detune spread, formant spread, jitter, reverb and level. A thirty-millisecond crossfade removes clicks at note boundaries, and the reverb is built from a handful of comb and allpass filters rather than an impulse response, so it costs almost nothing and never needs a file.</p>
+    <p class="paper-p">The detune is deliberately not random per note. It is locked per phrase, so a voice keeps its own slightly sharp or flat identity instead of wandering between notes. That is the difference between a section and a chorus effect.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> The small physics</p>
+    <h2 class="paper-h2">What makes a held note sound held</h2>
+    <p class="paper-lede">A synthesised note is not one oscillator. It is an envelope, a slow pitch movement, a little breath, a filter that follows the mouth, and a join to the note before it. Each of those is a small parameter, and each one is audible when it is wrong.</p>
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Parameter</th><th>Value</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Vibrato</td><td class="num">5.3 Hz · 14 cents</td><td>Fades in after roughly 0.6 s on a held note. A note that starts with full vibrato sounds like a synthetic pad; one that grows into it sounds sung.</td></tr>
+          <tr><td>Breathiness</td><td class="num">0.045</td><td>A small amount of formant-shaped noise mixed under the tone. It is the difference between a pure harmonic stack and a throat.</td></tr>
+          <tr><td>Note crossfade</td><td class="num">30 ms</td><td>Blends the start of a note against the tail of the previous one, so a legato line has no click at the join.</td></tr>
+          <tr><td>Reverb</td><td class="num">comb + allpass</td><td>Algorithmic, not a sampled impulse. A solo gets a little; a choir gets more. It costs no file and no latency.</td></tr>
+          <tr><td>Phoneme influence</td><td class="num">0.6</td><td>How far the singer's own brightness, vowel colour and nasality pull the robot's formants away from neutral.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-p" style="margin-top:20px">The phoneme profile is measured, not guessed. Thirteen MFCCs and a spectral centroid are extracted from each voiced frame, then mapped to three values: brightness from 0 to 1, vowel colour from front to back, and nasality from oral to fully nasal. With a trained classifier the mapping is learned; without one, the heuristic rules in <code>analysis/phonetic_analysis.py</code> do the same job. The synthesizer only ever sees the three numbers, so the same profile can drive a formant synth, a bank or a neural voice without changing the analysis code.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>07</b> The neural voice</p>
+    <h2 class="paper-h2">A modelled timbre, one stem at a time</h2>
+    <p class="paper-lede">RVC is a voice conversion model: it takes audio and a target voice model, and returns the same performance in that model's timbre. Here it runs in a separate process on port 8801, so a two-and-a-half-second conversion can never block the audio loop. The configured models are separate trained voices, not recordings of Archer.</p>
+    <p class="paper-p">The important detail is that the converter receives <strong>stems</strong>, not the mix. A solo voice is one stem. A duet is two. A choir is several, each slightly detuned. If the ensemble were mixed first, the model would hear several pitches at once and produce a smeared, unstable conversion. Keeping the stems separate means every call is monophonic, which is the only condition the model was trained for.</p>
+    <p class="paper-p">The lead always converts through the voice model the performer chose. Harmony stems rotate across the other configured voices, so a neural choir sounds like a room of different people rather than one person cloned at several pitches. The sidecar processes one conversion at a time, so a live take caps how many ensemble voices are converted; an offline render can afford to convert every one.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/rvc-pitch.svg?v=1" alt="Pitch accuracy after neural voice conversion across 24 renders" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure S4 · 24 neural renders.</b> Every render stayed within 50 cents of the requested pitch; the median error was 17.5 cents and the 95th percentile 33.2 cents. The neural stage changes timbre, not the note, and this is the check that it stays that way.</figcaption>
+    </figure>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Before and after the voice model<span>the same take, converted offline through the synthetic voice model</span></h3>
+      </div>
+      <div class="audio-matrix">
+        <table>
+          <tr><th>Cold</th><td><audio controls preload="none" src="/static/assets/audio/neural-ab/cold-source.wav"></audio><p class="audio-name"><b>Source take</b>the recorded voice, before conversion</p></td><td><audio controls preload="none" src="/static/assets/audio/neural-ab/cold-neural.wav"></audio><p class="audio-name"><b>Neural take</b>the same performance through the trained voice model</p></td></tr>
+          <tr><th>Lalanana</th><td><audio controls preload="none" src="/static/assets/audio/neural-ab/lalanana-source.wav"></audio><p class="audio-name"><b>Source take</b>the recorded voice, before conversion</p></td><td><audio controls preload="none" src="/static/assets/audio/neural-ab/lalanana-neural.wav"></audio><p class="audio-name"><b>Neural take</b>converted with the same model</p></td></tr>
+        </table>
+      </div>
+      <p class="paper-caption" style="margin-top:16px">These are the bank's own source and converted takes, not a staged comparison. The converted files are shorter because the bank trims them to the sung portion.</p>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/rvc-latency.svg?v=1" alt="Neural conversion latency distribution over 24 renders" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure S5 · conversion latency.</b> Median 2.5 s, 95th percentile 2.8 s per render on this machine. That number is the entire reason the live path uses a pre-rendered bank: a singer cannot wait 2.5 seconds for the next note.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card paper-card--tight">
+    <p class="paper-num"><b>08</b> What to listen for</p>
+    <h2 class="paper-h2" style="font-size:26px">Three things the ear checks first</h2>
+    <p class="paper-p"><strong>Attack.</strong> Does the note begin with a consonant-like click, or with breath? The 30 ms crossfade and the per-voice jitter exist for this. <strong>Vowel.</strong> Does the double sound like a different mouth, or the same mouth doubled? Formant spread is the control. <strong>Blend.</strong> Can you hear the lead above the ensemble without the ensemble disappearing? That is the level and reverb balance, and it is the difference between a duet and a wall.</p>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

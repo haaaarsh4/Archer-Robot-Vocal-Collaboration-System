@@ -1,0 +1,328 @@
+{
+  "pitch": {
+    "metrics": {
+      "samples": 236,
+      "median_cents": 3.73,
+      "p90_cents": 7.64,
+      "within_25c": 1.0,
+      "within_50c": 1.0,
+      "within_100c": 1.0,
+      "octave_errors": 0.0,
+      "smoother_trials": 240,
+      "smoother_frames": 21600,
+      "smoother_raw_p90_cents": 1182.8,
+      "smoother_out_p90_cents": 16.0,
+      "smoother_raw_octave_rate": 0.1064,
+      "smoother_out_octave_rate": 0.017
+    },
+    "charts": [
+      "assets/evidence/pitch-accuracy.svg",
+      "assets/evidence/pitch-error.svg",
+      "assets/evidence/pitch-smoother.svg"
+    ],
+    "elapsed_seconds": 9.0
+  },
+  "notes": {
+    "metrics": {
+      "melodies": 60,
+      "true_notes": 600,
+      "detected_notes": 600,
+      "matched_notes": 600,
+      "note_precision": 1.0,
+      "note_recall": 1.0,
+      "note_f1": 1.0,
+      "onset_median_ms": 6.5,
+      "onset_p90_ms": 10.3,
+      "pitch_median_cents": 3.7,
+      "pitch_within_50c": 1.0
+    },
+    "charts": [
+      "assets/evidence/note-onset-error.svg",
+      "assets/evidence/note-pitch-error.svg"
+    ],
+    "elapsed_seconds": 1.3
+  },
+  "rhythm": {
+    "metrics": {
+      "patterns": 96,
+      "tempo_mae_bpm": 20.77,
+      "tempo_median_mae_bpm": 1.49,
+      "onset_f1_mean": 0.9988,
+      "onset_f1_median": 1.0,
+      "tempo_within_2pct": 0.625,
+      "tempo_within_4pct": 0.6458,
+      "tempo_exact_within_2pct": 0.625,
+      "tempo_octave_tolerant": 0.7708
+    },
+    "charts": [
+      "assets/evidence/rhythm-tempo.svg",
+      "assets/evidence/rhythm-onset-f1.svg"
+    ],
+    "elapsed_seconds": 30.5
+  },
+  "key": {
+    "metrics": {
+      "songs": 120,
+      "exact_accuracy": 0.5667,
+      "tonic_accuracy": 0.5667,
+      "within_relative_key": 0.7083,
+      "misses": [
+        {
+          "song": "I'm Falling in Love with Someone",
+          "want": "5 major",
+          "got": "2 minor",
+          "exact": false
+        },
+        {
+          "song": "R\u00eaverie",
+          "want": "5 major",
+          "got": "2 minor",
+          "exact": false
+        },
+        {
+          "song": "She's Funny That Way",
+          "want": "3 major",
+          "got": "7 minor",
+          "exact": false
+        },
+        {
+          "song": "All the Things You Are",
+          "want": "0 minor",
+          "got": "8 major",
+          "exact": false
+        },
+        {
+          "song": "'S Wonderful",
+          "want": "3 major",
+          "got": "7 minor",
+          "exact": false
+        },
+        {
+          "song": "Marcheta",
+          "want": "0 major",
+          "got": "4 minor",
+          "exact": false
+        },
+        {
+          "song": "The Band Played On",
+          "want": "7 major",
+          "got": "4 minor",
+          "exact": false
+        },
+        {
+          "song": "Swingin' down the Lane",
+          "want": "5 major",
+          "got": "2 minor",
+          "exact": false
+        }
+      ]
+    },
+    "charts": [
+      "assets/evidence/key-accuracy.svg"
+    ],
+    "elapsed_seconds": 0.6
+  },
+  "modes": {
+    "metrics": {
+      "contexts": 1000,
+      "invariant_violations": 0,
+      "violations": {
+        "silent_when_protocol_off": 0,
+        "silent_when_sensitive": 0,
+        "call_response_after_phrase": 0,
+        "fusion_wins_over_tempo": 0
+      },
+      "distribution": {
+        "drone_support": 73,
+        "protocol_silence": 755,
+        "contour_following": 54,
+        "call_and_response": 65,
+        "timbral_thickening": 27,
+        "unison_shadowing": 26
+      }
+    },
+    "charts": [
+      "assets/evidence/mode-decisions.svg"
+    ],
+    "elapsed_seconds": 0.0
+  },
+  "voicing": {
+    "metrics": {
+      "progressions": 120,
+      "mean_voice_movement_semitones": 0.9,
+      "baseline_mean_movement": 1.56,
+      "parallel_perfects_per_100_transitions": 3.61,
+      "baseline_parallel_perfects_per_100": 3.89,
+      "median_voicing_span_semitones": 9.0
+    },
+    "charts": [
+      "assets/evidence/voicing-movement.svg"
+    ],
+    "elapsed_seconds": 0.1
+  },
+  "mysong": {
+    "metrics": {
+      "songs": 44,
+      "root": 0.6039,
+      "core": 0.5756,
+      "full": 0.3121,
+      "key": 0.9773,
+      "changes_f1": 0.5906,
+      "fixed_bar_root": 0.584,
+      "template_root": 0.4055,
+      "segments_per_song": 27.23
+    },
+    "charts": [
+      "assets/evidence/mysong-scores.svg",
+      "assets/evidence/mysong-baselines.svg"
+    ],
+    "elapsed_seconds": 40.1
+  },
+  "latency": {
+    "metrics": {
+      "endpoints": {
+        "/api/analyze": {
+          "n": 40,
+          "p50_ms": 51.3,
+          "p95_ms": 61.3
+        },
+        "/api/sentiment": {
+          "n": 40,
+          "p50_ms": 52.7,
+          "p95_ms": 57.6
+        },
+        "/api/vocables/manifest": {
+          "n": 40,
+          "p50_ms": 220.0,
+          "p95_ms": 269.6
+        },
+        "/api/mysong/status": {
+          "n": 40,
+          "p50_ms": 1.4,
+          "p95_ms": 11.0
+        },
+        "/singsong/status": {
+          "n": 40,
+          "p50_ms": 1.2,
+          "p95_ms": 2.2
+        }
+      }
+    },
+    "charts": [
+      "assets/evidence/api-latency.svg"
+    ],
+    "elapsed_seconds": 13.7
+  },
+  "cree": {
+    "metrics": {
+      "words_checked": 12372,
+      "syllabics_round_trip_failures": 0,
+      "sro_round_trip_failures": 0,
+      "syllable_count_failures": 0,
+      "fst_words_tested": 1000,
+      "fst_coverage": 0.599
+    },
+    "charts": [
+      "assets/evidence/cree-orthography.svg"
+    ],
+    "elapsed_seconds": 0.7
+  },
+  "sentiment": {
+    "metrics": {
+      "lines": 120,
+      "accuracy": 0.8,
+      "positive_recall": 1.0,
+      "negative_recall": 0.975,
+      "neutral_recall": 0.425,
+      "pos_vs_neg_auc": 1.0
+    },
+    "charts": [
+      "assets/evidence/sentiment-classes.svg"
+    ],
+    "elapsed_seconds": 3.5
+  },
+  "vocables": {
+    "metrics": {
+      "renders": 64,
+      "bank_pitch_median_cents": 12.8,
+      "bank_pitch_within_50c": 0.859,
+      "naive_pitch_median_cents": 3.7,
+      "bank_envelope_error_db": 11.77,
+      "naive_envelope_error_db": 14.21,
+      "timbre_improvement_pct": 17.2
+    },
+    "charts": [
+      "assets/evidence/vocable-pitch.svg",
+      "assets/evidence/vocable-timbre.svg"
+    ],
+    "elapsed_seconds": 4.6
+  },
+  "rvc": {
+    "metrics": {
+      "renders": 24,
+      "neural_applied": 24,
+      "pitch_median_cents": 17.5,
+      "pitch_within_50c": 1.0,
+      "pitch_p95_cents": 33.2,
+      "latency_p50_ms": 2496.0,
+      "latency_p95_ms": 2801.0,
+      "rms_median": 0.1996,
+      "peak_max": 0.998
+    },
+    "charts": [
+      "assets/evidence/rvc-pitch.svg",
+      "assets/evidence/rvc-latency.svg"
+    ],
+    "elapsed_seconds": 67.4
+  },
+  "asr": {
+    "metrics": {
+      "utterances": 40,
+      "wer_mean": 0.0147,
+      "wer_median": 0.0,
+      "exact_match": 0.875,
+      "latency_p50_ms": 1874.0,
+      "latency_p95_ms": 2044.0
+    },
+    "charts": [
+      "assets/evidence/asr-wer.svg"
+    ],
+    "elapsed_seconds": 76.2
+  },
+  "bands": {
+    "metrics": {
+      "renders": 12,
+      "voice_over_band_median_db": 12.98,
+      "voice_over_band_min_db": 8.55,
+      "voice_over_band_max_db": 18.91,
+      "peak_max": 0.76,
+      "per_style": {
+        "hand_drum": 15.5,
+        "round_dance": 12.38,
+        "grass_dance": 17.39,
+        "jingle_dress": 13.34,
+        "metis_fiddle": 9.55,
+        "cedar_flute": 10.43
+      }
+    },
+    "charts": [
+      "assets/evidence/band-balance.svg"
+    ],
+    "elapsed_seconds": 47.5
+  },
+  "singsong": {
+    "metrics": {
+      "trials": 120,
+      "tokens_checked": 750000,
+      "positions_checked": 270000,
+      "round_trip_failures": 0,
+      "mask_violations": 0,
+      "stage12_vocab": 5122,
+      "stage12_positions": 2250,
+      "fine_vocab": 8194,
+      "fine_positions": 4000
+    },
+    "charts": [],
+    "elapsed_seconds": 2.2
+  }
+}

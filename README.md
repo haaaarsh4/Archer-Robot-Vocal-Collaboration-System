@@ -64,6 +64,23 @@ mic -> AudioCapture -> Preprocessor -> PitchDetector (yin/rmvpe)
 
 **On the live transcription specifically:** it actually runs two ASR models at once, for a good reason. Vosk streams continuously and shows a rough caption almost immediately, in faded italic text. Whisper is much more accurate but only produces a result once it detects a pause in the audio, which barely happens during singing. So Vosk keeps something on screen the whole time, and whenever Whisper catches up, its cleaner result quietly replaces Vosk's rough guess. Neither model transcribes Cree. Both are English only, and that does not change with any config setting.
 
+### The nêhiyawêwin model
+
+The chat assistant has a second model behind it: a Plains Cree model trained for this project by [`Cree_LLM_Training.ipynb`](Cree_LLM_Training.ipynb), or on a GPU server by [`train_cree_llm.py`](train_cree_llm.py), which is generated from the same cells. It translates both directions, writes SRO and syllabics, explains words, and answers from Archer's song notes with the source listed beside the reply. A question written in Cree, or one that asks for Cree, is routed to it automatically; everything else stays on the general model.
+
+The notebook is the whole pipeline: corpus acquisition with a licence ledger, language filtering and near-duplicate removal, a Cree tokenizer grafted onto the base vocabulary, continued pretraining with English replay, instruction tuning with abstention examples, faithfulness preference tuning, a held-out benchmark, and a quantised GGUF export. You do not need it to run the app. Without the GGUF, `chat.cree_model` stays empty and Cree questions fall back to the general model. It is safe to interrupt: every stage writes a marker and its checkpoints to Google Drive (or to `--work` from the server script), so a dropped session resumes where it stopped instead of starting the run again. The training profiles, export and install steps are in [docs/cree-llm.md](docs/cree-llm.md).
+
+Setup, the data policy and the evaluation are in [`docs/cree-llm.md`](docs/cree-llm.md). The short version:
+
+```bash
+# after training, from the notebook's export folder
+cp archer-cree-7b.Q4_K_M.gguf assets/cree_llm/
+cp Modelfile assets/cree_llm/
+cd assets/cree_llm && ollama create archer-cree:7b -f Modelfile
+```
+
+Then set `chat.cree_model: archer-cree:7b` in `config/config.yaml`.
+
 ---
 
 ## Project structure

@@ -1,0 +1,28 @@
+<div class="cree-mic-demo">
+      <div class="cree-mic-header">
+        <div class="cree-mic-title">Cree &#8594; English translation</div>
+        <div class="cree-mic-status">
+          <div class="cree-mic-dot" id="mt-status-dot"></div>
+          <span id="mt-status-text">translation: idle</span>
+        </div>
+      </div>
+
+      <div class="cree-demo-layout">
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Input</div>
+          <textarea class="cree-syllabics-input" id="mt-text-input" rows="3" placeholder="tanisi  or  nehiyawewin katawasisin..." oninput="onMtTextInput()"></textarea>
+          <div id="mt-word-validation" style="margin-top: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.8;"></div>
+          <button class="cree-mic-trigger" onclick="runTranslationDemo()">
+            <div class="cmt-dot"></div>
+            Translate
+          </button>
+        </div>
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Output</div>
+          <div class="cree-output-box">
+            <div class="cree-output-box-label">English translation</div>
+            <div class="cree-output-text placeholder" id="mt-translation-out">translation will appear here</div>
+          </div>
+        </div>
+      </div>
+    </div>

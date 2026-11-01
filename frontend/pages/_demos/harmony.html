@@ -1,0 +1,67 @@
+<div class="note-demo">
+      <div class="note-demo-header">
+        <div class="note-demo-title">Try a musical function</div>
+        <button class="mic-btn" id="harmony-mic-btn" onclick="toggleHarmonyMic()">
+          <div class="mic-dot"></div>
+          Start microphone
+        </button>
+      </div>
+
+      <div id="harmony-pitch-engine" class="pitch-engine-row"></div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+        <span style="font-size: 13px; color: var(--muted);">Accompaniment mode:</span>
+        <div class="mode-picker" style="margin: 0;">
+          <button class="mode-btn active" data-mode="unison_shadowing" onclick="setHarmonyMode('unison_shadowing', this)">Unison shadowing</button>
+          <button class="mode-btn" data-mode="octave_reinforcement" onclick="setHarmonyMode('octave_reinforcement', this)">Octave reinforcement</button>
+          <button class="mode-btn" data-mode="delayed_response" onclick="setHarmonyMode('delayed_response', this)">Delayed response</button>
+          <button class="mode-btn" data-mode="timbral_thickening" onclick="setHarmonyMode('timbral_thickening', this)">Timbral thickening</button>
+          <button class="mode-btn" data-mode="contour_following" onclick="setHarmonyMode('contour_following', this)">Contour following</button>
+          <button class="mode-btn" data-mode="drone_support" onclick="setHarmonyMode('drone_support', this)">Drone support</button>
+          <button class="mode-btn" data-mode="call_and_response" onclick="setHarmonyMode('call_and_response', this)">Call and response</button>
+          <button class="mode-btn" data-mode="solo_humming" onclick="setHarmonyMode('solo_humming', this)">Solo humming</button>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+        <span style="font-size: 13px; color: var(--muted);">Sovereignty:</span>
+        <button class="protocol-btn" id="harmony-protocol-btn" onclick="toggleHarmonyProtocol()">
+          <div class="protocol-dot"></div>
+          <span class="protocol-btn-label">Sovereignty: ON</span>
+        </button>
+      </div>
+
+      <div class="note-displays">
+        <div class="note-box" id="harmony-singer-box">
+          <div class="note-box-label singer">You are singing</div>
+          <div class="note-display singer" id="harmony-singer-note">-</div>
+          <div class="note-freq" id="harmony-singer-freq"></div>
+        </div>
+        <div class="note-arrow-center">
+          <div style="font-size: 24px; color: var(--border);">&#8594;</div>
+          <div class="interval-label" id="harmony-mode-label">Unison shadowing</div>
+        </div>
+        <div class="note-box" id="harmony-robot-box">
+          <div class="note-box-label robot">Robot responds</div>
+          <div class="note-display robot" id="harmony-robot-note">-</div>
+          <div class="note-freq" id="harmony-robot-freq"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono);">PITCH DEVIATION FROM NEAREST NOTE</div>
+      <div class="pitch-meter">
+        <div class="pitch-center-line"></div>
+        <div class="pitch-bar" id="harmony-pitch-bar" style="width: 4px; left: 50%;"></div>
+      </div>
+      <div class="pitch-labels">
+        <span>-50 cents</span>
+        <span>in tune</span>
+        <span>+50 cents</span>
+      </div>
+
+      <div class="note-explanation" id="harmony-explanation">
+        Click "Start microphone", pick a mode above, and sing or hum. Try switching sovereignty off to see it override every mode.
+      </div>
+
+      <canvas id="harmony-piano-canvas" height="100"></canvas>
+    </div>

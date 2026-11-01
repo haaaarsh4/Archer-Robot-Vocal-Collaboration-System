@@ -196,9 +196,15 @@ img { max-width: 100%; display: block; }
    size and height (a 41px box 25px down, on the centre line), the three-bar
    menu at their corner (26px down, 28px in), and the status line tucked under
    the signature. Nothing else, no back-to-top, no words to the left. */
-body:has(#page-home.active) .sig-block {
-  position: fixed; top: 25px; left: 50%; transform: translateX(-50%);
-}
+/* The wordmark stays in the bar's own centre column on every page. It used
+   to be taken out of the grid and fixed at left: 50% on the home page, which
+   put it on the same line by measurement but made it a positioned element
+   inside a bar that can gain a backdrop-filter while a page is changing.
+   A filter on the bar makes the bar the containing block for a fixed child,
+   and the mark could land in the wrong column for a frame. The grid already
+   centres it exactly; the home page only needs the reference's vertical offset
+   and its larger size. */
+body:has(#page-home.active) .sig-block { transform: translateY(20px); }
 body:has(#page-home.active) .sig-logo { font-size: 55px; line-height: 41px; }
 /* the slot swaps over on the home page and on the artist's own page: the
    system's name stands on the front door and on the page about the person, and

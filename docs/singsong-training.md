@@ -468,8 +468,11 @@ Then open the SingSong controls inside the Live Demo page:
 http://localhost:8000/live-demo#singsong
 ```
 
-The status card should switch from “checkpoints missing” to ready, and the
-upload form should return a WAV instead of 503.
+The status card should switch from “built-in band engine” to “trained cascade
+ready”.  The upload form already returns a WAV before this point — the panel
+falls back to the built-in symbolic band engine when the weights are absent —
+so the completed run changes which model writes the band, not whether the panel
+works.
 
 ## 12. Sanity gates before calling it usable
 

@@ -1,0 +1,129 @@
+<div class="cree-mic-demo">
+      <div class="cree-mic-header">
+        <div class="cree-mic-title">nêhiyawêwin (Plains Cree) sentiment pipeline</div>
+        <div class="cree-mic-status">
+          <div class="cree-mic-dot" id="cree-status-dot"></div>
+          <span id="cree-status-text">idle</span>
+        </div>
+      </div>
+
+      <div class="cree-dialect-row">
+        <span class="cree-dialect-label">Language</span>
+        <span class="cree-dialect-sel" style="display: inline-flex; align-items: center;">nêhiyawêwin (Plains Cree)</span>
+        <span class="cree-dialect-hint">Prairies · y-dialect · Saskatchewan, Alberta</span>
+      </div>
+
+      <div class="cree-demo-layout">
+        <!-- INPUT COLUMN -->
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Input</div>
+
+          <button class="cree-mic-trigger" id="cree-mic-btn" onclick="toggleCreeMic()">
+            <div class="cmt-dot"></div>
+            Start microphone
+          </button>
+
+          <div class="cree-mic-lang-toggle" style="display:flex; gap:8px;">
+            <button type="button" class="node-pill cree-lang-pill active" id="cree-lang-en"
+                    style="cursor:pointer;" onclick="setCreeMicLanguage('en')">Speaking English</button>
+            <button type="button" class="node-pill cree-lang-pill" id="cree-lang-cr"
+                    style="cursor:pointer;" onclick="setCreeMicLanguage('cr')">Speaking Cree</button>
+          </div>
+
+          <div class="cree-waveform" id="cree-waveform">
+            <div style="font-family: var(--mono); font-size: 11px; color: var(--muted);">waiting for audio...</div>
+          </div>
+
+          <div class="cree-output-box cree-transcript-log">
+            <div class="cree-output-box-label">Transcript</div>
+            <div class="cree-output-text placeholder" id="cree-syllabics-out">waiting for voiced phrase</div>
+          </div>
+          <div style="font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 6px;">
+            Click any phrase above to see its translation and sentiment again.
+          </div>
+
+          <div class="cree-example-block">
+            <div class="cree-example-label">Or pick an example phrase</div>
+            <div id="cree-example-pills" class="cree-example-pills"></div>
+          </div>
+        </div>
+
+        <!-- OUTPUT COLUMN -->
+        <div class="cree-demo-col">
+          <div class="cree-demo-col-label">Pipeline output</div>
+
+          <div class="cree-pipeline-card">
+            <div class="cree-output-box-label">English translation</div>
+            <div class="cree-output-text placeholder" id="cree-translation-out">translation will appear here</div>
+
+            <div class="cree-pipeline-divider"></div>
+
+            <div class="cree-sentiment-meter-label">Emotional character</div>
+
+            <div class="cree-axis">
+              <div class="cree-axis-label">
+                <span>grief / dark</span>
+                <span>Valence</span>
+                <span>joy / bright</span>
+              </div>
+              <div class="cree-track">
+                <div class="cree-fill valence" id="cree-val-fill" style="width: 50%;"></div>
+              </div>
+            </div>
+
+            <div class="cree-axis">
+              <div class="cree-axis-label">
+                <span>still / calm</span>
+                <span>Arousal</span>
+                <span>intense</span>
+              </div>
+              <div class="cree-track">
+                <div class="cree-fill arousal" id="cree-aro-fill" style="width: 40%;"></div>
+              </div>
+            </div>
+
+            <div class="cree-emotion-row">
+              <span class="cree-emotion-badge neutral" id="cree-emotion-badge">neutral</span>
+              <span class="cree-emotion-desc" id="cree-emotion-desc">waiting for translation</span>
+            </div>
+
+            <div id="cree-vocal-tone-block" style="display:none; margin-top: 14px; font-family: var(--mono); font-size: 11px; color: var(--muted);">
+              <div style="color: var(--accent2, #7c6af7); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Vocal tone (from the recorded audio)</div>
+              <div id="cree-vocal-tone-detail">-</div>
+              <div style="margin-top: 4px; opacity: 0.8;">Arousal above blends word-level tone (<span id="cree-arousal-text-part">-</span>) with vocal energy (<span id="cree-arousal-audio-part">-</span>), 50/50. Valence stays word-based only: pitch and loudness alone cannot reliably signal positive from negative.</div>
+            </div>
+
+            <div class="cree-pipeline-divider"></div>
+
+            <div class="cree-chip-row-inline">
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Interval</div>
+                <div class="cree-chip-value" id="chip-interval">+7 (5th)</div>
+              </div>
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Waveform</div>
+                <div class="cree-chip-value" id="chip-osc">sine</div>
+              </div>
+              <div class="cree-chip-inline">
+                <div class="cree-chip-label">Vibrato</div>
+                <div class="cree-chip-value" id="chip-vibrato">off</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LED EYES SECTION -->
+      <div class="cree-led-row">
+        <div class="cree-led-label">LED eyes</div>
+        <div class="cree-led-eye-mini" id="led-left">
+          <div class="cree-led-pupil" id="led-left-pupil"></div>
+        </div>
+        <div class="cree-led-eye-mini" id="led-right">
+          <div class="cree-led-pupil" id="led-right-pupil"></div>
+        </div>
+        <div class="cree-led-desc" id="led-desc">
+          LED state mirrors the detected sentiment. Colour, pupil shape, and pulse rate update with each translated phrase.
+        </div>
+      </div>
+    </div>

@@ -324,14 +324,29 @@ The controls are at `http://localhost:8000/live-demo#singsong`; the API is:
 
 ```
 GET  /singsong/status
-POST /api/singsong/render     multipart file=<audio>, return_mix=true|false
+POST /api/singsong/render     multipart file=<audio>, return_mix=true|false, band=<style>
 ```
 
 The old `/singsong` URL redirects to that anchor.
 
 `/singsong/status` never loads weights and always reports the missing artifact
-list. `/api/singsong/render` returns 503 with that list until all four
-checkpoints exist.
+list.  It also reports `band_available: true` and `engine: "built-in"`, because
+this route never has to refuse: with no weights installed, the panel renders
+with the built-in symbolic band engine (the chord model and bands behind
+MySong, default `round_dance`) instead of returning 503.  `X-SingSong-Engine` on
+the response says which engine ran: `neural` for the trained cascade, `built-in`
+otherwise.  The four artifacts still switch the panel to the trained cascade as
+soon as they exist, and the panel says so in its status card instead of reading
+as broken.
+
+Both engines return the band at the app's one reference level plus the
+`X-SingSong-Band-Gain-Db` placement for the take, and both build the mix with
+`mysong.accompaniment.mix_with_vocal`, so the voice is over the band in the
+panel and in the saved WAV.  One upload renders both stems in a single pass
+(`_singsong_render_cache`), so the page's second request for the band it plays
+is a cache hit rather than a second model pass.  The same path is used by the
+trained cascade: its decoder output is the band, and it is levelled against the
+take before anything is returned.
 
 ---
 

@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import dataclasses
+import hashlib
 import io
 import json
 import math
@@ -470,6 +471,113 @@ def _get_sing_song_engine():
         raise
 
 
+def _wav_bytes(audio, sample_rate: int) -> bytes:
+    buffer = io.BytesIO()
+    sf.write(buffer, audio, sample_rate, format="WAV", subtype="PCM_16")
+    return buffer.getvalue()
+
+
+def _load_take(raw: bytes, sample_rate: int):
+    import librosa
+
+    take, _ = librosa.load(io.BytesIO(raw), sr=sample_rate, mono=True)
+    return np.asarray(take, dtype=np.float32)
+
+
+#: The band the built-in engine plays under a SingSong take.  Round dance is
+#: the fullest of the six bands this project is for -- hand drum, rattles,
+#: boom-chuck guitar and bass -- which is what "generate a band" should hand
+#: back before the trained cascade is installed.
+SINGSONG_BUILTIN_BAND = "round_dance"
+
+
+#: One upload is rendered once into both WAVs the page uses -- the band it
+#: plays under the take and the mix it saves -- because the expensive half is
+#: the model pass, not the encoding.
+_singsong_render_cache: dict[str, dict] = {}
+_SINGSONG_RENDER_CACHE_LIMIT = 4
+
+
+def _singsong_render_both(raw: bytes, band: str) -> dict[str, object]:
+    """Render the band and the mix for one upload, with whichever engine can.
+
+    The trained semantic -> coarse -> fine cascade answers whenever its four
+    artifacts exist.  A fresh clone has no weights, so the same function falls
+    back to the symbolic band engine (the one behind MySong) rather than
+    refusing: the output is a complete band, not a placeholder, and the only
+    thing that changes when the weights arrive is which model chose the notes.
+    Both engines place the band against the take's own level, so the panel's
+    voice is on top either way.
+    """
+    from mysong.accompaniment import (
+        band_placement_gain_db,
+        level_band_stem,
+        mix_with_vocal,
+    )
+
+    engine = None
+    try:
+        candidate = _get_sing_song_engine()
+        # A constructed engine is not a loaded one: with no weights `load()`
+        # raises, and the variable must stay None so the fallback below runs.
+        candidate.load()
+        engine = candidate
+    except Exception as e:  # noqa: BLE001 - the built-in band engine takes over
+        print(f"SingSong: trained cascade unavailable ({e}); using the built-in band engine")
+
+    if engine is None:
+        from mysong.pipeline import create_song
+
+        model = _get_mysong_model()
+        with tempfile.TemporaryDirectory(prefix="singsong-") as tmp:
+            path = Path(tmp) / "take.wav"
+            path.write_bytes(raw)
+            project = create_song(
+                str(path),
+                model=model,
+                arrangement_style=band or SINGSONG_BUILTIN_BAND,
+                sample_rate=44100,
+                render=True,
+            )
+        sr = project.sample_rate
+        headers = _mysong_readouts(project)
+        headers.update({
+            "X-SingSong-Engine": "built-in",
+            "X-SingSong-Device": "symbolic band engine",
+            "X-SingSong-Duration": f"{len(project.mix) / max(sr, 1):.1f}",
+            "X-SingSong-Windows": "1",
+            "X-SingSong-Band-Gain-Db": f"{float(project.band_placement_db):.2f}",
+        })
+        return {
+            "mix": _wav_bytes(project.mix, sr),
+            "band": _wav_bytes(project.band_stem, sr),
+            "headers": headers,
+        }
+
+    instrumental_wav, result = engine.render_bytes(raw, return_mix=False)
+    instrumental, sample_rate = sf.read(
+        io.BytesIO(instrumental_wav), dtype="float32", always_2d=True
+    )
+    if instrumental.shape[1] > 1:
+        instrumental = instrumental.mean(axis=1)
+    take = _load_take(raw, sample_rate)
+    return {
+        "mix": _wav_bytes(
+            mix_with_vocal(instrumental, take, sample_rate=sample_rate), sample_rate
+        ),
+        "band": _wav_bytes(level_band_stem(instrumental), sample_rate),
+        "headers": {
+            "X-SingSong-Engine": "neural",
+            "X-SingSong-Device": str(result.get("device", "")),
+            "X-SingSong-Duration": str(result.get("duration_s", "")),
+            "X-SingSong-Windows": str(len(result.get("windows", []))),
+            "X-SingSong-Band-Gain-Db": (
+                f"{float(band_placement_gain_db(take, sample_rate=sample_rate)):.2f}"
+            ),
+        },
+    }
+
+
 @app.get("/singsong/status")
 def singsong_status():
     try:
@@ -478,10 +586,17 @@ def singsong_status():
         return JSONResponse({
             "enabled": False, "ready": False, "loaded": False,
             "error": str(e),
+            # The panel is never dead: the built-in band engine writes a band
+            # under the take with no trained weights at all.
+            "band_available": True, "engine": "built-in",
+            "band": SINGSONG_BUILTIN_BAND,
         }, status_code=200)
     status = engine.status()
     if _sing_song_engine_error:
         status["error"] = _sing_song_engine_error
+    status["band_available"] = True
+    status["engine"] = "neural" if status.get("ready") else "built-in"
+    status["band"] = SINGSONG_BUILTIN_BAND
     return status
 
 
@@ -497,48 +612,40 @@ def singsong_page():
 async def singsong_render(
     file: UploadFile = File(...),
     return_mix: bool = Form(True),
+    band: str = Form(SINGSONG_BUILTIN_BAND),
 ):
     """Generate an instrumental for an uploaded vocal and return a WAV.
 
     The response is the mix (vocal + instrumental) by default; pass
-    ``return_mix=false`` for the isolated generated instrumental.  Until the
-    four project-trained artifacts exist, this refuses with the exact missing
-    paths rather than returning silence.
+    ``return_mix=false`` for the isolated generated instrumental.  Two engines
+    answer this route: the trained semantic -> coarse -> fine cascade whenever
+    its four artifacts exist, and the built-in symbolic band engine until then,
+    so the panel always renders something real.  ``X-SingSong-Engine`` says
+    which one ran.
     """
-    try:
-        engine = _get_sing_song_engine()
-    except Exception as e:  # noqa: BLE001
-        return JSONResponse({"error": f"SingSong is not available: {e}"}, status_code=503)
-
-    try:
-        await asyncio.to_thread(engine.load)
-    except Exception as e:  # noqa: BLE001
-        return JSONResponse({
-            "error": f"SingSong is not ready: {e}",
-            "missing": engine.cfg.missing_artifacts(),
-        }, status_code=503)
-
     raw = await file.read()
     if not raw:
         return JSONResponse({"error": "empty upload"}, status_code=400)
-    try:
-        wav_bytes, result = await asyncio.to_thread(
-            engine.render_bytes, raw, return_mix=return_mix
-        )
-    except Exception as e:  # noqa: BLE001
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"error": f"SingSong render failed: {e}"}, status_code=500)
 
+    cache_key = "|".join([hashlib.sha256(raw).hexdigest(), band or SINGSONG_BUILTIN_BAND])
+    entry = _singsong_render_cache.get(cache_key)
+    if entry is None:
+        try:
+            entry = await asyncio.to_thread(_singsong_render_both, raw, band)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            return JSONResponse({"error": f"SingSong render failed: {e}"}, status_code=500)
+        if len(_singsong_render_cache) >= _SINGSONG_RENDER_CACHE_LIMIT:
+            _singsong_render_cache.pop(next(iter(_singsong_render_cache)))
+        _singsong_render_cache[cache_key] = entry
+
+    headers = dict(entry["headers"])
+    headers["X-SingSong-Mode"] = "mix" if return_mix else "instrumental"
     return Response(
-        content=wav_bytes,
+        content=entry["mix"] if return_mix else entry["band"],
         media_type="audio/wav",
-        headers={
-            "X-SingSong-Device": str(result.get("device", "")),
-            "X-SingSong-Duration": str(result.get("duration_s", "")),
-            "X-SingSong-Windows": str(len(result.get("windows", []))),
-            "X-SingSong-Mode": "mix" if return_mix else "instrumental",
-        },
+        headers=headers,
     )
 
 
@@ -584,7 +691,16 @@ def _get_mysong_model():
         raise
 
 
-def _run_mysong_render(path: Path, style: str, key: str, return_mix: bool):
+#: One render is enough for both WAVs the page plays (the mix it downloads and
+#: the band it plays under the untouched take), so the last few renders are
+#: kept here.  Keyed by the upload's digest and every parameter that shapes the
+#: result, so a cache hit is always the same audio.
+_mysong_render_cache: "dict[str, dict]" = {}
+_MYSONG_RENDER_CACHE_LIMIT = 4
+
+
+def _run_mysong_render(path: Path, style: str, key: str, return_mix: bool,
+                       band_gain_db: float = 0.0, vocal_gain_db: float = 0.0):
     from mysong.pipeline import create_song
 
     model = _get_mysong_model()
@@ -593,11 +709,41 @@ def _run_mysong_render(path: Path, style: str, key: str, return_mix: bool):
             str(path),
             model=model,
             key=None if (key or "auto").strip().lower() == "auto" else key,
-            arrangement_style=style or "pop",
+            arrangement_style=style or "hand_drum",
             mix_vocal=return_mix,
             sample_rate=44100,
             render=True,
+            band_gain_db=float(band_gain_db),
+            vocal_gain_db=float(vocal_gain_db),
         )
+
+
+def _mysong_readouts(project) -> dict[str, str]:
+    """The track strip's readouts, from a finished MySong render.
+
+    Shared with the SingSong panel's built-in band, which runs the same engine,
+    so both strips fill from the same numbers under the same header names.
+    """
+    notes = list(getattr(project.analysis, "notes", []) or [])
+    pitches = sorted(int(n.pitch) for n in notes if getattr(n, "pitch", None) is not None)
+    if pitches:
+        names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        low, high = pitches[0], pitches[-1]
+        # ASCII only: header values cannot carry an en dash.
+        pitch_readout = f"{names[low % 12]}{low // 12 - 1} - {names[high % 12]}{high // 12 - 1}"
+    else:
+        pitch_readout = "no voiced notes"
+    return {
+        "X-MySong-Key": project.harmony.key.name(),
+        "X-MySong-Pitch-Range": pitch_readout,
+        "X-MySong-Key-Confidence": f"{float(project.harmony.key_confidence):.2f}",
+        "X-MySong-Tempo-Confidence": f"{float(project.analysis.tempo.confidence):.2f}",
+        "X-MySong-Tempo": f"{project.analysis.tempo.bpm:.1f}",
+        "X-MySong-Segments": str(len(project.harmony.segments)),
+        "X-MySong-Summary": project.harmony.summary()[:900],
+        "X-MySong-Style": project.arrangement.style.name,
+        "X-MySong-Duration": f"{len(project.mix) / max(project.sample_rate, 1):.1f}",
+    }
 
 
 @app.get("/api/mysong/status")
@@ -611,6 +757,13 @@ def mysong_status():
             "error": str(e),
         }, status_code=200)
     tagger_meta = model.meta.config.get("tagger", {}) if model.meta else {}
+    from mysong.accompaniment import ArrangementStyle
+
+    groups = {
+        "bands": [name for name in ArrangementStyle.INDIGENOUS],
+        "other": [name for name in ArrangementStyle.presets()
+                  if name not in ArrangementStyle.INDIGENOUS],
+    }
     return {
         "enabled": True,
         "ready": True,
@@ -620,16 +773,21 @@ def mysong_status():
         "tagger": model.tagger is not None,
         "tagger_extra_scores": tagger_meta.get("extra_scores", 0),
         "key_classifier": model.key_classifier is not None,
-        "styles": ["pop", "ballad", "folk", "jazz", "waltz", "ambient", "rock"],
+        # The bands for this project's own music come first; the rest are the
+        # other bands the engine knows.
+        "styles": groups["bands"] + groups["other"],
+        "styles_grouped": groups,
     }
 
 
 @app.post("/api/mysong/render")
 async def mysong_render(
     file: UploadFile = File(...),
-    style: str = Form("pop"),
+    style: str = Form("hand_drum"),
     key: str = Form("auto"),
     return_mix: bool = Form(True),
+    band_gain_db: float = Form(0.0),
+    vocal_gain_db: float = Form(0.0),
 ):
     """Harmonize an uploaded take and return a WAV accompaniment.
 
@@ -644,17 +802,48 @@ async def mysong_render(
     suffix = Path(file.filename or "take.wav").suffix.lower()
     if suffix not in {".wav", ".wave", ".flac", ".ogg", ".mp3", ".m4a", ".aiff", ".aif"}:
         suffix = ".wav"
+
+    def encode(audio, rate):
+        buffer = io.BytesIO()
+        sf.write(buffer, audio, rate, format="WAV", subtype="PCM_16")
+        return buffer.getvalue()
+
+    cache_key = "|".join([
+        hashlib.sha256(raw).hexdigest(), str(style), str(key),
+        f"{float(band_gain_db):.3f}", f"{float(vocal_gain_db):.3f}",
+    ])
+    cached = _mysong_render_cache.get(cache_key)
+    project = None          # the project, when this request did the render
+    fresh = False
     try:
-        with tempfile.TemporaryDirectory(prefix="mysong-") as tmp:
-            input_path = Path(tmp) / f"take{suffix}"
-            input_path.write_bytes(raw)
-            project = await asyncio.to_thread(
-                _run_mysong_render, input_path, style, key, return_mix
+        if cached is None:
+            with tempfile.TemporaryDirectory(prefix="mysong-") as tmp:
+                input_path = Path(tmp) / f"take{suffix}"
+                input_path.write_bytes(raw)
+                project = await asyncio.to_thread(
+                    _run_mysong_render, input_path, style, key, True,
+                    band_gain_db, vocal_gain_db,
+                )
+                band_stem = project.band_stem
+                cached = {
+                    "mix": encode(project.mix, project.sample_rate),
+                    # The stem the page plays under the take: written at the
+                    # app's one reference level, with the placement the page
+                    # applies on top of it, so the band is always the same
+                    # distance under this particular take.
+                    "band": encode(band_stem, project.sample_rate) if band_stem is not None else None,
+                    "placement_db": f"{float(project.band_placement_db):.2f}",
+                }
+                if len(_mysong_render_cache) >= _MYSONG_RENDER_CACHE_LIMIT:
+                    _mysong_render_cache.pop(next(iter(_mysong_render_cache)))
+                _mysong_render_cache[cache_key] = cached
+            fresh = True
+        if not return_mix and cached.get("band") is None:
+            return JSONResponse(
+                {"error": "this render has no band stem; request the mix first"},
+                status_code=409,
             )
-            audio = project.mix
-            buffer = io.BytesIO()
-            sf.write(buffer, audio, project.sample_rate, format="WAV", subtype="PCM_16")
-            wav_bytes = buffer.getvalue()
+        wav_bytes = cached["mix"] if return_mix else cached["band"]
     except ValueError as e:
         return JSONResponse({"error": f"MySong could not read that take: {e}"}, status_code=400)
     except Exception as e:  # noqa: BLE001
@@ -669,20 +858,64 @@ async def mysong_render(
         traceback.print_exc()
         return JSONResponse({"error": f"MySong render failed: {e}"}, status_code=500)
 
+    if not fresh:
+        # A cache hit: the strip's readouts come from the cached render, so the
+        # page can fill them without a second model pass.
+        summary = cached.get("summary", "")
+        warnings = list(cached.get("warnings", []))
+        pitch_readout = cached.get("pitch", "")
+        key_name = cached.get("key", "")
+        key_conf = cached.get("key_confidence", "")
+        tempo = cached.get("tempo", "")
+        tempo_conf = cached.get("tempo_confidence", "")
+        segments = cached.get("segments", "")
+        style_name = cached.get("style", style)
+        duration = cached.get("duration", "")
+        return Response(
+            content=wav_bytes,
+            media_type="audio/wav",
+            headers={
+                "X-MySong-Key": key_name,
+                "X-MySong-Pitch-Range": pitch_readout,
+                "X-MySong-Key-Confidence": key_conf,
+                "X-MySong-Tempo-Confidence": tempo_conf,
+                "X-MySong-Tempo": tempo,
+                "X-MySong-Segments": str(segments),
+                "X-MySong-Summary": summary,
+                "X-MySong-Style": style_name,
+                "X-MySong-Mode": "mix" if return_mix else "band",
+                "X-MySong-Duration": str(duration),
+                "X-MySong-Warnings": str(len(warnings)),
+                "X-MySong-Band-Gain-Db": cached.get("placement_db", "0.00"),
+            },
+        )
+
     summary = project.harmony.summary()
     warnings = list(project.warnings)
+    # The readouts the page's track strip shows next to the generated audio.
+    readouts = _mysong_readouts(project)
+    # Everything the strip needs is remembered with the audio, so the band-only
+    # request (a cache hit) returns the same readouts.
+    cached.update({
+        "summary": summary,
+        "warnings": warnings,
+        "pitch": readouts["X-MySong-Pitch-Range"],
+        "key": readouts["X-MySong-Key"],
+        "key_confidence": readouts["X-MySong-Key-Confidence"],
+        "tempo": readouts["X-MySong-Tempo"],
+        "tempo_confidence": readouts["X-MySong-Tempo-Confidence"],
+        "segments": readouts["X-MySong-Segments"],
+        "style": readouts["X-MySong-Style"],
+        "duration": readouts["X-MySong-Duration"],
+    })
     return Response(
         content=wav_bytes,
         media_type="audio/wav",
         headers={
-            "X-MySong-Key": project.harmony.key.name(),
-            "X-MySong-Tempo": f"{project.analysis.tempo.bpm:.1f}",
-            "X-MySong-Segments": str(len(project.harmony.segments)),
-            "X-MySong-Summary": summary[:900],
-            "X-MySong-Style": project.arrangement.style.name,
+            **readouts,
             "X-MySong-Mode": "mix" if return_mix else "band",
-            "X-MySong-Duration": f"{len(audio) / max(project.sample_rate, 1):.1f}",
             "X-MySong-Warnings": str(len(warnings)),
+            "X-MySong-Band-Gain-Db": f"{float(project.band_placement_db):.2f}",
         },
     )
 
@@ -698,6 +931,9 @@ def index():
 @app.get("/sentiment")
 @app.get("/live-demo")
 @app.get("/chat")
+@app.get("/singsong-guide")
+@app.get("/mysong-guide")
+@app.get("/measurements")
 @app.get("/about")
 def spa_routes():
     return FileResponse(str(FRONTEND_DIR / "index.html"))
@@ -874,6 +1110,26 @@ def cree_analyze(req: CreeAnalyzeRequest):
 @app.get("/api/cree/health")
 def cree_health():
     return {"status": "ok" if cree_analyzer_fst else "not_loaded", "error": cree_fst_load_error}
+
+
+class OrthographyRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/cree/orthography")
+def cree_orthography(req: OrthographyRequest):
+    """SRO, syllabics and the anglicised respelling for one line.
+
+    The converter is the same module the corpus round-trip test uses; this
+    route exists so the site can show the three scripts side by side without
+    duplicating the syllabary in JavaScript.
+    """
+    from analysis.cree_orthography import describe
+
+    text = (req.text or "").strip()
+    if not text:
+        return {"sro": "", "syllabics": "", "anglicized": "", "syllables": []}
+    return describe(text)
 
 
 # ------------------------------------------------------- nêhiyawêwin speech --
