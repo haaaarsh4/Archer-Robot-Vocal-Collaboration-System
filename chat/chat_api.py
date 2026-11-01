@@ -14,17 +14,22 @@ from loguru import logger
 
 from chat.rag_index import SongNotesIndex
 from chat.llm_client import LocalLLMClient, LLMConfig, ChatTurn
-from chat.cree_prompt import (
-    CREE_SYSTEM_PROMPT,
-    choose_route,
-    format_cree_prompt,
+from chat.archer_prompt import (
+    ARCHER_SYSTEM_PROMPT,
+    format_prompt,
     looks_like_cree,
     script_of,
+    task_of,
     wants_cree,
 )
 from chat.tts_engine import LocalTTS
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# A retrieved passage is only evidence when it is genuinely about the question.
+# One floor for the chat and for the retrieval demo, so the panel cannot show a
+# passage the model was not given.
+MIN_NOTE_SCORE = 0.30
 
 _rag_index: Optional[SongNotesIndex] = None
 _llm_client: Optional[LocalLLMClient] = None
@@ -51,13 +56,9 @@ def _get_llm() -> LocalLLMClient:
             llm_cfg = LLMConfig(
                 backend=ccfg.get("backend", "ollama"),
                 ollama_url=ccfg.get("ollama_url", "http://127.0.0.1:11434"),
-                ollama_model=ccfg.get("ollama_model", "llama3.1:8b-instruct-q4_K_M"),
+                model=str(ccfg.get("model", "archer:7b") or "archer:7b"),
                 gguf_path=ccfg.get("gguf_path"),
-                cree_model=str(ccfg.get("cree_model", "") or ""),
-                cree_gguf_path=ccfg.get("cree_gguf_path"),
-                cree_temperature=float(ccfg.get("cree_temperature", 0.2)),
-                cree_max_tokens=int(ccfg.get("cree_max_tokens", 400)),
-                temperature=float(ccfg.get("temperature", 0.4)),
+                temperature=float(ccfg.get("temperature", 0.3)),
                 max_tokens=int(ccfg.get("max_tokens", 500)),
             )
         except Exception:
@@ -105,12 +106,10 @@ class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
     mode: str = "text"          # "text" | "audio"
-    language: str = "auto"      # "auto" | "cree" | "english"
 
 
-class RouteRequest(BaseModel):
+class PromptRequest(BaseModel):
     message: str
-    language: str = "auto"      # "auto" | "cree" | "english"
 
 
 @router.get("/health")
@@ -123,43 +122,44 @@ def chat_health():
         logger.error(f"RAG index unavailable: {e}")
 
     tts = _get_tts()
-
     llm = _get_llm()
     return {
         "rag_ready": rag_ok,
         "rag_chunks_indexed": rag_chunks,
         "tts_ready": tts.available,
-        "cree_model": llm.cfg.cree_model or None,
-        "cree_model_configured": bool(llm.cfg.cree_model),
+        "backend": llm.cfg.backend,
+        "model": llm.cfg.model if llm.cfg.backend == "ollama" else llm.cfg.gguf_path,
+        "model_installed": llm.installed(),
+        "note_floor": MIN_NOTE_SCORE,
     }
 
 
-@router.post("/route")
-def chat_route(req: RouteRequest):
-    """The routing decision on its own, for the site's demo.
+@router.post("/prompt")
+def chat_prompt(req: PromptRequest):
+    """The exact prompt the one model receives, for the site's demo.
 
-    This is the same `choose_route` call the chat makes, with the same config,
-    so the panel cannot drift from the behaviour it claims to explain. It
-    reports the text signal and the final route separately: on a machine where
-    the Cree model is not configured, Cree text still is Cree text, it just
-    stays on the general model.
+    It runs the same retrieval and the same `format_prompt` as `chat()`, and
+    stops before the model. The task label is the prompt shape, not a model
+    choice: every branch is answered by the same model.
     """
-    llm = _get_llm()
     message = (req.message or "").strip()
-    configured = bool(llm.cfg.cree_model)
-    cree_question = wants_cree(message)
+    retrieved = _get_rag().query(message, top_k=4, min_score=MIN_NOTE_SCORE)
+    notes = [(Path(r.chunk.source).stem, r.chunk.text) for r in retrieved if r.chunk.text.strip()]
+    task = task_of(message, bool(notes))
+    used_notes = notes if task == "song_notes" else []
     return {
         "message": message,
-        "requested": req.language,
-        "configured": configured,
-        "model": llm.cfg.cree_model or None,
+        "task": task,
         "script": script_of(message),
         "looks_like_cree": looks_like_cree(message),
-        "wants_cree": cree_question,
-        "route": choose_route(message, req.language, llm.cfg.cree_model),
-        # The prompt is only meaningful when the text itself asks for Cree. On
-        # the English route the app sends the general SYSTEM prompt instead.
-        "cree_prompt": format_cree_prompt(message) if cree_question else None,
+        "wants_cree": wants_cree(message),
+        "notes": [
+            {"source": r.chunk.source, "score": round(r.score, 4), "text": r.chunk.text}
+            for r in retrieved
+        ],
+        "notes_used": [title for title, _ in used_notes],
+        "prompt": format_prompt(message, notes),
+        "system_prompt": ARCHER_SYSTEM_PROMPT,
     }
 
 
@@ -180,10 +180,11 @@ def chat_retrieve(req: ChatRequest):
     """
     try:
         rag = _get_rag()
-        retrieved = rag.query(req.message, top_k=4)
+        retrieved = rag.query(req.message, top_k=4, min_score=MIN_NOTE_SCORE)
         return {
             "query": req.message,
             "indexed": rag.num_chunks,
+            "floor": MIN_NOTE_SCORE,
             "chunks": [
                 {"source": r.chunk.source, "score": round(r.score, 4),
                  "text": r.chunk.text}
@@ -201,46 +202,26 @@ def chat(req: ChatRequest):
         rag = _get_rag()
         llm = _get_llm()
 
-        retrieved = rag.query(req.message, top_k=4)
-        context_chunks = [r.chunk.text for r in retrieved]
-        sources = sorted({r.chunk.source for r in retrieved})
+        retrieved = rag.query(req.message, top_k=4, min_score=MIN_NOTE_SCORE)
+        notes = [(Path(r.chunk.source).stem, r.chunk.text) for r in retrieved if r.chunk.text.strip()]
+        task = task_of(req.message, bool(notes))
+        # Notes are part of the prompt only when this is a notes question. A
+        # translation request is not padded with song prose, and a general
+        # question keeps its own answer instead of being forced onto a song.
+        used_notes = notes if task == "song_notes" else []
+        prompt = format_prompt(req.message, notes)
+        sources = sorted({r.chunk.source for r in retrieved}) if used_notes else []
 
         history = [ChatTurn(role=m.role, content=m.content) for m in req.history]
-
-        # A Cree question goes to the model that was trained for it, with the
-        # prompt it was trained with. Everything else stays on the general
-        # model. An empty cree_model sends Cree text to the general model; a
-        # configured tag that is missing from Ollama raises, and is reported
-        # as a 503 rather than answered by the wrong model.
-        route = choose_route(req.message, req.language, llm.cfg.cree_model)
-        if route == "cree":
-            # The notebook trains on "Notes on <song>:" followed by
-            # "Question:", so the app sends that, not a generic context block.
-            # Retrieval still runs for sources; only passages that clear a
-            # relevance floor are put in front of the model, because a Cree
-            # translation request should not be padded with song prose.
-            cree_notes = [
-                (Path(r.chunk.source).stem, r.chunk.text)
-                for r in retrieved if r.score >= 0.30
-            ]
-            reply_text = llm.chat(
-                format_cree_prompt(req.message, cree_notes), history, [],
-                system_prompt=CREE_SYSTEM_PROMPT,
-                model=llm.cfg.cree_model,
-                temperature=llm.cfg.cree_temperature,
-                max_tokens=llm.cfg.cree_max_tokens,
-            )
-            used_model = llm.cfg.cree_model
-            if not cree_notes:
-                sources = []
-        else:
-            reply_text = llm.chat(req.message, history, context_chunks)
-            used_model = llm.cfg.ollama_model if llm.cfg.backend == "ollama" else "llama_cpp"
+        reply_text = llm.chat(prompt, history, system_prompt=ARCHER_SYSTEM_PROMPT)
+        used_model = llm.cfg.model if llm.cfg.backend == "ollama" else "llama_cpp"
 
         response: dict = {
             "reply": reply_text,
             "sources": sources,
-            "language": route,
+            "task": task,
+            "language": "cree" if looks_like_cree(req.message) else "english",
+            "notes_used": len(used_notes),
             "model": used_model,
         }
 
@@ -258,7 +239,8 @@ def chat(req: ChatRequest):
         return response
 
     except RuntimeError as e:
-        # backend not reachable, etc, a clear message rather than a 500 stack trace
+        # Backend not reachable, or the one model is not installed: a clear
+        # message rather than a 500 stack trace.
         return JSONResponse({"error": str(e)}, status_code=503)
     except Exception as e:
         logger.error(f"[chat error] {e}")

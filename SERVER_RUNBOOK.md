@@ -1,4 +1,4 @@
-# Running the Cree model on a GPU server
+# Training the Archer model on a GPU server
 
 This is the whole procedure, from a bare server to a trained model the app can
 use. It assumes you have SSH access and a CUDA GPU. Nothing here needs Colab.
@@ -35,6 +35,12 @@ message instead of filling the machine.
 ---
 
 ## 2. The files to copy
+
+These instructions assume the server does not have the repository: the files are
+copied into `/data/cree`, and every command below runs from that folder. If the
+repository is already checked out on the server, work from its root instead, use
+`training/requirements-cree.txt`, and point `--work` at a scratch folder such as
+`$HOME/cree-work`. The trainer does not care where it is run from.
 
 Only these two are required:
 
@@ -123,14 +129,33 @@ It also tells you which profile to use:
 
 | GPU memory | Profile |
 |---|---|
-| 16 GB | `--profile t4` |
-| 24 GB | `--profile t4` (safe) |
+| 16 GB | `--profile t4` (7B) |
+| 24 GB | `--profile t4` (7B, fastest) or `--profile big24` (14B, slower but stronger) |
 | 40 GB | `--profile a100` |
 | 80 GB | `--profile big` for the 14B, or `--profile a100` for the 7B |
 | 80 GB and a second machine for the merge | `--profile huge` for the 32B |
 
 `--profile auto` picks `a100` on 38 GB or more and `t4` below that. Being
-explicit is better on a server you are paying for.
+explicit is better on a server you are paying for. `big24` is the 14B in 4-bit
+at a 1024-token context: one 24 GB card fits the training, and the merge runs on
+CPU, so that machine needs about 64 GB of RAM for the export stage.
+
+### Which card it uses
+
+The trainer reads `nvidia-smi` before it imports torch and pins itself to the
+card with the most free memory. On a shared box that is what stops the
+five-gigabyte allocation failure inside `caching_allocator_warmup` when device 0
+belongs to somebody else's job. The choice is printed as
+`gpu: using device 1 ...`, and `--gpu N` overrides it. `CUDA_VISIBLE_DEVICES`
+already set in the shell is respected, not overridden.
+
+The training itself is single-GPU: a second card does not make the model wider
+or the run faster. What it does give you is a free card to train on while the
+other is busy, and the option of a stronger base: `--profile big24` trains the
+14B on one 24 GB card instead of the 7B. That is the biggest quality step
+available on two 4090s, and it is slower and needs about 64 GB of RAM for the
+merge. Run the 7B first, read its report, then decide whether to spend the time
+on the 14B.
 
 ---
 
@@ -194,7 +219,7 @@ expected: that stage is network and CPU work.
 | `cpt` | Continued pretraining, packed Cree with 10% English replay | 1.5 to 2.5 h |
 | `sft` | Instruction tuning, completion-only loss | 30 to 60 min |
 | `dpo` | Preference tuning on faithfulness pairs | 20 to 40 min |
-| `eval` | CreeBench against the base model, then the language-model checks | 20 to 40 min |
+| `eval` | CreeBench against the base model and the old stack, then the language-model checks | 20 to 40 min |
 | `report` | Report card, model card, figures | under a minute |
 | `export` | Merge, GGUF, quantise, Modelfile, zip | 20 to 60 min |
 
@@ -211,6 +236,7 @@ Watch for these lines to know it is progressing:
 [..] CPT: 65470 Cree sentences -> ...
 [..] SFT: kept ... examples ...
 [..] CreeBench: 203 held-out pairs, both directions, base and tuned
+[..] the bar: the best of the old setup on each job ...
 [..] LLM checks: 6 probe pairs ...
 [..] pipeline finished in ...
 ```
@@ -269,7 +295,7 @@ python train_cree_llm.py --profile a100 --work /data/cree/work --to eval
   checkpoints/cpt/          adapter plus checkpoint-N folders
   checkpoints/sft/
   checkpoints/dpo/
-  out/creebench_report.json translation scores, before and after
+  out/creebench_report.json scores, the old-setup comparison, every example
   out/llm_tests.json        stability, abstention, retention, fertility, calibration, cost
   out/report_card.md        the readable report
   out/plots/                charts from the run
@@ -282,8 +308,8 @@ python train_cree_llm.py --profile a100 --work /data/cree/work --to eval
 ```
 
 The export file names follow the model actually trained, not a default. A 7B run
-writes `archer-cree-7b.Q4_K_M.gguf`; a 14B run writes
-`archer-cree-14b.Q4_K_M.gguf`.
+writes `archer-7b.Q4_K_M.gguf`; a 14B run writes
+`archer-14b.Q4_K_M.gguf`.
 
 ### Read the results
 
@@ -295,6 +321,13 @@ python -m json.tool /data/cree/work/out/web/cree-llm.json | less
 
 The report card carries the data table, the licence of every source, the
 translation scores, the tokenizer audit and the language-model checks.
+
+The section to read first is **Against the setup this replaces**. It lists, per
+job, this model's score, the best score any part of the old three-part setup got
+on the same held-out data, and whether the single model met or beat that bar.
+Pass `--external-model <ollama-tag>` to put the old Cree model into the same
+table; without it the bar is the base instruction model and the base model
+reading the same retrieved notes.
 
 ### Send the site bundle back
 
@@ -313,22 +346,25 @@ scp you@server:/data/cree/work/out/report_card.md ./report_card.md
 Copy the GGUF and the Modelfile out of the export folder:
 
 ```bash
-scp you@server:/data/cree/work/out/export/archer-cree-7b.Q4_K_M.gguf .
+scp you@server:/data/cree/work/out/export/archer-7b.Q4_K_M.gguf .
 scp you@server:/data/cree/work/out/export/Modelfile .
 
-mkdir -p assets/cree_llm
-cp archer-cree-7b.Q4_K_M.gguf assets/cree_llm/
-cp Modelfile assets/cree_llm/
-cd assets/cree_llm
-ollama create archer-cree:7b -f Modelfile
+mkdir -p assets/archer_llm
+cp archer-7b.Q4_K_M.gguf assets/archer_llm/
+cp Modelfile assets/archer_llm/
+cd assets/archer_llm
+ollama create archer:7b -f Modelfile
 ```
+
+This is the only chat model the app installs. It answers conversation, song
+notes, translation and script conversion, so there is no second tag to create.
 
 Confirm it is installed and answering:
 
 ```bash
-ollama list | grep archer-cree
+ollama list | grep '^archer'
 curl -s http://127.0.0.1:11434/api/chat \
-  -d '{"model":"archer-cree:7b","messages":[{"role":"user","content":"tânisi"}],"stream":false}' \
+  -d '{"model":"archer:7b","messages":[{"role":"user","content":"tânisi"}],"stream":false}' \
   | python -m json.tool
 ```
 
@@ -338,24 +374,22 @@ Point the app at it in `config/config.yaml`:
 chat:
   backend: ollama
   ollama_url: http://127.0.0.1:11434
-  ollama_model: llama3.1:8b-instruct-q4_K_M
-  cree_model: "archer-cree:7b"
-  cree_temperature: 0.2
-  cree_max_tokens: 400
+  model: archer:7b
+  temperature: 0.3
+  max_tokens: 500
 ```
 
-Restart the app, then check the Cree endpoint:
+Restart the app, then check the chat endpoint:
 
 ```bash
 curl -s http://127.0.0.1:8000/api/chat/health | python -m json.tool
 ```
 
-If `cree_model` is empty, Cree questions quietly fall back to the general model
-instead of failing, so an empty value is the safe state while you are still
-training.
+`model` should name the tag. If the tag is missing, the chat returns a 503 with
+the `ollama create` line; it does not fall back to another model.
 
 The same model can be used without Ollama through llama.cpp by setting
-`chat.backend: llama_cpp` and `chat.cree_gguf_path` to the GGUF file.
+`chat.backend: llama_cpp` and `chat.gguf_path` to the same GGUF file.
 
 ---
 
@@ -365,6 +399,7 @@ The same model can be used without Ollama through llama.cpp by setting
 |---|---|
 | `--work DIR` | Corpora, checkpoints, results. Default `./cree_llm_work` |
 | `--profile NAME` | `auto`, `smoke`, `t4`, `a100`, `big`, `huge` |
+| `--gpu N` | Train on card N. Without it, the run takes the card with the most free memory |
 | `--base-model MODEL` | Any Hugging Face causal LM; overrides the profile |
 | `--seq-len N` | Context length. Forced down to 1024 on cards under 24 GB |
 | `--lora-r N` | Adapter rank. Default 64 on A100, 32 on T4 |
@@ -392,7 +427,8 @@ Every run writes its own log to `<work>/logs/train-YYYYmmdd-HHMMSS.log`.
 
 | Message | What it means | What to do |
 |---|---|---|
-| `CUDA out of memory` | The profile is bigger than the card | `--profile t4`, or add `--seq-len 1024` |
+| `CUDA out of memory` at load | Another job is holding the card, or the profile is bigger than it | Read the `gpu:` line it prints, then `--gpu N` for a free card, or `--profile t4` with `--seq-len 1024` |
+| `CUDA out of memory` mid-training | The profile is bigger than the card | `--profile t4`, or add `--seq-len 1024` |
 | `torch.cuda.is_available()` is `False` | A CPU wheel got installed | Reinstall torch from the CUDA index that matches the driver |
 | `SafetensorError: header too large` | A model shard was written incompletely | Delete that one file under `<hf-home>/hub` and rerun. The loader validates every shard and names the bad file |
 | Corpus stage silent for 10 minutes | Downloading or streaming a dataset | Check `nvidia-smi` is idle and the log is moving. Retry if the log has not changed for 15 minutes |
@@ -421,4 +457,4 @@ from the memory actually available.
 - [ ] `out/report_card.md` read when the run finishes
 - [ ] `out/web/` copied back for the site
 - [ ] GGUF and Modelfile copied to the app machine, `ollama create` done
-- [ ] `chat.cree_model` set in `config.yaml`, `/api/chat/health` reports `cree_model_configured: true`
+- [ ] `chat.model` set in `config.yaml`, `/api/chat/health` reports the tag and `/api/chat` answers

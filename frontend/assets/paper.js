@@ -219,7 +219,7 @@ window.ragQuery = async function () {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
     if (!d.chunks || !d.chunks.length) {
-      out.textContent = 'No passage cleared the 0.15 similarity floor. The chat model would be told there are no notes on this question.';
+      out.textContent = 'No passage cleared the 0.30 similarity floor. The chat model would take the no-notes path for this question.';
       return;
     }
     out.innerHTML = '<b>' + d.chunks.length + ' passages returned · ' + d.indexed + ' chunks indexed</b>\n' +
@@ -241,42 +241,45 @@ window.ragHealth = async function () {
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
     out.textContent = 'notes index: ' + (d.rag_ready ? 'ready' : 'building') +
       '\nchunks indexed: ' + d.rag_chunks_indexed +
-      '\ncree model: ' + (d.cree_model_configured
-        ? d.cree_model + ' (configured)'
-        : 'not configured, Cree questions stay on the general model') +
+      '\nnote floor: ' + Number(d.note_floor).toFixed(2) +
+      '\nmodel: ' + (d.model || 'not set') + ' via ' + d.backend +
+      '\ninstalled: ' + (d.model_installed === true ? 'yes'
+        : d.model_installed === false ? 'no, run ollama create archer:7b -f Modelfile'
+        : 'cannot tell, the backend did not answer') +
       '\nspoken replies: ' + (d.tts_ready ? 'Piper voice configured' : 'text replies, with spoken replies available when a Piper voice is set');
   } catch (e) {
     out.textContent = 'Health check failed: ' + e.message;
   }
 };
 
-// ---------------------------------------------------------------- Cree model
-window.creeRoute = async function () {
-  const input = document.getElementById('cree-route-input');
-  const out = document.getElementById('cree-route-out');
+// ---------------------------------------------------------------- the one model
+window.archerPrompt = async function () {
+  const input = document.getElementById('archer-prompt-input');
+  const out = document.getElementById('archer-prompt-out');
   if (!input || !out) return;
-  const sel = document.getElementById('cree-route-language');
   const message = input.value.trim();
   if (!message) { out.textContent = 'Type a question first.'; return; }
-  out.textContent = 'Asking the router…';
+  out.textContent = 'Building the prompt…';
   try {
-    const r = await fetch('/api/chat/route', {
+    const r = await fetch('/api/chat/prompt', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: message, language: sel ? sel.value : 'auto' })
+      body: JSON.stringify({ message: message })
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    const notes = (d.notes || []).length;
     const lines = [
-      'route       ' + d.route + (d.route === 'cree' ? '  (the trained Cree model)' : '  (the general model)'),
+      'task        ' + d.task + '   (the prompt shape, not a model)',
       'text        ' + (d.looks_like_cree ? 'Cree' : 'not Cree') + (d.script ? '  ·  script ' + d.script : ''),
-      'asks for    ' + (d.wants_cree ? 'Cree output' : 'no Cree output'),
-      'setting     ' + (d.configured ? 'cree_model is ' + d.model : 'cree_model is empty, so this checkout answers on the general model')
+      'retrieved   ' + notes + ' passage' + (notes === 1 ? '' : 's') + ' above the 0.30 floor',
+      'notes used  ' + ((d.notes_used || []).length ? d.notes_used.join(', ') : 'none'),
+      '',
+      'system prompt',
+      d.system_prompt,
+      '',
+      'user message',
+      d.prompt
     ];
-    if (d.cree_prompt) {
-      lines.push('', 'prompt this request would carry on the Cree route', d.cree_prompt);
-    } else {
-      lines.push('', 'The general model gets the retrieval system prompt, not a Cree prompt.');
-    }
     out.textContent = lines.join('\n');
   } catch (e) {
     out.textContent = 'The chat server did not answer: ' + e.message + '\nStart server.py, then try again.';

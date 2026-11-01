@@ -49,4 +49,5 @@ renders/
 training/.venv/
 cree_llm_work/
 assets/cree_llm/
+assets/archer_llm/
 *.gguf

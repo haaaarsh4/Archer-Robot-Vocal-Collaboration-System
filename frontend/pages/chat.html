@@ -4,8 +4,8 @@
   <header class="paper-head">
     <p class="paper-kicker">Archer Bot</p>
     <h1 class="paper-title">It only knows what <em>Archer wrote down</em></h1>
-    <p class="paper-deck">A local assistant answers questions about the songs, their meaning, their backstory and how they came together. It does not answer from a general model's memory. Every reply is built from retrieved passages of Archer's own notes, and the sources are returned with it. The Cree side of the assistant is a different model, trained for this project, and the later sections of this page are how it was built.</p>
-    <div class="paper-meta"><span>all-MiniLM-L6-v2</span><span>top 4 passages</span><span>nêhiyawêwin LoRA</span><span>Ollama or llama.cpp</span></div>
+    <p class="paper-deck">A local assistant answers questions about the songs, their meaning, their backstory and how they came together. It does not answer song questions from the model's memory. Every reply is assembled with retrieved passages of Archer's own notes placed in front of it, and the sources are returned with it. The same model translates, writes syllabics and explains Cree words; there is no second chat model behind it. The later sections of this page are how that one model was built.</p>
+    <div class="paper-meta"><span>search index: all-MiniLM-L6-v2</span><span>top 4 passages</span><span>one model · archer:7b</span><span>Ollama or llama.cpp</span></div>
   </header>
 
   <section class="paper-card">
@@ -13,13 +13,14 @@
     <h2 class="paper-h2">A confident guess is the failure mode</h2>
     <p class="paper-lede">Ask a general language model about a song it has never heard of and it will rarely say “I do not know.” It will produce a plausible answer in a confident tone. For an assistant speaking about a living artist's work, that is not a minor inaccuracy; it is fabrication with a friendly voice.</p>
     <p class="paper-p">Retrieval-augmented generation changes the order of operations. The question is first used to search Archer's notes. Only the passages that search actually returns are placed in the prompt, under a header that says what they are. The system prompt instructs the model to answer from those passages, and to say plainly when they do not contain the answer. The model is still capable of ignoring that instruction, which is why the sources come back with every reply: a reader can see what the answer was built from.</p>
-    <div class="paper-note"><b>The boundary is the feature.</b> The assistant can discuss a song's backstory in depth because the notes contain it. It cannot invent a memory Archer never wrote down, and it is told not to try.</div>
+    <div class="paper-note"><b>The boundary is the feature.</b> The assistant can discuss a song's backstory in depth because the notes contain it. It is never handed a memory Archer did not write down, and it is told not to invent one.</div>
   </section>
 
   <section class="paper-card">
     <p class="paper-num"><b>02</b> Indexing</p>
     <h2 class="paper-h2">Turning notes into something searchable</h2>
     <p class="paper-lede">Every <code>.md</code> and <code>.txt</code> file in <code>song_notes/</code> is read, split into chunks of roughly 900 characters along paragraph boundaries, and embedded into a 384-dimensional vector by all-MiniLM-L6-v2 on the CPU.</p>
+    <p class="paper-p">That embedding model is a search index, not a chat model. It ranks passages and never writes an answer; the one language model reads whatever the index returns. So the install has one generator, <code>archer:7b</code>, plus this small fixed encoder that ships with the retrieval dependency.</p>
     <p class="paper-p">The chunk size is a compromise between two failures. Too large and a passage about the wrong song dilutes the one relevant paragraph; too small and a thought gets cut before it reaches its point. Paragraph-aware splitting keeps whole thoughts together. A paragraph that is longer than one chunk is windowed instead, and the 150-character overlap covers the seam.</p>
     <p class="paper-p">Rebuilding every embedding on every start would be wasteful, so the index is incremental. Each file's content is hashed, and the hash is stored in a manifest alongside the vector offsets. On the next start, an unchanged file reuses its cached vectors; only a changed file is re-chunked and re-embedded. Changing one note does not re-read the corpus.</p>
 
@@ -54,8 +55,8 @@
   <section class="paper-card">
     <p class="paper-num"><b>04</b> The prompt</p>
     <h2 class="paper-h2">What the model is allowed to see</h2>
-    <p class="paper-lede">Retrieved passages are joined under a short header, “Context from your song notes,” and placed with the question. A fixed system prompt sits above both, describing the assistant's role and its evidence rule.</p>
-    <p class="paper-p">The prompt asks for a warm, helpful guide to Archer's songs. It says to answer from the context passages and nothing else. If the context does not contain the answer, the model is told to say it has no notes on that yet. It also carries one specific redirect: a request for an actual Cree translation is handed to the dedicated Cree model, not answered here, because that is the part trained for it.</p>
+    <p class="paper-lede">Retrieved passages are placed in the <code>&lt;|song|&gt;&lt;|note|&gt;</code> block, each under <code>Notes on &lt;song&gt;:</code>, and the question follows as <code>Question:</code>. A fixed system prompt sits above both, describing the assistant's four jobs and its evidence rule.</p>
+    <p class="paper-p">The system prompt describes one assistant with four jobs: conversation about the project, answers from the notes, translation, and word or script work. When notes are present they are the only evidence for anything about a song. If they do not contain the answer, the model is told to say the notes do not say. There is no redirect to another model, because there is no other model to redirect to.</p>
     <p class="paper-p">The last eight turns of the conversation are sent with the question so follow-ups can refer back. The retrieval step runs fresh every time, including on a follow-up, because the subject of the conversation can change mid-thread. The history is context for tone and reference, never a substitute for retrieved evidence.</p>
 
     <figure class="paper-figure">
@@ -68,11 +69,11 @@
 
           <rect x="50" y="100" width="560" height="58" rx="6" fill="#16233f" stroke="#34517f"/>
           <text x="70" y="124" fill="#e8edf7" font-size="11">system prompt</text>
-          <text x="70" y="143" fill="#8195b8" font-size="9.5">role · evidence rule · Cree translation redirect</text>
+          <text x="70" y="143" fill="#8195b8" font-size="9.5">role · four jobs · evidence rule</text>
 
           <rect x="50" y="170" width="560" height="58" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
-          <text x="70" y="194" fill="#dbe6ff" font-size="11">context from your song notes</text>
-          <text x="70" y="213" fill="#8fa6ce" font-size="9.5">top 4 chunks · source names retained</text>
+          <text x="70" y="194" fill="#dbe6ff" font-size="11">notes on &lt;song&gt;:</text>
+          <text x="70" y="213" fill="#8fa6ce" font-size="9.5">top 4 above 0.30 · Question: appended</text>
 
           <rect x="50" y="240" width="330" height="58" rx="6" fill="#16233f" stroke="#34517f"/>
           <text x="70" y="264" fill="#e8edf7" font-size="11">last 8 turns</text>
@@ -87,8 +88,8 @@
           <path d="M640 269 H760" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b-arrow)"/>
 
           <rect x="764" y="140" width="266" height="120" rx="8" fill="#0f1728" stroke="#6f8cff"/>
-          <text x="897" y="176" fill="#f2f5fb" font-size="12" text-anchor="middle">local instruct model</text>
-          <text x="897" y="200" fill="#8195b8" font-size="9.5" text-anchor="middle">temperature 0.4 · 500 tokens</text>
+          <text x="897" y="176" fill="#f2f5fb" font-size="12" text-anchor="middle">archer:7b</text>
+          <text x="897" y="200" fill="#8195b8" font-size="9.5" text-anchor="middle">temperature 0.3 · 500 tokens</text>
           <text x="897" y="218" fill="#8195b8" font-size="9.5" text-anchor="middle">Ollama :11434 or llama.cpp</text>
           <text x="897" y="242" fill="#e0a06a" font-size="9.5" text-anchor="middle">reply + source filenames</text>
         </svg>
@@ -99,15 +100,15 @@
 
   <section class="paper-card">
     <p class="paper-num"><b>05</b> The model</p>
-    <h2 class="paper-h2">Two ways to run a model on your own machine</h2>
+    <h2 class="paper-h2">One model, two ways to run it on your own machine</h2>
     <p class="paper-lede">The backend is a configuration choice, not a rewrite. Ollama runs as a local server and manages models by name; llama.cpp loads a GGUF file inside the Python process. Both keep every token on the machine.</p>
 
     <div class="paper-grid two" style="margin-top:26px">
-      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code>. The default model is an 8-billion-parameter instruction model, quantised to run on a laptop. Pull it once, then the app only sends HTTP to localhost. If the local server is not running yet, the endpoint returns a clear message instead of a connection traceback.</p></div>
+      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code> and serves the one tag, <code>archer:7b</code>, a 7-billion-parameter model quantised to run on a laptop. Create it once from the exported Modelfile, then the app only sends HTTP to localhost. If the server is not running, or the tag is missing, the endpoint says which, with the command that fixes it.</p></div>
       <div class="paper-tile"><div class="paper-label">Alternative</div><h3 class="paper-h3">llama.cpp</h3><p class="paper-p">Loads a <code>.gguf</code> file in-process. One less service to start, at the cost of the app holding the model's memory. Useful on a machine where installing a background server is inconvenient, or where the model file is already managed by hand.</p></div>
     </div>
-    <p class="paper-p" style="margin-top:18px">Generation is deliberately conservative: temperature 0.4, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
-    <p class="paper-p">Both models run through this same choice. The general model answers the project and song questions, and the Cree model is a second Ollama tag beside it. Everything about that second model starts in section 08.</p>
+    <p class="paper-p" style="margin-top:18px">Generation is deliberately conservative: temperature 0.3, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
+    <p class="paper-p">There is one model behind both backends, one tag and one GGUF. Ollama and llama.cpp are two ways to serve it, not two assistants. Section 08 is what that model does and how one prompt selects the job.</p>
   </section>
 
   <section class="paper-card">
@@ -115,7 +116,7 @@
     <h2 class="paper-h2">A spoken reply is a separate, optional stage</h2>
     <p class="paper-lede">If the request asks for audio, the reply text is passed to a local Piper voice and returned as a base64 WAV alongside the text. The chat bubble can then speak the answer in that configured voice.</p>
     <p class="paper-p">Piper is optional by design. If no voice file is configured, the reply still arrives as text with a plain note that spoken replies are not set up. The failure is described in the response rather than swallowed or turned into a 500, because a text answer is still a complete answer.</p>
-    <p class="paper-p">The spoken voice and the sung voice are separate models. Piper is text to speech; the vocable synthesizer and RVC are singing models. They are configured independently, and neither one is the artist's voice.</p>
+    <p class="paper-p">The spoken voice and the sung voice are separate audio models, not chat models. Piper is text to speech; the vocable synthesizer and RVC are singing models. The assistant above is the only language model in the system, and none of these voices is the artist's voice.</p>
   </section>
 
   <section class="paper-card">
@@ -131,75 +132,73 @@
   </section>
 
   <section class="paper-card">
-    <p class="paper-num"><b>08</b> The Cree model</p>
-    <h2 class="paper-h2">The Cree answers come from a different model</h2>
-    <p class="paper-lede">A general model can talk about Cree music. Spelling nêhiyawêwin is a different job, and it is not one an English-first model does well. So the Cree side of the assistant is a second model, trained on Cree text, and the general model keeps the conversation.</p>
-    <p class="paper-p">The router is deliberately narrow. A question written in Cree, or one that asks for a Cree word or a Cree translation, goes to the Cree model. Everything else, including a question about Cree music written in English, stays on the general model, which is the better conversationalist. The routing lives in <code>chat/cree_prompt.py</code>, and <code>chat.language</code> can force either path for a single request.</p>
-    <p class="paper-p">An empty setting is a routing decision, not an error. If <code>chat.cree_model</code> is empty, Cree questions stay on the general model, and the response still carries <code>language</code> and <code>model</code>, so a transcript cannot pretend a Cree model answered. A tag that is configured but missing from Ollama is a different case: the request returns a 503 with the reason instead of quietly answering from the wrong model.</p>
-    <p class="paper-p">The model is a 7B by default because that is the largest size whose quantised export runs comfortably on the laptop that serves the app. The training file also has 14B and 32B profiles for a bigger card. Whichever one is trained, the name it exports under follows the model that was actually used, so a 14B run cannot produce a file called 7b.</p>
+    <p class="paper-num"><b>08</b> One model</p>
+    <h2 class="paper-h2">Every job, the same weights</h2>
+    <p class="paper-lede">There is no router and no second chat model. Conversation, song notes, translation, syllabics and word explanations are one set of weights, selected by the task prefix in the prompt.</p>
+    <p class="paper-p">The earlier design split the assistant in two: a general model for conversation and a Cree model for language. Every question became a routing decision, the install had two tags, and an English question about a Cree word could land on the model that was worse at it. This version puts every behaviour in one instruction set, so the model learns what a translation looks like, what a notes answer looks like and what ordinary conversation looks like in the same adapter.</p>
+    <p class="paper-p">Retrieval still runs on every question, but it decides whether notes are in the prompt, not which model answers. A passage above the 0.30 relevance floor is attached under <code>Notes on &lt;song&gt;:</code>; below it, the question takes the no-notes path. A translation request is never padded with song prose.</p>
+    <p class="paper-p">The response reports the task, the model tag and the notes used. <code>task</code> is the prompt shape, not a backend choice: <code>song_notes</code>, <code>chat</code>, <code>translate</code> or <code>orthography</code>. If the one model is not installed, the chat returns a 503 with the <code>ollama create</code> line. There is nothing else to fall back to, and answering as another model would not be this assistant.</p>
 
     <figure class="paper-figure">
       <div class="plate">
-        <svg viewBox="0 0 1080 330" role="img" aria-label="Routing: a question goes to the Cree model or the general model">
+        <svg viewBox="0 0 1080 360" role="img" aria-label="One model receives four prompt shapes: conversation, notes, translation and orthography">
           <defs><marker id="b2-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
-          <rect width="1080" height="330" fill="#0b1120"/>
-          <text x="50" y="48" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="21" font-weight="600">Where a question goes</text>
-          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">TWO MODELS, ONE ANSWER BOX</text>
+          <rect width="1080" height="360" fill="#0b1120"/>
+          <text x="50" y="46" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="21" font-weight="600">One model, four prompt shapes</text>
+          <text x="50" y="68" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">RETRIEVAL DECIDES THE NOTES, NOT THE MODEL</text>
 
-          <g font-family="Inter Tight, sans-serif" font-size="11">
-            <rect x="50" y="104" width="250" height="104" rx="7" fill="#16233f" stroke="#34517f"/>
-            <text x="175" y="134" fill="#e8edf7" text-anchor="middle">question</text>
-            <text x="175" y="155" fill="#8195b8" font-size="9.5" text-anchor="middle">typed or spoken</text>
-            <text x="175" y="173" fill="#8195b8" font-size="9.5" text-anchor="middle">language check first</text>
+          <g font-family="Inter Tight, sans-serif">
+            <rect x="50" y="108" width="232" height="160" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="166" y="140" fill="#e8edf7" font-size="12" text-anchor="middle">question</text>
+            <text x="166" y="162" fill="#8195b8" font-size="9.5" text-anchor="middle">typed or spoken</text>
+            <text x="166" y="184" fill="#8195b8" font-size="9.5" text-anchor="middle">retrieval runs first</text>
+            <text x="166" y="206" fill="#8195b8" font-size="9.5" text-anchor="middle">0.30 relevance floor</text>
 
-            <rect x="350" y="104" width="290" height="104" rx="7" fill="#1b2b4d" stroke="#4265a0"/>
-            <text x="495" y="134" fill="#dbe6ff" text-anchor="middle">router</text>
-            <text x="495" y="155" fill="#8fa6ce" font-size="9.5" text-anchor="middle">Cree text, or asks for Cree?</text>
-            <text x="495" y="173" fill="#8fa6ce" font-size="9.5" text-anchor="middle">chat/cree_prompt.py</text>
+            <rect x="322" y="96" width="288" height="184" rx="7" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="466" y="126" fill="#dbe6ff" font-size="12" text-anchor="middle">prompt builder</text>
+            <text x="466" y="147" fill="#8fa6ce" font-size="9.5" text-anchor="middle">task_of + format_prompt</text>
+            <text x="350" y="180" fill="#e8edf7" font-size="10">&lt;|song|&gt;</text>
+            <text x="596" y="180" fill="#8195b8" font-size="9.5" text-anchor="end">chat</text>
+            <text x="350" y="205" fill="#e8edf7" font-size="10">&lt;|song|&gt;&lt;|note|&gt;</text>
+            <text x="596" y="205" fill="#8195b8" font-size="9.5" text-anchor="end">song notes</text>
+            <text x="350" y="230" fill="#e8edf7" font-size="10">&lt;|translate|&gt;</text>
+            <text x="596" y="230" fill="#8195b8" font-size="9.5" text-anchor="end">translation</text>
+            <text x="350" y="255" fill="#e8edf7" font-size="10">&lt;|sro|&gt;&lt;|cans|&gt;</text>
+            <text x="596" y="255" fill="#8195b8" font-size="9.5" text-anchor="end">orthography</text>
 
-            <rect x="710" y="72" width="320" height="82" rx="7" fill="#16233f" stroke="#34517f"/>
-            <text x="870" y="100" fill="#e8edf7" text-anchor="middle">nêhiyawêwin model</text>
-            <text x="870" y="120" fill="#8195b8" font-size="9.5" text-anchor="middle">trained for this project</text>
-            <text x="870" y="137" fill="#8195b8" font-size="9.5" text-anchor="middle">Ollama, archer-cree</text>
+            <rect x="660" y="96" width="370" height="184" rx="8" fill="#0f1728" stroke="#6f8cff"/>
+            <text x="845" y="138" fill="#f2f5fb" font-size="15" text-anchor="middle">archer:7b</text>
+            <text x="845" y="164" fill="#8195b8" font-size="9.5" text-anchor="middle">one GGUF · one Ollama tag</text>
+            <text x="845" y="186" fill="#8195b8" font-size="9.5" text-anchor="middle">the same weights for every task</text>
+            <text x="845" y="208" fill="#8195b8" font-size="9.5" text-anchor="middle">no router · no second model</text>
+            <text x="845" y="238" fill="#e0a06a" font-size="9.5" text-anchor="middle">reply · task · model · sources</text>
 
-            <rect x="710" y="176" width="320" height="82" rx="7" fill="#16233f" stroke="#34517f"/>
-            <text x="870" y="204" fill="#e8edf7" text-anchor="middle">general model</text>
-            <text x="870" y="224" fill="#8195b8" font-size="9.5" text-anchor="middle">project talk, everything else</text>
-            <text x="870" y="241" fill="#8195b8" font-size="9.5" text-anchor="middle">never asked to spell Cree</text>
-
-            <path d="M300 156 H348" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b2-arrow)"/>
-            <path d="M640 142 C 675 142, 680 113, 708 113" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b2-arrow)"/>
-            <path d="M640 170 C 675 170, 680 217, 708 217" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b2-arrow)"/>
+            <path d="M284 188 H318" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b2-arrow)"/>
+            <path d="M612 188 H656" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b2-arrow)"/>
           </g>
-          <text x="50" y="300" fill="#8195b8" font-size="10">With no Cree model configured, Cree text stays on the general model, and the reply reports which model answered.</text>
-          <text x="50" y="322" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. B2 · ROUTING</text>
+          <text x="50" y="316" fill="#8195b8" font-size="10">A translation is never padded with song prose. A question with no matching note takes the &lt;|song|&gt; path.</text>
+          <text x="50" y="344" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. B2 · ONE MODEL, FOUR PROMPTS</text>
         </svg>
-        <div class="plate-foot"><span>Figure B2 · routing</span><span>chat/cree_prompt.py</span></div>
+        <div class="plate-foot"><span>Figure B2 · one model, four prompts</span><span>chat/archer_prompt.py</span></div>
       </div>
     </figure>
 
     <div class="paper-demo">
       <div class="paper-demo-head">
-        <h3 class="paper-demo-title">Route explorer<span>the decision the chat makes before any model speaks</span></h3>
-        <button class="paper-btn" onclick="creeRoute()">Route it</button>
+        <h3 class="paper-demo-title">Prompt builder<span>the exact string the one model receives, before it answers</span></h3>
+        <button class="paper-btn" onclick="archerPrompt()">Build it</button>
       </div>
       <div class="paper-row">
-        <input class="paper-input" id="cree-route-input" value="How do you say river in Cree?" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')creeRoute()">
-        <select class="paper-select" id="cree-route-language" style="width:auto" aria-label="Language setting">
-          <option value="auto">auto</option>
-          <option value="cree">force Cree</option>
-          <option value="english">force English</option>
-        </select>
+        <input class="paper-input" id="archer-prompt-input" value="How do you say river in Cree?" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')archerPrompt()">
       </div>
-      <div class="paper-readout" id="cree-route-out">Not routed yet. Press Route it.</div>
-      <p class="paper-quiet">Calls <code>POST /api/chat/route</code>, which runs the same <code>choose_route</code> the chat runs. A forced language overrides the text signal, exactly as it does at request time.</p>
+      <div class="paper-readout" id="archer-prompt-out">Not built yet. Press Build it.</div>
+      <p class="paper-quiet">Calls <code>POST /api/chat/prompt</code>, which runs the same retrieval and <code>format_prompt</code> as the chat and stops before the language model. The task it reports is the prompt shape, not a different model.</p>
     </div>
   </section>
-
   <section class="paper-card">
     <p class="paper-num"><b>09</b> The base</p>
-    <h2 class="paper-h2">A general model, taught to read a different language</h2>
-    <p class="paper-lede">A model trained from nothing on a million words has to learn the language and the task at the same time. This one starts from Qwen2.5-7B-Instruct, which already reads and follows instructions, and adds a small set of weights and a Cree vocabulary.</p>
+    <h2 class="paper-h2">A capable base, taught a second language and every task</h2>
+    <p class="paper-lede">A model trained from nothing on a million words has to learn the language and the task at the same time. This one starts from Qwen2.5-7B-Instruct, which already holds a conversation and follows an instruction, and adds a small set of weights, a Cree vocabulary and the instruction mix for all four jobs. The base is the starting point for training, not a second model that ships: the app loads the merged result as <code>archer:7b</code> and nothing else.</p>
     <p class="paper-p">The added weights are LoRA adapters: low-rank matrices attached to the attention and feed-forward projections, trained while the base weights stay exactly as they were. Rank 64 on an A100, rank 32 on a 16 GB card. There is no second copy of the model, and the adapter file is a few hundred megabytes instead of fifteen gigabytes, which is why a run can be stopped, moved and resumed like an ordinary file.</p>
     <p class="paper-p">The vocabulary is the part that matters most for a language the base model has barely seen. The base tokenizer spends over four tokens on a Cree word, splitting it into pieces that were never meant to be read together. A SentencePiece model trained on the Cree corpus, filtered and then grafted onto the existing vocabulary, spends about a third fewer tokens on the same text, and the run records the measured figure in its tokenizer audit. The full profile adds about four thousand new pieces.</p>
     <p class="paper-p">A new token cannot start at random. It starts at the average of the base model's embeddings for the pieces it replaces, so a word that was spelled <code>n · ê · hi · yaw · ê · win</code> already means something on its first day. Random rows have to be learned from scratch, and with a corpus this size they never fully are. The table is then frozen. The input and output embedding matrices together hold about 1.1 billion parameters, and in fp32 with gradients and Adam state that is roughly 11 GB, the difference between fitting a 16 GB card and dying on the first step.</p>
@@ -336,7 +335,7 @@
     <h2 class="paper-h2">Three passes, each with one job</h2>
     <p class="paper-lede">Continued pretraining teaches the language. Instruction tuning teaches the shape of the answers. Preference tuning teaches it to prefer the faithful answer over the fluent one.</p>
     <p class="paper-p"><strong>Continued pretraining</strong> reads the cleaned Cree text as packed 2,048-token windows, with no padding wasted between documents. Ten percent of the blocks are English, drawn from a held-out Wikipedia slice, and that replay is the reason the model still follows an English instruction after a week of Cree. Three passes at a learning rate of 2e-4.</p>
-    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, grounded answers from the song notes, and questions the notes cannot answer, where the correct reply is to say so. Two passes at 1.5e-4, deliberately lower, because over-training this stage flattens every reply into the same shape.</p>
+    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, word glosses, grounded answers from the song notes, questions the notes cannot answer, and ordinary conversation about the project. That mix is what makes one model work for every request instead of one narrow skill. Two passes at 1.5e-4, deliberately lower, because over-training this stage flattens every reply into the same shape.</p>
     <p class="paper-p"><strong>Preference tuning</strong> builds its pairs from the training translations. The gold sentence is the chosen answer; the rejected one has a dropped final clause, a flattened long vowel, an English word pushed in, a changed number, or its word order reversed. Those are the failures a fluent model actually makes. The objective is DPO with a beta of 0.1, and the reference is the same model with its adapters switched off, so no second copy is loaded.</p>
     <p class="paper-p">Each stage checkpoints every ten minutes and resumes from the newest checkpoint that has both its trainer state and an intact adapter header. The stage's root folder is written only after training returns, so an interrupted stage never looks finished. That is what makes a dropped SSH session a pause rather than a restart.</p>
 
@@ -358,7 +357,7 @@
 
             <rect x="390" y="96" width="300" height="180" rx="7" fill="#16233f" stroke="#34517f"/>
             <text x="410" y="124" fill="#e8edf7" font-size="12">instruction tuning</text>
-            <text x="410" y="146" fill="#8195b8">translation, syllabics, notes</text>
+            <text x="410" y="146" fill="#8195b8">talk, notes, translation, script</text>
             <text x="410" y="166" fill="#8195b8">completion-only loss</text>
             <text x="410" y="186" fill="#8195b8">2 passes, lr 1.5e-4</text>
             <text x="410" y="216" fill="#8fa6ce">learns the shape of an answer</text>
@@ -398,7 +397,7 @@ trains      the LoRA adapter, rank 64 on the A100 profile
 frozen      the base weights and the embedding table
 schedule    3 passes at 2e-4
 hands on    checkpoints/cpt, the adapter SFT starts from</div>
-      <div class="paper-readout" data-cree-stage="sft" hidden>input       translation pairs, syllabics pairs, grounded notes
+      <div class="paper-readout" data-cree-stage="sft" hidden>input       translation, syllabics, word glosses, song notes, project conversation
 reads       the chat template, with the question masked out of the loss
 trains      the same adapter, continuing from the CPT checkpoint
 frozen      the base weights and the embedding table
@@ -410,7 +409,7 @@ trains      the same adapter, against a reference with its adapters off
 frozen      the base weights, the embedding table and the reference
 schedule    1 pass, beta 0.1
 hands on    checkpoints/dpo, the adapter the export merges</div>
-      <p class="paper-quiet">These are the defaults in <code>train_cree_llm.py</code>. A run records the values it actually used in its report, and a resume reads them back from the checkpoint rather than from the command line.</p>
+      <p class="paper-quiet">These are the defaults in <code>train_cree_llm.py</code>. A run records the values it actually used in its report, and an interrupted stage resumes from its newest intact checkpoint.</p>
     </div>
   </section>
 
@@ -420,7 +419,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
     <p class="paper-lede">The benchmark runs the same held-out sentences through the base model with the adapters off and the tuned model with them on. The only thing that changes is the training, so the comparison is paired.</p>
     <p class="paper-p">Translation is scored with chrF++ and BLEU, but also with three measures that matter more here. <strong>Validity</strong> asks whether every generated word exists in the lexicon or obeys Cree phonotactics, because an invented word is the failure a speaker notices first. <strong>Code-switch</strong> counts English leaking into a Cree answer. <strong>Syllabics</strong> checks whether the script is actually written, not just named.</p>
     <p class="paper-p">The benchmark also measures the things a translation score cannot see. Does the same question get the same answer twice under greedy decoding? Does it still follow an English instruction after the Cree training? Does it decline a question the notes cannot answer, and does it also answer the ones they can? What does a Cree word cost in tokens now? Does its own confidence rise when its answer is better? Each of those is a separate probe with a fixed input list, so two runs of the same adapter produce the same numbers.</p>
-    <p class="paper-p">The evaluation cell writes its numbers and its charts into the run's export folder, in the same palette as this page. Nothing on this page is retyped from a screenshot; a number that changes in the code changes in the chart the next time the suite runs. Any Ollama model can also be scored on the identical prompts for a head-to-head, and this model's control tokens are stripped first, so the other model is judged on the instruction rather than on a prefix it has never seen.</p>
+    <p class="paper-p">The evaluation cell writes its numbers and its charts into the run's export folder, in the same palette as this page. A number that changes in the code changes in the chart the next time the suite runs. Any Ollama model can also be scored on the identical prompts for a head-to-head, and this model's control tokens are stripped first, so the other model is judged on the instruction rather than on a prefix it has never seen.</p>
 
     <div class="paper-table-wrap">
       <table class="paper-table">
@@ -511,10 +510,10 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
 python train_cree_llm.py --profile a100 --work /data/cree_llm
 
 # after the run
-mkdir -p assets/cree_llm
-cp archer-cree-7b.Q4_K_M.gguf Modelfile assets/cree_llm/
-cd assets/cree_llm &amp;&amp; ollama create archer-cree:7b -f Modelfile</div>
-    <p class="paper-p" style="margin-top:18px">The run writes <code>out/creebench_report.json</code>, <code>out/llm_tests.json</code>, a readable <code>report_card.md</code>, the plots, and an <code>out/web/</code> folder with the compact JSON bundle and the SVG charts this page is built to use. Pointing the app at the result is one line in <code>config/config.yaml</code>: <code>cree_model: "archer-cree:7b"</code>.</p>
+mkdir -p assets/archer_llm
+cp archer-7b.Q4_K_M.gguf Modelfile assets/archer_llm/
+cd assets/archer_llm &amp;&amp; ollama create archer:7b -f Modelfile</div>
+    <p class="paper-p" style="margin-top:18px">The run writes <code>out/creebench_report.json</code>, <code>out/llm_tests.json</code>, a readable <code>report_card.md</code>, the plots, and an <code>out/web/</code> folder with the compact JSON bundle and the SVG charts this page is built to use. Pointing the app at the result is one line in <code>config/config.yaml</code>: <code>model: "archer:7b"</code>.</p>
   </section>
 
   <section class="paper-card paper-card--tight">
@@ -523,7 +522,7 @@ cd assets/cree_llm &amp;&amp; ollama create archer-cree:7b -f Modelfile</div>
     <p class="paper-p">Open the Archer Bot panel in the corner to ask a question, or use the retrieval explorer above to inspect the evidence first. The health endpoint reports whether the index built, how many chunks it holds, and whether a voice is configured, so a broken setup is visible rather than silent.</p>
     <p class="paper-p"><button class="paper-btn" onclick="openArcherChat()">Open Archer Bot</button> <button class="paper-btn ghost" onclick="ragHealth()">Check health</button></p>
     <div class="paper-readout" id="rag-health" style="margin-top:12px">Health has not been checked yet.</div>
-    <p class="paper-quiet" style="margin-top:12px"><code>POST /api/chat</code> · <code>GET /api/chat/health</code> · <code>POST /api/chat/reindex</code> · <code>POST /api/chat/sing</code> · <code>POST /api/chat/sing-from-lyrics</code></p>
+    <p class="paper-quiet" style="margin-top:12px"><code>POST /api/chat</code> · <code>GET /api/chat/health</code> · <code>POST /api/chat/prompt</code> · <code>POST /api/chat/retrieve</code> · <code>POST /api/chat/reindex</code> · <code>POST /api/chat/sing</code> · <code>POST /api/chat/sing-from-lyrics</code></p>
   </section>
 
   <footer class="paper-foot">

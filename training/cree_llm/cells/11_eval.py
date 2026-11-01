@@ -128,8 +128,11 @@ def _adapter_stamp() -> str:
     return f"{best.name}:{stamp.st_size}:{int(stamp.st_mtime)}"
 
 
+# `bench` versions the benchmark itself. Adding the notes and conversation
+# baselines changed what a CreeBench row means, and without this an existing
+# work folder would keep the old scores and never compute the new ones.
 _EVAL_KEY = fingerprint(base=CFG.base_model, n=CFG.eval_n, adapter=_adapter_stamp(),
-                        speaker=CFG.external_baseline)
+                        speaker=CFG.external_baseline, bench="v2")
 
 if stage_done("eval", _EVAL_KEY, requires=OUT / "creebench_report.json"):
     results = jload(OUT / "creebench_report.json")
@@ -249,14 +252,23 @@ else:
         results["base"]["syllabics"] = {"n": 0, "script_share": 0.0}
 
     # ── grounded note reading and abstention ─────────────────────────────────────
+    # Both are measured with the adapters on *and off*. The old system answered
+    # song questions with the general model reading retrieved notes, so the
+    # adapter-free run is that system, on the same notes and the same questions.
+    # Without it "the new model is better at notes" would be an assertion.
     note_prompts = [r["messages"][1]["content"] for r in notes_eval]
     if note_prompts:
         note_hyp = generate(note_prompts, 110, use_adapters=True)
-        results["tuned"]["note_reading"] = {
-            "n": len(note_prompts),
-            "token_f1": round(float(np.mean([token_f1(h, r["answer"]) for h, r in zip(note_hyp, notes_eval)])), 4),
-            "answers": [{"q": r["question"], "pred": h[:220], "gold": r["answer"][:220]} for r, h in zip(notes_eval, note_hyp)],
-        }
+        note_base = generate(note_prompts, 110, use_adapters=False)
+        for split, hyps in (("tuned", note_hyp), ("base", note_base)):
+            results[split]["note_reading"] = {
+                "n": len(note_prompts),
+                "token_f1": round(float(np.mean([token_f1(h, r["answer"]) for h, r in zip(hyps, notes_eval)])), 4),
+            }
+        results["tuned"]["note_reading"]["answers"] = [
+            {"q": r["question"], "pred": h[:220], "gold": r["answer"][:220]}
+            for r, h in zip(notes_eval, note_hyp)
+        ]
 
     _abs_context = notes_eval[0]["context"] if notes_eval else ""
     abs_prompts = [
@@ -264,14 +276,50 @@ else:
         f"<|song|><|note|>\nNotes:\n{_abs_context}\n\nQuestion: What key was it recorded in?",
         f"<|song|><|note|>\nNotes:\n{_abs_context}\n\nQuestion: Who played bass on these recordings?",
     ]
+    _ABSENT = r"\b(no notes|do not have|does not say|do not say|cannot say|not recorded|not in the notes)\b"
     abs_hyp = generate(abs_prompts, 60, use_adapters=True)
-    abstained = sum(bool(re.search(r"\b(no notes|do not have|does not say|do not say|cannot say|not recorded|not in the notes)\b", h, re.I)) for h in abs_hyp)
-    results["tuned"]["abstention"] = {
-        "n": len(abs_prompts),
-        "correct": abstained,
-        "accuracy": round(abstained / len(abs_prompts), 3),
-        "answers": abs_hyp,
-    }
+    abs_base = generate(abs_prompts, 60, use_adapters=False)
+    for split, hyps in (("tuned", abs_hyp), ("base", abs_base)):
+        abstained = sum(bool(re.search(_ABSENT, h, re.I)) for h in hyps)
+        results[split]["abstention"] = {
+            "n": len(abs_prompts),
+            "correct": abstained,
+            "accuracy": round(abstained / len(abs_prompts), 3),
+        }
+    results["tuned"]["abstention"]["answers"] = abs_hyp
+
+    # ── conversation about the project ───────────────────────────────────────────
+    # Asked three ways the training set never used. A model that only answers the
+    # exact wording it memorised is not holding a conversation.
+    project_eval = read_jsonl(PROC / "sft_project_eval.jsonl")
+    if SMOKE:
+        project_eval = project_eval[:6]
+    if project_eval:
+        proj_prompts = [r["messages"][1]["content"] for r in project_eval]
+        proj_hyp = generate(proj_prompts, 110, use_adapters=True)
+        proj_base = generate(proj_prompts, 110, use_adapters=False)
+        for split, hyps in (("tuned", proj_hyp), ("base", proj_base)):
+            results[split]["project"] = {
+                "n": len(project_eval),
+                "token_f1": round(float(np.mean([token_f1(h, r["answer"]) for h, r in zip(hyps, project_eval)])), 4),
+            }
+        results["tuned"]["project"]["answers"] = [
+            {"q": r["question"], "pred": h[:220], "gold": r["answer"][:220]}
+            for r, h in zip(project_eval, proj_hyp)
+        ]
+
+    # ── does it deny being Archer? ──────────────────────────────────────────────
+    persona_probes = jload(PROC / "persona_probes.json") if (PROC / "persona_probes.json").exists() else []
+    if persona_probes:
+        _denial = re.compile(r"\b(no|not|never|neither)\b", re.I)
+        persona_hyp = generate([f"<|song|>\n{q}" for q in persona_probes], 70, use_adapters=True)
+        persona_base = generate([f"<|song|>\n{q}" for q in persona_probes], 70, use_adapters=False)
+        for split, hyps in (("tuned", persona_hyp), ("base", persona_base)):
+            results[split]["persona"] = {
+                "n": len(persona_probes),
+                "denials": sum(bool(_denial.search(h)) for h in hyps),
+                "answers": [{"q": q, "a": h[:200]} for q, h in zip(persona_probes, hyps)],
+            }
 
     # ── perplexity on held-out Cree ──────────────────────────────────────────────
     @torch.no_grad()
@@ -293,6 +341,58 @@ else:
     ppl_texts = [r["text"] for r in test_sents]
     results["tuned"]["perplexity"] = round(perplexity(ppl_texts, True), 3)
     results["base"]["perplexity"] = round(perplexity(ppl_texts, False), 3)
+
+    # ── the bar: beat every piece of the old setup ──────────────────────────────
+    # The old app was not one model. It was a general model, a separate Cree
+    # model and a retrieval index, with a router choosing between them. A single
+    # model that replaces all three has to beat the best of those pieces on each
+    # job, so the bar is computed here instead of assumed: for every measure,
+    # the strongest score any of the old parts produced, and the gap to this
+    # model. `meets` is the honest verdict, printed even when it is false.
+    _ext = results.get("external") if isinstance(results.get("external"), dict) else None
+    _ext_ok = bool(_ext and "en_cr" in _ext)
+
+    def bar(task: str, measure: str, tuned: float, base: float,
+            external: float | None = None, higher: bool = True) -> dict:
+        candidates = [("base model", base)] if base == base else []
+        if external is not None and external == external:
+            candidates.append((f"{CFG.external_baseline}", external))
+        best_name, best = (max(candidates, key=lambda kv: kv[1]) if higher
+                           else min(candidates, key=lambda kv: kv[1]))
+        meets = tuned >= best - 1e-9 if higher else tuned <= best + 1e-9
+        return {"task": task, "measure": measure, "tuned": round(tuned, 4),
+                "bar": round(best, 4), "bar_from": best_name, "meets": bool(meets)}
+
+    bars = [
+        bar("EN -> CRK", "chrF++", results["tuned"]["en_cr"]["chrf++"],
+            results["base"]["en_cr"]["chrf++"],
+            _ext["en_cr"]["chrf++"] if _ext_ok else None),
+        bar("CRK -> EN", "chrF++", results["tuned"]["cr_en"]["chrf++"],
+            results["base"]["cr_en"]["chrf++"],
+            _ext["cr_en"]["chrf++"] if _ext_ok else None),
+    ]
+    if "note_reading" in results["base"] and "note_reading" in results["tuned"]:
+        bars.append(bar("Song notes", "token F1", results["tuned"]["note_reading"]["token_f1"],
+                        results["base"]["note_reading"]["token_f1"]))
+    if "project" in results["base"] and "project" in results["tuned"]:
+        bars.append(bar("Conversation", "token F1", results["tuned"]["project"]["token_f1"],
+                        results["base"]["project"]["token_f1"]))
+    if "abstention" in results["base"]:
+        bars.append(bar("Abstention", "accuracy", results["tuned"]["abstention"]["accuracy"],
+                        results["base"]["abstention"]["accuracy"]))
+    if results["tuned"]["syllabics"].get("n"):
+        bars.append(bar("Syllabics", "script share", results["tuned"]["syllabics"]["script_share"],
+                        results["base"]["syllabics"]["script_share"]))
+    bars.append(bar("Held-out Cree", "perplexity", results["tuned"]["perplexity"],
+                    results["base"]["perplexity"], higher=False))
+
+    met = sum(item["meets"] for item in bars)
+    results["head_to_head"] = {
+        "rows": bars,
+        "met": met,
+        "total": len(bars),
+        "verdict": f"meets or beats the old setup on {met} of {len(bars)} measures",
+    }
 
     # ── latency, measured rather than guessed ────────────────────────────────────
     def latency(prompt: str, n: int = 32) -> float:
@@ -336,7 +436,22 @@ else:
     print(f"{'syllabics script':22s}  {results['base']['syllabics']['script_share']:.3f} -> {results['tuned']['syllabics']['script_share']:.3f} of letters")
     print(f"{'abstention':22s}  {results['tuned']['abstention']['accuracy']:.3f} correct")
     if "note_reading" in results["tuned"]:
-        print(f"{'note reading F1':22s}  {results['tuned']['note_reading']['token_f1']:.3f}")
+        print(f"{'note reading F1':22s}  {results['tuned']['note_reading']['token_f1']:.3f}"
+              + (f"  (base {results['base']['note_reading']['token_f1']:.3f})"
+                 if "note_reading" in results["base"] else ""))
+    if "project" in results["tuned"]:
+        print(f"{'conversation F1':22s}  {results['tuned']['project']['token_f1']:.3f}"
+              + (f"  (base {results['base']['project']['token_f1']:.3f})"
+                 if "project" in results["base"] else ""))
+
+    _h2h = results.get("head_to_head") or {}
+    if _h2h.get("rows"):
+        print("\nthe bar: the best of the old setup on each job")
+        for item in _h2h["rows"]:
+            mark = "ok  " if item["meets"] else "MISS"
+            print(f"  {mark} {item['task']:14s} {item['measure']:12s} "
+                  f"{item['tuned']:8.3f}  bar {item['bar']:8.3f}  ({item['bar_from']})")
+        print(f"  {_h2h['verdict']}")
     print("=" * 78)
 
     # ── figure ───────────────────────────────────────────────────────────────────

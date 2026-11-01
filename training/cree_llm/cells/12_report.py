@@ -38,6 +38,15 @@ table_rows = [
     ("CRK → EN", "token F1", b["cr_en"]["token_f1"], t["cr_en"]["token_f1"]),
 ]
 
+# The two jobs the old stack handled with a retrieval index and a second model
+# are only comparable if the base model's scores are in the same table.
+for _task, _label, _key in (("Song notes", "token F1", "note_reading"),
+                            ("Conversation", "token F1", "project")):
+    if _key in b and _key in t:
+        table_rows.append((_task, _label, b[_key]["token_f1"], t[_key]["token_f1"]))
+if "abstention" in b and "abstention" in t:
+    table_rows.append(("Song notes", "abstention", b["abstention"]["accuracy"], t["abstention"]["accuracy"]))
+
 lines = [
     "---",
     "language: crk",
@@ -48,9 +57,9 @@ lines = [
     "tags: [cree, nehiyawewin, low-resource, lora, gguf]",
     "---",
     "",
-    "# Cree LLM for the Archer project",
+    "# The Archer assistant model",
     "",
-    "A Plains Cree language model for the Archer project. It translates between English and nêhiyawêwin in both Standard Roman Orthography and syllabics, explains Cree words and sentences, and answers questions about Archer's songs from their notes, with the source listed beside the reply.",
+    "The one model the Archer app runs. The same weights hold the conversation about the project, answer questions about Archer's songs from their notes, translate between English and nêhiyawêwin in Standard Roman Orthography and syllabics, and explain Cree words. There is no second chat model and no router.",
     "",
     "It is not Archer, it does not sing in Archer's voice, and it is not a substitute for a fluent speaker or an Elder.",
     "",
@@ -60,8 +69,8 @@ if SMOKE:
         "> **Smoke run.** This report came from the tiny CPU profile, whose job is to",
         "> prove the pipeline runs. It deliberately uses a small slice of the corpus",
         "> and a 0.5B model, so the word count and scores below are not the model.",
-        "> The `t4`, `a100`, `big` and `huge` profiles use the complete corpus and the",
-        "> 7B, 14B or 32B base model.",
+        "> The `t4`, `big24`, `a100`, `big` and `huge` profiles use the complete corpus",
+        "> and the 7B, 14B or 32B base model.",
         "",
     ]
 lines += [
@@ -72,6 +81,31 @@ lines += [
 ]
 for task, measure, bv, tv in table_rows:
     lines.append(f"| {task} | {measure} | {bv:.3f} | {tv:.3f} |")
+
+# The claim this release rests on. The bar is the strongest score any piece of
+# the old setup produced on that job -- the general model, the separate Cree
+# model, or the general model reading retrieved notes -- and the verdict is
+# computed, not written by hand.
+_h2h = report.get("head_to_head") or {}
+if _h2h.get("rows"):
+    lines += [
+        "",
+        "### Against the setup this replaces",
+        "",
+        "The old app was a general model, a separate Cree model and a retrieval index, "
+        "with a router choosing between them. The bar below is the best score any of "
+        "those pieces got on each job, measured on the same held-out data. The "
+        "`From` column names which part set the bar.",
+        "",
+        "| Job | Measure | This model | Best of the old setup | From | Verdict |",
+        "|---|---|---:|---:|---|---|",
+    ]
+    for _row in _h2h["rows"]:
+        lines.append(
+            f"| {_row['task']} | {_row['measure']} | {_row['tuned']:.3f} | {_row['bar']:.3f} "
+            f"| {_row['bar_from']} | {'meets or beats' if _row['meets'] else 'below'} |"
+        )
+    lines += ["", f"**{_h2h['verdict'].capitalize()}.**", ""]
 if report.get("external") and "en_cr" in report["external"]:
     ext = report["external"]
     lines += [
@@ -169,7 +203,7 @@ lines += [
     f"| Instruction tuning | translation, orthography, notes, abstention, persona | {CFG.sft_epochs} epoch(s), lr {CFG.sft_lr} |",
     f"| Preference tuning | faithfulness pairs (dropped clauses, English leaks, flattened vowels) | {CFG.dpo_epochs} epoch(s), beta {CFG.dpo_beta} |",
     "",
-    "Packing removes padding from pretraining. Instruction tuning masks the prompt and scores only the reply. DPO uses the adapter-disabled model as its reference, so no second model is loaded.",
+    "Packing removes padding from pretraining. Instruction tuning masks the prompt and scores only the reply. DPO keeps a frozen copy of the instruction-tuned adapter as its reference, loaded beside the policy adapter, so preference tuning regularises towards what instruction tuning built instead of towards the base model.",
     "",
     "## Intended use",
     "",
@@ -196,7 +230,7 @@ lines += [
     "| File | What it is |",
     "|---|---|",
     f"| `{MODEL_STEM}.Q4_K_M.gguf` | quantised model for Ollama / llama.cpp |",
-    "| `Modelfile` | system prompt, context length and sampling |",
+    "| `Modelfile` | context length and sampling settings |",
     "| `creebench_report.json` | every score and the generated examples |",
     "| `training_curves.png`, `creebench.png`, `tokenizer_fertility.png` | figures |",
     "",

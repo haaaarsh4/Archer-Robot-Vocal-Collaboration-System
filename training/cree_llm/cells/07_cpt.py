@@ -68,7 +68,7 @@ else:
     cpt_history = run_training(
         model, cpt_data, None, CKPT / "cpt",
         epochs=CFG.cpt_epochs, lr=CFG.cpt_lr,
-        micro=CFG.micro_batch, accum=CFG.grad_accum, tag="CPT",
+        micro=CFG.micro_batch, accum=CFG.grad_accum, tag="CPT", key=_CPT_KEY,
     )
     mark_stage("cpt", _CPT_KEY, sentences=len(cree_texts), blocks=len(cpt_data))
     log(f"CPT adapter saved to {CKPT / 'cpt'}")
