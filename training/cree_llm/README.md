@@ -1,7 +1,10 @@
-# Cree LLM notebook sources
+# The Archer model: notebook sources
 
-The notebook to open in Colab is **[`Cree_LLM_Training.ipynb`](../../Cree_LLM_Training.ipynb)**
-in the repository root. It is generated from the files in `cells/`. Edit the
+This pipeline trains the one chat model the app runs, covering conversation,
+song-note answers, translation, orthography and word explanation in a single
+adapter. The notebook to open in Colab is
+**[`Cree_LLM_Training.ipynb`](../../Cree_LLM_Training.ipynb)** in the repository
+root. It is generated from the files in `cells/`. Edit the
 cell sources, never the notebook, then rebuild:
 
 ```bash
@@ -85,6 +88,22 @@ It takes `--work`, `--profile`, `--base-model`, `--seq-len`, `--lora-r`, the
 three epoch counts, `--eval-n`, `--hf-home`, `--to STAGE` and `--force STAGE`,
 and it writes a timestamped log under `<work>/logs/` as well as the terminal.
 Resuming works exactly as it does in the notebook: re-run the same command.
+
+Profiles are `smoke`, `t4` (16 GB, 7B), `big24` (24 GB, 14B), `a100` (40 GB,
+7B), `big` (80 GB, 14B) and `huge` (80 GB, 32B). `--gpu N` pins a card;
+otherwise the trainer picks the one with the most free memory before torch is
+imported, which is what a shared box needs.
+
+## What "better than the old setup" means here
+
+The app used to be three things: a general chat model, a separate Cree model and
+a retrieval index, with a router between them. The evaluation now measures that
+comparison instead of asserting it. Note reading and abstention are scored twice,
+with the adapter and without it -- the adapter-free run is the old system reading
+the same retrieved notes -- and the report computes, per job, the best score any
+of those old parts achieved. The report card prints `meets or beats` or `below`
+for each row and the count cleared. `--external-model <ollama-tag>` adds the old
+Cree model to the same table.
 
 `train_cree_llm.py` is generated, so edit `cells/` and rebuild. `--check` fails
 if the file on disk no longer matches its sources.

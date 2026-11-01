@@ -517,7 +517,7 @@ def _archive_candidates() -> list[tuple[str, str, int]]:
         "output": "json",
     }
     url = "https://archive.org/advancedsearch.php?" + urllib.parse.urlencode(params, doseq=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "archer-cree-llm/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "archer-llm/1.0"})
     payload = json.loads(urllib.request.urlopen(req, timeout=90).read())
     found: dict[str, tuple[str, str, int]] = {}
     for row in payload["response"]["docs"]:

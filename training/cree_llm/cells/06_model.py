@@ -619,7 +619,7 @@ def prune_checkpoints(folder: Path | str, keep: int = 2) -> None:
 
 def run_training(model, dataset, collator, out_dir: Path, epochs: float, lr: float,
                  micro: int, accum: int, tag: str,
-                 save_minutes: float | None = None) -> list[dict]:
+                 save_minutes: float | None = None, key: str = "") -> list[dict]:
     """Train, checkpointing to Drive and continuing from the last checkpoint.
 
     The save interval is derived from the schedule rather than fixed, because a
@@ -632,12 +632,27 @@ def run_training(model, dataset, collator, out_dir: Path, epochs: float, lr: flo
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Checkpoints belong to the data and schedule that produced them. A changed
+    # instruction set changes the stage fingerprint, and resuming the old
+    # checkpoints would train the new examples on top of the old run without
+    # anyone noticing. A mismatch moves the old folder aside instead.
+    key_path = out_dir / "stage_key.json"
+    same_run = bool(key) and key_path.exists() and jload(key_path).get("key") == key
+    if key and not same_run:
+        if any(out_dir.glob("checkpoint-*")) or (out_dir / "adapter_config.json").exists():
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            stale = out_dir.with_name(f"{out_dir.name}.stale-{stamp}")
+            out_dir.rename(stale)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            log(f"{tag}: inputs changed, previous checkpoints moved to {stale.name}")
+        jdump(key_path, {"key": key})
+
     steps = math.ceil(len(dataset) / (micro * accum) * epochs)
     warmup = max(1, int(steps * CFG.warmup_ratio))
     save_steps = max(10, steps // 8)
     args = train_args(out_dir, epochs, lr, micro, accum, warmup_steps=warmup, save_steps=save_steps)
 
-    resume = pick_resume_checkpoint(out_dir)
+    resume = pick_resume_checkpoint(out_dir) if same_run or not key else None
     trainer = Trainer(
         model=model, args=args, train_dataset=dataset, data_collator=collator,
         callbacks=[MetricsWriter(tag)],

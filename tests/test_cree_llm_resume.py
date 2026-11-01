@@ -250,3 +250,39 @@ def test_training_resumes_at_the_step_it_reached(nb, tmp_path, capsys):
     # restarting: 64 steps were already done, 64 more were trained.
     assert "resuming from checkpoint-64" in capsys.readouterr().out
     assert max(r["step"] for r in second) == 128
+
+
+def test_a_changed_training_key_starts_a_fresh_run(nb, tmp_path, capsys):
+    """A changed instruction set must not continue the old checkpoints."""
+    peft = pytest.importorskip("peft")
+    from transformers import Qwen2Config, Qwen2ForCausalLM
+
+    cfg = Qwen2Config(
+        vocab_size=64, hidden_size=16, intermediate_size=32, num_hidden_layers=1,
+        num_attention_heads=2, num_key_value_heads=2, tie_word_embeddings=False,
+        max_position_embeddings=64,
+    )
+
+    def build():
+        torch.manual_seed(0)
+        return peft.get_peft_model(Qwen2ForCausalLM(cfg), peft.LoraConfig(
+            r=4, lora_alpha=8, lora_dropout=0.0, bias="none", task_type="CAUSAL_LM",
+            target_modules=["q_proj", "v_proj"],
+        ))
+
+    blocks = [[(i * 7 + j) % 64 for j in range(8)] for i in range(64)]
+    data = nb["BlockDataset"](blocks)
+    out = tmp_path / "keyed"
+
+    first = nb["run_training"](build(), data, None, out, epochs=1, lr=1e-3,
+                                micro=1, accum=1, tag="KEYED", key="old-data")
+    assert max(r["step"] for r in first) == 64
+
+    capsys.readouterr()
+    second = nb["run_training"](build(), data, None, out, epochs=1, lr=1e-3,
+                                 micro=1, accum=1, tag="KEYED", key="new-data")
+    # It started at step 0 rather than continuing from 64, and the old run is
+    # preserved beside it instead of being deleted.
+    assert max(r["step"] for r in second) == 64
+    assert "inputs changed" in capsys.readouterr().out
+    assert list(tmp_path.glob("keyed.stale-*"))

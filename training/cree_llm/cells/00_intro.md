@@ -1,6 +1,6 @@
-# nêhiyawêwin Cree LLM for Archer
+# The Archer model
 
-This notebook trains a Plains Cree language model that belongs to this project: a model that reads, writes and explains nêhiyawêwin, answers questions about Archer's songs from their own notes, and translates between Cree, English and syllabics without inventing words.
+This notebook trains the one assistant model the app runs. It is not a Cree model sitting beside a general one: the same weights hold the conversation, read the retrieved song notes, translate between English and nêhiyawêwin, explain words, and convert between SRO and syllabics. The corpus is what makes that possible, and the instruction set is what teaches the model which job it is doing.
 
 It is written to run on a Colab GPU from top to bottom. Nothing is left as an exercise: it downloads every corpus, cleans and deduplicates it, builds a Cree tokenizer, continues pretraining, tunes on instruction data, teaches faithfulness with preference pairs, scores everything on held-out data, and exports a quantised GGUF that the app can load.
 
@@ -16,11 +16,11 @@ A general model sees Cree as a long tail of rare byte sequences. Three things ch
 
 | Artifact | Where | What it is |
 |---|---|---|
-| `archer-cree-<size>.Q4_K_M.gguf` | `out/` | the model Ollama loads, about 4.5 GB for the 7B default |
+| `archer-<size>.Q4_K_M.gguf` | `out/` | the only chat model the app loads, about 4.5 GB for the 7B default |
 | `creebench_report.json` | `out/` | every score, per task, per split |
 | `report_card.md` | `out/` | a model card with data provenance, licence and results |
 | `training_curves.png`, `creebench.png` | `out/` | the figures the report cites |
-| `Modelfile` | `out/` | system prompt and sampling settings for Ollama |
+| `Modelfile` | `out/` | sampling settings and context length for Ollama |
 | `run_state.json` | `archer_cree_llm/` | which stages are finished, and from which inputs |
 | `checkpoints/<stage>/checkpoint-N` | `archer_cree_llm/` | the resume points, written every few minutes |
 

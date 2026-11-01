@@ -70,6 +70,13 @@ _PRESETS = {
     "big": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=2048, lora_r=64,
                 cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
                 max_cpt_packs=100_000, max_sft=100_000),
+    # One 24 GB card (RTX 4090, A10): the 14B in nf4 at a shorter context. This
+    # is the largest base that fits a single 24 GB card; the merge runs on CPU
+    # and needs about 64 GB of system RAM. Slower than the 7B, and deliberately
+    # not chosen by `auto`, because it is a different bet on quality vs time.
+    "big24": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=1024, lora_r=32,
+                  cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=180,
+                  max_cpt_packs=100_000, max_sft=100_000),
     # The largest preset that fits one 80 GB card with QLoRA. Merging and
     # quantising a 32B needs a separate high-memory step; the notebook says so
     # rather than pretending it fits everywhere.
@@ -127,13 +134,13 @@ class Config:
 CFG = Config()
 
 # The exported artifact is named for the model actually trained, not for the
-# default. A 14B run must not produce a file called archer-cree-7b.
+# default. A 14B run must not produce a file called archer-7b.
 _BASE_LOWER = CFG.base_model.lower()
 MODEL_TAG = next(
     (tag for tag in ("32b", "14b", "7b", "3b", "1.5b", "0.5b") if tag in _BASE_LOWER),
     "custom",
 )
-MODEL_STEM = f"archer-cree-{MODEL_TAG}"
+MODEL_STEM = f"archer-{MODEL_TAG}"
 
 # ── where everything lives ────────────────────────────────────────────────────
 if IN_COLAB and os.environ.get("CREE_USE_DRIVE", "1") == "1":
@@ -266,7 +273,7 @@ def download(url: str, dest: Path, timeout: int = 120) -> Path:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    req = urllib.request.Request(url, headers={"User-Agent": "archer-cree-llm/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "archer-llm/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp, tmp.open("wb") as fh:
         shutil.copyfileobj(resp, fh)
     tmp.replace(dest)

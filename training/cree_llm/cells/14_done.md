@@ -1,13 +1,13 @@
 ## What just happened
 
-You now have a Cree model that was built from a ledgered corpus, tokenised for the language rather than for English, trained in three stages, and scored against its own base model on data it never saw.
+You now have the one Archer model, built from a ledgered corpus, tokenised for Cree rather than for English, trained in three stages, and scored against its own base model on data it never saw. It answers conversation, reads song notes, translates and converts scripts; the app does not run a second chat model beside it.
 
 The files that matter:
 
 | File | What to do with it |
 |---|---|
-| `out/export/archer-cree-<size>.Q4_K_M.gguf` | copy to `assets/cree_llm/` and load with Ollama |
-| `out/export/Modelfile` | `ollama create archer-cree:<size> -f Modelfile` |
+| `out/export/archer-<size>.Q4_K_M.gguf` | copy to `assets/archer_llm/` and load with Ollama |
+| `out/export/Modelfile` | `ollama create archer:<size> -f Modelfile` |
 | `out/report_card.md` | publish beside the model; it lists every source and licence |
 | `out/creebench_report.json` | the evidence behind every number |
 | `out/plots/` | the figures used in the report |

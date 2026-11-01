@@ -14,9 +14,20 @@
 train_rows = read_jsonl(PROC / "sft_train.jsonl")
 val_rows = read_jsonl(PROC / "sft_val.jsonl")
 
+def _file_digest(path: Path) -> str:
+    """Cheap identity for an instruction set.
+
+    The row count is not enough: changing which passages are used as retrieval
+    distractors leaves the count identical and the examples different, and the
+    stage would then be skipped while its adapter no longer matches the data.
+    """
+    return hashlib.sha1(path.read_bytes()).hexdigest()[:16]
+
+
 _SFT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.sft_epochs, examples=len(train_rows),
+    data=_file_digest(PROC / "sft_train.jsonl"),
 )
 
 if stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
@@ -41,7 +52,7 @@ else:
     run_training(
         model, sft_data, collator, CKPT / "sft",
         epochs=CFG.sft_epochs, lr=CFG.sft_lr,
-        micro=CFG.micro_batch, accum=max(4, CFG.grad_accum // 2), tag="SFT",
+        micro=CFG.micro_batch, accum=max(4, CFG.grad_accum // 2), tag="SFT", key=_SFT_KEY,
     )
     mark_stage("sft", _SFT_KEY, examples=len(train_rows))
     log(f"SFT adapter saved to {CKPT / 'sft'}")

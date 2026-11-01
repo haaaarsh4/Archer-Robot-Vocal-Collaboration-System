@@ -1,22 +1,35 @@
-# The nêhiyawêwin model
+# The Archer model
 
-The chat tab has two models behind it. One is a general local model that talks
-about the project. The other is a Plains Cree model trained for this project by
-`Cree_LLM_Training.ipynb`; it translates, writes SRO and syllabics, explains
-words, and answers from Archer's song notes with a citation.
+The chat tab runs one model, trained for this project by
+`Cree_LLM_Training.ipynb` and served as `archer:7b`. It does every job the
+assistant has:
 
-They are separate on purpose. A general model can discuss Cree music without
-being able to spell `nêhiyawêwin`, and a language model tuned on a small corpus
-should not be asked to be a general assistant. The router in
-[`chat/cree_prompt.py`](../chat/cree_prompt.py) sends a question to the Cree
-model when the question is written in Cree or explicitly asks for Cree, and
-leaves everything else on the general model.
+- conversation about Archer's work, the songs and this system
+- answers from Archer's song notes, retrieved per question, with the source
+- translation between English and nêhiyawêwin in both directions
+- SRO and syllabics conversion, and explanations of Cree words
+
+There is no second chat model and no router. Fetching notes, translating and
+talking are the same weights under different task prefixes, listed under
+[how the app calls it](#how-the-app-calls-it). Retrieval decides whether notes
+are in the prompt; it does not decide which model answers.
+
+Retrieval uses a small sentence-embedding model to rank passages. It is a search
+index, not a second chat model: it returns text and never writes an answer.
+
+That is a training decision, not only a wiring one. The instruction set mixes
+translation, orthography, word glosses, note reading, abstention and project
+conversation in one adapter, so the model learns the behaviour of the whole
+assistant instead of one narrow skill. English replay during continued
+pretraining is what keeps the base model's conversation intact while the Cree
+tokenizer and corpus are added.
 
 ## What the notebook trains
 
 `Cree_LLM_Training.ipynb` is a complete run, not a fine-tuning snippet. It
 downloads the corpus, cleans it, builds a tokenizer, trains in three stages,
-scores the result against its own base model, and exports a GGUF.
+scores the result against its own base model and against the old three-part
+setup, and exports a GGUF.
 
 | Stage | What happens | Why it is there |
 |---|---|---|
@@ -25,7 +38,7 @@ scores the result against its own base model, and exports a GGUF.
 | Tokenizer | SentencePiece BPE trained on Cree, filtered, grafted onto the base vocabulary, syllabics glyphs added | the base tokenizer spends over four tokens on a Cree word; the Cree one spends about a third fewer, and the notebook reports the exact held-out figure |
 | Embeddings | each new token initialised from the average of the base model's pieces for the same string | a token that starts with meaning needs far less data to learn |
 | Continued pretraining | packed Cree text with 10% English replay, rank-64 LoRA | teaches the language without erasing the base model's instruction ability |
-| Instruction tuning | translation both ways, SRO and syllabics, grounded note answers, abstention, persona | teaches the shape of the task, not just the language |
+| Instruction tuning | translation both ways, SRO and syllabics, word glosses, grounded note answers, abstention, project conversation, persona | one adapter learns every job the assistant does, not just the language |
 | Preference tuning | DPO on faithfulness pairs: dropped clauses, changed numbers, English leaks, flattened vowels | fluency is not fidelity |
 | CreeBench | chrF++, BLEU, token F1, lexicon validity, code-switch, abstention, perplexity, latency | one BLEU number hides the failures a speaker hears first |
 | Export | merge, convert to GGUF, Q4_K_M, Modelfile | the app runs on a laptop |
@@ -111,6 +124,7 @@ The full run is roughly:
 | Profile | Base | Context | Time on the target GPU |
 |---|---|---|---|
 | `t4` | Qwen2.5-7B-Instruct | 1024 | 4 to 7 hours |
+| `big24` | Qwen2.5-14B-Instruct | 1024 | 14B on one 24 GB card; slower than the 7B, merge needs about 64 GB of RAM |
 | `a100` | Qwen2.5-7B-Instruct | 2048 | 2 to 4 hours |
 | `big` | Qwen2.5-14B-Instruct | 2048 | 6 to 10 hours on an 80 GB A100 |
 | `huge` | Qwen2.5-32B-Instruct | 2048 | about a day on an 80 GB A100; merging needs a separate machine with roughly 160 GB of RAM |
@@ -147,46 +161,60 @@ than another ten billion parameters.
 ## Installing the result
 
 ```bash
-mkdir -p assets/cree_llm
-cp archer-cree-7b.Q4_K_M.gguf assets/cree_llm/
-cp Modelfile assets/cree_llm/
-cd assets/cree_llm && ollama create archer-cree:7b -f Modelfile
+mkdir -p assets/archer_llm
+cp archer-7b.Q4_K_M.gguf assets/archer_llm/
+cp Modelfile assets/archer_llm/
+cd assets/archer_llm && ollama create archer:7b -f Modelfile
 ```
 
-Then point the chat at it:
+`config/config.yaml` already points at that tag:
 
 ```yaml
 chat:
-  cree_model: archer-cree:7b
-  cree_temperature: 0.2
-  cree_max_tokens: 400
+  model: archer:7b
+  temperature: 0.3
+  max_tokens: 500
 ```
 
-If `cree_model` is empty, Cree questions fall back to the general model. The
-endpoint reports which model answered:
+For `chat.backend: llama_cpp`, set `chat.gguf_path` to the same
+`archer-7b.Q4_K_M.gguf` file. It is the same model, not a smaller fallback.
+
+If the tag is missing, the chat returns a 503 with the `ollama create` command.
+It does not answer from another model, because another model would not be this
+assistant. Every reply reports the model and the task it used:
 
 ```json
-{"reply": "...", "language": "cree", "model": "archer-cree:7b", "sources": ["Horse.md"]}
+{"reply": "...", "task": "song_notes", "language": "english", "model": "archer:7b", "sources": ["Horse.md"]}
 ```
 
-`language` can be forced per request with `"language": "cree"` or
-`"language": "english"`; `"auto"` is the default.
+`task` is `song_notes`, `chat`, `translate` or `orthography`. It describes the
+prompt shape, not a model choice. `language` reports whether the question was
+written in Cree; it does not change the backend.
 
 ## How the app calls it
 
 The model was trained with control prefixes, so the app reproduces them rather
-than sending a bare chat message. A song question becomes
-`<|song|><|note|>` followed by `Notes on <song>:` and `Question:`, which is the
-shape of every note example in the instruction set. A translation request gets
-`<|translate|><|english|><|sro|>` (or the reverse direction), and a syllabics
-request gets `<|cans|><|sro|>`. Retrieval still supplies the sources shown under
-the reply, but a translation request is never padded with song prose, and only
-passages above a relevance floor are used as notes.
+than sending a bare chat message:
 
-The router is deliberately narrow. Cree text, or a request such as "the Cree
-word for river" or "translate this into Cree", goes to the Cree model;
-"tell me about Cree music" stays on the general model, which is the better
-conversationalist. `chat.language` can force either route per request.
+| Request | Prompt shape |
+|---|---|
+| question with retrieved notes | `<|song|><|note|>` · `Notes on <song>:` · `Question:` |
+| question with no notes | `<|song|>` · the question |
+| English to Cree | `<|translate|><|english|><|sro|>` (or `<|cans|>` for syllabics) |
+| Cree to English | `<|translate|><|cree|><|english|>` |
+| SRO to syllabics | `<|sro|><|cans|>` |
+| syllabics to SRO | `<|cans|><|sro|>` |
+
+The prompt builder is [`chat/archer_prompt.py`](../chat/archer_prompt.py). It
+classifies the request into one of those shapes with `task_of`, and
+`format_prompt` emits the shape. Retrieval runs on every question, but notes are
+attached only when the request is a notes question and the passage clears the
+0.30 relevance floor. A translation is never padded with song prose, and a
+general question with no matching notes is answered on the `<|song|>` path.
+
+`POST /api/chat/prompt` exposes the same call for the site's demo: it returns
+the task, the retrieved passages, the notes that were actually used and the
+exact string sent to the model.
 
 ## Comparing against another Cree model
 
@@ -198,8 +226,17 @@ metrics, and prints them under the tuned model's rows. The control tokens this
 model was trained on are stripped first, so the other model is measured on the
 instruction, not on a prefix it has never seen. Comparing
 `mickymultani/Cree-Llama-3.3-70B` this way takes one tag and one run, and the
-same setting with `llama3.1:8b-instruct-q4_K_M` measures the model the chat used
-before this one existed.
+same setting with `llama3.1:8b-instruct-q4_K_M` measures the general instruction
+model the app used before this project trained its own.
+
+The report also computes the bar this model has to clear. The app used to be a
+general model, a separate Cree model and a retrieval index, with a router
+choosing between them, so "better than all three" means beating the best of
+those pieces on each job. Note reading and abstention are therefore measured
+twice, with the adapter and without it: the adapter-free run is the old system,
+reading the same retrieved notes with the same general model. The report prints
+`meets or beats` or `below` for every row, and the count of rows cleared, so the
+result is measured instead of claimed.
 
 In Colab, put `os.environ["CREE_EXTERNAL_MODEL"] = "llama3.1:8b-instruct-q4_K_M"`
 at the top of the setup cell, before `CFG` is created. Point the notebook at an

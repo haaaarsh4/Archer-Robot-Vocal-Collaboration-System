@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
 from loguru import logger
 
-
-DEFAULT_SYSTEM_PROMPT = """You are Archer's music assistant: a helpful, warm guide to Archer's \
-songs, running entirely on the user's own laptop. Answer questions about song meaning, \
-backstory, and creation using ONLY the context passages you are given below each question. \
-If the context doesn't contain the answer, say you don't have notes on that yet instead of \
-guessing. Keep answers conversational and concise. Some songs reference Cree phrases or \
-titles; if the user asks for an actual Cree translation (not just discussion), tell them you're \
-routing that through the app's dedicated Cree translator instead of answering yourself."""
+from chat.archer_prompt import ARCHER_SYSTEM_PROMPT
 
 
 @dataclass
@@ -23,19 +17,19 @@ class ChatTurn:
 
 @dataclass
 class LLMConfig:
+    """One model, two ways to run it.
+
+    ``model`` is the Ollama tag; ``gguf_path`` is the same model as a file for
+    the llama_cpp backend. There is no second chat model and no fallback: if the
+    Archer model is not installed, the request fails with the install command
+    rather than being answered by a different model.
+    """
     backend: str = "ollama"                      # "ollama" | "llama_cpp"
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "llama3.1:8b-instruct-q4_K_M"
-    gguf_path: str | None = None                  # used only for llama_cpp backend
-    # The nêhiyawêwin model trained by Cree_LLM_Training.ipynb. It is a separate
-    # model with its own prompt; an empty value keeps every request on the
-    # general model, so a checkout without the GGUF still runs.
-    cree_model: str = ""
-    cree_gguf_path: str | None = None
-    cree_temperature: float = 0.2
-    cree_max_tokens: int = 400
+    model: str = "archer:7b"
+    gguf_path: str | None = None
     n_ctx: int = 4096
-    temperature: float = 0.4
+    temperature: float = 0.3
     max_tokens: int = 500
     timeout_s: float = 120.0
 
@@ -43,72 +37,74 @@ class LLMConfig:
 class LocalLLMClient:
     def __init__(self, config: LLMConfig | None = None):
         self.cfg = config or LLMConfig()
-        self._llama_cpp_models: dict[str, object] = {}
-        # Each model is checked against Ollama once. The Cree model is a second
-        # tag, so a single "backend is up" flag would hide the case where the
-        # general model is pulled and the Cree one is not.
-        self._checked_models: set[str] = set()
+        self._llama_cpp_model = None
+        self._checked = False
 
-    def _ensure_backend(self, model: str | None = None):
-        if self.cfg.backend != "ollama":
+    def installed(self) -> bool | None:
+        """Is the one model there? None means the backend could not be asked."""
+        if self.cfg.backend == "llama_cpp":
+            return bool(self.cfg.gguf_path) and Path(self.cfg.gguf_path).exists()
+        try:
+            resp = requests.get(f"{self.cfg.ollama_url}/api/tags", timeout=2.0)
+            resp.raise_for_status()
+            return self.cfg.model in [m["name"] for m in resp.json().get("models", [])]
+        except requests.exceptions.RequestException:
+            return None
+
+    def _ensure_backend(self) -> None:
+        if self.cfg.backend == "llama_cpp":
             return
-        wanted = model or self.cfg.ollama_model
-        if wanted in self._checked_models:
+        if self.cfg.backend != "ollama":
+            raise ValueError(f"Unknown LLM backend: {self.cfg.backend!r}")
+        if self._checked:
             return
         try:
             resp = requests.get(f"{self.cfg.ollama_url}/api/tags", timeout=3.0)
             resp.raise_for_status()
             available = [m["name"] for m in resp.json().get("models", [])]
-            if wanted not in available:
-                logger.warning(
-                    f"Ollama is running but model '{wanted}' isn't pulled yet. "
-                    f"Run: ollama pull {wanted}"
-                )
         except requests.exceptions.RequestException as e:
             raise RuntimeError(
                 f"Can't reach Ollama at {self.cfg.ollama_url}: {e}\n"
-                "Is it running? Try `ollama serve` in a terminal, or switch chat.backend "
-                "to 'llama_cpp' in config.yaml if you'd rather run in-process."
+                "Start it with `ollama serve`, or switch chat.backend to 'llama_cpp' "
+                "in config.yaml and set chat.gguf_path."
             ) from e
-        self._checked_models.add(wanted)
+        if self.cfg.model not in available:
+            raise RuntimeError(
+                f"The Archer model '{self.cfg.model}' is not installed in Ollama. "
+                "Install it once:\n"
+                "  mkdir -p assets/archer_llm\n"
+                "  cp archer-7b.Q4_K_M.gguf Modelfile assets/archer_llm/\n"
+                "  cd assets/archer_llm && ollama create archer:7b -f Modelfile\n"
+                "See docs/cree-llm.md. There is no second chat model to fall back to."
+            )
+        self._checked = True
 
-    def chat(self, user_message: str, history: list[ChatTurn], context_chunks: list[str],
-             system_prompt: str = DEFAULT_SYSTEM_PROMPT, model: str | None = None,
-             temperature: float | None = None, max_tokens: int | None = None) -> str:
-        self._ensure_backend(model)
-
-        context_block = ""
-        if context_chunks:
-            joined = "\n\n===\n\n".join(context_chunks)
-            context_block = f"\n\nContext from your song notes:\n{joined}"
-
-        temperature = self.cfg.temperature if temperature is None else temperature
-        max_tokens = self.cfg.max_tokens if max_tokens is None else max_tokens
+    def chat(self, user_message: str, history: list[ChatTurn],
+             system_prompt: str = ARCHER_SYSTEM_PROMPT) -> str:
+        self._ensure_backend()
+        temperature = self.cfg.temperature
+        max_tokens = self.cfg.max_tokens
 
         if self.cfg.backend == "ollama":
-            return self._chat_ollama(user_message, history, system_prompt, context_block,
-                                     model or self.cfg.ollama_model, temperature, max_tokens)
-        if self.cfg.backend == "llama_cpp":
-            path = self.cfg.gguf_path
-            if model and model == self.cfg.cree_model:
-                path = self.cfg.cree_gguf_path or path
-            return self._chat_llama_cpp(user_message, history, system_prompt, context_block,
-                                        path, temperature, max_tokens)
-        raise ValueError(f"Unknown LLM backend: {self.cfg.backend!r}")
+            return self._chat_ollama(user_message, history, system_prompt,
+                                     temperature, max_tokens)
+        return self._chat_llama_cpp(user_message, history, system_prompt,
+                                    temperature, max_tokens)
+
+    def _messages(self, user_message: str, history: list[ChatTurn], system_prompt: str):
+        messages = [{"role": "system", "content": system_prompt}]
+        for turn in history[-8:]:      # tone and reference, not evidence
+            messages.append({"role": turn.role, "content": turn.content})
+        messages.append({"role": "user", "content": user_message})
+        return messages
 
     def _chat_ollama(self, user_message: str, history: list[ChatTurn],
-                     system_prompt: str, context_block: str, model: str,
-                     temperature: float, max_tokens: int) -> str:
-        messages = [{"role": "system", "content": system_prompt}]
-        for turn in history[-8:]:      # keep the last few turns; RAG context is per-question anyway
-            messages.append({"role": turn.role, "content": turn.content})
-        messages.append({"role": "user", "content": user_message + context_block})
-
+                     system_prompt: str, temperature: float, max_tokens: int) -> str:
         resp = requests.post(
             f"{self.cfg.ollama_url}/api/chat",
             json={
-                "model": model,
-                "messages": messages,
+                "model": self.cfg.model,
+                "messages": self._messages(user_message, history, system_prompt),
                 "stream": False,
                 "options": {
                     "temperature": temperature,
@@ -119,39 +115,32 @@ class LocalLLMClient:
             timeout=self.cfg.timeout_s,
         )
         resp.raise_for_status()
-        data = resp.json()
-        return data.get("message", {}).get("content", "").strip()
+        return resp.json().get("message", {}).get("content", "").strip()
 
-    def _load_llama_cpp(self, path: str | None):
-        if not path:
+    def _load_llama_cpp(self):
+        if not self.cfg.gguf_path:
             raise RuntimeError(
-                "chat.backend is 'llama_cpp' but no GGUF path is set in config.yaml. "
-                "Set chat.gguf_path for the general model and chat.cree_gguf_path for the Cree model."
+                "chat.backend is 'llama_cpp' but chat.gguf_path is not set. "
+                "Point it at archer-7b.Q4_K_M.gguf, the same model the Ollama "
+                "backend serves as chat.model."
             )
-        if path in self._llama_cpp_models:
-            return self._llama_cpp_models[path]
+        if self._llama_cpp_model is not None:
+            return self._llama_cpp_model
         from llama_cpp import Llama
-        logger.info(f"Loading GGUF model from {path} (CPU, this can take a bit)...")
-        model = Llama(
-            model_path=path,
+        logger.info(f"Loading GGUF model from {self.cfg.gguf_path} (CPU, this can take a bit)...")
+        self._llama_cpp_model = Llama(
+            model_path=self.cfg.gguf_path,
             n_ctx=self.cfg.n_ctx,
             n_threads=None,   # let llama.cpp pick based on available cores
             verbose=False,
         )
-        self._llama_cpp_models[path] = model
-        return model
+        return self._llama_cpp_model
 
     def _chat_llama_cpp(self, user_message: str, history: list[ChatTurn],
-                        system_prompt: str, context_block: str, gguf_path: str | None,
-                        temperature: float, max_tokens: int) -> str:
-        model = self._load_llama_cpp(gguf_path)
-        messages = [{"role": "system", "content": system_prompt}]
-        for turn in history[-8:]:
-            messages.append({"role": turn.role, "content": turn.content})
-        messages.append({"role": "user", "content": user_message + context_block})
-
+                        system_prompt: str, temperature: float, max_tokens: int) -> str:
+        model = self._load_llama_cpp()
         result = model.create_chat_completion(
-            messages=messages,
+            messages=self._messages(user_message, history, system_prompt),
             temperature=temperature,
             max_tokens=max_tokens,
         )

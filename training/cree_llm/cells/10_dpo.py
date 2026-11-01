@@ -1,17 +1,24 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Preference tuning for faithfulness.
 #
-# A translation model can be fluent and still be wrong: a dropped negation, a
-# changed number, an English word left in the Cree, a long vowel flattened. Each
-# of those is a real failure, so each becomes a rejected answer while the gold
-# translation is the chosen one. The objective is DPO, with the reference being
-# the same model with its adapters switched off, so no second copy is needed.
+# The one model can be fluent and still be wrong: a dropped negation, a changed
+# number, an English word left in the Cree, a long vowel flattened, or an
+# invented detail in a song answer. Each of those is a real failure, so each
+# becomes a rejected answer while the faithful one is chosen. The objective is
+# DPO, with the reference being the same model with its adapters switched off,
+# so no second copy is needed.
 # ─────────────────────────────────────────────────────────────────────────────
 CFG.dpo_enabled = CFG.dpo_enabled and CFG.dpo_epochs > 0
 
 pairs_train = read_jsonl(PROC / "parallel_train.jsonl")
 pair_rng = random.Random(CFG.seed + 1)
 prefs: list[dict] = []
+
+# Content words drawn from the corpus, for the substitution corruption below.
+# Reversing the word order would not be a faithful negative: Plains Cree word
+# order is freer than English, and a reordered sentence is often grammatical,
+# so that pair would teach the model to downvote valid Cree.
+_DPO_VOCAB = sorted({w for row in pairs_train[:3000] for w in row["cree"].split() if len(w) > 2})
 
 
 def corrupt(cree: str, english: str) -> str | None:
@@ -28,8 +35,13 @@ def corrupt(cree: str, english: str) -> str | None:
         return " ".join(words[:pos] + [donor] + words[pos:])
     if kind == 3 and re.search(r"\b(nîso|nisto|nêwo|niyânan|nikotwâsik|pêyak)\b", cree):
         return re.sub(r"\b(nîso|nisto|nêwo|niyânan|nikotwâsik|pêyak)\b", "pêyak", cree, count=1)
-    if len(words) > 3:                                     # reverse the word order
-        return " ".join(list(reversed(words)))
+    if len(words) > 2 and _DPO_VOCAB:                      # a different word: wrong meaning
+        pos = pair_rng.randrange(len(words))
+        choices = [w for w in _DPO_VOCAB if w != words[pos]]
+        if choices:
+            words = list(words)
+            words[pos] = pair_rng.choice(choices)
+            return " ".join(words)
     return None
 
 
@@ -43,6 +55,26 @@ for row in pairs_train:
     prompt = f"<|translate|><|english|><|sro|>\n{instruction}\n{row['english']}"
     prefs.append({"prompt": prompt, "chosen": row["cree"], "rejected": rejected})
 
+# Abstention is part of the same skill. A note answer that fills a gap with a
+# plausible invention is the failure this project cares about most, so the
+# honest reply is chosen and an invented one is rejected.
+# The title that belongs to `_horse_context`, which is not necessarily the
+# first note: the first section of the first note can be the held-out one.
+_abstain_title = _horse_title
+for question, honest, invented in [
+    (f"What key was {_abstain_title} recorded in?",
+     "The notes do not say what key it was recorded in.",
+     f"It was recorded in D major, in {_abstain_title}, at 92 BPM."),
+    ("Who played bass on these recordings?",
+     "The notes do not say who played on the recordings.",
+     "Aaron Twoyoungmen played bass on every track."),
+    ("What is the backstory of the song The Unwritten Song?",
+     "I do not have notes on that song yet, so I cannot tell you.",
+     "It was written in 2019 after a trip to Batoche, and it began as a round."),
+]:
+    prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
+    prefs.append({"prompt": prompt, "chosen": honest, "rejected": invented})
+
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]
 log(f"DPO: {len(prefs)} preference pairs")
@@ -54,9 +86,13 @@ print("  rejected", prefs[0]["rejected"])
 
 
 _DPO_DIR = CKPT / "dpo"
+# `ref` versions the reference policy. The first version of this stage used the
+# adapter-disabled base model, which is a different objective; a run that holds
+# one of those adapters must not be told its DPO stage is still current.
 _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
-    lr=CFG.dpo_lr, pairs=len(prefs),
+    lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
+    corrupt="substitute-v1",
 )
 
 if not CFG.dpo_enabled or not prefs:
@@ -119,7 +155,21 @@ if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
     # `trainer_state.json` every few dozen steps, which is enough for the same
     # checker the CPT and SFT stages use to accept it as a resume point.
     fresh_if_forced("dpo")
-    partial = pick_resume_checkpoint(_DPO_DIR)
+    # The preference set changed with the unified instruction data, so the old
+    # DPO checkpoints belong to a different objective. The same rule as SFT:
+    # continue only when the stage fingerprint matches.
+    _dpo_key_path = _DPO_DIR / "stage_key.json"
+    if not _dpo_key_path.exists() or jload(_dpo_key_path).get("key") != _DPO_KEY:
+        if any(_DPO_DIR.glob("checkpoint-*")):
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            stale = _DPO_DIR.with_name(f"dpo.stale-{stamp}")
+            _DPO_DIR.rename(stale)
+            log(f"DPO: inputs changed, previous checkpoints moved to {stale.name}")
+        _DPO_DIR.mkdir(parents=True, exist_ok=True)
+        jdump(_dpo_key_path, {"key": _DPO_KEY})
+        partial = None
+    else:
+        partial = pick_resume_checkpoint(_DPO_DIR)
     done = int(jload(partial / "trainer_state.json")["global_step"]) if partial is not None else 0
 
     if partial is not None:
@@ -128,6 +178,17 @@ if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
         _LOADED_ADAPTER = str(partial)
     else:
         model, tok = ensure_model(upto="sft")
+
+    # The reference policy is the instruction-tuned adapter, frozen and loaded
+    # beside the policy adapter (LoRA weights only, so no second base model).
+    # `disable_adapter()` would make the *base* model the reference instead, and
+    # DPO is KL-regularised: regularising towards the base pulls the policy back
+    # and undoes the instruction tuning this stage exists to sharpen. That is a
+    # quiet way to end up worse than SFT, so the reference is stated here.
+    if "ref" not in getattr(model, "peft_config", {}):
+        model.load_adapter(str(CKPT / "sft"), adapter_name="ref", is_trainable=False)
+        log(f"DPO: reference policy = the frozen SFT adapter at {CKPT / 'sft'}")
+    model.set_adapter("default")
 
     dpo_collator = PreferenceCollator(tok, CFG.seq_len)
     dpo_data = PreferenceDataset()
@@ -164,9 +225,11 @@ if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
             pol_c = sequence_logprob(model, chosen["input_ids"], chosen["labels"], chosen["attention_mask"])
             pol_r = sequence_logprob(model, rejected["input_ids"], rejected["labels"], rejected["attention_mask"])
             model.eval()
-            with torch.no_grad(), model.disable_adapter():
+            model.set_adapter("ref")
+            with torch.no_grad():
                 ref_c = sequence_logprob(model, chosen["input_ids"], chosen["labels"], chosen["attention_mask"])
                 ref_r = sequence_logprob(model, rejected["input_ids"], rejected["labels"], rejected["attention_mask"])
+            model.set_adapter("default")
             model.train()
 
             margin = beta * ((pol_c - ref_c) - (pol_r - ref_r))
@@ -184,14 +247,16 @@ if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
                 append_metrics("DPO", [{"step": step, "loss": round(mean, 5)}])
             if step % save_every == 0:
                 folder = _DPO_DIR / f"checkpoint-{step}"
-                model.save_pretrained(str(folder))
+                # Only the policy adapter: the frozen reference is a copy of the
+                # SFT adapter and saving it would double the export folder.
+                model.save_pretrained(str(folder), selected_adapters=["default"])
                 jdump(folder / "trainer_state.json", {"global_step": step, "total": total_steps})
                 prune_checkpoints(_DPO_DIR)
                 log(f"DPO checkpoint {step}/{total_steps} written to {folder.name}")
     minutes = (time.time() - t0) / 60
     log(f"DPO: done in {minutes:.1f} min")
 
-    model.save_pretrained(str(_DPO_DIR))
+    model.save_pretrained(str(_DPO_DIR), selected_adapters=["default"])
     _LOADED_ADAPTER = str(_DPO_DIR)
     prune_checkpoints(_DPO_DIR)
     mark_stage("dpo", _DPO_KEY, pairs=len(prefs), steps=total_steps)

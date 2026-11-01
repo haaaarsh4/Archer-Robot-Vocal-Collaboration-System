@@ -527,18 +527,16 @@ output:
 logging:
   level: DEBUG
 
-# Chat models. The general model answers questions about the project and the
-# songs. `cree_model` is the separate nêhiyawêwin model produced by
-# Cree_LLM_Training.ipynb; leave it empty until that model has been installed,
-# and Cree questions fall back to the general model instead of failing.
+# The chat model. There is exactly one: the Archer model trained by
+# Cree_LLM_Training.ipynb. The same weights answer conversation, read retrieved
+# song notes, translate and convert scripts. `model` is its Ollama tag;
+# `gguf_path` is the same model as a file for the llama_cpp backend.
+# Nothing falls back to another model: if it is missing, the chat reports the
+# install command instead of answering as a different assistant.
 chat:
   backend: ollama
   ollama_url: http://127.0.0.1:11434
-  ollama_model: llama3.1:8b-instruct-q4_K_M
-  gguf_path: null
-  cree_model: ""                 # e.g. archer-cree:7b
-  cree_gguf_path: null           # used only when backend is llama_cpp
-  cree_temperature: 0.2
-  cree_max_tokens: 400
-  temperature: 0.4
+  model: archer:7b
+  gguf_path: null                # archer-7b.Q4_K_M.gguf, used only for llama_cpp
+  temperature: 0.3
   max_tokens: 500

@@ -19,7 +19,7 @@ EXPORT.mkdir(parents=True, exist_ok=True)
 
 if SMOKE:
     log("SMOKE: skipping merge and GGUF; packaging the adapter only")
-    zip_path = OUT / "archer-cree-smoke.zip"
+    zip_path = OUT / "archer-smoke.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
         for path in (CKPT / "dpo").rglob("*"):
             if path.is_file():
@@ -132,13 +132,15 @@ else:
             raise RuntimeError(f"quantisation did not produce a usable GGUF at {q4}")
 
     modelfile = EXPORT / "Modelfile"
+    # The system prompt lives in the app (chat/archer_prompt.py) and is sent on
+    # every request. Baking it into the Modelfile as well would put it in the
+    # context twice, once from .System and once as the system message.
     modelfile.write_text(
         f"FROM ./{q4.name}\n"
-        "PARAMETER temperature 0.2\n"
+        "PARAMETER temperature 0.3\n"
         "PARAMETER top_p 0.9\n"
         "PARAMETER repeat_penalty 1.08\n"
-        "PARAMETER num_ctx 4096\n"
-        f'SYSTEM """{SYSTEM}"""\n',
+        "PARAMETER num_ctx 4096\n",
         encoding="utf-8",
     )
 
@@ -187,14 +189,14 @@ else:
             except Exception as exc:
                 print(f"[note] automatic download failed ({exc}); use the Files pane")
 
-print("\n── install on the machine that runs the app ──")
+print("\n── install the one model on the machine that runs the app ──")
 print(textwrap.dedent(f"""
-    mkdir -p assets/cree_llm
-    cp {MODEL_STEM}.Q4_K_M.gguf assets/cree_llm/
-    cp Modelfile assets/cree_llm/
-    cd assets/cree_llm && ollama create archer-cree:{MODEL_TAG} -f Modelfile
+    mkdir -p assets/archer_llm
+    cp {MODEL_STEM}.Q4_K_M.gguf assets/archer_llm/
+    cp Modelfile assets/archer_llm/
+    cd assets/archer_llm && ollama create archer:{MODEL_TAG} -f Modelfile
 
     # config.yaml
     chat:
-      cree_model: archer-cree:{MODEL_TAG}
+      model: archer:{MODEL_TAG}
 """))

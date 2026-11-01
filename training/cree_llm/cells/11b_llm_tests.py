@@ -206,7 +206,7 @@ def _scored(prompts: list[str], max_new_tokens: int = 44) -> tuple[list[str], li
 
 
 _TESTS_KEY = fingerprint(base=CFG.base_model, adapter=_adapter_stamp(), n=len(_eval_pairs),
-                         probes="v1")
+                         probes="v2")
 
 if stage_done("llmtests", _TESTS_KEY, requires=OUT / "llm_tests.json"):
     llm_tests = jload(OUT / "llm_tests.json")
@@ -478,6 +478,9 @@ else:
         "perplexity": _report["tuned"].get("perplexity"),
         "perplexity_base": _report["base"].get("perplexity"),
         "time_to_first_token_note": "measured on the training GPU, not a laptop",
+        # The per-job comparison against the old setup, so the site can show the
+        # same bar the report card prints instead of restating a claim.
+        "head_to_head": _report.get("head_to_head"),
     }
 
     jdump(OUT / "llm_tests.json", llm_tests)
