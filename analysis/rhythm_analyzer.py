@@ -19,9 +19,16 @@ class RhythmAnalyzer:
 
         buffer_frames = int(2.0 * self.sample_rate / self.frame_size)
         self._buffer: collections.deque = collections.deque(maxlen=buffer_frames)
+        # Tempo needs a longer view than onsets do.  Two seconds is less than
+        # three beats at 60 BPM, which is why the tracker used to report a
+        # metrical neighbour of the real pulse; eight seconds is six to twenty
+        # beats and costs about 1.4 MB.
+        tempo_frames = int(8.0 * self.sample_rate / self.frame_size)
+        self._tempo_buffer: collections.deque = collections.deque(maxlen=tempo_frames)
 
         self.current_tempo: float       = 0.0
         self.latest_onset:  float|None  = None
+        self._last_reported_onset: float|None = None
         self.phrase_state:  str         = "silence"
 
         self._silent_frame_count: int = 0
@@ -32,6 +39,13 @@ class RhythmAnalyzer:
         self._elapsed:    float = 0.0
 
         self._onset_times: collections.deque = collections.deque(maxlen=16)
+        # Two peaks inside one attack are not two notes.  A click or a plucked
+        # string often produces a second spectral-flux peak 30-50 ms after the
+        # first (the body resonance after the transient), and librosa reports
+        # both.  Without a floor, every real onset was counted twice, which
+        # halved the tempo confidence and made the phrase timing stutter.
+        # 55 ms still lets 16th notes at 200 BPM (75 ms apart) through.
+        self._min_onset_gap_s: float = 0.055
 
         self._frames_since_onset_check: int = 0
         self._onset_check_interval: int = buffer_frames // 2  
@@ -43,6 +57,7 @@ class RhythmAnalyzer:
     def push_frame(self, frame: np.ndarray, is_voiced: bool):
         self._elapsed += self._frame_time
         self._buffer.append(frame)
+        self._tempo_buffer.append(frame)
 
         self._update_phrase_state(is_voiced)
 
@@ -95,7 +110,7 @@ class RhythmAnalyzer:
 
             for t_rel in onset_frames:
                 abs_onset = buffer_start + float(t_rel)
-                if not self._onset_times or abs_onset > self._onset_times[-1] + 0.03:
+                if not self._onset_times or abs_onset > self._onset_times[-1] + self._min_onset_gap_s:
                     self._onset_times.append(abs_onset)
                     self.latest_onset = abs_onset
                     logger.debug(f"Onset detected at t={abs_onset:.3f}s")
@@ -104,17 +119,24 @@ class RhythmAnalyzer:
             logger.error(f"Onset detection error: {e}")
 
     def _estimate_tempo(self):
+        """Estimate the pulse over the last eight seconds of singing.
+
+        On a two-second window the beat tracker is biased toward a metrical
+        neighbour of the real pulse: it reported 123 BPM for a 185 BPM
+        pattern, and clipped a 125 BPM double to the 240 ceiling.  Eight
+        seconds contains six to twenty beats, which is enough for the tracker
+        to see the pattern rather than one accent.
+        """
         try:
-            audio = np.concatenate(list(self._buffer))
-            tempo, _ = librosa.beat.beat_track(
-                y=audio,
-                sr=self.sample_rate,
-                bpm=self.current_tempo if self.current_tempo > 0 else None,
-            )
+            audio = np.concatenate(list(self._tempo_buffer))
+            # No bpm prior: passing the previous estimate back in made the
+            # tracker defend its own first answer, so an early 2-second
+            # misread could never be corrected by the longer buffer.
+            tempo, _ = librosa.beat.beat_track(y=audio, sr=self.sample_rate)
             tempo = float(np.atleast_1d(tempo)[0])
             tempo = float(np.clip(tempo, self.min_bpm, self.max_bpm))
 
-            if abs(tempo - self.current_tempo) > 2.0:   
+            if abs(tempo - self.current_tempo) > 2.0:
                 self.current_tempo = tempo
                 logger.debug(f"Tempo updated: {tempo:.1f} BPM")
 
@@ -134,7 +156,9 @@ class RhythmAnalyzer:
 
     def reset(self):
         self._buffer.clear()
+        self._tempo_buffer.clear()
         self._onset_times.clear()
+        self._last_reported_onset = None
         self.current_tempo  = 0.0
         self.latest_onset   = None
         self.phrase_state   = "silence"

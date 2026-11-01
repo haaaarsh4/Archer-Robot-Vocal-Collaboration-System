@@ -1,0 +1,217 @@
+<div id="page-translation" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">Cree sentiment</p>
+    <h1 class="paper-title">What the words <em>carry</em>, under the melody</h1>
+    <p class="paper-deck">Three layers sit between a sung phrase and a robot that seems to understand it. The phrase becomes text, the text becomes English, and the English becomes an emotional reading. Each layer is separate, each one can be checked on its own, and none of them pretends to be the others.</p>
+    <div class="paper-meta"><span>nêhiyawêwin · Plains Cree</span><span>SRO + syllabics</span><span>from-scratch translation</span><span>valence + arousal</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The chain</p>
+    <h2 class="paper-h2">Three steps, and why they are not one model</h2>
+    <p class="paper-lede">It would be convenient to hand a microphone to one large multimodal model and ask for “the emotion of this Cree sentence.” It would also make every mistake invisible. Splitting the chain means a transcription error, a translation error and a sentiment error each have a different address.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 300" role="img" aria-label="Cree pipeline: audio to transcript to English to valence and arousal">
+          <defs><marker id="c-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="300" fill="#0b1120"/>
+          <text x="50" y="50" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="22" font-weight="600">From voice to feeling</text>
+          <text x="50" y="72" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">THREE CONTRACTS · THREE FAILURE ADDRESSES</text>
+
+          <g font-family="Inter Tight, sans-serif" font-size="11">
+            <rect x="50" y="108" width="180" height="94" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="140" y="139" fill="#e8edf7" text-anchor="middle">Sung phrase</text>
+            <text x="140" y="160" fill="#8195b8" font-size="9.5" text-anchor="middle">44.1 kHz audio</text>
+            <text x="140" y="178" fill="#8195b8" font-size="9.5" text-anchor="middle">vocal isolation</text>
+
+            <rect x="270" y="108" width="190" height="94" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="365" y="139" fill="#e8edf7" text-anchor="middle">Transcript</text>
+            <text x="365" y="160" fill="#8195b8" font-size="9.5" text-anchor="middle">MMS-1b-all + crk</text>
+            <text x="365" y="178" fill="#8195b8" font-size="9.5" text-anchor="middle">lexicon + CTC</text>
+
+            <rect x="500" y="108" width="190" height="94" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="595" y="139" fill="#e8edf7" text-anchor="middle">English</text>
+            <text x="595" y="160" fill="#8195b8" font-size="9.5" text-anchor="middle">from-scratch transformer</text>
+            <text x="595" y="178" fill="#8195b8" font-size="9.5" text-anchor="middle">beam search decoding</text>
+
+            <rect x="730" y="108" width="300" height="94" rx="7" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="880" y="136" fill="#dbe6ff" text-anchor="middle">Emotional reading</text>
+            <text x="880" y="157" fill="#8fa6ce" font-size="9.5" text-anchor="middle">valence: RoBERTa, VADER fallback</text>
+            <text x="880" y="175" fill="#8fa6ce" font-size="9.5" text-anchor="middle">arousal: words + vocal delivery</text>
+
+            <path d="M230 155 H270" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#c-arrow)"/>
+            <path d="M460 155 H500" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#c-arrow)"/>
+            <path d="M690 155 H730" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#c-arrow)"/>
+
+            <rect x="50" y="232" width="430" height="34" rx="5" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="265" y="253" fill="#8195b8" font-size="9.5" text-anchor="middle">Fail here: wrong vowel, missing word, wrong spelling</text>
+            <rect x="500" y="232" width="230" height="34" rx="5" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="615" y="253" fill="#8195b8" font-size="9.5" text-anchor="middle">Fail here: literal but awkward English</text>
+            <rect x="750" y="232" width="280" height="34" rx="5" fill="#0f1728" stroke="#2a3d63"/>
+            <text x="890" y="253" fill="#8195b8" font-size="9.5" text-anchor="middle">Fail here: flat or overstated feeling</text>
+          </g>
+          <text x="50" y="288" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. C1 · TRANSCRIPTION → TRANSLATION → SENTIMENT</text>
+        </svg>
+        <div class="plate-foot"><span>Figure C1 · the language chain</span><span>each stage independently testable</span></div>
+      </div>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> Transcription</p>
+    <h2 class="paper-h2">Whisper was never going to transcribe Cree</h2>
+    <p class="paper-lede">Whisper's <code>language="cr"</code> is not a Plains Cree decoder. It selects the English decoder and attaches a Cree language tag, and what comes back for sung Cree is English words that sound vaguely like the vowels. The project measured that, stopped using it for Cree, and built a separate path.</p>
+    <p class="paper-p">The Cree path uses Meta's MMS-1b-all with both <code>crk</code> adapters, a lexicon and a character model built from this project's own Cree texts, and a CTC beam search constrained so it cannot emit an English word. Before recognition, Demucs can isolate the vocal from the accompaniment, and a harmonic vocal hint keeps the sung pitch content from being discarded by the separator.</p>
+    <p class="paper-p">English speech still goes through faster-whisper, because for English it is excellent. The demo below lets you choose which language is being spoken. The transcript is shown as it arrives, followed by the checked version, so a rough guess never gets mistaken for a final reading.</p>
+    <p class="paper-p">Silence is handled explicitly. A span with no voiced frames is not sent to the recogniser at all; it is labelled as silence, which is both faster and more honest than asking a language model to transcribe a breath.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/asr-wer.svg?v=1" alt="Word error rate across 40 spoken test utterances" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure C2 · 40 utterances.</b> Mean word error rate 1.5%, median 0%, exact match on 87.5% of samples. The test set is spoken English read into the same microphone path the demo uses, not a benchmark leaderboard; it is there to catch a regression in the app's own audio chain.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> Orthography</p>
+    <h2 class="paper-h2">One language, three ways to write it</h2>
+    <p class="paper-lede">Plains Cree is written in Roman orthography (SRO), in Canadian Aboriginal Syllabics, and in the anglicised respelling used by learners and singers who did not grow up with either. The app has to move between all three without losing a long vowel or a <em>w</em>.</p>
+    <p class="paper-p">SRO uses digraphs and diacritics: <code>ê</code> for a long e, <code>â</code>, <code>î</code>, <code>ô</code>, and combinations such as <code>tw</code> or <code>kw</code> that are one sound, not two. Syllabics writes a consonant and its vowel as a single glyph, with a separate final form for a consonant that closes a syllable. A naive character-by-character mapping fails on both.</p>
+    <p class="paper-p">The converter works from a syllabary table, not from a transliteration service. It normalises macrons to circumflexes, folds optional doubled vowels, syllabifies before mapping, and round-trips every word in the project's corpus back to the exact SRO it started from. That round trip is the test: 12,372 words, zero failures, zero syllable-count failures.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Orthography converter<span>SRO ↔ syllabics ↔ anglicised respelling</span></h3>
+        <button class="paper-btn" onclick="ogConvert()">Convert</button>
+      </div>
+      <div class="paper-row">
+        <span class="paper-row-label">Input</span>
+        <input class="paper-input" id="og-input" value="tanisi, kîhtwâm ka-wâpamitin" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')ogConvert()">
+      </div>
+      <div class="paper-grid three" style="gap:12px;margin-top:6px">
+        <div><div class="paper-label" style="font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink-3);margin-bottom:6px">SRO</div><div class="paper-readout" id="og-sro">·</div></div>
+        <div><div class="paper-label" style="font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink-3);margin-bottom:6px">SYLLABICS</div><div class="paper-readout" id="og-syl" style="font-family:var(--sans)">·</div></div>
+        <div><div class="paper-label" style="font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--ink-3);margin-bottom:6px">ANGLICISED</div><div class="paper-readout" id="og-ang">·</div></div>
+      </div>
+      <p class="paper-quiet" id="og-syllables" style="margin-top:10px">Syllables will appear here.</p>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/cree-orthography.svg?v=1" alt="Orthography round-trip and morphological coverage results" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure C3 · 12,372 words.</b> Every corpus word survives SRO → syllabics → SRO unchanged, and every syllable count matches the number of syllabic glyphs. The FST coverage bar is a different measurement: the share of words the finite-state morphological analyser can parse, 59.9% of a 1,000-word sample.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> Translation</p>
+    <h2 class="paper-h2">Building a translator where almost no parallel text exists</h2>
+    <p class="paper-lede">There is no off-the-shelf Plains Cree–English model to fine-tune. The translation layer is a transformer encoder–decoder trained from scratch on the material that could be assembled and permissioned: community-contributed text from the Cree corpus, aligned sentences, and vocabulary from Watkins' 1865 dictionary.</p>
+    <p class="paper-p">Cree is polysynthetic, so a single word can carry what English needs a clause to say. Tokenisation is therefore the first engineering problem, not an afterthought. The project uses a Cree-aware segmentation step (Morfessor and a finite-state analyser where available) before a shared SentencePiece vocabulary, so the model sees morphemes rather than an arbitrary split of a long word.</p>
+    <p class="paper-p">At inference, the model decodes with beam search, keeping several candidate sentences alive at each step and returning the highest-scoring complete one. The model is deliberately small, because a large model on a small corpus memorises the corpus rather than learning to generalise.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 250" role="img" aria-label="Translation pipeline: corpus, alignment, segmentation, transformer, decoding">
+          <defs><marker id="t-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="250" fill="#0b1120"/>
+          <text x="50" y="46" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="21" font-weight="600">The translation stack</text>
+          <g font-family="Inter Tight, sans-serif" font-size="10">
+            <rect x="50" y="84" width="150" height="72" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="125" y="110" fill="#e8edf7" text-anchor="middle">sources</text>
+            <text x="125" y="128" fill="#8195b8" font-size="9" text-anchor="middle">corpus · dictionary</text>
+            <text x="125" y="144" fill="#8195b8" font-size="9" text-anchor="middle">community text</text>
+
+            <rect x="240" y="84" width="160" height="72" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="320" y="110" fill="#e8edf7" text-anchor="middle">alignment</text>
+            <text x="320" y="128" fill="#8195b8" font-size="9" text-anchor="middle">sentence pairs</text>
+            <text x="320" y="144" fill="#8195b8" font-size="9" text-anchor="middle">Wiktionary · Watkins</text>
+
+            <rect x="440" y="84" width="170" height="72" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="525" y="110" fill="#e8edf7" text-anchor="middle">segmentation</text>
+            <text x="525" y="128" fill="#8195b8" font-size="9" text-anchor="middle">Morfessor · FST</text>
+            <text x="525" y="144" fill="#8195b8" font-size="9" text-anchor="middle">SentencePiece</text>
+
+            <rect x="650" y="84" width="170" height="72" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="735" y="110" fill="#dbe6ff" text-anchor="middle">transformer</text>
+            <text x="735" y="128" fill="#8fa6ce" font-size="9" text-anchor="middle">encoder–decoder</text>
+            <text x="735" y="144" fill="#8fa6ce" font-size="9" text-anchor="middle">trained from scratch</text>
+
+            <rect x="860" y="84" width="170" height="72" rx="6" fill="#232a4d" stroke="#5a64a8"/>
+            <text x="945" y="110" fill="#dfe3ff" text-anchor="middle">decode</text>
+            <text x="945" y="128" fill="#9ba3d6" font-size="9" text-anchor="middle">beam search</text>
+            <text x="945" y="144" fill="#9ba3d6" font-size="9" text-anchor="middle">length-normalised score</text>
+
+            <path d="M200 120 H240" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#t-arrow)"/>
+            <path d="M400 120 H440" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#t-arrow)"/>
+            <path d="M610 120 H650" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#t-arrow)"/>
+            <path d="M820 120 H860" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#t-arrow)"/>
+          </g>
+          <text x="50" y="206" fill="#8195b8" font-size="10">The 1865 dictionary is used for vocabulary and glosses, not as a sentence-aligned corpus; alignment is built separately for every pair.</text>
+          <text x="50" y="238" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. C4 · DATA → MODEL → DECODE</text>
+        </svg>
+        <div class="plate-foot"><span>Figure C4 · translation</span><span>translation/</span></div>
+      </div>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> Sentiment</p>
+    <h2 class="paper-h2">Two axes, because “happy” is not one number</h2>
+    <p class="paper-lede">Valence says how positive or negative a line is. Arousal says how calm or intense it is. A quiet lament and a furious one are both negative, and they should not produce the same robot. The app reads both axes, from different evidence, and combines them into one of three responses.</p>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">Valence · from words</div><h3 class="paper-h3">RoBERTa first, VADER as the fallback</h3><p class="paper-p">The primary model is a pretrained RoBERTa sentiment classifier, mapped from its classes to a −1 to +1 score. VADER's compound score is the second backend, and the response always reports which one ran. Valence is never inferred from pitch: loudness and register cannot tell joy from grief without a harmonic reference, so the app does not pretend they can.</p></div>
+      <div class="paper-tile"><div class="paper-label">Arousal · words + voice</div><h3 class="paper-h3">Half text, half delivery</h3><p class="paper-p">Text arousal combines the model's emotional charge with intensifiers, exclamation marks, capitals and sentence length. Audio arousal combines pitch range, mean loudness and dynamic variance measured from the take. When a recording is present the two are averaged 50/50, so the same sentence whispered and shouted moves.</p></div>
+    </div>
+
+    <div class="paper-stats">
+      <div class="paper-stat"><b>0.15</b><span>valence threshold for joy / grief</span></div>
+      <div class="paper-stat"><b>0.5</b><span>arousal that chooses a third or a fifth</span></div>
+      <div class="paper-stat"><b>3.5 Hz</b><span>vibrato added only to grief</span></div>
+      <div class="paper-stat"><b>3</b><span>states the stage can return</span></div>
+    </div>
+
+    <p class="paper-p">The three states are deliberately asymmetric. <strong>Joy</strong> takes a major third if arousal is above 0.5, a perfect fifth if it is calm, and a triangle wave with no vibrato. <strong>Grief</strong> takes a minor third, a plain sine and a 3.5 Hz vibrato, the only state that gets one. <strong>Neutral</strong> holds a perfect fifth, a sine, no vibrato, and the resting LED. The LED eyes follow the same state: green and wide, indigo and narrow, or muted.</p>
+
+    <div class="paper-grid three" style="margin-top:24px">
+      <div class="paper-tile" style="border-color:rgba(5,150,105,.35)"><div class="paper-label" style="color:#059669">valence &gt; 0.15</div><h3 class="paper-h3">Joy</h3><p class="paper-p">Major third or perfect fifth. Triangle. No vibrato. Green eyes, pupil at its widest.</p></div>
+      <div class="paper-tile" style="border-color:rgba(129,140,248,.4)"><div class="paper-label" style="color:#5b67c9">valence &lt; −0.15</div><h3 class="paper-h3">Grief</h3><p class="paper-p">Minor third. Sine. 3.5 Hz vibrato. Indigo eyes, pupil at its narrowest.</p></div>
+      <div class="paper-tile"><div class="paper-label">−0.15 to 0.15</div><h3 class="paper-h3">Neutral</h3><p class="paper-p">Perfect fifth. Sine. No vibrato. Muted, resting eyes.</p></div>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/sentiment-classes.svg?v=1" alt="Sentiment classification results across 120 held-out lines" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure C5 · 120 held-out lines.</b> Overall three-class accuracy 80%. Positive recall 100%, negative 97.5%, neutral 42.5%: neutral is the hard class because a line with no strong words is not the same as a line with no feeling. Positive-versus-negative AUC is 1.0, so the axis the robot actually uses for joy and grief separates cleanly; neutral is the deliberate middle.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> Live demonstration</p>
+    <h2 class="paper-h2">Translate a phrase, then sing one</h2>
+    <p class="paper-lede">The first box is the real translation model. Type a Plains Cree word or phrase and it returns what the model currently produces, not a canned gloss. The second is the full pipeline: microphone, transcript, translation, valence, arousal and the LED state the robot would show.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head"><h3 class="paper-demo-title">Cree → English<span>the server's translation model</span></h3></div>
+      <!--DEMO:cree0-->
+    </div>
+
+    <div class="paper-demo" style="margin-top:22px">
+      <div class="paper-demo-head"><h3 class="paper-demo-title">The full sentiment pipeline<span>microphone → transcript → translation → valence + arousal → response</span></h3></div>
+      <!--DEMO:cree1-->
+    </div>
+    <p class="paper-caption">The mic pipeline accepts English or Cree. Choosing “Speaking Cree” routes the audio through the MMS recogniser; choosing English routes it through faster-whisper. The output panel reports which engine produced the valence.</p>
+  </section>
+
+  <section class="paper-card paper-card--tight">
+    <p class="paper-num"><b>07</b> Where the reading goes</p>
+    <h2 class="paper-h2" style="font-size:26px">A feeling is only useful if it changes something</h2>
+    <p class="paper-p">The valence and arousal pair drives the interval, oscillator, vibrato and LED state you see above. The same numbers are returned by <code>/api/analyze</code> and <code>/api/sentiment</code> for any other client. The language layer and the live harmony engine are separate on purpose: one reads meaning, the other reads pitch, and keeping them separate means a mistranslation cannot silently change a note.</p>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

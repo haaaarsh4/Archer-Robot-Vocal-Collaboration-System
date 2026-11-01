@@ -493,8 +493,27 @@ def describe(text: str) -> dict:
         "sro": sro,
         "syllabics": cans,
         "anglicized": anglicize(sro),
-        "syllables": syllabify(sro),
+        "syllables": _phrase_syllables(sro),
     }
+
+
+def _phrase_syllables(sro: str) -> list[str]:
+    """Syllables for a whole line, with the punctuation kept out of them.
+
+    :func:`syllabify` reads one word and keeps every character it is given, so
+    a comma or a space handed to it would ride inside the last syllable of the
+    word before it. The panel joins these with a separator, and `si,` did not
+    belong there. Words are split first, then each word is syllabified on its
+    own, so a hyphen (the prefix boundary in `ka-wâpamitin`) starts a fresh
+    word rather than hanging off the syllable before it.
+    """
+    import re
+
+    syllables: list[str] = []
+    for word in re.split(r"[\s,.;:!?\"“”()\[\]{}]+", sro):
+        for part in re.split(r"[-/]+", word):
+            syllables.extend(syllabify(part))
+    return syllables
 
 
 # ---------------------------------------------------------------- self-test ---

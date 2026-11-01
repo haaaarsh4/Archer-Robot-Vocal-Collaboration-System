@@ -1,0 +1,238 @@
+<div id="page-harmony" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">Harmony</p>
+    <h1 class="paper-title">Ten ways to answer <em>without</em> becoming the lead</h1>
+    <p class="paper-deck">A fixed third above the melody is one idea, repeated forever. This engine has ten musical functions instead, and a public rule for choosing between them. The first rule is not musical at all: Archer decides whether the robot may sing.</p>
+    <div class="paper-meta"><span>10 modes</span><span>sovereignty checked first</span><span>key re-estimated once a second</span><span>exact, ordered selection</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The premise</p>
+    <h2 class="paper-h2">A chord is one option, not the assumption</h2>
+    <p class="paper-lede">Traditional harmonisers assume the answer to “what should the second voice sing?” is a pitch a fixed interval away. That works for a hymn. It does not work for a solo voice carrying a phrase, because a second voice that doubles every note at a third is no longer accompanying; it is competing for the same musical role.</p>
+    <p class="paper-p">The modes here are best read as <strong>functions</strong>, not intervals. Unison shadowing reinforces identity. Drone support holds a floor. Call and response gives the singer space and then answers into it. Timbral thickening changes colour without changing pitch. Each one makes a different claim on the listener's attention, and the engine's job is to pick the claim that fits the moment.</p>
+    <div class="paper-note"><b>The design constraint that matters most:</b> the robot must be able to stop. Every musical decision sits behind a sovereignty switch that is checked before the key, the tempo, the phrase, or the singer's pitch. A harmony engine that can be talked out of silence by a fast tempo is not a collaborator.</div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> The vocabulary</p>
+    <h2 class="paper-h2">The ten functions, one by one</h2>
+    <p class="paper-lede">Five of these are chosen automatically, three are manual or configured defaults, one is fusion-only, and one is the stop. The distinction is not cosmetic: it is the difference between a behaviour the engine can infer from context and a behaviour a person has to ask for.</p>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">Automatic · default</div><h3 class="paper-h3">Unison shadowing</h3><p class="paper-p">Sings the singer's exact pitch in another voice. No interval, no scale snap. The identity is reinforcement: the same note, wider. It is the default because it is the least presumptuous thing a second voice can do.</p></div>
+      <div class="paper-tile"><div class="paper-label">Automatic · long note</div><h3 class="paper-h3">Timbral thickening</h3><p class="paper-p">Holds the same pitch but changes the vowel, brightness and attack, so the double becomes a colour rather than a copy. Triggered after a note has been sustained for thirty frames, where a second onset would sound like an error and a pitch change would sound like harmony the singer did not ask for.</p></div>
+      <div class="paper-tile"><div class="paper-label">Automatic · fast</div><h3 class="paper-h3">Contour following</h3><p class="paper-p">While the melody holds still, it sits in unison. When the pitch genuinely moves, it glides a step above a rising line or below a falling one, then settles back when the motion stops. Hysteresis keeps it from flickering at the threshold; a continuous timbre lean tracks the shape even when the pitch does not move.</p></div>
+      <div class="paper-tile"><div class="paper-label">Automatic · silence</div><h3 class="paper-h3">Drone support</h3><p class="paper-p">One note, one vowel, one breath per phrase, locked near the tonic and held under the line. It is not “the melody an octave down”; it waits for a phrase to begin, opens once, and stops when the phrase stops. The pitch is clamped into a singable low register so it stays a voice rather than a foghorn.</p></div>
+      <div class="paper-tile"><div class="paper-label">Automatic · phrase end</div><h3 class="paper-h3">Call and response</h3><p class="paper-p">When the singer stops, the answer begins: a phrase with the same rhythm as the call, arriving on the tonic by step. The live responder composes it from the last phrase; the offline renderer composes a better one from the whole take, because it can see the ending before it plays it.</p></div>
+      <div class="paper-tile"><div class="paper-label">Manual</div><h3 class="paper-h3">Octave reinforcement</h3><p class="paper-p">Doubles the line an octave down, with the three things a singer actually does on a low note: a brighter vowel, a narrower vowel, and less level. Without those, an octave double reads as the same voice gone muddy rather than a second singer joining underneath.</p></div>
+      <div class="paper-tile"><div class="paper-label">Manual</div><h3 class="paper-h3">Delayed response</h3><p class="paper-p">Sings the pitch the singer used one beat ago. The decision supplies the note; a separate echo effect supplies the repeating, decaying taps. Keeping those apart is deliberate: a delay pedal repeats whatever came out of it, and does not need to know the note.</p></div>
+      <div class="paper-tile"><div class="paper-label">Manual</div><h3 class="paper-h3">Solo humming</h3><p class="paper-p">One closed-mouth voice, barely there. It is the quietest possible presence: not a harmony, not a double, just another body in the room. Useful when the arrangement needs company without a musical statement.</p></div>
+      <div class="paper-tile"><div class="paper-label">Fusion only</div><h3 class="paper-h3">Triadic harmony</h3><p class="paper-p">A conventional chord tone above the melody, unlocked only when fusion mode is explicitly on. It is the one mode that behaves like a traditional harmoniser, and it is opt-in because that vocabulary belongs to a different musical context.</p></div>
+      <div class="paper-tile"><div class="paper-label">Override</div><h3 class="paper-h3">Protocol silence</h3><p class="paper-p">The stop. It returns no pitch, no note and no sound, and it is checked before every other branch. If sovereignty is off, or the current phoneme belongs to the protocol-sensitive set, the answer is silence even if a mode button is lit.</p></div>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> Selection</p>
+    <h2 class="paper-h2">The checklist, in the order it actually runs</h2>
+    <p class="paper-lede">There is no scoring function and no learned policy here. Selection is a short ordered list of questions; the first one that answers wins. That makes the behaviour inspectable: given the same context, you can predict the mode by reading six lines.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 690" role="img" aria-label="Flow chart of the accompaniment selection rules, first match wins">
+          <defs><marker id="h-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="690" fill="#0b1120"/>
+          <text x="50" y="48" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="22" font-weight="600">Mode selection</text>
+          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">FIRST MATCH WINS · NO SCORING</text>
+
+          <g font-family="Inter Tight, sans-serif" font-size="10.5">
+            <!-- rules -->
+            <rect x="60" y="106" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="128" fill="#e8edf7" font-size="11" text-anchor="middle">1 · protocol enabled?</text>
+            <text x="210" y="146" fill="#8195b8" font-size="9" text-anchor="middle">the sovereignty switch</text>
+
+            <rect x="60" y="190" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="212" fill="#e8edf7" font-size="11" text-anchor="middle">2 · protocol-sensitive phoneme?</text>
+            <text x="210" y="230" fill="#8195b8" font-size="9" text-anchor="middle">the protected class list</text>
+
+            <rect x="60" y="274" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="296" fill="#e8edf7" font-size="11" text-anchor="middle">3 · singer sounding?</text>
+            <text x="210" y="314" fill="#8195b8" font-size="9" text-anchor="middle">a pitch present this frame</text>
+
+            <rect x="60" y="358" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="380" fill="#e8edf7" font-size="11" text-anchor="middle">4 · fusion mode on?</text>
+            <text x="210" y="398" fill="#8195b8" font-size="9" text-anchor="middle">an explicit setting</text>
+
+            <rect x="60" y="442" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="464" fill="#e8edf7" font-size="11" text-anchor="middle">5 · tempo at or above 120?</text>
+            <text x="210" y="482" fill="#8195b8" font-size="9" text-anchor="middle">the fast-tempo threshold</text>
+
+            <rect x="60" y="526" width="300" height="54" rx="6" fill="#16233f" stroke="#34517f"/>
+            <text x="210" y="548" fill="#e8edf7" font-size="11" text-anchor="middle">6 · held for 30 frames?</text>
+            <text x="210" y="566" fill="#8195b8" font-size="9" text-anchor="middle">a sustained note</text>
+
+            <rect x="60" y="610" width="300" height="54" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="210" y="632" fill="#dbe6ff" font-size="11" text-anchor="middle">default mode (unison)</text>
+            <text x="210" y="650" fill="#8fa6ce" font-size="9" text-anchor="middle">whatever config.yaml names</text>
+
+            <!-- outcomes -->
+            <rect x="620" y="106" width="400" height="54" rx="6" fill="#2a1720" stroke="#8d4a58"/>
+            <text x="820" y="128" fill="#f0c8cf" font-size="11" text-anchor="middle">protocol silence</text>
+            <text x="820" y="146" fill="#b98a94" font-size="9" text-anchor="middle">no sound at all, before any musical test</text>
+
+            <rect x="620" y="190" width="400" height="54" rx="6" fill="#2a1720" stroke="#8d4a58"/>
+            <text x="820" y="212" fill="#f0c8cf" font-size="11" text-anchor="middle">protocol silence</text>
+            <text x="820" y="230" fill="#b98a94" font-size="9" text-anchor="middle">the current phoneme is protected</text>
+
+            <rect x="620" y="274" width="400" height="54" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="820" y="296" fill="#dbe6ff" font-size="11" text-anchor="middle">call and response, or drone</text>
+            <text x="820" y="314" fill="#8fa6ce" font-size="9" text-anchor="middle">answer if the phrase just ended; otherwise hold the floor</text>
+
+            <rect x="620" y="358" width="400" height="54" rx="6" fill="#232a4d" stroke="#5a64a8"/>
+            <text x="820" y="380" fill="#dfe3ff" font-size="11" text-anchor="middle">triadic harmony</text>
+            <text x="820" y="398" fill="#9ba3d6" font-size="9" text-anchor="middle">a chord tone above the melody, then snapped to the key</text>
+
+            <rect x="620" y="442" width="400" height="54" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="820" y="464" fill="#dbe6ff" font-size="11" text-anchor="middle">contour following</text>
+            <text x="820" y="482" fill="#8fa6ce" font-size="9" text-anchor="middle">the shadow follows the shape of the line</text>
+
+            <rect x="620" y="526" width="400" height="54" rx="6" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="820" y="548" fill="#dbe6ff" font-size="11" text-anchor="middle">timbral thickening</text>
+            <text x="820" y="566" fill="#8fa6ce" font-size="9" text-anchor="middle">same pitch, a different colour</text>
+
+            <!-- spine -->
+            <path d="M210 160 V190" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M210 244 V274" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M210 328 V358" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M210 412 V442" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M210 496 V526" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M210 580 V610" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+
+            <!-- branches -->
+            <path d="M360 133 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M360 217 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M360 301 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M360 385 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M360 469 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+            <path d="M360 553 H620" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#h-arrow)"/>
+
+            <!-- labels -->
+            <text x="226" y="180" fill="#e0a06a" font-size="8.5">YES</text>
+            <text x="226" y="264" fill="#e0a06a" font-size="8.5">NO</text>
+            <text x="226" y="348" fill="#e0a06a" font-size="8.5">YES</text>
+            <text x="226" y="432" fill="#e0a06a" font-size="8.5">NO</text>
+            <text x="226" y="516" fill="#e0a06a" font-size="8.5">NO</text>
+            <text x="226" y="600" fill="#e0a06a" font-size="8.5">NO</text>
+
+            <text x="480" y="123" fill="#e0a06a" font-size="8.5" text-anchor="middle">NO</text>
+            <text x="480" y="207" fill="#e0a06a" font-size="8.5" text-anchor="middle">YES</text>
+            <text x="480" y="291" fill="#e0a06a" font-size="8.5" text-anchor="middle">NO</text>
+            <text x="480" y="375" fill="#e0a06a" font-size="8.5" text-anchor="middle">YES</text>
+            <text x="480" y="459" fill="#e0a06a" font-size="8.5" text-anchor="middle">YES</text>
+            <text x="480" y="543" fill="#e0a06a" font-size="8.5" text-anchor="middle">YES</text>
+          </g>
+          <text x="50" y="684" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. H1 · SELECTOR · synthesis/accompaniment_modes.py</text>
+        </svg>
+        <div class="plate-foot"><span>Figure H1 · selection order</span><span>synthesis/accompaniment_modes.py</span></div>
+      </div>
+    </figure>
+
+    <div class="paper-demo hs-demo" style="margin-top:30px">
+      <div class="hs-head">
+        <h3 class="paper-demo-title">Step through the selector<span>set the context, see the mode the engine returns</span></h3>
+      </div>
+
+      <div class="hs-stage">
+        <div class="hs-group">
+          <span class="hs-label">Sovereignty</span>
+          <div class="hs-chips">
+            <button class="paper-chip is-on" id="hs-protocol" onclick="hsToggle('protocol')">ON</button>
+            <button class="paper-chip" id="hs-sensitive" onclick="hsToggle('sensitive')">sensitive phoneme</button>
+          </div>
+        </div>
+        <div class="hs-group">
+          <span class="hs-label">Singer</span>
+          <div class="hs-chips">
+            <button class="paper-chip is-on" id="hs-voiced" onclick="hsToggle('voiced')">sounding</button>
+            <button class="paper-chip" id="hs-ended" onclick="hsToggle('ended')">phrase just ended</button>
+          </div>
+        </div>
+        <div class="hs-group">
+          <span class="hs-label">Context</span>
+          <div class="hs-chips">
+            <button class="paper-chip" id="hs-fusion" onclick="hsToggle('fusion')">fusion mode</button>
+            <button class="paper-chip" id="hs-fast" onclick="hsToggle('fast')">120 bpm or faster</button>
+            <button class="paper-chip" id="hs-long" onclick="hsToggle('long')">held 30 frames</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hs-result">
+        <span class="hs-result-label">Engine returns</span>
+        <div class="paper-readout" id="hs-out"><b>unison_shadowing</b>
+The singer is sounding, the tempo is calm, and the note is new. The default mode answers.</div>
+      </div>
+
+      <p class="hs-note">The same six checks, in the same order, as <code>AccompanimentModeSelector.select</code>. Toggle a condition and watch a later branch become unreachable.</p>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/mode-decisions.svg?v=1" alt="Distribution of modes chosen across 1,000 randomised musical contexts" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure H2 · one thousand contexts.</b> Randomised protocol state, sensitivity, singer presence, phrase ending, tempo and sustain length, run through the real selector. The suite also asserts four invariants: silence whenever protocol is off, silence on a sensitive phoneme, call-and-response after a phrase, and fusion ahead of tempo. Violations: zero.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> Key and scale</p>
+    <h2 class="paper-h2">The robot never sings outside the key it has inferred</h2>
+    <p class="paper-lede">Modes that invent a pitch (contour following, the fusion chord) are rounded to the nearest degree of the inferred key before anything is sung. Modes that return the singer's own note are deliberately exempt: rounding a unison is how a double ends up a few cents beside the singer instead of with them.</p>
+    <p class="paper-p">The key is inferred once a second from the last 256 pitched frames. The distribution of pitch classes is correlated against Krumhansl–Kessler major and minor profiles, and the best-fitting root and mode become the current key. The drone is anchored to that root, not to whatever note just passed; the call-and-response answer is built from its scale degrees, not rounded into them afterwards.</p>
+    <p class="paper-p">Scale lock is therefore a small, explicit exception list, not a blanket rule. It touches contour following and triadic harmony. It does not touch unison, octave, delay, timbral thickening or drone. The reason is simple: those five already have a trustworthy pitch, and the two that do not are the two that calculate.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/key-accuracy.svg?v=1" alt="Key detection results on 120 held-out songs" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure H3 · key inference on 120 songs.</b> Scored against the written key, with relative major/minor counted separately because a relative key shares every pitch class and sounds consonant over the same material. The chart shows exact and relative agreement side by side rather than hiding the distinction in one number.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> Voice leading</p>
+    <h2 class="paper-h2">Movement is the difference between a chord and a choir</h2>
+    <p class="paper-lede">When a mode needs more than one note, the voicing search prefers the inversion that moves each voice the shortest distance from where it already was. That single constraint is what makes a sequence of chords sound like voices holding a conversation instead of a keyboard being pressed.</p>
+    <p class="paper-p">The test suite generates 120 progressions, voices each chord with the project's search and with a naive root-position baseline, and measures the total semitone movement of the upper voices plus the number of parallel perfect fifths and octaves. The search cuts mean movement from 1.56 to 0.90 semitones per transition and parallel perfects from 3.89 to 3.61 per hundred transitions, while keeping a median span of nine semitones. The point is not the decimal; it is that the improvement is measured on the same progressions the baseline sees.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/voicing-movement.svg?v=1" alt="Voice movement and parallel perfect intervals, search versus root-position baseline" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure H4 · 120 progressions, two voicing strategies.</b> Lower is better on both measures. The search never widens the span beyond an octave and a third, so the result stays singable rather than spreading into a keyboard voicing.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> Sovereignty</p>
+    <h2 class="paper-h2">The switch is not a setting. It is the first rule.</h2>
+    <p class="paper-lede">The protocol guard is checked before the key, before the tempo, before the phrase, and before any mode's own logic. When it is off, the engine returns silence with a reason, not a quiet note. When the current phoneme is in the protected class list, the same thing happens even with a mode button lit.</p>
+    <p class="paper-p">This is a political requirement expressed as control flow. The robot is a guest in Archer's performance. A guest who can only be asked to leave after the harmony has already been chosen is not a guest; it is a collaborator with veto power over silence. Putting the check first makes silence the default state and sound the exception that has to be earned.</p>
+    <div class="paper-note"><b>Try it in the demo below.</b> Turn sovereignty off, pick any mode, and sing. The mode stays selected, the meters still move, and the robot stays silent, because the check runs before the mode does.</div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>07</b> Live demonstration</p>
+    <h2 class="paper-h2">Sing one note and hear the function change</h2>
+    <p class="paper-lede">Pick a mode, allow or deny sovereignty, and sing. YIN runs in the browser; RMVPE can run on the server. The readout shows the note the robot would answer with under that function, not a pre-recorded example.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Accompaniment functions, live<span>microphone → mode → answer</span></h3>
+      </div>
+      <!--DEMO:harmony-->
+    </div>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

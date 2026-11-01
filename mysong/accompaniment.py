@@ -3,9 +3,11 @@
 MySong's paper stops at "a simple, pre-defined pattern of chord-dependent piano
 notes" and points at Band-in-a-Box for better audio.  This module goes further:
 
-* a voice-leading search over inversions, so the piano does not jump around;
-* style-specific piano, bass and drum patterns (pop, ballad, folk, jazz, waltz,
-  ambient, rock) rather than one block-chord pattern;
+* a voice-leading search over inversions, so the chordal part does not jump
+  around;
+* a band per style rather than one block-chord pattern: hand drum, round dance,
+  Métis fiddle and cedar flute come first (the music this project is for),
+  with pop, ballad, folk, jazz, waltz, ambient and rock as the other bands;
 * a small additive piano, a plucked bass, an optional pad and synthesised
   drums, all rendered offline at 44.1 kHz;
 * a convolution reverb, vocal ducking and a soft limiter for a mix that can be
@@ -29,7 +31,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import ClassVar, Iterable, Sequence
 
 import numpy as np
 
@@ -46,7 +48,7 @@ class ArrangementNote:
     duration: float    # beats
     pitch: int         # MIDI
     velocity: int      # 1..127
-    instrument: str    # "piano", "bass", "pad", "drums"
+    instrument: str    # "piano", "guitar", "bass", "pad", "drums"
     channel: int = 0
 
     @property
@@ -61,29 +63,94 @@ class ArrangementStyle:
     swing: float = 0.0           # 0..1, delays off-beats
     humanize: float = 0.5        # 0..1, timing/velocity jitter
     reverb: float = 0.22         # wet amount
-    piano: bool = True
+    #: How much this band moves from the common mix level.  A dense band at the
+    #: same RMS as a sparse one masks more of the voice, so the busiest of the
+    #: indigenous bands sits a little further back and the drum-and-bass one a
+    #: little closer; everything else stays where ``BAND_OFFSET_DB`` puts it.
+    level_db: float = 0.0
+    piano: bool = True           # the chordal or melodic slot (see programmes)
     bass: bool = True
     pad: bool = False
+    guitar: bool = False         # strummed acoustic guitar, its own slot
     drums: bool = True
     count_in_bars: int = 0
+    percussion: str = ""         # "" = the drum kit for this style's name,
+    #                              or "hand", "round_dance", "light"
+    programmes: dict[str, int] = field(default_factory=dict)  # slot -> GM programme
+
+    #: The bands this project belongs to come first in the app, in the code and
+    #: in every list the CLI prints: the hand drum, round dance, grass dance,
+    #: jingle dress, Métis fiddle and cedar flute, for a Cree and Métis artist
+    #: who has sung with a hand drum since 1982.  The Western kit is available
+    #: under "Other bands" and is not the default anywhere.
+    INDIGENOUS: ClassVar[tuple[str, ...]] = (
+        "hand_drum", "round_dance", "grass_dance", "jingle_dress",
+        "metis_fiddle", "cedar_flute",
+    )
 
     @classmethod
     def preset(cls, name: str, **overrides) -> "ArrangementStyle":
         name = (name or "pop").lower().strip()
         presets = {
-            "pop": dict(intensity=0.72, drums=True, pad=False, reverb=0.20),
-            "ballad": dict(intensity=0.50, drums=False, pad=True, reverb=0.32),
-            "folk": dict(intensity=0.60, drums=True, pad=False, reverb=0.14),
-            "jazz": dict(intensity=0.55, drums=True, pad=False, reverb=0.18, swing=0.55),
-            "waltz": dict(intensity=0.52, drums=False, pad=False, reverb=0.22),
-            "ambient": dict(intensity=0.35, drums=False, pad=True, reverb=0.45),
-            "rock": dict(intensity=0.85, drums=True, pad=False, reverb=0.12),
+            # --- the bands this project is for, first in every list --------
+            # Hand drum: the heartbeat pulse, a drone under it and two strums
+            # that leave the middle of the bar to the voice.  The high
+            # humanize is deliberate: a drum a person plays moves, and the
+            # grid-perfect pulse is the single biggest reason a generated
+            # backing reads as a machine.
+            "hand_drum": dict(intensity=0.50, drums=True, pad=False, bass=True,
+                              reverb=0.15, humanize=0.78, percussion="hand",
+                              level_db=-3.0, programmes={"piano": 25}),
+            # Round dance: steady hand drum with rattles on the eighths and a
+            # boom-chuck guitar, the shape of a northern round-dance song.
+            "round_dance": dict(intensity=0.62, drums=True, pad=False, piano=False,
+                                guitar=True, bass=True, reverb=0.16, humanize=0.72,
+                                percussion="round_dance"),
+            # Grass dance: the big drum on every beat -- the honour beat -- with
+            # the dancers' bells on the eighths and a pickup into the next bar.
+            # Drum and bass only; the harmony moves under the voices.
+            "grass_dance": dict(intensity=0.68, drums=True, pad=False, piano=False,
+                                guitar=False, bass=True, reverb=0.17, humanize=0.82,
+                                level_db=2.5, percussion="grass_dance"),
+            # Jingle dress: the side-step a jingle dancer steps on, a hand drum
+            # on the pulse with the cone jingles ringing with each step and a
+            # soft boom-chuck guitar holding the chords.
+            "jingle_dress": dict(intensity=0.55, drums=True, pad=False, piano=False,
+                                 guitar=True, bass=True, reverb=0.20, humanize=0.78,
+                                 percussion="jingle_dress"),
+            # Métis fiddle: a reel line on the fiddle over a two-step guitar
+            # and an upright two-feel bass.  No drum kit.
+            "metis_fiddle": dict(intensity=0.58, drums=False, pad=False, guitar=True,
+                                 bass=True, reverb=0.18, humanize=0.66,
+                                 programmes={"piano": 41}),
+            # Cedar flute: long tones with air around them, a soft drum and a
+            # warm pad underneath.
+            "cedar_flute": dict(intensity=0.40, drums=True, pad=True, bass=True,
+                                reverb=0.30, humanize=0.62, percussion="light",
+                                programmes={"piano": 73}),
+            # --- other bands -------------------------------------------------
+            "pop": dict(intensity=0.60, drums=True, pad=False, reverb=0.20),
+            "ballad": dict(intensity=0.46, drums=False, pad=True, reverb=0.32),
+            "folk": dict(intensity=0.54, drums=True, pad=False, reverb=0.14),
+            "jazz": dict(intensity=0.52, drums=True, pad=False, reverb=0.18, swing=0.55),
+            "waltz": dict(intensity=0.48, drums=False, pad=False, reverb=0.22),
+            "ambient": dict(intensity=0.32, drums=False, pad=True, reverb=0.45),
+            "rock": dict(intensity=0.78, drums=True, pad=False, reverb=0.12),
         }
         if name not in presets:
             raise ValueError(f"unknown style {name!r}; choose from {sorted(presets)}")
         values = dict(presets[name])
         values.update(overrides)
         return cls(name=name, **values)
+
+    @classmethod
+    def presets(cls) -> tuple[str, ...]:
+        """Every band name, the ones for this project's own music first."""
+        return (
+            "hand_drum", "round_dance", "grass_dance", "jingle_dress",
+            "metis_fiddle", "cedar_flute",
+            "pop", "ballad", "folk", "jazz", "waltz", "ambient", "rock",
+        )
 
 
 @dataclass
@@ -315,8 +382,91 @@ def _piano_pattern(
                     hit(at, 0.75, 62, voicing[1:] if len(voicing) > 1 else voicing)
         elif name == "ambient":
             hit(origin, max(0.5, bar_length - 0.1), 52)
+        elif name == "hand_drum":
+            # Two off-beat strums: the middle of the bar belongs to the voice.
+            hit(origin + 1.5, 0.4, 56, voicing[:2] if len(voicing) >= 2 else voicing)
+            hit(origin + 3.5, 0.4, 48, voicing[:2] if len(voicing) >= 2 else voicing)
+        elif name == "metis_fiddle":
+            # A reel line instead of block chords: eighths through the chord in
+            # the fiddle's own register, so the slot answers the voice rather
+            # than competing with it in the middle of the keyboard.
+            pcs = sorted({int(pitch) % 12 for pitch in voicing})
+            ladder = [pitch for pitch in range(67, 88) if pitch % 12 in pcs] or [67, 69, 71, 72]
+            steps = 8 if meter >= 4 else 6
+            step = meter / float(steps)
+            for index in range(steps):
+                at = origin + index * step
+                if at >= origin + bar_length - 1e-6:
+                    break
+                pitch = ladder[(index * 3) % len(ladder)]
+                hit(at, step * 0.92, 66 + (10 if index % 4 == 0 else 0), [pitch])
+        elif name == "cedar_flute":
+            # Long tones with air around them: the root, then a tone above it.
+            ordered = list(voicing)
+            hit(origin, min(bar_length, meter) * 0.9, 64, [ordered[0]])
+            if meter >= 4 and bar_length > meter * 0.8 and len(ordered) > 2:
+                hit(origin + meter * 0.5, meter * 0.4, 58, [ordered[2]])
         else:  # pragma: no cover - preset validation catches this
             hit(origin, min(1.5, bar_length), 80)
+        bar += 1
+    return notes
+
+
+def _guitar_pattern(
+    segment: ChordSegment,
+    voicing: Sequence[int],
+    style: ArrangementStyle,
+    meter: float,
+    rng: np.random.Generator,
+) -> list[ArrangementNote]:
+    """Strummed acoustic guitar: a boom-chuck, not a block chord.
+
+    Each string lands a few milliseconds after the one below it, which is most
+    of what separates a strummed chord from a triggered one.
+    """
+    notes: list[ArrangementNote] = []
+    if not voicing or segment.duration <= 0:
+        return notes
+    start = segment.start_beat
+    length = segment.duration
+    strings = [int(pitch) for pitch in voicing if pitch >= 52] or [int(pitch) for pitch in voicing]
+    low = int(min(voicing)) - 12
+
+    def strum(at: float, duration: float, velocity: int, pitches: Sequence[int]) -> None:
+        onset = at + rng.normal(0, 0.007 * style.humanize)
+        for index, pitch in enumerate(pitches):
+            notes.append(ArrangementNote(
+                start=max(0.0, onset + index * 0.011),
+                duration=max(0.1, duration),
+                pitch=int(pitch),
+                velocity=_velocity(velocity - index * 3, style.intensity, rng, style.humanize),
+                instrument="guitar",
+                channel=3,
+            ))
+
+    bar = 0
+    while bar * meter < length - 1e-6:
+        origin = start + bar * meter
+        bar_length = min(meter, start + length - origin)
+        if style.name == "metis_fiddle":
+            # Two-step: a bass note on 1 and 3, the chord on 2 and 4.
+            strum(origin, 0.5, 78, [low])
+            if bar_length > 1.0:
+                strum(origin + 1.0, 0.4, 70, strings)
+            if bar_length > 2.0:
+                strum(origin + 2.0, 0.5, 76, [low])
+            if bar_length > 3.0:
+                strum(origin + 3.0, 0.4, 68, strings)
+        else:
+            # Round dance: low note on the beat, chord on the off-beat.
+            for index in range(max(1, int(round(meter)))):
+                at = origin + index
+                if at >= origin + bar_length - 1e-6:
+                    break
+                if index % 2 == 0:
+                    strum(at, 0.35, 62, [low])
+                elif at + 0.5 < origin + bar_length:
+                    strum(at + 0.5, 0.3, 66, strings)
         bar += 1
     return notes
 
@@ -354,7 +504,29 @@ def _bass_pattern(
     length = segment.duration
     start = segment.start_beat
     name = style.name
-    if name == "jazz":
+    if name in ("hand_drum", "cedar_flute"):
+        # One low root per chord: a drone to sing over, not a bass line.
+        add(start, max(0.75, length - 0.05), base, 66)
+    elif name in ("grass_dance", "jingle_dress"):
+        # The drum's own pulse: one low root per beat, the fifth answering it,
+        # so the harmony moves with the dancers instead of walking anywhere.
+        beats = max(1, int(math.ceil(length - 1e-6)))
+        for index in range(beats):
+            at = start + index
+            if at >= start + length - 1e-6:
+                break
+            add(at, min(0.9, start + length - at),
+                base if index % 2 == 0 else fifth,
+                82 if index % 2 == 0 else 66)
+    elif name == "round_dance":
+        add(start, min(1.9, max(0.5, length)), base, 82)
+        if length > 2.0:
+            add(start + 2.0, min(1.8, length - 2.0), fifth, 72)
+    elif name == "metis_fiddle":
+        add(start, min(1.8, max(0.5, length)), base, 84)
+        if length > 2.0:
+            add(start + 2.0, min(1.7, length - 2.0), fifth, 74)
+    elif name == "jazz":
         # Walking quarter notes, with a chromatic approach into the next root.
         approach = None
         if next_chord is not None:
@@ -401,6 +573,7 @@ def _drum_pattern(
         pitch = {
             "kick": 36, "snare": 38, "hat": 42, "open_hat": 46, "ride": 51,
             "crash": 49, "tom_low": 45, "tom_mid": 47, "tom_high": 50,
+            "shaker": 69, "rattle": 54,
         }[instrument]
         onset = at + rng.normal(0, 0.006 * style.humanize)
         notes.append(ArrangementNote(
@@ -414,9 +587,81 @@ def _drum_pattern(
         origin = bar * meter
         if origin >= total_beats:
             break
-        if bar == 0 or bar % 8 == 0:
+        if not style.percussion and (bar == 0 or bar % 8 == 0):
+            # A cymbal is the Western kit's punctuation; the drum-led bands
+            # below never ask for one.
             hit(origin, "crash", 74)
-        if style.name == "jazz":
+        if style.percussion == "hand":
+            # The heartbeat a hand drum keeps under a song: an accented low
+            # stroke on the beat, a lighter answer to it, and space between
+            # them for the voice.
+            for beat in range(max(1, int(round(meter)))):
+                at = origin + beat
+                if at >= total_beats:
+                    break
+                accent = beat % 2 == 0
+                # Under a voice the drum is played, not struck for its own
+                # sake: the accent carries the pulse and the answer stays
+                # under the consonants instead of on top of them.
+                hit(at, "tom_low", 82 if accent else 58)
+                if not accent:
+                    hit(at + 0.5, "tom_mid", 36)
+        elif style.percussion == "round_dance":
+            # Steady pulse with rattles on the eighths.
+            for index in range(max(2, int(round(meter * 2)))):
+                at = origin + index * 0.5
+                if at >= total_beats:
+                    break
+                if index % 2 == 0:
+                    hit(at, "tom_low", 94 if index % 4 == 0 else 80)
+                else:
+                    hit(at, "tom_mid", 52)
+                hit(at, "shaker", 44 if index % 2 == 0 else 34)
+        elif style.percussion == "grass_dance":
+            # The big drum on every beat (the honour beat), the dancers' bells on
+            # the eighths and a pickup into the next bar.  No cymbal: the
+            # drum-led bands in this list never ask for one.
+            for beat in range(max(1, int(round(meter)))):
+                at = origin + beat
+                if at >= total_beats:
+                    break
+                accent = beat % 2 == 0
+                hit(at, "tom_low", 104 if accent else 88)
+                if not accent and bar % 2:
+                    hit(at + 0.5, "tom_mid", 58)
+            for index in range(max(2, int(round(meter * 2)))):
+                at = origin + index * 0.5
+                if at >= total_beats:
+                    break
+                hit(at, "rattle", 50 if index % 2 == 0 else 38)
+            if bar % 4 == 3 and meter >= 4:
+                for offset, drum, velocity in (
+                    (3.0, "tom_mid", 74), (3.5, "tom_high", 82),
+                ):
+                    if origin + offset < total_beats:
+                        hit(origin + offset, drum, velocity)
+        elif style.percussion == "jingle_dress":
+            # The side-step: a hand drum on the pulse with the cone jingles
+            # ringing as the dancer steps, so the jingles sit on the beat and
+            # on the step after it, never as a hi-hat pattern.
+            for beat in range(max(1, int(round(meter)))):
+                at = origin + beat
+                if at >= total_beats:
+                    break
+                hit(at, "tom_low", 92 if beat % 2 == 0 else 68)
+                hit(at, "shaker", 56 if beat % 2 == 0 else 46)
+                if beat % 2:
+                    hit(at + 0.5, "shaker", 34)
+        elif style.percussion == "light":
+            # Two soft strokes a bar and a quiet rattle, under a flute.
+            hit(origin, "tom_low", 68)
+            if meter >= 4:
+                hit(origin + 2.0, "tom_low", 58)
+            for index in range(max(2, int(round(meter * 2)))):
+                at = origin + index * 0.5
+                if at < total_beats:
+                    hit(at, "shaker", 36 if index % 2 == 0 else 30)
+        elif style.name == "jazz":
             for beat in np.arange(0, meter, 0.5):
                 if origin + beat >= total_beats:
                     break
@@ -501,6 +746,8 @@ def arrange(
             notes.extend(_piano_pattern(segment, voicings[index], style, meter, rng))
         if style.bass:
             notes.extend(_bass_pattern(segment, next_chord, style, meter, rng))
+        if style.guitar:
+            notes.extend(_guitar_pattern(segment, voicings[index], style, meter, rng))
         if style.pad:
             for pitch in voicings[index]:
                 notes.append(ArrangementNote(
@@ -731,6 +978,9 @@ def _render_arrangement_synth(
         elif note.instrument == "bass":
             signal = _bass_note(note.pitch, note.velocity, seconds, sample_rate)
             _add(buffer, signal, start, gain=0.55, pan=0.0)
+        elif note.instrument == "guitar":
+            signal = _piano_note(note.pitch, note.velocity, seconds * 0.8, sample_rate)
+            _add(buffer, signal, start, gain=0.30, pan=float(np.clip((note.pitch - 62) / 45.0, -0.5, 0.5)))
         elif note.instrument == "pad":
             signal = _pad_note(note.pitch, note.velocity, seconds + 0.8, sample_rate)
             _add(buffer, signal, start, gain=0.22, pan=float(np.clip((note.pitch - 60) / 50.0, -0.6, 0.6)))
@@ -837,7 +1087,7 @@ def _render_midi(
 def _stem_gain(instrument: str) -> float:
     # FluidSynth's master gain is conservative; these levels put the sampled
     # stems in the same range as the additive engine before bus compression.
-    return {"piano": 1.55, "bass": 1.35, "pad": 0.82, "drums": 1.22}.get(instrument, 0.9)
+    return {"piano": 1.55, "guitar": 1.30, "bass": 1.35, "pad": 0.82, "drums": 1.22}.get(instrument, 0.9)
 
 
 def render_arrangement_soundfont(
@@ -865,7 +1115,9 @@ def render_arrangement_soundfont(
 
     with tempfile.TemporaryDirectory(prefix="mysong-sf2-") as tmp:
         tmp_path = Path(tmp)
-        for instrument in ("piano", "bass", "pad", "drums"):
+        present = {note.instrument for note in arrangement.notes}
+        for instrument in [slot for slot in ("piano", "guitar", "bass", "pad", "drums")
+                           if slot in present]:
             notes = arrangement.notes_for(instrument)
             if not notes:
                 continue
@@ -874,6 +1126,8 @@ def render_arrangement_soundfont(
             # the same gesture would ring on a real instrument.
             if instrument == "piano":
                 notes = [replace(note, duration=note.duration + 0.18) for note in notes]
+            elif instrument == "guitar":
+                notes = [replace(note, duration=note.duration + 0.10) for note in notes]
             elif instrument == "pad":
                 notes = [replace(note, duration=note.duration + 0.5) for note in notes]
             stem_arrangement = replace(arrangement, notes=notes)
@@ -901,6 +1155,12 @@ def render_arrangement_soundfont(
                 delay = int(0.017 * sample_rate)
                 if len(stem) > delay:
                     stem[delay:, 1] += 0.22 * stem[:-delay, 0]
+            elif instrument == "guitar":
+                # A strummed guitar wants width; a short decorrelation does it
+                # without smearing the attack.
+                delay = int(0.011 * sample_rate)
+                if len(stem) > delay:
+                    stem[delay:, 1] += 0.20 * stem[:-delay, 0]
             elif instrument == "bass":
                 stem *= 0.92  # keep the low end centered and out of the way
             mix += stem
@@ -959,6 +1219,98 @@ def render_arrangement(
 # Mixing with the voice
 # --------------------------------------------------------------------------- #
 
+#: The band every path uses unless it is told otherwise: the hand drum this
+#: project's artist has sung with since 1982, not a generic pop kit.
+DEFAULT_BAND = "hand_drum"
+
+#: Level targets for the voice-over-band mix.  The voice is levelled to
+#: ``VOICE_RMS`` and the band is then placed ``BAND_OFFSET_DB`` under it.  A
+#: dense polyphonic band at the same RMS as a single voice still buries that
+#: voice, which is exactly what this mix got wrong when it levelled nothing and
+#: relied on the recording's own level.
+VOICE_RMS = 0.18
+#: How far under the voice the band sits, in dB, before ducking.  Public
+#: because the app lets the user trim it from the panel.
+BAND_OFFSET_DB = -10.0
+_MAX_VOICE_BOOST = 16.0   # +24 dB, enough for a quiet phone recording
+
+#: Every generated band the app plays is written at one reference RMS, the same
+#: way the DSP vocable is levelled to its own target, so a slider means the
+#: same thing from one render and one band to the next.  The panel then places
+#: that stem under the take with :func:`band_placement_gain_db`.
+BAND_STEM_RMS = 0.1
+
+
+def _highpass_voice(vocal: np.ndarray, sample_rate: int) -> np.ndarray:
+    """The take without its rumble, and the signal every level is read from."""
+    from scipy.signal import butter, sosfiltfilt
+
+    vocal = np.asarray(vocal, dtype=np.float64).reshape(-1)
+    if vocal.size == 0:
+        return vocal.astype(np.float32)
+    sos = butter(2, 75.0, btype="high", fs=sample_rate, output="sos")
+    return sosfiltfilt(sos, vocal).astype(np.float32)
+
+
+def _voice_gain(voice: np.ndarray, *, voice_rms: float = VOICE_RMS) -> float:
+    """How far a take has to move to reach ``voice_rms`` (boost is capped)."""
+    rms = float(np.sqrt(np.mean(np.asarray(voice, dtype=np.float64) ** 2)) + 1e-9)
+    return float(min(_MAX_VOICE_BOOST, voice_rms / rms))
+
+
+def level_band_stem(band: np.ndarray, *, reference_rms: float = BAND_STEM_RMS) -> np.ndarray:
+    """Write a rendered band at the one level the app's player expects.
+
+    A renderer writes a full-scale band whichever style it rendered, while the
+    take beside it is whatever the person recorded, so the raw render says
+    nothing about how loud the band should sit.  Normalising the stem to
+    ``reference_rms`` and letting the page place it with
+    :func:`band_placement_gain_db` is what keeps the two sliders meaning the
+    same thing on every render, and keeps the downloaded band a usable stem
+    rather than a file scaled down for one particular take.
+
+    The RMS is measured and set *after* the peak is made safe, not before: a
+    soft limiter that drives low levels up would otherwise return a stem about
+    2 dB hotter than the placement arithmetic assumes.
+    """
+    band = np.asarray(band, dtype=np.float32)
+    if band.size == 0:
+        return band
+    if band.ndim == 1:
+        band = np.stack([band, band], axis=1)
+    peak = float(np.max(np.abs(band)))
+    if peak > 0.95:
+        band = band * (0.95 / peak)
+    rms = float(np.sqrt(np.mean(band.astype(np.float64) ** 2)) + 1e-9)
+    if rms > 1e-6:
+        band = band * float(reference_rms / rms)
+    return band.astype(np.float32)
+
+
+def band_placement_gain_db(
+    vocal: np.ndarray,
+    *,
+    sample_rate: int,
+    band_offset_db: float = BAND_OFFSET_DB,
+    reference_rms: float = BAND_STEM_RMS,
+) -> float:
+    """How far to pull the band stem down so it sits under *this* take.
+
+    The page plays the take itself, untouched, at its own recorded level, so
+    the band has to be placed relative to that level rather than to any fixed
+    number: a quiet phone recording and a loud studio take both get the same
+    balance, which is the one the rendered mix has (``band_offset_db``).
+    """
+    voice = _highpass_voice(vocal, sample_rate)
+    if voice.size == 0:
+        return 0.0
+    rms = float(np.sqrt(np.mean(voice.astype(np.float64) ** 2)) + 1e-9)
+    target = rms * 10 ** (band_offset_db / 20.0)
+    if target <= 0 or reference_rms <= 0:
+        return 0.0
+    return float(20.0 * math.log10(target / reference_rms))
+
+
 def mix_with_vocal(
     accompaniment: np.ndarray,
     vocal: np.ndarray,
@@ -966,11 +1318,18 @@ def mix_with_vocal(
     sample_rate: int,
     offset_seconds: float = 0.0,
     vocal_gain_db: float = 0.0,
-    duck_db: float = 3.0,
+    duck_db: float = 6.0,
+    band_offset_db: float = BAND_OFFSET_DB,
+    voice_rms: float = VOICE_RMS,
 ) -> np.ndarray:
-    """Place a vocal over an arrangement, ducking the band under it."""
-    from scipy.signal import butter, sosfiltfilt
+    """Place a vocal over an arrangement with the voice on top.
 
+    Both parts are levelled explicitly instead of trusting the absolute level
+    of the recording or of the renderer: the voice is normalised to
+    ``voice_rms`` and the band is set ``band_offset_db`` under it, then ducked
+    further while the voice is singing.  ``vocal_gain_db`` is the user's trim
+    on the voice ("track volume"); ``band_offset_db`` moves the whole band.
+    """
     if vocal.ndim > 1:
         vocal = vocal.mean(axis=1)
     if accompaniment.ndim == 1:
@@ -978,27 +1337,39 @@ def mix_with_vocal(
     start = max(0, int(round(offset_seconds * sample_rate)))
     length = max(len(accompaniment), start + len(vocal))
     out = np.zeros((length, 2), dtype=np.float32)
-    out[: len(accompaniment)] += accompaniment
     if len(vocal) == 0:
+        out[: len(accompaniment)] += accompaniment
         return out
 
-    sos = butter(2, 75.0, btype="high", fs=sample_rate, output="sos")
-    voice = sosfiltfilt(sos, vocal.astype(np.float64)).astype(np.float32)
+    voice = _highpass_voice(vocal, sample_rate)
     gain = 10 ** (vocal_gain_db / 20.0)
-    # Level the voice against the band rather than letting the recording's
-    # absolute level decide the mix.
-    rms = float(np.sqrt(np.mean(voice ** 2)) + 1e-9)
-    voice *= min(2.0, 0.12 / rms) * gain
+
+    # 1. Level the voice.  A real take can be 20 dB quieter than the band, so
+    #    the boost is generous; the cap only stops a silent file from being
+    #    amplified into noise.
+    voice = voice * (_voice_gain(voice, voice_rms=voice_rms) * gain)
     voice = _soft_limit(voice, ceiling=0.98)
 
-    # Duck the band with a smoothed vocal envelope.
+    # 2. Level the band against the levelled voice, whatever the renderer
+    #    produced, so every style sits in the same place under the voice.
+    band = accompaniment.astype(np.float32)
+    band_rms = float(np.sqrt(np.mean(band.astype(np.float64) ** 2)) + 1e-9)
+    if band_rms > 1e-6:
+        target = voice_rms * gain * 10 ** (band_offset_db / 20.0)
+        band = band * float(target / band_rms)
+
+    # 3. Duck the band with a smoothed vocal envelope.
     envelope = np.abs(voice)
     window = max(1, int(0.08 * sample_rate))
     kernel = np.ones(window) / window
     smoothed = np.convolve(envelope, kernel, mode="same")
     duck = 1.0 - (1.0 - 10 ** (-duck_db / 20.0)) * np.clip(smoothed / 0.08, 0.0, 1.0)
-    out[start:start + len(voice), 0] += voice * duck
-    out[start:start + len(voice), 1] += voice * duck
+    span_end = min(start + len(voice), len(band))
+    band[start:span_end] *= duck[: span_end - start, None]
+
+    out[: len(band)] += band
+    out[start:start + len(voice), 0] += voice
+    out[start:start + len(voice), 1] += voice
 
     # A little vocal reverb, without drowning the words.
     wet = np.zeros_like(out)
@@ -1093,9 +1464,15 @@ def write_midi(
             melody.append((finish, bytes([0x80, pitch & 0x7F, 0])))
     tracks.append(_track_chunk(melody))
 
-    programs = {"piano": (0, 0), "bass": (1, 32), "pad": (2, 89), "drums": (9, 0)}
+    programs = {"piano": (0, 0), "bass": (1, 32), "pad": (2, 89), "guitar": (3, 25),
+                "drums": (9, 0)}
+    # A band can re-point a slot at a different General MIDI instrument: the
+    # "piano" slot carries the fiddle in the Métis fiddle band and the flute in
+    # the cedar flute band, which is why the slot is not named after one voice.
+    overrides = dict(getattr(arrangement.style, "programmes", {}) or {})
     for instrument, (channel, program) in programs.items():
         events: list[tuple[int, bytes]] = [(0, _track_name(instrument.title()))]
+        program = int(overrides.get(instrument, program))
         if channel != 9:
             events.append((0, bytes([0xC0 | channel, program & 0x7F])))
         for note in arrangement.notes_for(instrument):

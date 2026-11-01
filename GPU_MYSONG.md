@@ -114,10 +114,19 @@ The output directory must contain both:
 ```
 data/mysong/model/mysong_large.npz
 data/mysong/model/mysong_large_tagger.npz
+data/mysong/model/mysong_large_tagger2.npz   # optional second seed -> ensemble
 ```
 
 `MySongModel.load("data/mysong/model/mysong_large.npz")` looks for the tagger
-next to the structural model.  The `.pt` copy is optional.
+next to the structural model, and loads a sibling `_tagger2.npz` as a two-model
+ensemble when it is there.  The `.pt` copy is optional.
+
+The whole recipe — corpora, integrity check, resumable training, evaluation,
+tests, listening render, packaging — is the Colab notebook
+[`MySong_Colab_Training.ipynb`](MySong_Colab_Training.ipynb): drop it into Colab,
+pick a GPU runtime, `Run all`.  It rewrites the tagger block in the structural
+model's metadata as it assembles the checkpoint, so `python -m mysong.cli
+status` and the model card describe the tagger that is actually attached.
 
 ## 4. Evaluate on the clean test split
 
@@ -137,9 +146,14 @@ To use the large model as the package default:
 cp data/mysong/model/mysong.npz data/mysong/model/mysong_small_backup.npz
 cp data/mysong/model/mysong_large.npz data/mysong/model/mysong.npz
 cp data/mysong/model/mysong_large_tagger.npz data/mysong/model/mysong_tagger.npz
+cp data/mysong/model/mysong_large_tagger.pt data/mysong/model/mysong_tagger.pt
+cp data/mysong/model/mysong_large_tagger2.npz data/mysong/model/mysong_tagger2.npz
+python -m mysong.cli status      # reports the tagger it loaded
 ```
 
 Keep the backup; the small model is the fallback on machines without PyTorch.
+The promotion the notebook's `promote` flag performs keeps the previous defaults
+in `data/mysong/model/mysong_pre_large_backup/` instead.
 
 ## 5. Install the good-sounding renderer
 
@@ -166,9 +180,12 @@ deterministic tests and for machines without FluidSynth.
 ## 6. What “done” means
 
 - [ ] `data/mysong/corpus_extra.jsonl` has about 4,571 scores and zero melody-signature overlap with the OpenEWLD test split.
-- [ ] `data/mysong/model/mysong_large.npz` and `mysong_large_tagger.npz` exist.
+- [ ] `data/mysong/model/mysong_large.npz` and `mysong_large_tagger.npz` exist
+      (plus `mysong_large_tagger2.npz` for the shipped two-seed ensemble).
 - [ ] `python -m mysong.cli evaluate --model ... --split test` runs and the
       number is recorded in `docs/mysong.md`.
+- [ ] `python -m mysong.cli status` names the tagger that is actually attached
+      (units, ensemble size) rather than the tagger the base model was fitted with.
 - [ ] `--renderer soundfont` produces finite, non-silent audio.
 - [ ] A held-out take has been listened to, not just scored.
 - [ ] The model card records the exact corpus counts, licenses and split.

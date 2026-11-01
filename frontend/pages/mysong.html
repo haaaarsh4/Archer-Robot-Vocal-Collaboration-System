@@ -1,0 +1,183 @@
+<div id="page-mysong" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">MySong</p>
+    <h1 class="paper-title">Chords that follow <em>the melody</em>, not a grid</h1>
+    <p class="paper-deck">MySong reads a vocal melody, infers its key, chooses a chord sequence, and arranges a band around it. It began as a reimplementation of Microsoft's 2008 MySong and became a different decoder: flexible harmonic rhythm, a learned chord classifier, an exact semi-Markov search, and a band that knows more than one tradition.</p>
+    <div class="paper-meta"><span>semi-Markov HMM</span><span>60 chord states</span><span>24-way key classifier</span><span>Indigenous band presets first</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The problem</p>
+    <h2 class="paper-h2">A melody does not come with its harmony</h2>
+    <p class="paper-lede">Given only a tune, there are usually many chord sequences that fit. A good accompaniment is not the one with the most correct labels; it is the one that supports the phrase, changes when the phrase changes, and leaves room for the voice. That is a sequence problem, not a classification problem.</p>
+    <p class="paper-p">The 2008 paper framed it as a hidden Markov model: one node per measure, sixty chord states, a transition matrix learned from lead sheets, and a melody observation table. Viterbi finds the most likely path. It is elegant, fast, and it assumes one chord per bar, which is exactly the assumption most real songs break.</p>
+    <p class="paper-p">This implementation keeps the probabilistic framing and removes the grid. A chord can last 1, 2, 3, 4, 6, 8, 12 or 16 quarter notes, with a duration prior learned per meter and a separate prior for where in the bar changes happen. The decoder is a semi-Markov HMM, so a chord can begin on any beat. A truncated final chord is allowed, which means a 67-beat take does not have to pretend it is 68.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 360" role="img" aria-label="MySong decoding: melody to chroma to semi-Markov Viterbi to chords and band">
+          <defs><marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="360" fill="#0b1120"/>
+          <text x="50" y="50" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="22" font-weight="600">From a sung note to a band</text>
+          <text x="50" y="72" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">ONE PASS · NO SAMPLING · REPRODUCIBLE</text>
+
+          <g font-family="Inter Tight, sans-serif" font-size="10.5">
+            <rect x="50" y="110" width="160" height="86" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="130" y="138" fill="#e8edf7" text-anchor="middle">vocal take</text>
+            <text x="130" y="158" fill="#8195b8" font-size="9" text-anchor="middle">pitch track</text>
+            <text x="130" y="176" fill="#8195b8" font-size="9" text-anchor="middle">or symbolic notes</text>
+
+            <rect x="250" y="110" width="160" height="86" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="330" y="138" fill="#e8edf7" text-anchor="middle">features</text>
+            <text x="330" y="158" fill="#8195b8" font-size="9" text-anchor="middle">metric chroma</text>
+            <text x="330" y="176" fill="#8195b8" font-size="9" text-anchor="middle">onset · tail · phase</text>
+
+            <rect x="450" y="110" width="180" height="86" rx="7" fill="#1b2b4d" stroke="#4265a0"/>
+            <text x="540" y="138" fill="#dbe6ff" text-anchor="middle">observation</text>
+            <text x="540" y="158" fill="#8fa6ce" font-size="9" text-anchor="middle">BiGRU tagger</text>
+            <text x="540" y="176" fill="#8fa6ce" font-size="9" text-anchor="middle">or logistic classifier</text>
+
+            <rect x="670" y="110" width="180" height="86" rx="7" fill="#232a4d" stroke="#5a64a8"/>
+            <text x="760" y="138" fill="#dfe3ff" text-anchor="middle">decoder</text>
+            <text x="760" y="158" fill="#9ba3d6" font-size="9" text-anchor="middle">semi-Markov Viterbi</text>
+            <text x="760" y="176" fill="#9ba3d6" font-size="9" text-anchor="middle">exact, no beam</text>
+
+            <rect x="890" y="110" width="140" height="86" rx="7" fill="#16233f" stroke="#34517f"/>
+            <text x="960" y="138" fill="#e8edf7" text-anchor="middle">arrangement</text>
+            <text x="960" y="158" fill="#8195b8" font-size="9" text-anchor="middle">piano · bass</text>
+            <text x="960" y="176" fill="#8195b8" font-size="9" text-anchor="middle">drums · pad</text>
+
+            <path d="M210 153 H250" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#m-arrow)"/>
+            <path d="M410 153 H450" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#m-arrow)"/>
+            <path d="M630 153 H670" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#m-arrow)"/>
+            <path d="M850 153 H890" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#m-arrow)"/>
+
+            <text x="50" y="244" fill="#8195b8" font-size="9.5">Duration prior: 1, 2, 3, 4, 6, 8, 12, 16 quarters, learned per meter, plus a bar-phase prior.</text>
+            <text x="50" y="264" fill="#8195b8" font-size="9.5">Key: a 24-way linear classifier over the twelve pitch classes, then the sequence likelihood breaks near-ties.</text>
+            <text x="50" y="284" fill="#8195b8" font-size="9.5">Extensions: chosen from P(extension | core triad, mode), weighted by whether the melody contains the added pitch classes.</text>
+          </g>
+          <text x="50" y="336" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" letter-spacing="1.5">FIG. M1 · DECODER</text>
+        </svg>
+        <div class="plate-foot"><span>Figure M1 · the decode path</span><span>mysong/harmonize.py</span></div>
+      </div>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> What changed</p>
+    <h2 class="paper-h2">Six changes from the paper, each with a reason</h2>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">01 · Harmonic rhythm</div><h3 class="paper-h3">Chords can change on any beat</h3><p class="paper-p">A fixed one-chord-per-bar grid cannot express a two-chord bar or a chord held for four bars. The semi-Markov decoder scores spans of eight possible durations, with priors learned per meter. The paper's fixed grid is still available as an evaluation baseline.</p></div>
+      <div class="paper-tile"><div class="paper-label">02 · Observation model</div><h3 class="paper-h3">A classifier, not a duration table</h3><p class="paper-p">The paper's P(note | chord) table ignores note order and octave. This implementation fits a multinomial logistic regression on 52 features: metric chroma, downbeat chroma, onset chroma, tail chroma, log duration, bar phase and mode. It is exported to numpy, so inference needs no scikit-learn.</p></div>
+      <div class="paper-tile"><div class="paper-label">03 · Key</div><h3 class="paper-h3">A learned 24-way classifier</h3><p class="paper-p">Krumhansl–Schmuckler correlation gets 55% exact key accuracy on held-out OpenEWLD, mostly confusing a key with its relative major or minor. A linear classifier trained on the corpus's key labels, transposition-augmented across all 24 keys, reaches 93.2% on the test split. It is a 24 × 12 matrix, not a model file.</p></div>
+      <div class="paper-tile"><div class="paper-label">04 · Context</div><h3 class="paper-h3">A BiGRU tagger sees the phrase</h3><p class="paper-p">A span classifier cannot see what came before it. A two-layer bidirectional GRU over per-beat features emits 60 chord log-probabilities per beat. It is trained with label smoothing and early stopping on a validation split carved out of the training songs. When its weights are present it is the observation model; otherwise the numpy classifier runs.</p></div>
+      <div class="paper-tile"><div class="paper-label">05 · Inference</div><h3 class="paper-h3">Exact paths, real posteriors</h3><p class="paper-p">Viterbi over the semi-Markov model is exact. Forward–backward gives a posterior over chords for every span, so the panel can show alternatives and confidence. The posterior is tempered per beat before display because tagger errors are correlated; without that, every long chord reads as 100%. The mean chosen confidence is 0.62 against 0.53 core accuracy.</p></div>
+      <div class="paper-tile"><div class="paper-label">06 · Sound</div><h3 class="paper-h3">Sampled instruments, arranged</h3><p class="paper-p">The first renderer was additive numpy: clean and plainly an oscillator. The default now renders each stem through FluidSynth and a General MIDI SoundFont, then applies balance, stereo width, convolution room, bus compression and a limiter. The numpy synth remains the deterministic fallback, and a MIDI file is always written.</p></div>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> The band</p>
+    <h2 class="paper-h2">The first six presets are for this music</h2>
+    <p class="paper-lede">A Cree or Métis song should not have to sound like a pop demo before it can sound like itself. The band presets lead with the forms this project is for, and the Western styles sit after them as additional choices, not as the default frame.</p>
+
+    <div class="paper-grid three" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">Hand drum</div><h3 class="paper-h3">Voice and frame drum</h3><p class="paper-p">A steady hand-drum pattern with bass and guitar support, no pad. The drum is the centre; the harmony stays out of its way.</p></div>
+      <div class="paper-tile"><div class="paper-label">Round dance</div><h3 class="paper-h3">Fuller, moving</h3><p class="paper-p">Hand drum, rattles, boom-chuck guitar and bass. The fullest of the six, and the default for the SingSong panel's built-in band.</p></div>
+      <div class="paper-tile"><div class="paper-label">Grass dance</div><h3 class="paper-h3">Fast, percussive</h3><p class="paper-p">A denser percussion pattern and a higher intensity. The arrangement leans forward rather than settling under the voice.</p></div>
+      <div class="paper-tile"><div class="paper-label">Jingle dress</div><h3 class="paper-h3">Bright, shimmering</h3><p class="paper-p">A lighter percussion pattern with the jingle texture implied by the rhythm and the high end. The voice stays on top.</p></div>
+      <div class="paper-tile"><div class="paper-label">Métis fiddle</div><h3 class="paper-h3">Fiddle-led</h3><p class="paper-p">No drum kit; fiddle, guitar and bass. The melody instrument answers the vocal rather than doubling it.</p></div>
+      <div class="paper-tile"><div class="paper-label">Cedar flute</div><h3 class="paper-h3">Sparse, breathy</h3><p class="paper-p">Flute, light percussion, bass and pad. The quietest band, built for a voice that needs space around it.</p></div>
+    </div>
+    <p class="paper-caption">After these six come pop, ballad, folk, jazz, waltz, ambient and rock. Every preset sets its own instrumentation, intensity, swing, humanisation and level. The style is a choice in the panel, not a guess made from the melody.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Hear the decoder on a real take<span>a 14-second vocal, a hand-drum band, and the mix</span></h3>
+      </div>
+      <div class="audio-matrix">
+        <table>
+          <tr><th>Source</th><td><audio controls preload="none" src="/static/assets/audio/mysong-examples/take.mp3"></audio><p class="audio-name"><b>The take</b>the vocal as it went in, no band</p></td></tr>
+          <tr class="is-highlight"><th>Band</th><td><audio controls preload="none" src="/static/assets/audio/mysong-examples/hand-drum-band.mp3"></audio><p class="audio-name"><b>Hand drum, band only</b>B major · 120.2 BPM · 3 segments</p></td></tr>
+          <tr class="is-highlight"><th>Mix</th><td><audio controls preload="none" src="/static/assets/audio/mysong-examples/hand-drum-mix.mp3"></audio><p class="audio-name"><b>Take + band</b>the band placed 16.2 dB under the voice</p></td></tr>
+        </table>
+      </div>
+      <p class="paper-caption" style="margin-top:16px">Rendered by the same endpoint the upload panel uses. The readouts are the server's own headers, not a second analysis pass: key B, tempo 120.2, three chord spans, zero warnings.</p>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> Training</p>
+    <h2 class="paper-h2">Five hundred songs to prove it, four thousand to hear it</h2>
+    <p class="paper-lede">The base corpus is OpenEWLD, the public-domain subset of the Essen folksong collection: 502 songs, 52,417 melody notes, 19,569 chord spans. Splits are by song, 409 train, 49 dev, 44 test. The model is deterministic given a seed.</p>
+    <p class="paper-p">Five hundred lead sheets are enough to prove a decoder; making the observer strong takes more, which is why the large corpus exists. It is built from the 5,204-score AutoHarmonizer/Wikifonia archive, with two kinds of duplicate removed: normalised title and, more importantly, a transposition-invariant melody signature. Title matching alone missed 40 of the 44 test songs; the signature check removes them. The result is 4,571 extra scores with zero melody overlap against OpenEWLD train, dev or test.</p>
+    <p class="paper-p">The large tagger is trained by streaming one score at a time and keeping only the per-beat features. A naive load of five thousand songs plus the training graph exceeded 10 GB on a 27 GB laptop; the streaming path stays around 1.5 GB. The structural tables still come from OpenEWLD, which isolates the effect of the extra data and keeps the evaluation honest.</p>
+
+    <div class="paper-stats">
+      <div class="paper-stat"><b>502</b><span>base songs</span></div>
+      <div class="paper-stat"><b>4,571</b><span>auxiliary scores, deduplicated</span></div>
+      <div class="paper-stat"><b>44</b><span>held-out test songs</span></div>
+      <div class="paper-stat"><b>2 × 256</b><span>BiGRU ensemble units</span></div>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> Results</p>
+    <h2 class="paper-h2">Measured against three baselines, not against a feeling</h2>
+    <p class="paper-lede">Accuracy is frame-weighted at quarter-beat resolution against the lead sheet, at three levels: root, core (root plus one of the five triads) and full (exact extension). Key is exact key and mode; changes is F1 of chord-change positions within half a beat.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>System</th><th>root</th><th>core</th><th>full</th><th>key</th><th>changes</th></tr></thead>
+        <tbody>
+          <tr><td>Two-tagger ensemble · shipped</td><td class="num">0.604</td><td class="num">0.576</td><td class="num">0.312</td><td class="num">0.977</td><td class="num">0.591</td></tr>
+          <tr><td>Single 256-unit tagger</td><td class="num">0.592</td><td class="num">0.560</td><td class="num">0.315</td><td class="num">0.955</td><td class="num">0.600</td></tr>
+          <tr><td>128-unit tagger (ablation)</td><td class="num">0.544</td><td class="num">0.522</td><td class="num">0.299</td><td class="num">0.932</td><td class="num">0.552</td></tr>
+          <tr><td>Fixed bar, large tagger</td><td class="num">0.584</td><td class="num">0.559</td><td class="num">n/a</td><td class="num">1.000</td><td class="num">n/a</td></tr>
+          <tr><td>Template matching</td><td class="num">0.406</td><td class="num">0.353</td><td class="num">n/a</td><td class="num">1.000</td><td class="num">n/a</td></tr>
+          <tr><td>Paper's generative observation</td><td class="num">0.249</td><td class="num">0.206</td><td class="num">0.146</td><td class="num">1.000</td><td class="num">0.600</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-caption">44 held-out songs, 2026-10-27. Key is a 24-way classifier; the fixed-bar and template rows do not predict extensions, hence the dashes. The generative row uses the paper's P(note | chord) observation with the same transitions, durations and decoder, so the comparison isolates the observation model.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/mysong-baselines.svg?v=1" alt="Root accuracy of the shipped model against fixed-bar, template and generative baselines" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure M2 · root accuracy.</b> The shipped ensemble reaches 0.604 against 0.249 for the paper's generative observation and 0.406 for template matching. The improvement is not a tuning artefact: the baselines share the decoder, the transitions and the test split.</figcaption>
+    </figure>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/mysong-scores.svg?v=1" alt="Root, core, full, key and change detection scores of the shipped model" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure M3 · the shipped model, five measures.</b> Exact extensions are the hardest level (0.312) because the corpus annotates dense jazz symbols, not because the triad is wrong. Key is 0.977 exact with the learned classifier, which is what makes the rest of the decode stable.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> The mix</p>
+    <h2 class="paper-h2">The band is placed under the voice, not beside it</h2>
+    <p class="paper-lede">A generated band that sits at the same level as the singer is not an accompaniment. The renderer writes the band at one reference level and then places it under this particular take, so the balance does not depend on how loud the recording happened to be.</p>
+    <p class="paper-p">Across twelve renders the voice sat between 8.6 and 18.9 dB above the band, with a median of 13.0 dB. The spread is intentional: a sparse hand-drum arrangement can sit closer than a dense round-dance band without masking the voice. The loudest peak was 0.76 full scale, so the limiter is not working overtime to rescue a hot mix.</p>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/band-balance.svg?v=1" alt="Voice-over-band level per arrangement style across twelve renders" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure M4 · voice over band, per style.</b> Twelve renders across the six Indigenous presets. Every style lands on the voice side of the balance; the differences track how dense the arrangement is, not a random level.</figcaption>
+    </figure>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Try MySong on your own take<span>upload a vocal, choose a band, get a mix and a MIDI file</span></h3>
+        <button class="paper-btn" onclick="showUploadTool('mysong')">Open the MySong panel</button>
+      </div>
+      <div class="paper-readout" id="ms-page-status">Checking the model on this machine…</div>
+      <p class="paper-quiet" style="margin-top:10px">The panel is on the Live Demo page, in the same upload tool as SingSong. It reports the detected key, tempo and chord segments in the response headers, which is how the example above was labelled.</p>
+    </div>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

@@ -257,24 +257,33 @@ this isolates the effect of adding data and keeps the evaluation honest.
 ```bash
 python tools/build_autoharmonizer_corpus.py --workers 8
 python tools/train_mysong_tagger_large.py \
-  --epochs 15 --hidden 192 \
+  --epochs 60 --hidden 256 \
   --out-model data/mysong/model/mysong_large.npz
 ```
 
 On a GPU server use `--device cuda` and [GPU_MYSONG.md](../GPU_MYSONG.md).  The
 checkpoint is always written as CPU tensors, so inference does not need CUDA.
+The supported GPU path for the shipped weights — 60 epochs, two seeds for the
+ensemble, checkpoints every 10 epochs, and the tagger metadata rewritten on the
+structural model — is the Colab notebook
+[`MySong_Colab_Training.ipynb`](../MySong_Colab_Training.ipynb).
 
 Model artefacts:
 
 | File | Contents | Size |
 |---|---|---|
-| `data/mysong/model/mysong.npz` | transitions, start/end, duration/phase priors, extension/bass tables, chord classifier, key classifier, key profiles, metadata | ~75 KiB |
-| `data/mysong/model/mysong_tagger.npz` | 192-unit BiGRU weights + architecture metadata, plain numpy (a `.pt` copy is written too) | ~4.1 MB |
+| `data/mysong/model/mysong.npz` | transitions, start/end, duration/phase priors, extension/bass tables, chord classifier, key classifier, key profiles, metadata — including the attached tagger's architecture and run report | ~75 KiB |
+| `data/mysong/model/mysong_tagger.npz` | 256-unit BiGRU weights + architecture metadata, plain numpy (a `.pt` copy is written too) | ~7.1 MiB |
+| `data/mysong/model/mysong_tagger2.npz` | the second 256-unit tagger (same data, different seed); `MySongModel.load` loads it as a 2-model log-probability ensemble | ~7.1 MiB |
 | `data/mysong/model/mysong_large.npz` | the same structural model, paired with the large-corpus tagger | ~75 KiB |
-| `data/mysong/model/mysong_large_tagger.npz` | 192-unit BiGRU trained on 4,571 deduplicated extra scores | ~4.1 MB |
+| `data/mysong/model/mysong_large_tagger.npz` | the ensemble's first 256-unit BiGRU, trained on 4,571 deduplicated extra scores | ~7.1 MiB |
+| `data/mysong/model/mysong_large_tagger2.npz` | the ensemble's second tagger | ~7.1 MiB |
 | `data/mysong/model/mysong_tagger_archive_small.npz` | 128-unit BiGRU kept for the ablation row | ~1.9 MB |
 
-`python -m mysong.cli status` reports which parts are present.
+`python -m mysong.cli status` reports which parts are present.  The shipped
+weights come from the Colab notebook [`MySong_Colab_Training.ipynb`](../MySong_Colab_Training.ipynb);
+`reports/mysong_colab/model_card.md` records the run, the corpus counts, the
+assembly hashes and the ablation behind the table below.
 
 ---
 
@@ -288,15 +297,16 @@ The baselines are the paper's fixed one-chord-per-bar model, a key-aware
 template matcher, and the paper's generative observation with everything else
 unchanged.
 
-### Test split (44 held-out songs, 2026-10-20)
+### Test split (44 held-out songs, 2026-10-27)
 
 | System | root | core | full | key | changes |
 |---|---:|---:|---:|---:|---:|
-| **large corpus, auto key** | **0.592** | **0.560** | **0.322** | **0.977** | **0.595** |
-| large corpus, oracle key | 0.595 | 0.564 | 0.324 | 1.000 | 0.595 |
+| **256-unit two-tagger ensemble, auto key (shipped)** | **0.604** | **0.576** | **0.312** | **0.977** | **0.591** |
+| 256-unit two-tagger ensemble, oracle key | 0.606 | 0.577 | 0.312 | 1.000 | 0.592 |
+| single 256-unit tagger, auto key (ensemble ablation) | 0.592 | 0.560 | 0.315 | 0.955 | 0.600 |
+| 192-unit tagger, auto key (2026-10-20 run) | 0.592 | 0.560 | 0.322 | 0.977 | 0.595 |
 | 128-unit tagger, auto key (ablation) | 0.544 | 0.522 | 0.299 | 0.932 | 0.552 |
-| fixed bar, 128-unit tagger | 0.543 | 0.524 | - | 1.000 | - |
-| fixed bar, large tagger | 0.579 | 0.553 | - | 1.000 | - |
+| fixed bar, large tagger | 0.584 | 0.559 | - | 1.000 | - |
 | template matching | 0.406 | 0.353 | - | 1.000 | - |
 | paper's generative observation | 0.249 | 0.206 | 0.146 | 1.000 | 0.600 |
 
@@ -312,11 +322,17 @@ is therefore the honest held-out number for the shipped model. The previous
 corpus, scored 0.544 root / 0.932 exact key; the larger network and the extra
 in-domain examples bought about five points of root accuracy.
 
+The second tagger is a different seed over the same data, so it costs one extra
+training run and no extra data; averaging the two log-probability fields buys
+0.012 root and 0.022 exact key over the single tagger, which is what the table
+above ships.
+
 One intermediate result is worth recording because it was wrong: deduplicating
 the auxiliary archive by title alone gave a **0.73 root** test score. Forty of
 the 44 test melodies were still in the training archive under a different
 title. Matching a transposition-invariant melody signature removed them, and
-the leaked score is not reported as a result. The clean number is 0.592.
+the leaked score is not reported as a result. The clean number was 0.592 for a
+single tagger and is 0.604 for the shipped ensemble.
 
 ### What the metrics do and do not mean
 
@@ -331,6 +347,70 @@ corpus.
 ---
 
 ## 5. Using it
+
+### The bands
+
+The bands for this project's own music come first, in the code, in `python -m
+mysong.cli render` and in the app; the Western presets are still there under
+"other bands".
+
+| Band | What it plays |
+|---|---|
+| `hand_drum` (default) | The heartbeat a hand drum keeps under a song, a low drone per chord, and two off-beat strums. The middle of the bar is left to the voice. |
+| `round_dance` | Steady hand-drum pulse with rattles on the eighths and a boom-chuck guitar. |
+| `grass_dance` | The big drum on every beat (the honour beat), the dancers' bells on the eighths, a pickup into the next bar, and one low root per beat on the bass. |
+| `jingle_dress` | The side-step: a hand drum on the pulse with the cone jingles ringing on the beat and the step after it, over a soft boom-chuck guitar. |
+| `metis_fiddle` | A reel line on the fiddle (GM 41) over a two-step guitar and an upright two-feel bass. No drum kit. |
+| `cedar_flute` | Long flute tones (GM 73) with a warm pad and two soft drum strokes a bar. |
+| `pop`, `ballad`, `folk`, `jazz`, `waltz`, `ambient`, `rock` | The other bands. `jazz` swings, `ambient` has no drums. |
+
+A band is a `ArrangementStyle`; the "piano" slot is whichever chordal or
+melodic instrument the band points at it through `programmes`, which is why the
+same slot carries the fiddle in one band and the flute in another. Percussion
+comes from the drum channel of the SoundFont, so the drum-led bands use toms and
+shakers rather than a rock kit, and they never add a cymbal.
+
+These bands are played, not programmed: `humanize` (0.62-0.82 for the six
+indigenous bands, against 0.5 for the other presets) jitters every onset by a
+few milliseconds and every velocity by a few units, the hand drum's accents are
+softer than a solo drum's because they sit under a voice, and `level_db` moves a
+band from the common level -- `-3` for the dense hand-drum trio, `+2.5` for the
+drum-and-bass grass dance -- so a busier band does not mask the words a sparse
+one leaves alone. That is the difference between a band that was arranged for
+the take and a grid with instruments on it.
+
+### Levels: the voice is on top of the band
+
+`mix_with_vocal` levels both parts instead of trusting the recording. The voice
+is normalised to 0.18 RMS (up to +24 dB of boost, which covers a quiet phone
+recording) and the band is then placed 10 dB under it (`BAND_OFFSET_DB`), moved
+by the band's own `level_db` (-3 for the dense hand-drum trio, +2.5 for the
+drum-and-bass grass dance), and ducked a further 6 dB while the voice sounds.
+
+**The panel does not play that mix.**  It plays two sources -- your untouched
+take and the generated band -- so the band file has to be levelled too, and this
+was the bug that made the band louder than the singing: the player used to get
+the renderer's raw, full-scale band against the raw (often 20 dB quieter)
+recording. The band is now written at one reference RMS (`BAND_STEM_RMS`, the
+same idea as the DSP vocable's fixed level) and the server measures the take and
+returns `X-MySong-Band-Gain-Db`, the amount to pull the band down by for *that*
+take. The page applies it with the ROBOT VOLUME slider, so the two sources at
+100% are the mix, and a quiet phone recording gets the same balance as a loud
+studio take.
+
+Measured on the project's own take, with the panel at its defaults (ROBOT
+VOLUME 100%, TRACK VOLUME 78%), the voice sits **9.4-13.1 dB above the band** in
+the 300 Hz-3.4 kHz band across the six indigenous bands -- 9.4 for the dense
+hand-drum trio, 12.8 for the round dance, 13.1 for the jingle dress -- and the
+same take recorded 22 dB quieter lands at exactly the same 9.4 dB. The sum peaks
+between 0.61 and 0.80, so nothing clips.
+
+Those are also the defaults of the Sing with Archer panel, which is deliberate:
+the same two labels, the same two numbers, the same meaning. The sliders are
+playback trims; the same positions are sent to the render as `band_gain_db` and
+`vocal_gain_db` so the WAV that gets saved is the balance that is playing. The
+band's own trim is part of the arrangement, so it is applied to the mix and to
+the player's placement, never to the slider.
 
 ### Symbolic melody
 
@@ -423,7 +503,7 @@ python -m mysong.cli train         # structural model + small tagger
 # large corpus (download/build it first; see GPU_MYSONG.md section 2)
 python tools/build_autoharmonizer_corpus.py --workers 8
 python tools/train_mysong_tagger_large.py \
-  --epochs 15 --hidden 192 \
+  --epochs 60 --hidden 256 \
   --out-model data/mysong/model/mysong_large.npz
 
 python -m mysong.cli evaluate --model data/mysong/model/mysong_large.npz --split dev
@@ -432,9 +512,10 @@ python -m pytest -q tests/test_mysong.py
 ```
 
 The small tagger takes a few minutes on CPU.  The large-corpus run took about
-50 minutes on this 16-core CPU; `--device cuda` and `GPU_MYSONG.md` are the
-server path.  `--no-tagger` trains only the numpy models and is enough for the
-CLI fallback.
+50 minutes on this 16-core CPU and about 20 minutes on a Colab T4 for the
+shipped 60-epoch, two-seed recipe; `--device cuda`,
+[GPU_MYSONG.md](../GPU_MYSONG.md) and the Colab notebook are the server paths.
+`--no-tagger` trains only the numpy models and is enough for the CLI fallback.
 
 ### References
 

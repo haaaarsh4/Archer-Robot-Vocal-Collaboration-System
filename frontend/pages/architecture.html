@@ -1,0 +1,271 @@
+<div id="page-architecture" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">The system</p>
+    <h1 class="paper-title">One voice, <em>three</em> machines, and a microphone in the middle</h1>
+    <p class="paper-deck">A singer sings. A browser, a Python server and a small family of local models listen, decide, and answer in a synthetic voice. This page is the map: every process, every stage, the contract between them, and the reason each one is built the way it is.</p>
+    <div class="paper-meta">
+      <span>FastAPI on one port</span><span>44.1 kHz live path</span><span>local models only</span><span>no cloud dependency</span>
+    </div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> The shape of the system</p>
+    <h2 class="paper-h2">Three ways in, one set of ears</h2>
+    <p class="paper-lede">The project is one codebase with three front doors. The live path listens to a microphone and answers in real time. The SingSong path listens to a finished vocal and composes a band around it. The MySong path takes a melody, reads its harmony, and arranges a band from chords. All three share the same pitch, rhythm, key and audio code, which is why a fix in one makes the others better.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 640" role="img" aria-label="System map: singer, browser, FastAPI server, real-time analysis, harmony, synthesis, neural sidecar, and the three product paths">
+          <defs>
+            <marker id="a-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker>
+            <marker id="a-arrow-w" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e0a06a"/></marker>
+            <linearGradient id="a-glow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2b4d"/><stop offset="1" stop-color="#111a2e"/></linearGradient>
+          </defs>
+          <rect width="1080" height="640" fill="#0b1120"/>
+          <text x="54" y="62" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="26" font-weight="600">System context</text>
+          <text x="54" y="88" fill="#7d90b3" font-family="Space Mono, monospace" font-size="11" letter-spacing="2">ARCHER / LIVE + SINGSONG + MYSONG</text>
+
+          <!-- input column -->
+          <rect x="54" y="132" width="190" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="149" y="170" fill="#e8edf7" font-size="14" text-anchor="middle">Singer</text>
+          <text x="149" y="192" fill="#8195b8" font-size="10.5" text-anchor="middle">voice, breath, drum</text>
+          <text x="149" y="210" fill="#8195b8" font-size="10.5" text-anchor="middle">44.1 kHz mono</text>
+
+          <rect x="54" y="262" width="190" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="149" y="300" fill="#e8edf7" font-size="14" text-anchor="middle">Browser</text>
+          <text x="149" y="322" fill="#8195b8" font-size="10.5" text-anchor="middle">Web Audio + canvas</text>
+          <text x="149" y="340" fill="#8195b8" font-size="10.5" text-anchor="middle">mic, upload, playback</text>
+
+          <rect x="54" y="392" width="190" height="120" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="149" y="428" fill="#e8edf7" font-size="13" text-anchor="middle">Two model families</text>
+          <text x="149" y="450" fill="#8195b8" font-size="10.5" text-anchor="middle">SingSong · token seq2seq</text>
+          <text x="149" y="468" fill="#8195b8" font-size="10.5" text-anchor="middle">MySong · chords + band</text>
+          <text x="149" y="486" fill="#8195b8" font-size="10.5" text-anchor="middle">both CPU/GPU, both local</text>
+
+          <!-- server -->
+          <rect x="330" y="132" width="250" height="380" rx="10" fill="#0f1728" stroke="#3b5c96"/>
+          <text x="455" y="166" fill="#9fb0cc" font-family="Space Mono, monospace" font-size="10" text-anchor="middle" letter-spacing="2">FASTAPI / UVICORN</text>
+          <text x="455" y="196" fill="#f2f5fb" font-size="17" text-anchor="middle" font-weight="600">server.py</text>
+          <text x="455" y="218" fill="#8195b8" font-size="10.5" text-anchor="middle">one process, one port</text>
+
+          <rect x="352" y="240" width="206" height="58" rx="6" fill="#16233f" stroke="#34517f"/>
+          <text x="455" y="263" fill="#e8edf7" font-size="12" text-anchor="middle">Analysis</text>
+          <text x="455" y="282" fill="#8195b8" font-size="9.5" text-anchor="middle">pitch · rhythm · phonetics</text>
+
+          <rect x="352" y="310" width="206" height="58" rx="6" fill="#16233f" stroke="#34517f"/>
+          <text x="455" y="333" fill="#e8edf7" font-size="12" text-anchor="middle">Harmony</text>
+          <text x="455" y="352" fill="#8195b8" font-size="9.5" text-anchor="middle">key · mode · target note</text>
+
+          <rect x="352" y="380" width="206" height="58" rx="6" fill="#16233f" stroke="#34517f"/>
+          <text x="455" y="403" fill="#e8edf7" font-size="12" text-anchor="middle">Synthesis</text>
+          <text x="455" y="422" fill="#8195b8" font-size="9.5" text-anchor="middle">vocables · textures · mix</text>
+
+          <rect x="352" y="450" width="206" height="42" rx="6" fill="#16233f" stroke="#34517f"/>
+          <text x="455" y="476" fill="#e8edf7" font-size="11.5" text-anchor="middle">Knowledge: translation · chat</text>
+
+          <!-- outputs / sidecars -->
+          <rect x="660" y="132" width="170" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="745" y="170" fill="#e8edf7" font-size="13" text-anchor="middle">Speakers</text>
+          <text x="745" y="192" fill="#8195b8" font-size="10" text-anchor="middle">live answer</text>
+          <text x="745" y="210" fill="#8195b8" font-size="10" text-anchor="middle">70 ms base delay</text>
+
+          <rect x="660" y="258" width="170" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="745" y="296" fill="#e8edf7" font-size="13" text-anchor="middle">Renderer</text>
+          <text x="745" y="318" fill="#8195b8" font-size="10" text-anchor="middle">SoundFont / numpy</text>
+          <text x="745" y="336" fill="#8195b8" font-size="10" text-anchor="middle">WAV + MIDI</text>
+
+          <rect x="660" y="384" width="170" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="745" y="420" fill="#e8edf7" font-size="13" text-anchor="middle">RVC sidecar</text>
+          <text x="745" y="442" fill="#8195b8" font-size="10" text-anchor="middle">port 8801</text>
+          <text x="745" y="460" fill="#8195b8" font-size="10" text-anchor="middle">PyTorch, separate process</text>
+
+          <rect x="880" y="258" width="146" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="953" y="294" fill="#e8edf7" font-size="12.5" text-anchor="middle">Ollama</text>
+          <text x="953" y="316" fill="#8195b8" font-size="9.5" text-anchor="middle">11434</text>
+          <text x="953" y="334" fill="#8195b8" font-size="9.5" text-anchor="middle">song chat only</text>
+
+          <rect x="880" y="384" width="146" height="96" rx="8" fill="url(#a-glow)" stroke="#2a3d63"/>
+          <text x="953" y="420" fill="#e8edf7" font-size="12.5" text-anchor="middle">FluidSynth</text>
+          <text x="953" y="442" fill="#8195b8" font-size="9.5" text-anchor="middle">General MIDI</text>
+          <text x="953" y="460" fill="#8195b8" font-size="9.5" text-anchor="middle">band voices</text>
+
+          <!-- links -->
+          <path d="M244 180 H330" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M244 310 H330" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M244 452 H330" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M455 512 V546 H550" stroke="#e0a06a" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow-w)"/>
+          <text x="565" y="550" fill="#e0a06a" font-size="10.5">WAV / MIDI / JSON back to the browser</text>
+
+          <path d="M580 269 H660" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M580 409 H660" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M745 354 V384" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+          <path d="M830 432 H880" stroke="#6f8cff" stroke-dasharray="5 4" fill="none"/>
+          <path d="M830 306 H880" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#a-arrow)"/>
+
+          <text x="54" y="604" fill="#6f86aa" font-family="Space Mono, monospace" font-size="10" letter-spacing="1.5">FIG. A1</text>
+          <text x="1026" y="604" fill="#6f86aa" font-family="Space Mono, monospace" font-size="10" text-anchor="end" letter-spacing="1.5">NO NETWORK REQUIRED</text>
+        </svg>
+        <div class="plate-foot"><span>Figure A1 · system map</span><span>solid border = process boundary</span></div>
+      </div>
+      <figcaption class="paper-caption"><b>Read it left to right.</b> Audio enters through the browser or a local device, crosses one HTTP boundary into FastAPI, and is answered either as sound (live path) or as files (offline paths). The two neural sidecars sit outside the main process on purpose: a slow model must never be able to stall the audio loop.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> The live path</p>
+    <h2 class="paper-h2">What happens between one note and the next</h2>
+    <p class="paper-lede">The live path is a chain of small, replaceable stages. Each stage has one job and one output shape, and the next stage never reaches back into the previous one. That is what makes it possible to swap YIN for RMVPE, or a DSP voice for a neural one, without rewriting the performance.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Stage</th><th>File</th><th>Input → output</th><th>What it guarantees</th></tr></thead>
+        <tbody>
+          <tr><td>Capture</td><td><code>core/audio_capture.py</code></td><td>device → 1024-sample float32 frames</td><td>The callback only enqueues; a slow pipeline can never starve the audio thread.</td></tr>
+          <tr><td>Gate</td><td><code>core/preprocessor.py</code></td><td>frame → voiced frame or silence</td><td>Room noise below −40 dBFS never becomes a note; level is normalised before analysis.</td></tr>
+          <tr><td>Pitch</td><td><code>analysis/pitch_detector.py</code></td><td>frame → Hz + confidence</td><td>65–1200 Hz, two hops per frame, jump-aware smoothing; YIN or RMVPE behind the same interface.</td></tr>
+          <tr><td>Rhythm</td><td><code>analysis/rhythm_analyzer.py</code></td><td>2 s buffer → onsets, BPM, phrase state</td><td>Onsets are computed once per second of new audio, not once per frame, so a note is counted once.</td></tr>
+          <tr><td>Phonetics</td><td><code>analysis/phonetic_analysis.py</code></td><td>voiced frame → brightness, colour, nasality</td><td>13 MFCCs + centroid; a trained classifier if present, documented heuristics if not.</td></tr>
+          <tr><td>Key</td><td><code>synthesis/harmony_engine.py</code></td><td>256-pitch history → root + mode</td><td>Krumhansl–Kessler correlation, re-estimated every 43 frames (about once a second), never per note.</td></tr>
+          <tr><td>Decision</td><td><code>synthesis/accompaniment_modes.py</code></td><td>context → mode, target Hz, action</td><td>Protocol silence is checked before anything musical; the rest is an ordered checklist.</td></tr>
+          <tr><td>Voice</td><td><code>synthesis/vocable_synthesizer.py</code></td><td>decision → stereo audio</td><td>Vowel, texture and vibrato are applied here; the neural stage receives separate stems, never a mix.</td></tr>
+          <tr><td>Timing</td><td><code>output/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-caption">The browser demo uses the same analysis maths but not the hardware <code>TimingSync</code>; it schedules Web Audio directly. Both are real, they are simply different transports for the same decision.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> Frame budget</p>
+    <h2 class="paper-h2">Twenty-three milliseconds is the whole world</h2>
+    <p class="paper-lede">At 44,100 Hz a 1024-sample frame is 23.2 ms of audio. Every real-time stage has to finish well inside that window, or the next frame is already waiting. The design keeps the expensive parts off the critical path instead of hoping they get faster.</p>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">On the hot path</div><h3 class="paper-h3">Cheap, bounded, per frame</h3><p class="paper-p">YIN on two 512-sample hops, one MFCC pass, a few deque updates, a key lookup, and a mode decision. No disk, no network, no model loading, no allocation of a new graph.</p></div>
+      <div class="paper-tile"><div class="paper-label">Off the hot path</div><h3 class="paper-h3">Expensive, cached, or separate</h3><p class="paper-p">RMVPE runs on a rolling window every few hops. Neural voice conversion lives in its own process. SingSong and MySong render an uploaded file after the fact, where a two-second wait is acceptable because nobody is singing into it.</p></div>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/api-latency.svg?v=1" alt="Bar chart of median and p95 response time for five API endpoints" loading="lazy">
+      <figcaption class="paper-caption"><b>Figure A2 · measured API latency.</b> Forty sequential requests per endpoint on this machine, after warm-up. The analysis and sentiment endpoints answer in about 51–53 ms at the median; the vocable manifest is slower because it reads the bank from disk, and both status endpoints are effectively free because they never load weights. Full method on the <a href="#" onclick="showPage('measurements'); return false;">Measurements page</a>.</figcaption>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> Runtime</p>
+    <h2 class="paper-h2">A small family of processes, and why they are not one</h2>
+    <p class="paper-lede">The app is deliberately not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 420" role="img" aria-label="Runtime process diagram: browser on 8000, FastAPI, RVC sidecar on 8801, Ollama on 11434, FluidSynth in process">
+          <defs><marker id="r-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker></defs>
+          <rect width="1080" height="420" fill="#0b1120"/>
+          <text x="54" y="58" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="24" font-weight="600">Runtime topology</text>
+          <text x="54" y="82" fill="#7d90b3" font-family="Space Mono, monospace" font-size="10" letter-spacing="2">ONE MACHINE · LOOPBACK ONLY</text>
+
+          <rect x="54" y="120" width="210" height="180" rx="9" fill="#16233f" stroke="#34517f"/>
+          <text x="159" y="152" fill="#e8edf7" font-size="13" text-anchor="middle">Browser</text>
+          <text x="159" y="174" fill="#8195b8" font-size="10" text-anchor="middle">HTML · CSS · JS</text>
+          <text x="159" y="194" fill="#8195b8" font-size="10" text-anchor="middle">Web Audio · getUserMedia</text>
+          <text x="159" y="214" fill="#8195b8" font-size="10" text-anchor="middle">no build step</text>
+          <text x="159" y="252" fill="#6f8cff" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">localhost:8000</text>
+
+          <rect x="340" y="120" width="230" height="180" rx="9" fill="#16233f" stroke="#6f8cff"/>
+          <text x="455" y="152" fill="#e8edf7" font-size="13" text-anchor="middle">FastAPI + Uvicorn</text>
+          <text x="455" y="174" fill="#8195b8" font-size="10" text-anchor="middle">routes · static files · pipeline</text>
+          <text x="455" y="194" fill="#8195b8" font-size="10" text-anchor="middle">holds config, bank, models</text>
+          <text x="455" y="214" fill="#8195b8" font-size="10" text-anchor="middle">one event loop, worker threads</text>
+          <text x="455" y="252" fill="#6f8cff" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">port 8000</text>
+
+          <rect x="646" y="120" width="190" height="76" rx="9" fill="#16233f" stroke="#34517f"/>
+          <text x="741" y="150" fill="#e8edf7" font-size="12" text-anchor="middle">RVC sidecar</text>
+          <text x="741" y="170" fill="#8195b8" font-size="9.5" text-anchor="middle">torch · voice conversion</text>
+          <text x="741" y="186" fill="#6f8cff" font-family="Space Mono, monospace" font-size="9.5" text-anchor="middle">8801</text>
+
+          <rect x="646" y="224" width="190" height="76" rx="9" fill="#16233f" stroke="#34517f"/>
+          <text x="741" y="254" fill="#e8edf7" font-size="12" text-anchor="middle">Ollama</text>
+          <text x="741" y="274" fill="#8195b8" font-size="9.5" text-anchor="middle">local instruct model</text>
+          <text x="741" y="290" fill="#6f8cff" font-family="Space Mono, monospace" font-size="9.5" text-anchor="middle">11434</text>
+
+          <rect x="884" y="120" width="142" height="180" rx="9" fill="#16233f" stroke="#34517f"/>
+          <text x="955" y="152" fill="#e8edf7" font-size="12" text-anchor="middle">FluidSynth</text>
+          <text x="955" y="174" fill="#8195b8" font-size="9.5" text-anchor="middle">subprocess</text>
+          <text x="955" y="192" fill="#8195b8" font-size="9.5" text-anchor="middle">SoundFont</text>
+          <text x="955" y="210" fill="#8195b8" font-size="9.5" text-anchor="middle">MySong band</text>
+          <text x="955" y="252" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">OPTIONAL</text>
+
+          <path d="M264 210 H340" stroke="#6f8cff" stroke-dasharray="5 4" marker-end="url(#r-arrow)"/>
+          <path d="M570 168 H646" stroke="#6f8cff" stroke-dasharray="5 4" marker-end="url(#r-arrow)"/>
+          <path d="M570 258 H646" stroke="#6f8cff" stroke-dasharray="5 4" marker-end="url(#r-arrow)"/>
+          <path d="M836 246 H884" stroke="#6f8cff" stroke-dasharray="5 4" marker-end="url(#r-arrow)"/>
+
+          <text x="54" y="356" fill="#8195b8" font-size="11">Rules: sidecars are optional, timeouts are short, and an offline sidecar leaves the DSP path running instead of taking the server down.</text>
+          <text x="54" y="386" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="1.5">FIG. A3 · PROCESS BOUNDARIES</text>
+        </svg>
+        <div class="plate-foot"><span>Figure A3 · runtime</span><span>loopback · no outbound traffic</span></div>
+      </div>
+    </figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> The stack</p>
+    <h2 class="paper-h2">Every dependency, and what it buys</h2>
+    <p class="paper-lede">A stack table is only worth reading if it says why. Each row below names the alternative that was not chosen and the consequence of choosing this one.</p>
+
+    <div style="margin-top:26px">
+      <div class="stack-row"><div class="stack-name">Python 3.10+<span>language</span></div><div class="stack-why">The audio and model ecosystem lives here: librosa, aubio, PyTorch, sentence-transformers and RVC all share one runtime. A browser-only build would have to reimplement all of it, and a compiled service would lose the interactive research loop.</div><div class="stack-buys"><b>Buys:</b> one language from microphone to model. <b>Costs:</b> the GIL, so heavy work stays in worker threads or separate processes.</div></div>
+      <div class="stack-row"><div class="stack-name">FastAPI + Uvicorn<span>HTTP</span></div><div class="stack-why">Typed request models, async routes and automatic docs for a few dozen endpoints, with almost no framework between the route and the numpy array. Flask would need another validation layer; a JS server would split the stack in two.</div><div class="stack-buys"><b>Buys:</b> fast iteration and clear contracts. <b>Costs:</b> the real-time loop is not an async task; it runs in its own thread and communicates through queues.</div></div>
+      <div class="stack-row"><div class="stack-name">NumPy · SciPy · librosa<span>analysis</span></div><div class="stack-why">Chroma, MFCC, onset strength, resampling, FFT and WAV I/O are all solved, tested operations. Rewriting them would add risk without adding a single musical decision.</div><div class="stack-buys"><b>Buys:</b> correctness on the boring parts. <b>Costs:</b> librosa's first import is slow, so the app pays it once at startup.</div></div>
+      <div class="stack-row"><div class="stack-name">aubio<span>pitch + level</span></div><div class="stack-why">YIN and dBFS in a small C library with Python bindings, fast enough to run every frame on a CPU. A pure-Python YIN was measured against it and lost on both speed and octave stability.</div><div class="stack-buys"><b>Buys:</b> a real-time detector with no GPU. <b>Costs:</b> a native dependency that has to be installed, not pip-imported from pure Python.</div></div>
+      <div class="stack-row"><div class="stack-name">PyTorch<span>neural models</span></div><div class="stack-why">RMVPE, the RVC sidecar, the Cree tagger and the SingSong models are all torch graphs. One runtime means one checkpoint format, one device switch and one set of tensor contracts.</div><div class="stack-buys"><b>Buys:</b> GPU when available, CPU when not. <b>Costs:</b> a large install, kept out of the base requirement file where possible.</div></div>
+      <div class="stack-row"><div class="stack-name">Vanilla JS + Web Audio<span>frontend</span></div><div class="stack-why">The site is a set of documents with small live instruments, not a single-page application. There is no build step, no bundler and no framework to upgrade; every page is readable in view-source and loads instantly from disk.</div><div class="stack-buys"><b>Buys:</b> zero build risk and direct access to the audio graph. <b>Costs:</b> shared behaviour lives in plain functions and has to be kept tidy by hand.</div></div>
+      <div class="stack-row"><div class="stack-name">Ollama or llama.cpp<span>chat</span></div><div class="stack-why">A local instruct model is the only way to answer questions about Archer's notes without sending them anywhere. The Cree model is a second tag beside it, installed from the same export. Ollama is the default because it manages both model lifecycles; llama.cpp is the single-process alternative.</div><div class="stack-buys"><b>Buys:</b> privacy and offline operation. <b>Costs:</b> the model has to be installed once, and the app must explain that clearly when it is absent.</div></div>
+      <div class="stack-row"><div class="stack-name">FluidSynth + SoundFont<span>band</span></div><div class="stack-why">A sampled piano, bass and drum kit sound like instruments; an additive oscillator sounds like a test signal. FluidSynth renders a MIDI arrangement through a General MIDI bank, and the MIDI file remains editable in any DAW.</div><div class="stack-buys"><b>Buys:</b> an arrangement that can be listened to as music. <b>Costs:</b> an optional native library; the numpy synth stays as the deterministic fallback.</div></div>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> Decisions</p>
+    <h2 class="paper-h2">Seven choices that shaped everything after them</h2>
+    <p class="paper-lede">Architecture is mostly a record of what you refused to do. These are the decisions that still constrain the code today, written as decision, reason and consequence rather than as a feature list.</p>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">D1 · Local first</div><h3 class="paper-h3">No note leaves the machine</h3><p class="paper-p">Every model runs on the same computer as the microphone. The consequence is real: no API keys, no per-note cost, no network jitter in the audio path. It also means the project ships code, not a hosted service, and the person running it owns the data.</p></div>
+      <div class="paper-tile"><div class="paper-label">D2 · Separate processes</div><h3 class="paper-h3">Slow work cannot stall the loop</h3><p class="paper-p">RVC and the language model are sidecars. If the voice model takes 2.5 seconds to convert a note, the DSP voice still answers on time; if Ollama is not running, the chat reports it and the stage keeps singing. The boundary is a timeout, not a promise.</p></div>
+      <div class="paper-tile"><div class="paper-label">D3 · Two pitch engines</div><h3 class="paper-h3">YIN for speed, RMVPE for truth</h3><p class="paper-p">YIN is the default because it fits the frame budget on a CPU. RMVPE is available when accuracy matters more than latency, with a rolling window and a cached result between hops. One interface, two behaviours, chosen live.</p></div>
+      <div class="paper-tile"><div class="paper-label">D4 · Pre-rendered vocables</div><h3 class="paper-h3">The bank is the fast path</h3><p class="paper-p">Neural conversion is expensive; a note is not. The bank is rendered once, offline, then pitch-shifted and cached by semitone at runtime. The singer hears a neural timbre without waiting for a neural network on every note.</p></div>
+      <div class="paper-tile"><div class="paper-label">D5 · Per-stem conversion</div><h3 class="paper-h3">One pitch per call</h3><p class="paper-p">A choir mixed down to one signal gives the voice model several simultaneous pitches and a smeared result. Converting each detuned stem separately keeps every call monophonic, and lets harmony stems rotate across voices instead of cloning one.</p></div>
+      <div class="paper-tile"><div class="paper-label">D6 · Discrete tokens</div><h3 class="paper-h3">SingSong predicts codes, not samples</h3><p class="paper-p">Waveform generation at 16 kHz for ten seconds is a very long sequence. The paper's factorization into semantic, coarse and fine tokens makes the problem tractable, and each stage can be trained and evaluated on its own.</p></div>
+      <div class="paper-tile"><div class="paper-label">D7 · Exact decoding</div><h3 class="paper-h3">MySong uses Viterbi, not sampling</h3><p class="paper-p">A chord sequence is a path through a small state space, so exact inference is possible and reproducible. The semi-Markov decoder can change chord on any beat, which fixed one-chord-per-bar grids could not express.</p></div>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>07</b> Live demonstration</p>
+    <h2 class="paper-h2">Watch the first stage run on your own voice</h2>
+    <p class="paper-lede">This is the real pitch stage, not a recording. YIN runs in the browser through Web Audio and never sends audio anywhere; RMVPE runs on the server and streams the microphone over a WebSocket. The interval buttons show what the harmony stage would do with the note it hears.</p>
+
+    <div class="paper-demo">
+      <div class="paper-demo-head">
+        <h3 class="paper-demo-title">Pitch detection, live<span>microphone → Hz → note → interval</span></h3>
+      </div>
+      <div id="arch-demo-mount"></div>
+    </div>
+    <p class="paper-caption">The demo reports the nearest equal-tempered note and the cents deviation. A reading inside ±15 cents is drawn as in tune; the bar shows the raw deviation before any smoothing.</p>
+  </section>
+
+  <section class="paper-card paper-card--tight">
+    <p class="paper-num"><b>08</b> Where to go next</p>
+    <h2 class="paper-h2" style="font-size:26px">The map is not the territory</h2>
+    <p class="paper-p">The Harmony page opens the decision engine and its ten modes. Vocable Synthesis follows a decision into actual samples, formants and the neural voice. Cree Sentiment covers the language layer, Archer Bot covers retrieval, and Measurements shows every number on this site being produced by a reproducible test.</p>
+    <p class="paper-p"><a href="#" onclick="showPage('harmony'); return false;">Harmony</a> · <a href="#" onclick="showPage('synthesis'); return false;">Vocable Synthesis</a> · <a href="#" onclick="showPage('translation'); return false;">Cree Sentiment</a> · <a href="#" onclick="showPage('chat'); return false;">Archer Bot</a> · <a href="#" onclick="showPage('measurements'); return false;">Measurements</a></p>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

@@ -1,0 +1,55 @@
+<div class="note-demo">
+      <div class="note-demo-header">
+        <div class="note-demo-title">Real-time pitch detection</div>
+        <button class="mic-btn" id="arch-mic-btn" onclick="toggleArchMic()">
+          <div class="mic-dot"></div>
+          Start microphone
+        </button>
+      </div>
+
+      <div id="arch-pitch-engine" class="pitch-engine-row"></div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+        <span style="font-size: 13px; color: var(--muted);">Harmony interval:</span>
+        <div class="interval-picker" style="margin: 0;">
+          <button class="interval-btn" data-semitones="0" onclick="setArchInterval(0, this)">Unison (+0)</button>
+          <button class="interval-btn" data-semitones="4" onclick="setArchInterval(4, this)">Third (+4)</button>
+          <button class="interval-btn active" data-semitones="7" onclick="setArchInterval(7, this)">Fifth (+7)</button>
+          <button class="interval-btn" data-semitones="12" onclick="setArchInterval(12, this)">Octave (+12)</button>
+        </div>
+      </div>
+
+      <div class="note-displays">
+        <div class="note-box" id="arch-singer-box">
+          <div class="note-box-label singer">You are singing</div>
+          <div class="note-display singer" id="arch-singer-note">-</div>
+          <div class="note-freq" id="arch-singer-freq"></div>
+        </div>
+        <div class="note-arrow-center">
+          <div style="font-size: 24px; color: var(--border);">&#8594;</div>
+          <div class="interval-label" id="arch-interval-label">+7 semitones<br>perfect fifth</div>
+        </div>
+        <div class="note-box" id="arch-robot-box">
+          <div class="note-box-label robot">Robot would sing</div>
+          <div class="note-display robot" id="arch-robot-note">-</div>
+          <div class="note-freq" id="arch-robot-freq"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 8px; font-size: 12px; color: var(--muted); font-family: var(--mono);">PITCH DEVIATION FROM NEAREST NOTE</div>
+      <div class="pitch-meter">
+        <div class="pitch-center-line"></div>
+        <div class="pitch-bar" id="arch-pitch-bar" style="width: 4px; left: 50%;"></div>
+      </div>
+      <div class="pitch-labels">
+        <span>-50 cents</span>
+        <span>in tune</span>
+        <span>+50 cents</span>
+      </div>
+
+      <div class="note-explanation" id="arch-explanation">
+        Click "Start microphone" and sing or hum. YIN runs in the browser and never sends audio anywhere; choose RMVPE above to stream the same microphone to the server's learned detector. The interval buttons show what the harmony stage would add to the note it hears.
+      </div>
+
+      <canvas id="piano-canvas" height="100"></canvas>
+    </div>

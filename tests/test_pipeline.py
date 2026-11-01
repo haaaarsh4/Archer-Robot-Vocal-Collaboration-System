@@ -161,7 +161,7 @@ class TestHarmonyEngine:
             tempo_bpm=120.0,
             phoneme_profile=self.neutral_profile,
         )
-        assert decision.vocable in ["aah", "ooo", "mmm", "hey"]
+        assert decision.vocable in self.engine._vocable_common
 
     def test_set_invalid_interval_does_not_crash(self):
         self.engine.set_interval("invalid_interval")
@@ -179,7 +179,9 @@ class TestVocableSynthesizer:
         self.HarmonyDecision = HarmonyDecision
 
     def _make_decision(self, hz=440.0, action="sing"):
+        from synthesis.accompaniment_modes import AccompanimentMode
         return self.HarmonyDecision(
+            mode=AccompanimentMode.UNISON,
             target_hz=hz,
             vocable="aah",
             duration_s=0.2,
@@ -227,7 +229,9 @@ class TestCreeTokenizer:
         self.tok = CreeTokenizer()
 
     def test_disabled_returns_neutral(self):
-        # Default config has enabled=false
+        # The shipped config enables the tokenizer, so the disabled path is
+        # exercised directly rather than relying on a config default.
+        self.tok.enabled = False
         frame = make_sine(440.0)
         profile = self.tok.analyze(frame)
         assert profile.influence == 0.0

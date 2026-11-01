@@ -45,3 +45,8 @@ renders/
 
 # macOS
 .DS_Store
+# Cree LLM training (Cree_LLM_Training.ipynb)
+training/.venv/
+cree_llm_work/
+assets/cree_llm/
+*.gguf

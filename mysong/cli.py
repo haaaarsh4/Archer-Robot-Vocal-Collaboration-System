@@ -17,6 +17,7 @@ import json
 import sys
 from pathlib import Path
 
+from mysong.accompaniment import ArrangementStyle, DEFAULT_BAND
 from mysong.corpus import DEFAULT_CACHE, DEFAULT_CORPUS, build_corpus, corpus_stats, load_corpus
 from mysong.harmonize import Style
 from mysong.model import DEFAULT_MODEL, MySongModel
@@ -265,8 +266,8 @@ def build_parser() -> argparse.ArgumentParser:
     render = sub.add_parser("render", help="render an accompaniment and mix")
     render.add_argument("audio")
     render.add_argument("--out", required=True)
-    render.add_argument("--style", default="pop",
-                        choices=["pop", "ballad", "folk", "jazz", "waltz", "ambient", "rock"])
+    render.add_argument("--style", default=DEFAULT_BAND,
+                        choices=list(ArrangementStyle.presets()))
     render.add_argument("--key", default=None)
     render.add_argument("--bpm", type=float, default=None)
     render.add_argument("--offset", type=float, default=None)

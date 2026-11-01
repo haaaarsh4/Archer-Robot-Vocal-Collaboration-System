@@ -1,0 +1,128 @@
+<div id="page-measurements" class="page paper">
+<div class="paper-wrap">
+
+  <header class="paper-head">
+    <p class="paper-kicker">Measurements</p>
+    <h1 class="paper-title">Every claim has a <em>sample</em> behind it</h1>
+    <p class="paper-deck">This site makes a lot of numerical claims: cents, BPM, word error rate, root accuracy, latency. Each one comes from a reproducible test in <code>tools/site_evidence.py</code>, run against the real code, with the sample size printed beside the result. This page is the ledger.</p>
+    <div class="paper-meta"><span>15 suites</span><span>seeded and repeatable</span><span>real endpoints</span><span>SVG generated from the run</span></div>
+  </header>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>01</b> Method</p>
+    <h2 class="paper-h2">What counts as evidence here</h2>
+    <p class="paper-lede">A single hand-picked example can make any system look good. The harness therefore prefers many randomised cases with known ground truth, and it records the sample size, the distribution and the failures, not just the mean.</p>
+    <p class="paper-p">Three kinds of test are used. <strong>Synthetic ground truth</strong> generates signals where the correct answer is known exactly: a note at 220 Hz, a pattern at 96 BPM, a chord progression with a written key. <strong>Corpus ground truth</strong> uses held-out songs and sentences with human annotations. <strong>Live endpoint tests</strong> call the running server and measure the response, which catches integration errors that unit tests cannot.</p>
+    <p class="paper-p">Each suite writes a plain JSON record and one or more SVG charts into <code>frontend/assets/evidence/</code>. The charts on the site are those files, not screenshots. A number that changes in the code changes in the chart the next time the suite runs.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Suite</th><th>Sample</th><th>Headline</th></tr></thead>
+        <tbody>
+          <tr><td>pitch</td><td>236 tones + 21,600 smoother frames</td><td>median 3.7 cents, zero octave errors</td></tr>
+          <tr><td>notes</td><td>60 melodies, 600 notes</td><td>F1 1.000, onset median 6.5 ms</td></tr>
+          <tr><td>rhythm</td><td>96 patterns</td><td>onset F1 0.999, tempo median error 1.5 BPM</td></tr>
+          <tr><td>key</td><td>120 songs</td><td>57% exact, 71% relative</td></tr>
+          <tr><td>modes</td><td>1,000 contexts</td><td>0 invariant violations</td></tr>
+          <tr><td>voicing</td><td>120 progressions</td><td>0.90 vs 1.56 semitones movement</td></tr>
+          <tr><td>mysong</td><td>44 held-out songs</td><td>root 0.604, key 0.977</td></tr>
+          <tr><td>latency</td><td>40 requests × 5 endpoints</td><td>51 ms analyze, 53 ms sentiment</td></tr>
+          <tr><td>cree</td><td>12,372 words + 1,000 FST</td><td>0 round-trip failures</td></tr>
+          <tr><td>sentiment</td><td>120 lines</td><td>80% three-class accuracy, AUC 1.0</td></tr>
+          <tr><td>vocables</td><td>64 renders</td><td>17.2% lower envelope error</td></tr>
+          <tr><td>rvc</td><td>24 renders</td><td>100% within 50 cents, 2.5 s median</td></tr>
+          <tr><td>asr</td><td>40 utterances</td><td>1.5% mean WER, 87.5% exact</td></tr>
+          <tr><td>bands</td><td>12 renders</td><td>13.0 dB voice over band, median</td></tr>
+          <tr><td>singsong</td><td>750,000 tokens</td><td>0 vocabulary or mask violations</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>02</b> Pitch</p>
+    <h2 class="paper-h2">Cents, not “sounds about right”</h2>
+    <p class="paper-lede">236 synthesised tones sweep the singing range with vibrato, breath noise and level changes. The detector's answer is compared to the frequency it was given, in cents, and the error distribution is plotted rather than averaged into a single number.</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/pitch-error.svg?v=1" alt="Distribution of pitch error in cents across 236 tones" loading="lazy"><figcaption class="paper-caption"><b>Figure E1 · pitch error.</b> Median 3.73 cents, 90th percentile 7.64 cents, 100% of tones within 25 cents. All 236 tones passed; no octave errors.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/pitch-accuracy.svg?v=1" alt="Pitch accuracy by note across the singing range" loading="lazy"><figcaption class="paper-caption"><b>Figure E2 · accuracy across the range.</b> The test covers 65 to 1,200 Hz, not a single comfortable octave. The chart shows where the detector is strongest and where the error grows at the edges.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/pitch-smoother.svg?v=1" alt="Raw versus smoothed pitch error, including octave-error rate" loading="lazy"><figcaption class="paper-caption"><b>Figure E3 · the smoother.</b> 240 trials, 21,600 frames, with deliberate octave jumps and dropouts. Raw 90th-percentile error 1,182.8 cents and 10.6% octave errors; after the jump-confirm smoother, 16.0 cents and 1.7%. The smoother is doing real work, not cosmetic filtering.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>03</b> Notes and rhythm</p>
+    <h2 class="paper-h2">Did it hear the note, and did it hear when</h2>
+    <p class="paper-lede">Pitch accuracy says nothing about segmentation. A detector can be perfectly in tune and still split one note into three. The note suite generates 60 melodies with 600 known notes and scores onset matching, pitch matching and F1 together.</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/note-onset-error.svg?v=1" alt="Onset timing error distribution across 600 notes" loading="lazy"><figcaption class="paper-caption"><b>Figure E4 · onset error.</b> Median 6.5 ms, 90th percentile 10.3 ms. At 44.1 kHz that is under half an audio frame, which is the resolution the frame-based detector can offer.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/note-pitch-error.svg?v=1" alt="Pitch error per detected note across 600 notes" loading="lazy"><figcaption class="paper-caption"><b>Figure E5 · note pitch.</b> 600 of 600 notes matched, precision and recall 1.000, every note within 50 cents. This is a synthetic melody test with clean attacks; it is the ceiling, not a claim about a noisy room.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/rhythm-tempo.svg?v=1" alt="Tempo error across 96 rhythmic patterns" loading="lazy"><figcaption class="paper-caption"><b>Figure E6 · tempo.</b> 96 patterns across 60 to 180 BPM, with syncopation and silence. Median absolute error 1.49 BPM; 62.5% within 2% exactly and 77.1% once the octave/metrical equivalent is counted. The mean is pulled up by a small number of half/double-time ambiguities, which is why the distribution is shown, not just the mean.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/rhythm-onset-f1.svg?v=1" alt="Onset detection F1 across rhythmic patterns" loading="lazy"><figcaption class="paper-caption"><b>Figure E7 · onsets.</b> Mean F1 0.9988, median 1.000 across the same 96 patterns. The onset test is separate from tempo because a pattern can have perfect onsets and an ambiguous pulse.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>04</b> Harmony</p>
+    <h2 class="paper-h2">Key, voicing and the selector</h2>
+    <p class="paper-lede">Three different questions, three different tests: does the key inference find the key, does the voicing search move smoothly, and does the selector obey its own rules under random conditions?</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/key-accuracy.svg?v=1" alt="Key accuracy on 120 songs, exact and relative" loading="lazy"><figcaption class="paper-caption"><b>Figure E8 · key.</b> 120 songs. Exact key and mode 56.7%; relative key 70.8%. Relative counts a relative major/minor as correct because the two share every pitch class and the same scale lock. The distinction is shown rather than folded into one flattering number.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/voicing-movement.svg?v=1" alt="Voice movement and parallel perfects, search versus baseline" loading="lazy"><figcaption class="paper-caption"><b>Figure E9 · voicing.</b> 120 progressions. Mean movement 0.90 semitones against 1.56 for root position; parallel perfects 3.61 against 3.89 per hundred transitions. The search is not just smoother, it is also slightly better behaved contrapuntally.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/mode-decisions.svg?v=1" alt="Mode distribution over 1,000 randomised contexts" loading="lazy"><figcaption class="paper-caption"><b>Figure E10 · the selector.</b> 1,000 randomised contexts. Protocol silence dominates because sovereignty is off in a large share of them, which is the correct bias. Invariant violations across all four rules: zero.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>05</b> The generated band</p>
+    <h2 class="paper-h2">Held-out songs, three baselines</h2>
+    <p class="paper-lede">The MySong suite is the largest corpus test on the site: 44 songs the model never saw, scored at quarter-beat resolution against the lead sheet. The decoder, transitions and split are shared with the baselines, so the comparison isolates the model.</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/mysong-baselines.svg?v=1" alt="Root accuracy of the shipped MySong model against baselines" loading="lazy"><figcaption class="paper-caption"><b>Figure E11 · root accuracy.</b> Shipped ensemble 0.604; fixed-bar 0.584; template 0.406; the paper's generative observation 0.249. The gain over fixed-bar is modest because the decoder is shared; the gain over the generative observation is the observation model doing its job.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/mysong-scores.svg?v=1" alt="All five MySong measures" loading="lazy"><figcaption class="paper-caption"><b>Figure E12 · five measures.</b> Root, core, full, key and changes on the same 44 songs. Full is the strictest level, 0.312, because the lead sheets annotate dense extensions; core is the triad measure.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/band-balance.svg?v=1" alt="Voice-to-band level per style" loading="lazy"><figcaption class="paper-caption"><b>Figure E13 · mix balance.</b> Twelve renders. Voice over band ranges from 8.6 to 18.9 dB, median 13.0 dB, and the loudest peak is 0.76. Dense styles get more space, sparse styles sit closer.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>06</b> Voice and language</p>
+    <h2 class="paper-h2">The parts you can hear, measured</h2>
+    <p class="paper-lede">Vocable pitch, vocable timbre, neural conversion and speech recognition each have a different failure mode, so each gets its own sample and its own chart.</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/vocable-pitch.svg?v=1" alt="Vocable bank pitch error across 64 renders" loading="lazy"><figcaption class="paper-caption"><b>Figure E14 · vocable pitch.</b> 64 renders, 85.9% within 50 cents, median 12.8 cents. The bank spends a little pitch accuracy on timbre; the next chart shows what it buys.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/vocable-timbre.svg?v=1" alt="Spectral envelope error of the bank versus the naive shifter" loading="lazy"><figcaption class="paper-caption"><b>Figure E15 · vocable timbre.</b> Envelope error 11.77 dB against 14.21 dB for the naive shift, a 17.2% reduction. This is the measurement that justified making the bank the default engine.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/rvc-pitch.svg?v=1" alt="Pitch accuracy after neural conversion across 24 renders" loading="lazy"><figcaption class="paper-caption"><b>Figure E16 · neural pitch.</b> 24 renders, all within 50 cents, median 17.5 cents, p95 33.2 cents. The voice model changes timbre without moving the note.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/rvc-latency.svg?v=1" alt="Neural conversion latency across 24 renders" loading="lazy"><figcaption class="paper-caption"><b>Figure E17 · neural latency.</b> Median 2.5 s, p95 2.8 s. This is why the live path uses a pre-rendered bank and reserves live conversion for offline renders.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/asr-wer.svg?v=1" alt="Word error rate across 40 utterances" loading="lazy"><figcaption class="paper-caption"><b>Figure E18 · speech recognition.</b> 40 utterances, mean WER 1.5%, median 0%, exact match 87.5%, p95 latency 2.0 s. The errors are concentrated in the same few samples, not spread evenly.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/cree-orthography.svg?v=1" alt="Cree orthography round-trip and FST coverage" loading="lazy"><figcaption class="paper-caption"><b>Figure E19 · Cree orthography.</b> 12,372 words round-tripped with zero failures and zero syllable-count failures. FST coverage is 59.9% of a 1,000-word sample.</figcaption></figure>
+    <figure class="paper-figure"><img src="/static/assets/evidence/sentiment-classes.svg?v=1" alt="Sentiment classification by class across 120 lines" loading="lazy"><figcaption class="paper-caption"><b>Figure E20 · sentiment.</b> 120 lines. Overall 80%, with positive 100%, negative 97.5% and neutral 42.5% recall. AUC for positive versus negative is 1.0, which is the separation the joy/grief response depends on.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>07</b> Latency</p>
+    <h2 class="paper-h2">What the app actually costs per request</h2>
+    <p class="paper-lede">Forty sequential requests per endpoint, after warm-up, on the same machine that serves the demo. Both the median and the 95th percentile are recorded, because a good median can hide a bad tail.</p>
+    <figure class="paper-figure"><img src="/static/assets/evidence/api-latency.svg?v=1" alt="Median and p95 latency for five endpoints" loading="lazy"><figcaption class="paper-caption"><b>Figure E21 · API latency.</b> Analysis 51.3 ms median / 61.3 ms p95; sentiment 52.7 / 57.6; vocable manifest 220.0 / 269.6; MySong status 1.4 / 11.0; SingSong status 1.2 / 2.2. The status endpoints are cheap because they never load weights.</figcaption></figure>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>08</b> What a measurement changed</p>
+    <h2 class="paper-h2">Six fixes that exist because a test failed</h2>
+
+    <div class="paper-grid two" style="margin-top:26px">
+      <div class="paper-tile"><div class="paper-label">Pitch smoothing</div><h3 class="paper-h3">Octave errors fell from 10.6% to 1.7%</h3><p class="paper-p">The raw detector's p90 error was 1,182 cents, almost entirely octave jumps. The jump-confirm smoother requires two consecutive frames before accepting a large leap, bringing p90 to 16 cents without adding latency to real note changes.</p></div>
+      <div class="paper-tile"><div class="paper-label">Contour following</div><h3 class="paper-h3">A frame-count window became a time window</h3><p class="paper-p">The original lookback covered six frames, about 140 ms, which is shorter than a musical phrase. Fitting a slope over a 0.6 s window, in log frequency, is what made the mode track shape instead of jitter.</p></div>
+      <div class="paper-tile"><div class="paper-label">Drone</div><h3 class="paper-h3">One note per phrase, not one per frame</h3><p class="paper-p">Recomputing the drone from the latest note made it flip octaves mid-phrase and retrigger constantly. Locking it to the tonic, with hysteresis and a phrase-gap test, turned it into a held pedal.</p></div>
+      <div class="paper-tile"><div class="paper-label">Octave reinforcement</div><h3 class="paper-h3">A low note needs a different vowel</h3><p class="paper-p">The same vowel an octave down sounded muddy. A brighter, narrower vowel with a level trim that grows as the note descends is what makes the double read as a second singer.</p></div>
+      <div class="paper-tile"><div class="paper-label">Neural choir</div><h3 class="paper-h3">Convert stems, not the mix</h3><p class="paper-p">A mixed ensemble gives the voice model several pitches at once. Per-stem conversion keeps every call monophonic and lets harmony stems rotate across voices.</p></div>
+      <div class="paper-tile"><div class="paper-label">MySong data leak</div><h3 class="paper-h3">A 0.73 result was withdrawn</h3><p class="paper-p">Title-based deduplication left 40 of 44 test melodies in the training archive. A transposition-invariant signature check removed them, and the leaked score is not reported as a result. The clean number is 0.604.</p></div>
+    </div>
+  </section>
+
+  <section class="paper-card paper-card--tight">
+    <p class="paper-num"><b>09</b> Reproduce it</p>
+    <h2 class="paper-h2" style="font-size:26px">One command, every suite</h2>
+    <div class="paper-readout" style="font-size:12.5px;line-height:1.9">python tools/site_evidence.py            # every fast suite
+python tools/site_evidence.py --only pitch
+python tools/site_evidence.py --list
+python -m pytest tests -q               # the unit and integration tests</div>
+    <p class="paper-p" style="margin-top:16px">The heavy suites (<code>rvc</code>, <code>asr</code>, <code>bands</code>) talk to the running app, so start <code>server.py</code> first; they skip with a clear message if it is not reachable. The JSON record is written to <code>reports/site_evidence.json</code>, and the charts are written beside the site's own assets.</p>
+    <p class="paper-caption">These are objective measurements: they show that the note is in tune, the band sits under the voice, and the timing lands on the grid. The demo pages are where you hear the result and judge the phrase for yourself.</p>
+  </section>
+
+  <footer class="paper-foot">
+        <a href="https://github.com/haaaarsh4/Archer-Robot-Vocal-Collaboration-System" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</div>
+</div>

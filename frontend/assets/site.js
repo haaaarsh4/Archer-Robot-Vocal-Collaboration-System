@@ -403,6 +403,9 @@
       if (menuBack) menuBack.focus();
     } else {
       document.body.classList.remove('is-locked');
+      // The panel took focus when it opened; give it back to the control that
+      // opened it rather than leaving it on an element nobody can see.
+      if (menuBack && document.activeElement === menuBack && menuBtn) menuBtn.focus();
     }
   }
   /* One button in the corner, two jobs, exactly as the reference's own corner
@@ -419,7 +422,11 @@
     }
   });
   if (menu) {
-    if (menuBack) menuBack.addEventListener('click', goBack);
+    /* The panel opens from the front door, so its cross closes the panel. It
+       used to call goBack(), which walked the site's page trail and could
+       land on whichever section had been visited before: closing a menu is
+       not a navigation, and it should never take you to Sentiment. */
+    if (menuBack) menuBack.addEventListener('click', function () { setMenu(false); });
     menu.querySelector('.menu-veil').addEventListener('click', function () { setMenu(false); });
     menu.querySelectorAll('button[data-page]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -468,8 +475,8 @@
      there, and it is the paper leaving that makes it arrive.
 
      Anything that returns to the front door comes through here, the corner
-     control, the panel's own links, the panel's back button, the wordmark, the
-     browser's back, because the one thing they all pass through is
+     control, the panel's own links, the panel's close control, the wordmark,
+     the browser's back, because the one thing they all pass through is
      `showPage`, and that is where this is called from. One way home. */
   var SETTLE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';  /* `--ease`: quick, then a quiet */
   var MS_CLOSE_OUT = 300;   /* the leaving view washes out to paper */
@@ -557,38 +564,24 @@
   }
 
   /* =========================================== page switcheroo hooks */
-  /* The panel's back button steps back the way you came. Every page change
-     pushes the page you were on, and the button pops one and goes there:
-     open the menu on the About page, walk to Harmony, press back, and you
-     are on About again. It never leaves the site and never runs off the end
-     with nothing left to pop it lands on the home page, which is where
-     the whole thing starts. The trail is bounded so a long session cannot
-     grow it without limit. */
-  var trail = [];
+  /* The browser's own back button is the history API's job, and the menu's
+     cross closes the menu rather than walking a trail of pages. There is no
+     second back stack to keep in step with the real one. */
   var currentPage = null;
-  function goBack() {
-    var back = trail.length ? trail.pop() : 'home';
-    setMenu(false);
-    window.showPage(back);
-  }
 
   var originalShowPage = window.showPage;
   window.showPage = function (name, updateUrl) {
     if (!document.getElementById('page-' + name)) name = 'home';
     /* Going home from anywhere behind the front door is the paper close, and it
        is caught here rather than at each of the places that ask for it: the
-       corner control, the panel's links, the panel's back button, the wordmark
-       and the browser's own back all end up in this function, and one way home
+       corner control, the panel's links, the wordmark and the browser's own
+       back all end up in this function, and one way home
        is the point. The veil's own swap calls this with the paper already down,
        so it passes straight through. */
     if (name === 'home' && currentPage && currentPage !== 'home' &&
         !document.body.classList.contains('is-closing') && !REDUCED) {
       closeToHome();
       return;
-    }
-    if (currentPage && name !== currentPage) {
-      trail.push(currentPage);
-      if (trail.length > 20) trail.shift();
     }
     currentPage = name;
     originalShowPage(name, updateUrl === undefined ? true : updateUrl);
