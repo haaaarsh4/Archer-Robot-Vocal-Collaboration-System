@@ -114,7 +114,12 @@ class Config:
     max_sft: int = P["max_sft"]
     cpt_lr: float = 2e-4
     sft_lr: float = 1.5e-4
-    dpo_lr: float = 5e-5
+    # Preference tuning moves an already-instruction-tuned policy, so it needs a
+    # far smaller step than SFT. At 5e-5 a 7B run answered correctly for a few
+    # tokens and then repeated one symbol to the token limit on every job -- the
+    # signature of a policy that the preference step has collapsed, not of a
+    # translation that is merely weak.
+    dpo_lr: float = 1e-6
     dpo_beta: float = 0.1
     micro_batch: int = 1
     grad_accum: int = 16

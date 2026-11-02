@@ -125,6 +125,14 @@ lines += [
     f"- Syllabics output: **{pct(b['syllabics']['script_share'])} → {pct(t['syllabics']['script_share'])}** of letters in syllabics",
     f"- Abstention: **{pct(t['abstention']['accuracy'])}** of unanswerable questions correctly declined",
 ]
+if t["en_cr"].get("script_share") is not None:
+    # A script failure and a translation failure look identical in chrF++; this
+    # is the line that tells them apart.
+    _sro = 100 * (1 - t["en_cr"]["script_share"])
+    lines.append(
+        f"- Script respected (EN → CRK): **{_sro:.1f}%** of letters in SRO when SRO was asked; "
+        f"the same replies converted to SRO score chrF++ {t['en_cr'].get('chrf++_as_sro', 0):.3f}"
+    )
 if "note_reading" in t:
     lines.append(f"- Reading an unseen note section: **token F1 {t['note_reading']['token_f1']:.3f}**")
 

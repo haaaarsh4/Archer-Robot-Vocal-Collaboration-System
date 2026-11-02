@@ -17,7 +17,11 @@ from peft import PeftModel
 EXPORT = Path("/content/cree_llm_export") if IN_COLAB else OUT / "export"
 EXPORT.mkdir(parents=True, exist_ok=True)
 
-if SMOKE:
+if os.environ.get("CREE_ADAPTER_STAGE", "").strip():
+    # A scoring run must not overwrite the shipped weights with an adapter it
+    # was only asked to measure.
+    log("export skipped: scoring run (CREE_ADAPTER_STAGE is set)")
+elif SMOKE:
     log("SMOKE: skipping merge and GGUF; packaging the adapter only")
     zip_path = OUT / "archer-smoke.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
@@ -66,11 +70,21 @@ else:
             "The trained adapter and report are already saved; nothing is lost."
         )
 
+    # Every artifact is checked against the adapter's own timestamp, not just
+    # against existence. Retraining one stage and re-running this cell used to
+    # keep the previous GGUF, because a file was there and large: the export
+    # would report success while shipping the old weights.
+    def _newest(path: Path) -> float:
+        return max((p.stat().st_mtime for p in path.rglob("*") if p.is_file()), default=0.0)
+
+    adapter_mtime = _newest(CKPT / "dpo")
     merged_dir = EXPORT / "merged"
     merged_shards = sorted(merged_dir.glob("*.safetensors"))
     merged_ok = bool(merged_shards) and (merged_dir / "config.json").exists() and not any(
         safetensors_problem(p) for p in merged_shards
-    )
+    ) and _newest(merged_dir) >= adapter_mtime
+    if merged_shards and not merged_ok:
+        log("merged model is older than the adapter it should contain; merging again")
     if merged_ok:
         log(f"merged model already complete at {merged_dir}, skipping the merge")
     else:
@@ -97,7 +111,12 @@ else:
         log(f"merged model saved to {merged_dir}")
 
     q4 = EXPORT / f"{MODEL_STEM}.Q4_K_M.gguf"
-    if q4.exists() and q4.stat().st_size > 1_000_000_000:
+    q4_fresh = (q4.exists() and q4.stat().st_size > 1_000_000_000
+                and q4.stat().st_mtime >= adapter_mtime)
+    if q4.exists() and not q4_fresh:
+        log(f"{q4.name} is older than the adapter; rebuilding it")
+        q4.unlink()
+    if q4_fresh:
         log(f"{q4.name} already built ({q4.stat().st_size / 1e9:.2f} GB), skipping conversion")
     else:
         # ── llama.cpp: convert, then quantise ────────────────────────────────
