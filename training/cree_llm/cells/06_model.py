@@ -442,6 +442,13 @@ def best_adapter(upto: str | None = None) -> Path | None:
     return None
 
 
+# A scoring run asks what an existing adapter scores. Nothing underneath it may
+# be trained on the way to that answer: a changed fingerprint would otherwise
+# retrain six hours of pretraining before the benchmark it was only asked to
+# measure. Every training stage checks this, not just the eval cell.
+SCORING_ONLY = bool(os.environ.get("CREE_ADAPTER_STAGE", "").strip())
+
+
 def ensure_model(upto: str | None = None, force: bool = False):
     """`model` and `tok` in the kernel, continued from the best saved adapter."""
     global model, tok, _LOADED_ADAPTER

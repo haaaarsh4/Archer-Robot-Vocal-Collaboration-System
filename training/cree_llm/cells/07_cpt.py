@@ -22,7 +22,7 @@ _CPT_KEY = fingerprint(
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
 )
 
-if stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
+if SCORING_ONLY or stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
     model, tok = ensure_model()
     cpt_history = read_metrics("CPT")
 else:

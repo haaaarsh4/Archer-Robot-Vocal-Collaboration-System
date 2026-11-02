@@ -30,7 +30,7 @@ _SFT_KEY = fingerprint(
     data=_file_digest(PROC / "sft_train.jsonl"),
 )
 
-if stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
+if SCORING_ONLY or stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
     model, tok = ensure_model()
     sft_history = read_metrics("SFT")
 else:
