@@ -111,9 +111,8 @@ _DPO_KEY = fingerprint(
     sft=_sft_stamp(), corrupt="substitute-v1",
 )
 
-# A scoring run (`CREE_ADAPTER_STAGE` set) is asking what an existing adapter
-# scores, so it must not train a new one on the way to the answer.
-_SCORING_ONLY = bool(os.environ.get("CREE_ADAPTER_STAGE", "").strip())
+# `SCORING_ONLY` is set by the model cell: a scoring run is asking what an
+# existing adapter scores, so it must not train a new one on the way there.
 
 if not CFG.dpo_enabled or not prefs:
     if not stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
@@ -125,9 +124,9 @@ if not CFG.dpo_enabled or not prefs:
         shutil.copytree(CKPT / "sft", _DPO_DIR)
         mark_stage("dpo", _DPO_KEY, skipped=True)
         log("DPO skipped; SFT adapter carried forward unchanged")
-elif _SCORING_ONLY or stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
+elif SCORING_ONLY or stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
     model, tok = ensure_model()
-    if _SCORING_ONLY:
+    if SCORING_ONLY:
         log("DPO: scoring run, training skipped")
 
 
@@ -176,7 +175,7 @@ def sequence_logprob(model, input_ids, labels, attention_mask) -> torch.Tensor:
     return (logp * mask).sum(dim=1)
 
 
-if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
+if CFG.dpo_enabled and prefs and not SCORING_ONLY and not stage_done("dpo", _DPO_KEY, quiet=True):
     # A disconnect during DPO used to lose the whole stage, because this loop is
     # hand-written and had no saving of its own. It now writes the adapter and a
     # `trainer_state.json` every few dozen steps, which is enough for the same

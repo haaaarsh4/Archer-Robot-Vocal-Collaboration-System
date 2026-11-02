@@ -3033,6 +3033,13 @@ def best_adapter(upto: str | None = None) -> Path | None:
     return None
 
 
+# A scoring run asks what an existing adapter scores. Nothing underneath it may
+# be trained on the way to that answer: a changed fingerprint would otherwise
+# retrain six hours of pretraining before the benchmark it was only asked to
+# measure. Every training stage checks this, not just the eval cell.
+SCORING_ONLY = bool(os.environ.get("CREE_ADAPTER_STAGE", "").strip())
+
+
 def ensure_model(upto: str | None = None, force: bool = False):
     """`model` and `tok` in the kernel, continued from the best saved adapter."""
     global model, tok, _LOADED_ADAPTER
@@ -3334,7 +3341,7 @@ _CPT_KEY = fingerprint(
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
 )
 
-if stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
+if SCORING_ONLY or stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
     model, tok = ensure_model()
     cpt_history = read_metrics("CPT")
 else:
@@ -4065,7 +4072,7 @@ _SFT_KEY = fingerprint(
     data=_file_digest(PROC / "sft_train.jsonl"),
 )
 
-if stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
+if SCORING_ONLY or stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
     model, tok = ensure_model()
     sft_history = read_metrics("SFT")
 else:
@@ -4239,9 +4246,8 @@ _DPO_KEY = fingerprint(
     sft=_sft_stamp(), corrupt="substitute-v1",
 )
 
-# A scoring run (`CREE_ADAPTER_STAGE` set) is asking what an existing adapter
-# scores, so it must not train a new one on the way to the answer.
-_SCORING_ONLY = bool(os.environ.get("CREE_ADAPTER_STAGE", "").strip())
+# `SCORING_ONLY` is set by the model cell: a scoring run is asking what an
+# existing adapter scores, so it must not train a new one on the way there.
 
 if not CFG.dpo_enabled or not prefs:
     if not stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
@@ -4253,9 +4259,9 @@ if not CFG.dpo_enabled or not prefs:
         shutil.copytree(CKPT / "sft", _DPO_DIR)
         mark_stage("dpo", _DPO_KEY, skipped=True)
         log("DPO skipped; SFT adapter carried forward unchanged")
-elif _SCORING_ONLY or stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
+elif SCORING_ONLY or stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
     model, tok = ensure_model()
-    if _SCORING_ONLY:
+    if SCORING_ONLY:
         log("DPO: scoring run, training skipped")
 
 
@@ -4304,7 +4310,7 @@ def sequence_logprob(model, input_ids, labels, attention_mask) -> torch.Tensor:
     return (logp * mask).sum(dim=1)
 
 
-if CFG.dpo_enabled and prefs and not stage_done("dpo", _DPO_KEY, quiet=True):
+if CFG.dpo_enabled and prefs and not SCORING_ONLY and not stage_done("dpo", _DPO_KEY, quiet=True):
     # A disconnect during DPO used to lose the whole stage, because this loop is
     # hand-written and had no saving of its own. It now writes the adapter and a
     # `trainer_state.json` every few dozen steps, which is enough for the same
@@ -5562,12 +5568,17 @@ for _task, _label, _key in (("Song notes", "token F1", "note_reading"),
 if "abstention" in b and "abstention" in t:
     table_rows.append(("Song notes", "abstention", b["abstention"]["accuracy"], t["abstention"]["accuracy"]))
 
+# Which adapter these numbers belong to. A card that does not say is how a
+# scoring run of the instruction-tuned model gets mistaken for the shipped one.
+_scored = best_adapter()
+
 lines = [
     "---",
     "language: crk",
     "language_name: nêhiyawêwin (Plains Cree)",
     "base_model: " + report["meta"]["base_model"],
     f"licence: {model_licence}",
+    f"adapter: {_scored.name if _scored is not None else 'base model'}",
     f"trained: {report['meta']['timestamp']}",
     "tags: [cree, nehiyawewin, low-resource, lora, gguf]",
     "---",

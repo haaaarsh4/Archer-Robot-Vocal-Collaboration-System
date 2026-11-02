@@ -47,12 +47,17 @@ for _task, _label, _key in (("Song notes", "token F1", "note_reading"),
 if "abstention" in b and "abstention" in t:
     table_rows.append(("Song notes", "abstention", b["abstention"]["accuracy"], t["abstention"]["accuracy"]))
 
+# Which adapter these numbers belong to. A card that does not say is how a
+# scoring run of the instruction-tuned model gets mistaken for the shipped one.
+_scored = best_adapter()
+
 lines = [
     "---",
     "language: crk",
     "language_name: nêhiyawêwin (Plains Cree)",
     "base_model: " + report["meta"]["base_model"],
     f"licence: {model_licence}",
+    f"adapter: {_scored.name if _scored is not None else 'base model'}",
     f"trained: {report['meta']['timestamp']}",
     "tags: [cree, nehiyawewin, low-resource, lora, gguf]",
     "---",
