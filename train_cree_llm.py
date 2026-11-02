@@ -2821,6 +2821,14 @@ def _dtype_kwargs(dtype=None) -> dict:
 # 3,949 rows of 3,584 values is 28 MB; keeping them separate is what lets the
 # embedding table stay frozen, and that is the whole memory fix.
 GRAFTED = PROC / "grafted_embeddings.pt"
+# Which vocabulary these rows belong to. A rebuilt tokenizer puts different
+# tokens at the same offsets, so a saved file cannot be reused just because it
+# exists: the graft would quietly hand a new token another token's embedding,
+# and every number measured afterwards would be measured on that.
+_GRAFT_KEY = fingerprint(
+    base=CFG.base_model, start=NEW_TOKEN_START, n=len(NEW_TOKENS),
+    tokens=sha1("\n".join(NEW_TOKENS)),
+)
 
 
 def graft_rows(model, tok) -> None:
@@ -2833,19 +2841,27 @@ def graft_rows(model, tok) -> None:
     training saw.
     """
     n = len(tok)
+    saved = None
     if GRAFTED.exists():
-        saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
-    elif n > model.get_input_embeddings().weight.shape[0]:
-        model.resize_token_embeddings(n)
+        try:
+            saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
+        except Exception as exc:
+            log(f"graft: {GRAFTED.name} is unreadable ({exc}); rebuilding it")
+            saved = None
+        if saved is not None and saved.get("key") != _GRAFT_KEY:
+            log("graft: the vocabulary changed since these rows were saved; rebuilding them")
+            saved = None
+
+    if saved is None:
+        if model.get_input_embeddings().weight.shape[0] < n:
+            model.resize_token_embeddings(n)
         decomposer = AutoTokenizer.from_pretrained(PROC / "base_tokenizer")
         init_new_embeddings(model, decomposer, NEW_TOKENS, NEW_TOKEN_START)
         rows = model.get_input_embeddings().weight[NEW_TOKEN_START: NEW_TOKEN_START + len(NEW_TOKENS)]
         rows = rows.detach().cpu().clone()
-        saved = {"start": NEW_TOKEN_START, "rows": rows}
+        saved = {"key": _GRAFT_KEY, "start": NEW_TOKEN_START, "rows": rows}
         torch.save(saved, GRAFTED)
         log(f"grafted {len(NEW_TOKENS)} new rows from base subword pieces -> {GRAFTED.name}")
-    else:
-        return
 
     # Applied whenever the file exists, even if the sizes already agree: a model
     # that was resized elsewhere carries random rows, and matching a length is
@@ -2889,13 +2905,19 @@ def reset_stale_checkpoints() -> None:
     frozen table mixes two incompatible checkpoints, and the mismatch surfaces
     hours later. Renaming keeps the old run instead of deleting it.
     """
+    # `four_bit` is deliberately not part of this. It describes how the base was
+    # loaded in that session and changes not one adapter tensor, so two runs of
+    # the same recipe on cards with different free memory must not move each
+    # other's adapters aside. Older plan files carry the field; dropping it from
+    # the comparison is what keeps this change from reading as a plan change.
     plan = {
         "base": CFG.base_model,
-        "four_bit": USE_4BIT,
         "trainable_embeddings": False,
         "lora_r": CFG.lora_r,
     }
     previous = jload(PLAN_FILE) if PLAN_FILE.exists() else None
+    if isinstance(previous, dict):
+        previous.pop("four_bit", None)
     if previous and previous != plan:
         stamp = time.strftime("%Y%m%d-%H%M%S")
         for name in TRAIN_STAGES:
