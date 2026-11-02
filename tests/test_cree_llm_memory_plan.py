@@ -190,6 +190,24 @@ def test_a_graft_without_a_key_is_rebuilt_not_trusted(nb):
     assert torch.allclose(saved["rows"], expected, atol=1e-6)
 
 
+def test_an_uncheckable_graft_is_used_when_it_cannot_be_rebuilt(nb):
+    """The export must not die because the base tokenizer folder is gone."""
+    model = _tiny_model(nb)
+    rows = torch.full((2, 16), 0.5)
+    torch.save({"start": 32, "rows": rows}, nb["GRAFTED"])
+
+    class Factory:
+        @staticmethod
+        def from_pretrained(path):
+            raise OSError("no tokenizer here")
+
+    nb["AutoTokenizer"] = Factory
+    nb["graft_rows"](model, _Tok(34))
+
+    got = model.get_input_embeddings().weight[32:34].detach()
+    assert torch.allclose(got, rows.to(got.dtype))
+
+
 def test_first_load_builds_the_graft_from_pieces(nb):
     nb["GRAFTED"].unlink(missing_ok=True)
     model = _tiny_model(nb)

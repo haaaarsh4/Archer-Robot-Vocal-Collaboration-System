@@ -2849,19 +2849,35 @@ def graft_rows(model, tok) -> None:
             log(f"graft: {GRAFTED.name} is unreadable ({exc}); rebuilding it")
             saved = None
         if saved is not None and saved.get("key") != _GRAFT_KEY:
-            log("graft: the vocabulary changed since these rows were saved; rebuilding them")
+            reason = ("these rows predate the vocabulary key" if "key" not in saved
+                      else "the vocabulary changed")
+            log(f"graft: {reason}; rebuilding the rows from the base pieces")
             saved = None
 
     if saved is None:
         if model.get_input_embeddings().weight.shape[0] < n:
             model.resize_token_embeddings(n)
-        decomposer = AutoTokenizer.from_pretrained(PROC / "base_tokenizer")
-        init_new_embeddings(model, decomposer, NEW_TOKENS, NEW_TOKEN_START)
-        rows = model.get_input_embeddings().weight[NEW_TOKEN_START: NEW_TOKEN_START + len(NEW_TOKENS)]
-        rows = rows.detach().cpu().clone()
-        saved = {"key": _GRAFT_KEY, "start": NEW_TOKEN_START, "rows": rows}
-        torch.save(saved, GRAFTED)
-        log(f"grafted {len(NEW_TOKENS)} new rows from base subword pieces -> {GRAFTED.name}")
+        try:
+            decomposer = AutoTokenizer.from_pretrained(PROC / "base_tokenizer")
+        except Exception as exc:
+            # A file written before the key existed cannot be checked, and the
+            # rows cannot be recomputed without the base tokenizer. Using them
+            # unchecked is the old behaviour and is right whenever the
+            # vocabulary did not change, so warn rather than stop an export that
+            # is otherwise finished.
+            if not GRAFTED.exists():
+                raise RuntimeError(
+                    f"the vocabulary graft is missing and cannot be rebuilt: {exc}"
+                ) from exc
+            log(f"graft: {GRAFTED.name} cannot be checked or rebuilt ({exc}); using its rows as they are")
+            saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
+        if saved is None:
+            init_new_embeddings(model, decomposer, NEW_TOKENS, NEW_TOKEN_START)
+            rows = model.get_input_embeddings().weight[NEW_TOKEN_START: NEW_TOKEN_START + len(NEW_TOKENS)]
+            rows = rows.detach().cpu().clone()
+            saved = {"key": _GRAFT_KEY, "start": NEW_TOKEN_START, "rows": rows}
+            torch.save(saved, GRAFTED)
+            log(f"grafted {len(NEW_TOKENS)} new rows from base subword pieces -> {GRAFTED.name}")
 
     # Applied whenever the file exists, even if the sizes already agree: a model
     # that was resized elsewhere carries random rows, and matching a length is
