@@ -286,6 +286,52 @@ python train_cree_llm.py --profile a100 --work /data/cree/work --to eval
 
 ---
 
+## 7b. Pulling new code without losing the run
+
+A `git pull` cannot remove a finished stage. Everything the run produces lives in
+the folder you pass as `--work`, which is outside the repository, and the folder
+the script uses when `--work` is omitted (`./cree_llm_work`) is gitignored. Code
+changes arrive in the checkout; checkpoints, `run_state.json` and `out/` do not
+move.
+
+Confirm it in two commands, before and after the pull:
+
+```bash
+cat /data/cree/work/run_state.json | head -20
+git pull --ff-only && git log --oneline -1
+```
+
+The pull also does not change which stages rerun. A stage is skipped only when
+the fingerprint of its inputs matches the one in `run_state.json`, and those
+inputs are data files, the base model, the context length, the LoRA rank and the
+schedule. Editing Python does not touch them, so a bug fix is free: pull, rerun,
+and the finished stages walk past.
+
+Two things do cause a rerun, and both are visible in the first ten lines of the
+log, in the stage table:
+
+- **A changed input.** A regenerated corpus, a different base model, a different
+  context length or LoRA rank invalidates the stages built on it. This is
+  deliberate: a score computed from other data is not a score for this model.
+- **`--force STAGE`.** The stage and everything downstream of it rerun.
+
+When a stage reruns, its previous folder is renamed to `<stage>.stale-<time>`,
+never deleted, so a mistake is reversible.
+
+The one way to appear to lose progress is to omit `--work`. The default is
+`cree_llm_work` relative to the current directory, so a run started from a
+different folder looks like a fresh run. Always pass the absolute path:
+
+```bash
+python train_cree_llm.py --profile t4 --work "$HOME/cree-work" --hf-home "$HOME/cree-hf"
+```
+
+If the stage table says `cpt done`, `sft done`, `dpo done` and the run still
+starts training, that is the fingerprint doing its job, and the log line names
+which stage and why.
+
+---
+
 ## 8. Where everything lands
 
 ```
@@ -302,7 +348,7 @@ python train_cree_llm.py --profile a100 --work /data/cree/work --to eval
   out/web/cree-llm.json     compact bundle for the project site
   out/web/corpus.json       source list and totals from the licence ledger
   out/web/llm-*.svg         the site figures, in the site's palette
-  out/export/               merged model, f16 GGUF, Q4_K_M GGUF, Modelfile, manifest, zip
+  out/export/               merged model, f16 GGUF, the quantised GGUF, Modelfile, manifest, zip
   run_state.json            the stage ledger
   logs/                     one log per run
 ```
@@ -310,6 +356,13 @@ python train_cree_llm.py --profile a100 --work /data/cree/work --to eval
 The export file names follow the model actually trained, not a default. A 7B run
 writes `archer-7b.Q4_K_M.gguf`; a 14B run writes
 `archer-14b.Q4_K_M.gguf`.
+
+Quantising to Q4_K_M needs `llama-quantize`, which is a compiled binary. The
+export installs `cmake` into the virtualenv and builds it once. On a host with no
+compiler at all it does not fail: the converter writes `archer-7b.Q8_0.gguf`
+instead, about 8.2 GB rather than 4.7 GB and slightly higher quality. The
+Modelfile, the zip and `manifest.json` all name the file that was actually
+written, so `ollama create` is unchanged either way.
 
 ### Read the results
 
