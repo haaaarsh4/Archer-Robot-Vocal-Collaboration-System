@@ -132,7 +132,7 @@ def _adapter_stamp() -> str:
 # baselines changed what a CreeBench row means, and without this an existing
 # work folder would keep the old scores and never compute the new ones.
 _EVAL_KEY = fingerprint(base=CFG.base_model, n=CFG.eval_n, adapter=_adapter_stamp(),
-                        speaker=CFG.external_baseline, bench="v2")
+                        speaker=CFG.external_baseline, bench="v3")
 
 if stage_done("eval", _EVAL_KEY, requires=OUT / "creebench_report.json"):
     results = jload(OUT / "creebench_report.json")
@@ -152,6 +152,7 @@ else:
     en_prompts = [f"<|translate|><|english|><|sro|>\nTranslate into Plains Cree (SRO):\n{r['english']}" for r in eval_pairs]
     cr_prompts = [f"<|translate|><|cree|><|english|>\nTranslate into English:\n{r['cree']}" for r in eval_pairs]
 
+    log(f"CreeBench: adapter {best_adapter() or 'none (base only)'}")
     log(f"CreeBench: {len(eval_pairs)} held-out pairs, both directions, base and tuned")
     t0 = time.time()
     tuned_en = generate(en_prompts, 64, use_adapters=True)
@@ -180,6 +181,24 @@ else:
             "cr_en": score_translation(tuned_cr, [r["english"] for r in eval_pairs], False),
         },
     }
+
+    # Which script did it answer in? A model that writes syllabics when SRO was
+    # asked scores near zero on chrF++ for a reason that has nothing to do with
+    # translation, and without this number a script failure reads as "it cannot
+    # translate". The SRO-converted score separates the two, and five of the
+    # actual replies are kept so a run can be inspected without reloading it.
+    _en_cr_script = round(float(np.mean([script_share(h) for h in tuned_en])), 4)
+    results["tuned"]["en_cr"]["script_share"] = _en_cr_script
+    results["base"]["en_cr"]["script_share"] = round(float(np.mean([script_share(h) for h in base_en])), 4)
+    results["tuned"]["en_cr"]["chrf++_as_sro"] = round(
+        sacrebleu.corpus_chrf(
+            [to_sro(h) if script_share(h) > 0.5 else h for h in tuned_en],
+            [[r["cree"] for r in eval_pairs]], word_order=2,
+        ).score, 3)
+    results["tuned"]["en_cr"]["examples"] = [
+        {"english": r["english"], "pred": h[:200], "gold": r["cree"][:200]}
+        for r, h in list(zip(eval_pairs, tuned_en))[:5]
+    ]
 
     if CFG.external_baseline:
         import requests
@@ -371,6 +390,12 @@ else:
             results["base"]["cr_en"]["chrf++"],
             _ext["cr_en"]["chrf++"] if _ext_ok else None),
     ]
+    if results["tuned"]["en_cr"].get("script_share") is not None:
+        # Measured as SRO share, so higher is better and the bar is the base
+        # model's own tendency to answer in the script it was asked for.
+        bars.append(bar("EN -> CRK", "SRO share",
+                        1 - results["tuned"]["en_cr"]["script_share"],
+                        1 - results["base"]["en_cr"].get("script_share", 0)))
     if "note_reading" in results["base"] and "note_reading" in results["tuned"]:
         bars.append(bar("Song notes", "token F1", results["tuned"]["note_reading"]["token_f1"],
                         results["base"]["note_reading"]["token_f1"]))
@@ -421,6 +446,10 @@ else:
                        ("CRK -> EN", ["chrf++", "bleu", "token_f1"])]:
         key = "en_cr" if task.startswith("EN") else "cr_en"
         print(row(task, results["base"][key], results["tuned"][key], keys))
+    _script = results["tuned"]["en_cr"].get("script_share")
+    if _script is not None:
+        print(f"{'EN->CRK script':22s}  {100 * _script:.1f}% of letters in syllabics "
+              f"(SRO was asked); after conversion chrF++ {results['tuned']['en_cr'].get('chrf++_as_sro', 0):.3f}")
     ext = results.get("external")
     if ext and "en_cr" in ext:
         tag = ext["model"][:22]

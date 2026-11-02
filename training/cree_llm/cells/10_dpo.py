@@ -89,19 +89,46 @@ _DPO_DIR = CKPT / "dpo"
 # `ref` versions the reference policy. The first version of this stage used the
 # adapter-disabled base model, which is a different objective; a run that holds
 # one of those adapters must not be told its DPO stage is still current.
+def _sft_stamp() -> str:
+    """Identity of the adapter DPO starts from.
+
+    DPO trains on top of SFT. Re-running SFT changes the policy, so a DPO
+    adapter trained on the previous one is not this stage's output -- without
+    this the new SFT adapter would be skipped over and the old DPO adapter, with
+    the old behaviour baked in, would be exported.
+    """
+    folder = adapter_ready("sft")
+    if folder is None:
+        return "none"
+    weights = folder / "adapter_model.safetensors"
+    stamp = weights.stat() if weights.exists() else folder.stat()
+    return f"{folder.name}:{stamp.st_size}:{int(stamp.st_mtime)}"
+
+
 _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
-    corrupt="substitute-v1",
+    sft=_sft_stamp(), corrupt="substitute-v1",
 )
+
+# A scoring run (`CREE_ADAPTER_STAGE` set) is asking what an existing adapter
+# scores, so it must not train a new one on the way to the answer.
+_SCORING_ONLY = bool(os.environ.get("CREE_ADAPTER_STAGE", "").strip())
 
 if not CFG.dpo_enabled or not prefs:
     if not stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
-        shutil.copytree(CKPT / "sft", _DPO_DIR, dirs_exist_ok=True)
+        # copy over the SFT adapter as a *new* folder: a merge into an existing
+        # dpo/ leaves the previous adapter's shards beside the copied ones.
+        if _DPO_DIR.exists():
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            _DPO_DIR.rename(_DPO_DIR.with_name(f"dpo.stale-{stamp}"))
+        shutil.copytree(CKPT / "sft", _DPO_DIR)
         mark_stage("dpo", _DPO_KEY, skipped=True)
         log("DPO skipped; SFT adapter carried forward unchanged")
-elif stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
+elif _SCORING_ONLY or stage_done("dpo", _DPO_KEY, requires=_DPO_DIR / "adapter_config.json"):
     model, tok = ensure_model()
+    if _SCORING_ONLY:
+        log("DPO: scoring run, training skipped")
 
 
 class PreferenceDataset(torch.utils.data.Dataset):

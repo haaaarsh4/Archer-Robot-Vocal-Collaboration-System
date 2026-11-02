@@ -422,7 +422,18 @@ def best_adapter(upto: str | None = None) -> Path | None:
     disconnect used to load the bare base model and quietly train instruction
     tuning without the Cree pretraining underneath it, which is worse than not
     training at all because the scores still look plausible.
+
+    `CREE_ADAPTER_STAGE=sft` scores a finished earlier stage instead of the
+    newest one. Without it, deciding whether the last stage helped means
+    retraining everything under it; with it, the question is one eval run.
     """
+    wanted = os.environ.get("CREE_ADAPTER_STAGE", "").strip().lower()
+    if upto is None and wanted:
+        folder = adapter_ready(wanted)
+        if folder is not None:
+            log(f"adapter: CREE_ADAPTER_STAGE={wanted} -> {folder}")
+            return folder
+        log(f"adapter: CREE_ADAPTER_STAGE={wanted} has no finished adapter; using the newest")
     names = TRAIN_STAGES if upto is None else TRAIN_STAGES[: TRAIN_STAGES.index(upto) + 1]
     for name in reversed(names):
         folder = adapter_ready(name)
