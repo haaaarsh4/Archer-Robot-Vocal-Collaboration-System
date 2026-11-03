@@ -81,7 +81,7 @@ FRAME_PERIOD_MS = 5.0
 # The slow/fast split of the take's own pitch movement, in seconds. Movement
 # slower than this is removed (a constant note cannot follow it); movement
 # faster than it, vibrato, micro-movement, is the performance's own life
-# and is kept. Same value as melody_voice.FLATTEN_SLOW_S, deliberately: the
+# and is kept. Same value as melody_voice.FLATTEN_SLOW_S, : the
 # two paths must agree on what "the take's own movement" means.
 SLOW_S = 0.40
 

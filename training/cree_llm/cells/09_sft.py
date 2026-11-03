@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Supervised instruction tuning.
 #
 # Only the assistant's tokens contribute to the loss. The schedule is short and
@@ -10,7 +9,6 @@
 # kernel has no memory of CPT, so the adapter is loaded from Drive explicitly;
 # training instruction-following on an untuned base would produce a model that
 # answers neatly in English and cannot write Cree at all.
-# ─────────────────────────────────────────────────────────────────────────────
 train_rows = read_jsonl(PROC / "sft_train.jsonl")
 val_rows = read_jsonl(PROC / "sft_val.jsonl")
 
@@ -74,7 +72,7 @@ def reply(prompt: str, max_new_tokens: int = 120, system: str = SYSTEM) -> str:
     return tok.decode(new, skip_special_tokens=True).strip()
 
 
-print("\n── held-out prompts, after tuning ──")
+print("\nHeld-out prompts, after tuning")
 for row in val_rows[: (1 if SMOKE else 4)]:
     question = row["messages"][1]["content"]
     print(f"\nQ: {question[:180]}")

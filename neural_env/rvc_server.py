@@ -14,7 +14,6 @@ torch.load = _patched_torch_load
 
 import os as _os
 
-#---------------------------------------------------------------------------
 # HOW MANY THREADS, and this is the single number that decides whether Live
 # mode can keep up with the track at all.
 #
@@ -291,7 +290,7 @@ async def convert(
     # offered a model the sidecar had not loaded (a stale sidecar, or a main app
     # whose config.yaml has more entries than the running sidecar) could ask for
     # Model 3 and be answered by Model 1 -- audibly the wrong voice, with no
-    # error anywhere. Refusing is the honest answer, and the page now disables a
+    # error anywhere. Refusing is the accurate answer, and the page now disables a
     # slot the running sidecar does not have.
     if voice_index < 0 or voice_index >= len(_voices):
         return JSONResponse(

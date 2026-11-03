@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Cleaning, deduplication and splitting.
 #
 # Three failures destroy a low-resource model, and each is handled explicitly:
@@ -6,7 +5,6 @@
 #   2. The same sentence in train and test -> exact + near-duplicate removal,
 #      then a document-disjoint split, then a second leakage check.
 #   3. Bag-of-words files pretending to be prose -> rejected by shape.
-# ─────────────────────────────────────────────────────────────────────────────
 
 DOCS = read_jsonl(RAW / "docs.jsonl")
 PAIRS = read_jsonl(RAW / "pairs.jsonl")
@@ -117,7 +115,7 @@ def norm_key(text: str) -> str:
     return re.sub(r"[^\wâêîô]+", "", normalize_sro(text))
 
 
-# ── documents -> sentences ───────────────────────────────────────────────────
+# documents -> sentences
 # The splits are the thing every later cell reads, so they are built once and
 # then read back. Rebuilding them is not just slow: the near-duplicate filter is
 # randomised by insertion order, so a second build could produce slightly
@@ -135,7 +133,7 @@ if all(f.exists() for f in _SPLIT_FILES) and stage_done("clean", _CLEAN_KEY, req
     stats = jload(PROC / "stats.json")
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 else:
-    # ── documents -> sentences ───────────────────────────────────────────────────
+    # documents -> sentences
     NOTES = [d for d in DOCS if d["kind"] == "song-notes"]
     DOCS = [d for d in DOCS if d["kind"] != "song-notes"]
 
@@ -183,7 +181,7 @@ else:
 
     log(f"sentences kept {len(sentences)}  rejected {rejected}")
 
-    # ── pairs: deduplicate, then split by document ───────────────────────────────
+    # pairs: deduplicate, then split by document
     _PRIORITY = {"edtekla": 0, "figurative": 1, "project": 2, "watkins1865": 3}
 
     pairs_by_cree: dict[str, dict] = {}
@@ -229,7 +227,7 @@ else:
     for row in pairs:
         row["split"] = assign(group_of(row))
 
-    # ── leakage guard: nothing in dev/test may be a near-duplicate of train ──────
+    # leakage guard: nothing in dev/test may be a near-duplicate of train
     train_guard = NearDup(threshold=0.8)
     for row in sentences:
         if row["split"] == "train":
@@ -248,7 +246,7 @@ else:
             leaked += 1
     log(f"moved {leaked} near-duplicates out of dev/test")
 
-    # ── a tiny dev/test split must still exist ───────────────────────────────────
+    # a tiny dev/test split must still exist
     def ensure_split(rows: list[dict], minimum: int) -> None:
         """Top up the test split by moving whole groups, never single rows.
 
@@ -305,7 +303,7 @@ else:
     jdump(PROC / "stats.json", stats)
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 
-    # ── integrity assertions: the rest of the notebook relies on these ───────────
+    # integrity assertions: the rest of the notebook relies on these
     assert lm["train"] and lm["test"], "empty LM split"
     assert tr["train"] and tr["test"], "empty pair split"
     _train_keys = {norm_key(r["text"]) for r in lm["train"]}
@@ -315,7 +313,7 @@ else:
                for r in lm["test"]), "English in LM test"
     print("\nintegrity checks passed: splits are disjoint and language-checked")
 
-    # ── composition figure ───────────────────────────────────────────────────────
+    # composition figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))

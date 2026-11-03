@@ -71,7 +71,7 @@ _TAKES = _ROOT / "frontend" / "assets" / "audio"
 _FILLER = re.compile(r"[^\wâêîôāēīō' ]+", re.UNICODE)
 
 
-# ---------------------------------------------------------------- scoring ---
+# scoring
 
 def normalise(text: str) -> str:
     """One spelling for comparison: letters and single spaces, nothing else.
@@ -192,7 +192,7 @@ def _english_lines() -> list[str]:
     """The English translations that ship beside the Cree gold lines.
 
     Only used as evidence. One of the seven takes contains more than the Cree
-    line, and the honest question about the extra is whether the audio really
+    line, and the accurate question about the extra is whether the audio really
     holds something else or whether the decoder invented it. The translations
     answer that for the loudest case directly: if the reading's surplus words
     reconstruct the English sentence that goes with the line, then the surplus
@@ -291,7 +291,7 @@ def english_leakage(text: str) -> tuple[int, list[str]]:
     return len(offenders), offenders[:8]
 
 
-# ------------------------------------------------------------------ corpus ---
+# corpus
 
 def grad_lines() -> list[str]:
     """The reference lines of the Congrats Grads series, in order."""
@@ -365,7 +365,7 @@ def corpus_sentences(limit: int = 400, min_words: int = 3, max_words: int = 14) 
     return out
 
 
-# --------------------------------------------------------------------- TTS ---
+# TTS
 
 _TTS_CACHE: dict[str, object] = {}
 
@@ -460,7 +460,7 @@ def _apply_pitch_wobble(audio: np.ndarray, sr: int, wobble: np.ndarray) -> np.nd
     return np.interp(positions, np.arange(audio.size), audio).astype(np.float32)
 
 
-# ------------------------------------------------------------------ metrics ---
+# metrics
 
 class Row(dict):
     pass
@@ -525,7 +525,7 @@ def oracle_cer(transcriber: CreeTranscriber, audio: np.ndarray, reference: str
     return best, best_text
 
 
-# ------------------------------------------------------------------- modes ---
+# modes
 
 def mode_gold(transcriber: CreeTranscriber, *, limit: int | None = None,
               verbose: bool = True) -> dict:
@@ -997,7 +997,7 @@ def mode_health(transcriber: CreeTranscriber) -> None:
         print(f"    {word}: {why}")
 
 
-# --------------------------------------------------------------------- main ---
+# main
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,

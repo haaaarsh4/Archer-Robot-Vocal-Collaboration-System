@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import io
+import re
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
@@ -16,10 +18,10 @@ from chat.rag_index import SongNotesIndex
 from chat.llm_client import LocalLLMClient, LLMConfig, ChatTurn
 from chat.archer_prompt import (
     ARCHER_SYSTEM_PROMPT,
-    format_prompt,
     looks_like_cree,
+    route,
     script_of,
-    task_of,
+    translation_prompt,
     wants_cree,
 )
 from chat.tts_engine import LocalTTS
@@ -30,6 +32,48 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 # One floor for the chat and for the retrieval demo, so the panel cannot show a
 # passage the model was not given.
 MIN_NOTE_SCORE = 0.30
+
+# Translation was trained on one sentence at a time. A paragraph is split before
+# it reaches the model; handing it four sentences at once is what makes it copy
+# the English back or answer a question instead of translating it.
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+_CREE_TRANSLATION_MAX_SENTENCES = 2
+
+# A Cree answer that still carries English function words is the model copying
+# its input, not translating it. The app hides that instead of printing it.
+_ENGLISH_FUNCTION_WORDS = re.compile(
+    r"\b(?:the|and|is|are|was|were|be|been|being|to|of|in|on|for|with|that|this|"
+    r"it|as|at|by|from|we|you|they|he|she|his|her|their|our|not|but|or|if|then|"
+    r"when|what|which|who|how|why|can|could|will|would|should|may|might|must|have|"
+    r"has|had|do|does|did)\b",
+    re.IGNORECASE,
+)
+
+
+def _plain_text(text: str) -> str:
+    """Strip the markdown the model copies out of the notes."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text, flags=re.S)
+    text = re.sub(r"__(.+?)__", r"\1", text, flags=re.S)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s+", "", text, flags=re.M)
+    return text
+
+
+def _reliable_cree(text: str) -> bool:
+    """True when a reply reads as Cree rather than copied English or a loop."""
+    if not looks_like_cree(text):
+        return False
+    if _ENGLISH_FUNCTION_WORDS.search(text):
+        return False
+    words = re.findall(r"[A-Za-zâêîôûāēīōū'’‑-]+", text.lower())
+    if len(words) >= 8 and len(set(words)) / len(words) < 0.4:
+        return False
+    counted = [word for word in words if len(word) >= 3]
+    if counted:
+        repeated = max(Counter(counted).values())
+        if repeated >= 4 and repeated / len(counted) >= 0.2:
+            return False
+    return True
 
 _rag_index: Optional[SongNotesIndex] = None
 _llm_client: Optional[LocalLLMClient] = None
@@ -77,6 +121,42 @@ def _get_tts() -> LocalTTS:
             voice_path = None
         _tts = LocalTTS(voice_path=voice_path)
     return _tts
+
+
+def _plain_for_translation(text: str) -> str:
+    """Remove the formatting characters that are not part of the sentence."""
+    text = re.sub(r"[*_`#]+", "", str(text))
+    text = re.sub(r"^\s*[-\u2022]\s*", "", text, flags=re.MULTILINE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _split_sentences(text: str) -> list[str]:
+    parts = [p.strip() for p in _SENTENCE_END.split(_plain_for_translation(text)) if p.strip()]
+    return parts or [_plain_for_translation(text)]
+
+
+def _translation_target(plan) -> str:
+    if plan.prompt.startswith("<|translate|><|english|><|cans|>"):
+        return "cans"
+    if plan.prompt.startswith("<|translate|><|english|>"):
+        return "cr"
+    return "en"
+
+
+def _translate_sentences(llm: LocalLLMClient, text: str, target: str) -> str:
+    """Translate one sentence at a time, the shape the model was trained on."""
+    pieces: list[str] = []
+    for sentence in _split_sentences(text):
+        piece = llm.chat(
+            translation_prompt(sentence, target), [], system_prompt=ARCHER_SYSTEM_PROMPT,
+        ).strip()
+        if piece:
+            pieces.append(piece)
+    return " ".join(pieces).strip()
+
+
+def _answer_in_cree(llm: LocalLLMClient, english: str) -> str:
+    return _translate_sentences(llm, english, "cr")
 
 
 def _get_svs(neural_timbre):
@@ -145,11 +225,12 @@ def chat_prompt(req: PromptRequest):
     message = (req.message or "").strip()
     retrieved = _get_rag().query(message, top_k=4, min_score=MIN_NOTE_SCORE)
     notes = [(Path(r.chunk.source).stem, r.chunk.text) for r in retrieved if r.chunk.text.strip()]
-    task = task_of(message, bool(notes))
-    used_notes = notes if task == "song_notes" else []
+    plan = route(message, notes, [])
+    used_notes = notes if plan.task == "song_notes" else []
     return {
         "message": message,
-        "task": task,
+        "task": plan.task,
+        "answer_language": plan.answer_language,
         "script": script_of(message),
         "looks_like_cree": looks_like_cree(message),
         "wants_cree": wants_cree(message),
@@ -158,7 +239,7 @@ def chat_prompt(req: PromptRequest):
             for r in retrieved
         ],
         "notes_used": [title for title, _ in used_notes],
-        "prompt": format_prompt(message, notes),
+        "prompt": plan.prompt,
         "system_prompt": ARCHER_SYSTEM_PROMPT,
     }
 
@@ -204,23 +285,73 @@ def chat(req: ChatRequest):
 
         retrieved = rag.query(req.message, top_k=4, min_score=MIN_NOTE_SCORE)
         notes = [(Path(r.chunk.source).stem, r.chunk.text) for r in retrieved if r.chunk.text.strip()]
-        task = task_of(req.message, bool(notes))
+        history_pairs = [(m.role, m.content) for m in req.history]
+        plan = route(req.message, notes, history_pairs)
         # Notes are part of the prompt only when this is a notes question. A
         # translation request is not padded with song prose, and a general
         # question keeps its own answer instead of being forced onto a song.
-        used_notes = notes if task == "song_notes" else []
-        prompt = format_prompt(req.message, notes)
+        used_notes = notes if plan.task == "song_notes" else []
         sources = sorted({r.chunk.source for r in retrieved}) if used_notes else []
 
         history = [ChatTurn(role=m.role, content=m.content) for m in req.history]
-        reply_text = llm.chat(prompt, history, system_prompt=ARCHER_SYSTEM_PROMPT)
+        # A translation or script prompt already carries the text to work on.
+        # Replaying the previous turn as chat makes the model answer the turn
+        # instead of translating the payload, so those calls get no history.
+        chat_history = [] if plan.task in {"translate", "orthography"} else history
+        if plan.task == "translate" and len(_split_sentences(plan.payload)) > 1:
+            # The model was trained on one sentence per translation prompt. A
+            # multi-sentence answer is split instead of handed over as a block.
+            reply_text = _translate_sentences(
+                llm, plan.payload, _translation_target(plan),
+            )
+        else:
+            reply_text = llm.chat(plan.prompt, chat_history, system_prompt=ARCHER_SYSTEM_PROMPT)
+        machine_translation = False
+
+        if plan.task == "translate":
+            target = _translation_target(plan)
+            if target in {"cr", "cans"} and not _reliable_cree(reply_text):
+                reply_text = (
+                    "The model could not produce a reliable Cree translation for that "
+                    "text."
+                )
+            elif target == "en" and looks_like_cree(reply_text):
+                reply_text = "The model did not produce an English translation for that text."
+
+        if plan.task == "song_notes" and plan.answer_language == "cr":
+            english = reply_text
+            cree = ""
+            if len(_split_sentences(english)) <= _CREE_TRANSLATION_MAX_SENTENCES:
+                try:
+                    cree = _answer_in_cree(llm, english)
+                except Exception as exc:  # noqa: BLE001 - the English answer is still useful
+                    logger.warning(f"[chat] Cree translation failed: {exc}")
+                    cree = ""
+            if cree and _reliable_cree(cree):
+                reply_text = (
+                    f"{cree}\n\n"
+                    f"English answer it was translated from:\n{english}"
+                )
+                machine_translation = True
+            else:
+                reply_text = (
+                    f"{english}\n\n"
+                    "The Cree translation was not reliable enough to show, so this is "
+                    "the English answer."
+                )
+
+        reply_text = _plain_text(reply_text)
         used_model = llm.cfg.model if llm.cfg.backend == "ollama" else "llama_cpp"
+        reply_is_cree = plan.answer_language == "cr" and _reliable_cree(reply_text)
 
         response: dict = {
             "reply": reply_text,
             "sources": sources,
-            "task": task,
-            "language": "cree" if looks_like_cree(req.message) else "english",
+            "task": plan.task,
+            "answer_language": plan.answer_language,
+            "machine_translation": machine_translation,
+            "used_history": plan.used_history,
+            "language": "cree" if reply_is_cree else "english",
             "notes_used": len(used_notes),
             "model": used_model,
         }

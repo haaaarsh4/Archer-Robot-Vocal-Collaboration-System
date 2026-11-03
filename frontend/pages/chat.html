@@ -3,9 +3,9 @@
 
   <header class="paper-head">
     <p class="paper-kicker">Archer Bot</p>
-    <h1 class="paper-title">It only knows what <em>Archer wrote down</em></h1>
-    <p class="paper-deck">A local assistant answers questions about the songs, their meaning, their backstory and how they came together. It does not answer song questions from the model's memory. Every reply is assembled with retrieved passages of Archer's own notes placed in front of it, and the sources are returned with it. The same model translates, writes syllabics and explains Cree words; there is no second chat model behind it. The later sections of this page are how that one model was built.</p>
-    <div class="paper-meta"><span>search index: all-MiniLM-L6-v2</span><span>top 4 passages</span><span>one model · archer:7b</span><span>Ollama or llama.cpp</span></div>
+    <h1 class="paper-title">One local model, and <em>a rule about evidence</em></h1>
+    <p class="paper-deck">It answers questions about Archer's songs from Archer's own notes, and says plainly when the notes do not contain the answer. The same weights translate between English and nêhiyawêwin, write syllabics and explain Cree words, and there is no second chat model behind them. This page covers the retrieval that feeds it, the data it learned from, the three training passes, and the numbers the last run actually measured.</p>
+    <div class="paper-meta"><span>one model · archer:7b</span><span>Q4_K_M · 4.7 GB</span><span>120 held-out pairs</span><span>8 of 8 jobs ahead of its base</span></div>
   </header>
 
   <section class="paper-card">
@@ -35,7 +35,7 @@
   <section class="paper-card">
     <p class="paper-num"><b>03</b> Retrieval</p>
     <h2 class="paper-h2">Four passages, and a floor below which nothing is used</h2>
-    <p class="paper-lede">The question is embedded with the same model and compared against every stored chunk by cosine similarity. The four closest chunks are returned, but only those above a minimum score of 0.15. A weak match is not included to fill the quota.</p>
+    <p class="paper-lede">The question is embedded with the same model and compared against every stored chunk by cosine similarity. The four closest chunks are returned, but only those above a minimum score of 0.30. A weak match is not included to fill the quota.</p>
     <p class="paper-p">Both sides of the comparison are normalised, so the dot product is the cosine. The search is exact, not approximate: there is no vector database and no index structure beyond a single matrix multiply. At the size of a song-notes folder that is faster than maintaining an approximate index, and it cannot miss a passage because of a hash collision.</p>
     <p class="paper-p">The same query returns the source filename for each chunk. Those filenames travel back to the browser with the reply, so the assistant's answer is always accompanied by the notes it came from. This is not a citation bolted on afterwards; it is the retrieval result itself.</p>
 
@@ -104,10 +104,10 @@
     <p class="paper-lede">The backend is a configuration choice, not a rewrite. Ollama runs as a local server and manages models by name; llama.cpp loads a GGUF file inside the Python process. Both keep every token on the machine.</p>
 
     <div class="paper-grid two" style="margin-top:26px">
-      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code> and serves the one tag, <code>archer:7b</code>, a 7-billion-parameter model quantised to run on a laptop. Create it once from the exported Modelfile, then the app only sends HTTP to localhost. If the server is not running, or the tag is missing, the endpoint says which, with the command that fixes it.</p></div>
+      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code> and serves the one tag, <code>archer:7b</code>, a 7-billion-parameter model quantised to Q4_K_M: 4.7 GB on disk, 4,096 tokens of context, and the same weights for every job on this page. Create it once from the exported Modelfile, then the app only sends HTTP to localhost. If the server is not running, or the tag is missing, the endpoint says which, with the command that fixes it.</p></div>
       <div class="paper-tile"><div class="paper-label">Alternative</div><h3 class="paper-h3">llama.cpp</h3><p class="paper-p">Loads a <code>.gguf</code> file in-process. One less service to start, at the cost of the app holding the model's memory. Useful on a machine where installing a background server is inconvenient, or where the model file is already managed by hand.</p></div>
     </div>
-    <p class="paper-p" style="margin-top:18px">Generation is deliberately conservative: temperature 0.3, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
+    <p class="paper-p" style="margin-top:18px">Generation is conservative: temperature 0.3, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
     <p class="paper-p">There is one model behind both backends, one tag and one GGUF. Ollama and llama.cpp are two ways to serve it, not two assistants. Section 08 is what that model does and how one prompt selects the job.</p>
   </section>
 
@@ -137,6 +137,7 @@
     <p class="paper-lede">There is no router and no second chat model. Conversation, song notes, translation, syllabics and word explanations are one set of weights, selected by the task prefix in the prompt.</p>
     <p class="paper-p">The earlier design split the assistant in two: a general model for conversation and a Cree model for language. Every question became a routing decision, the install had two tags, and an English question about a Cree word could land on the model that was worse at it. This version puts every behaviour in one instruction set, so the model learns what a translation looks like, what a notes answer looks like and what ordinary conversation looks like in the same adapter.</p>
     <p class="paper-p">Retrieval still runs on every question, but it decides whether notes are in the prompt, not which model answers. A passage above the 0.30 relevance floor is attached under <code>Notes on &lt;song&gt;:</code>; below it, the question takes the no-notes path. A translation request is never padded with song prose.</p>
+    <p class="paper-p">The request is unwrapped before it reaches the model. "How do you say river in Cree?" becomes the training shape with <code>river</code> after the header, and "Write tânisi in Cree syllabics" sends <code>tânisi</code>. The model learned the sentence to act on, not the question that asked for it, and handing it the whole question makes it translate the question instead.</p>
     <p class="paper-p">The response reports the task, the model tag and the notes used. <code>task</code> is the prompt shape, not a backend choice: <code>song_notes</code>, <code>chat</code>, <code>translate</code> or <code>orthography</code>. If the one model is not installed, the chat returns a 503 with the <code>ollama create</code> line. There is nothing else to fall back to, and answering as another model would not be this assistant.</p>
 
     <figure class="paper-figure">
@@ -199,8 +200,8 @@
     <p class="paper-num"><b>09</b> The base</p>
     <h2 class="paper-h2">A capable base, taught a second language and every task</h2>
     <p class="paper-lede">A model trained from nothing on a million words has to learn the language and the task at the same time. This one starts from Qwen2.5-7B-Instruct, which already holds a conversation and follows an instruction, and adds a small set of weights, a Cree vocabulary and the instruction mix for all four jobs. The base is the starting point for training, not a second model that ships: the app loads the merged result as <code>archer:7b</code> and nothing else.</p>
-    <p class="paper-p">The added weights are LoRA adapters: low-rank matrices attached to the attention and feed-forward projections, trained while the base weights stay exactly as they were. Rank 64 on an A100, rank 32 on a 16 GB card. There is no second copy of the model, and the adapter file is a few hundred megabytes instead of fifteen gigabytes, which is why a run can be stopped, moved and resumed like an ordinary file.</p>
-    <p class="paper-p">The vocabulary is the part that matters most for a language the base model has barely seen. The base tokenizer spends over four tokens on a Cree word, splitting it into pieces that were never meant to be read together. A SentencePiece model trained on the Cree corpus, filtered and then grafted onto the existing vocabulary, spends about a third fewer tokens on the same text, and the run records the measured figure in its tokenizer audit. The full profile adds about four thousand new pieces.</p>
+    <p class="paper-p">The added weights are LoRA adapters: low-rank matrices attached to the attention and feed-forward projections, trained while the base weights stay exactly as they were. The run described here used rank 32 with alpha 64 on one 24 GB card, with the base loaded in 4-bit. That is 80,740,352 trainable parameters, 1.05% of the model. The base weights never change, and the adapter is small enough to checkpoint, move and resume like an ordinary file.</p>
+    <p class="paper-p">The vocabulary is the part that matters most for a language the base model has barely seen. The base tokenizer spends 4.72 tokens on the average Cree word, splitting it into pieces that were never meant to be read together. A SentencePiece model trained on the Cree corpus, filtered and then grafted onto the existing vocabulary, spends 3.65 on the same held-out text, 22.6% fewer. The run adds 3,947 pieces and takes the vocabulary from 151,665 to 155,620, and the audit that measures the change is part of the run.</p>
     <p class="paper-p">A new token cannot start at random. It starts at the average of the base model's embeddings for the pieces it replaces, so a word that was spelled <code>n · ê · hi · yaw · ê · win</code> already means something on its first day. Random rows have to be learned from scratch, and with a corpus this size they never fully are. The table is then frozen. The input and output embedding matrices together hold about 1.1 billion parameters, and in fp32 with gradients and Adam state that is roughly 11 GB, the difference between fitting a 16 GB card and dying on the first step.</p>
 
     <figure class="paper-figure">
@@ -247,9 +248,9 @@
 
   <section class="paper-card">
     <p class="paper-num"><b>10</b> The data</p>
-    <h2 class="paper-h2">Fifteen collections, one licence ledger</h2>
+    <h2 class="paper-h2">Thirteen collections, one licence ledger</h2>
     <p class="paper-lede">Everything the model learns comes from material whose licence is recorded. Each source is written down with its licence, dialect and script before a single sentence is used, and the run carries that ledger into its report.</p>
-    <p class="paper-p">The full profile keeps <strong>1,124,146 words across 66,071 sentences</strong>, <strong>10,934 aligned Cree and English pairs</strong>, <strong>203 held-out pairs</strong> for the benchmark and <strong>57,579 lexicon forms</strong> for the validity check. The smaller smoke profile deliberately uses a slice of the same pipeline, which is why its report shows smaller numbers.</p>
+    <p class="paper-p">This run kept <strong>1,121,753 words across 65,861 training sentences</strong>, <strong>10,934 aligned Cree and English pairs</strong>, a <strong>203-pair document-disjoint test split</strong> of which 120 are scored, and <strong>57,579 lexicon forms</strong> for the validity check. The smoke profile uses a slice of the same pipeline, which is why its report shows smaller numbers.</p>
     <p class="paper-p">The licence policy is part of the loader, not a note added afterwards. NoDerivatives material in the EdTeKLA collection is skipped at the source. NonCommercial ShareAlike material is used only while the released model carries that same licence. Historical books are tagged as historical, so they can teach vocabulary and spelling without being mistaken for how the language is written today.</p>
 
     <figure class="paper-figure">
@@ -257,19 +258,19 @@
         <svg viewBox="0 0 1080 340" role="img" aria-label="Data funnel from fifteen collections to two hundred held-out pairs">
           <rect width="1080" height="340" fill="#0b1120"/>
           <text x="50" y="48" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="21" font-weight="600">What survives</text>
-          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">FIFTEEN COLLECTIONS TO ONE BENCHMARK</text>
+          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">THIRTEEN COLLECTIONS TO ONE BENCHMARK</text>
           <g font-family="Inter Tight, sans-serif" font-size="11">
             <text x="50" y="112" fill="#8195b8">collections</text>
             <rect x="300" y="96" width="700" height="24" rx="3" fill="#34517f"/>
-            <text x="988" y="113" fill="#f2f5fb" text-anchor="end" font-size="10">15</text>
+            <text x="988" y="113" fill="#f2f5fb" text-anchor="end" font-size="10">13</text>
 
             <text x="50" y="152" fill="#8195b8">words kept</text>
             <rect x="300" y="136" width="600" height="24" rx="3" fill="#4265a0"/>
-            <text x="888" y="153" fill="#f2f5fb" text-anchor="end" font-size="10">1,124,146</text>
+            <text x="888" y="153" fill="#f2f5fb" text-anchor="end" font-size="10">1,121,753</text>
 
             <text x="50" y="192" fill="#8195b8">sentences</text>
             <rect x="300" y="176" width="500" height="24" rx="3" fill="#5a64a8"/>
-            <text x="788" y="193" fill="#f2f5fb" text-anchor="end" font-size="10">66,071</text>
+            <text x="788" y="193" fill="#f2f5fb" text-anchor="end" font-size="10">65,861</text>
 
             <text x="50" y="232" fill="#8195b8">aligned pairs</text>
             <rect x="300" y="216" width="400" height="24" rx="3" fill="#6f8cff"/>
@@ -287,38 +288,40 @@
     </figure>
 
     <div class="paper-tabs" role="group" aria-label="Filter the ledger by licence">
-      <button class="paper-tab is-on" data-licence-filter="all" onclick="creeLicence('all', this)">All 15</button>
+      <button class="paper-tab is-on" data-licence-filter="all" onclick="creeLicence('all', this)">All 13</button>
       <button class="paper-tab" data-licence-filter="open" onclick="creeLicence('open', this)">Open 6</button>
       <button class="paper-tab" data-licence-filter="sa" onclick="creeLicence('sa', this)">ShareAlike 1</button>
       <button class="paper-tab" data-licence-filter="nc" onclick="creeLicence('nc', this)">NonCommercial 2</button>
-      <button class="paper-tab" data-licence-filter="pd" onclick="creeLicence('pd', this)">Public domain 2</button>
-      <button class="paper-tab" data-licence-filter="other" onclick="creeLicence('other', this)">Other 4</button>
+      <button class="paper-tab" data-licence-filter="pd" onclick="creeLicence('pd', this)">Public domain 1</button>
+      <button class="paper-tab" data-licence-filter="other" onclick="creeLicence('other', this)">Other 3</button>
     </div>
-    <p class="paper-quiet" id="cree-licence-count">Showing all 15 collections.</p>
+    <p class="paper-quiet" id="cree-licence-count">Showing all 13 collections.</p>
 
     <div class="paper-table-wrap">
       <table class="paper-table" id="cree-licence-table">
         <thead><tr><th>Source</th><th>What it contributes</th><th>Licence</th></tr></thead>
         <tbody>
-          <tr data-licence="nc"><td><a href="https://github.com/EdTeKLA/IndigenousLanguages_Corpora" target="_blank" rel="noopener">EdTeKLA Cree Corpus</a></td><td>Community texts, stories and lessons in SRO and syllabics. The largest single source of running Cree prose.</td><td>CC BY-NC-SA 4.0 by default, per-text READMEs; NoDerivatives subcollections skipped</td></tr>
+          <tr data-licence="nc"><td><a href="https://github.com/EdTeKLA/IndigenousLanguages_Corpora" target="_blank" rel="noopener">EdTeKLA Cree Corpus</a></td><td>Community texts, stories and lessons in SRO and syllabics. 31 texts used, 37 skipped on licence, and 25 bag-of-words files counted for vocabulary only.</td><td>CC BY-NC-SA 4.0 by default, per-text READMEs; NoDerivatives subcollections skipped</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/KonradBRG/plains-cree-figurative" target="_blank" rel="noopener">Plains Cree Figurative Language</a></td><td>Sentence pairs written to show idiom and figurative meaning, not just literal glosses.</td><td>CC BY 4.0</td></tr>
-          <tr data-licence="sa"><td><a href="https://huggingface.co/datasets/wikimedia/wikipedia" target="_blank" rel="noopener">Cree Wikipedia</a></td><td>187 articles, of which 37 survive the language filter. Encyclopedic register and modern vocabulary.</td><td>CC BY-SA 4.0</td></tr>
+          <tr data-licence="sa"><td><a href="https://huggingface.co/datasets/wikimedia/wikipedia" target="_blank" rel="noopener">Cree Wikipedia</a></td><td>37 articles survive the language filter. Encyclopedic register and modern vocabulary.</td><td>CC BY-SA 4.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-2" target="_blank" rel="noopener">FineWeb-2 Cree slices</a></td><td>192 documents and about 108,000 words of web text, the small public footprint of the language.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/finepdfs" target="_blank" rel="noopener">FinePDFs Cree slices</a></td><td>733 PDFs and about 1.19 million words of extracted text, the largest source examined.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/finetranslations" target="_blank" rel="noopener">FineTranslations Cree</a></td><td>582 aligned Cree and English chunks. The English side is machine translation and is treated as such.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotCC-V1" target="_blank" rel="noopener">GlotCC Cree slices</a></td><td>Web-crawled Cree documents, used for coverage of places and names.</td><td>ODC-BY 1.0</td></tr>
-          <tr data-licence="open"><td><a href="https://tatoeba.org/" target="_blank" rel="noopener">Tatoeba Cree</a></td><td>Short everyday sentences, the register a learner actually needs.</td><td>CC BY 2.0 FR</td></tr>
-          <tr data-licence="nc"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotStoryBook" target="_blank" rel="noopener">GlotStoryBook Cree</a></td><td>Story paragraphs with a parallel English telling, useful for narrative and sentence rhythm.</td><td>CC BY-NC-SA, per row</td></tr>
-          <tr data-licence="pd"><td><a href="https://archive.org/" target="_blank" rel="noopener">Internet Archive books</a></td><td>14 public-domain books, about 612,000 words, including Bloomfield's Plains Cree Texts and Sacred Stories of the Sweet Grass Cree.</td><td>public domain, printed before 1935</td></tr>
-          <tr data-licence="other"><td><a href="https://huggingface.co/datasets/verayang/plainscree" target="_blank" rel="noopener">Plains Cree phrase recordings</a></td><td>Phrase transcriptions. The audio is not redistributed and is not used for the language model.</td><td>research dataset, transcriptions only</td></tr>
-          <tr data-licence="other"><td><a href="https://github.com/giellalt/lang-crk" target="_blank" rel="noopener">GiellaLT lang-crk</a></td><td>A community-maintained morphological lexicon for Plains Cree, the word list behind the validity measure and a weighting source for the tokenizer.</td><td>AGPL-3.0 source; word list used, not the code</td></tr>
-          <tr data-licence="pd"><td>Watkins 1865 dictionary</td><td>Historical Cree and English glosses, kept under a historical tag and capped so archaic spelling cannot crowd out modern text.</td><td>public domain</td></tr>
-          <tr data-licence="other"><td>This project's own data</td><td>Aligned pairs from the project and Archer's song notes, used for grounded question and answer examples.</td><td>project-owned</td></tr>
-          <tr data-licence="other"><td>Community uploads</td><td>Anything placed in the uploads folder, read as <code>.txt</code> or <code>.md</code> and recorded as unspecified until someone labels it.</td><td>user-provided, confirm before publishing</td></tr>
+          <tr data-licence="open"><td><a href="https://tatoeba.org/" target="_blank" rel="noopener">Tatoeba Cree</a></td><td>31 short everyday sentences, the register a learner actually needs.</td><td>CC BY 2.0 FR</td></tr>
+          <tr data-licence="nc"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotStoryBook" target="_blank" rel="noopener">GlotStoryBook Cree</a></td><td>88 story paragraphs with a parallel English telling, useful for narrative and sentence rhythm.</td><td>CC BY-NC-SA, per row</td></tr>
+          <tr data-licence="pd"><td><a href="https://archive.org/" target="_blank" rel="noopener">Internet Archive books</a></td><td>12 books used from 653 documents and 456,177 Cree words, after 44 failed the dialect or OCR check. Includes Bloomfield's Plains Cree Texts and Sacred Stories of the Sweet Grass Cree.</td><td>public domain, printed before 1935</td></tr>
+          <tr data-licence="other"><td><a href="https://huggingface.co/datasets/verayang/plainscree" target="_blank" rel="noopener">Plains Cree phrase recordings</a></td><td>64 phrase transcriptions. The audio is not redistributed and is not used for the language model.</td><td>research dataset, transcriptions only</td></tr>
+          <tr data-licence="other"><td><a href="https://github.com/giellalt/lang-crk" target="_blank" rel="noopener">GiellaLT lang-crk</a></td><td>57,579 word forms from a community-maintained morphological lexicon for Plains Cree, the list behind the validity measure and a weighting source for the tokenizer.</td><td>AGPL-3.0 source; word list used, not the code</td></tr>
+          <tr data-licence="other"><td>This project's own data</td><td>709 aligned pairs, Archer's song notes, and 443 historical Watkins 1865 glosses, used for grounded question and answer examples.</td><td>project-owned</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="paper-quiet" style="margin-top:12px">Word counts are the text examined before cleaning, except the totals above, which are what survived. Fourteen of these are written to <code>ledger.json</code> by the loader; Watkins 1865 travels inside the project data entry and is listed separately here because its dialect tag and licence differ.</p>
+    <p class="paper-quiet" style="margin-top:12px">Word counts are the text examined before cleaning, except the totals above, which are what survived. All thirteen are written to <code>ledger.json</code> by the loader. Watkins 1865 travels inside the project entry, and anything placed in <code>uploads/</code> is read and recorded as unspecified until someone labels it.</p>
+
+    <p class="paper-p" style="margin-top:18px">The corpus is built on the EdTeKLA Indigenous Languages Corpora at the University of Alberta, the Plains Cree Figurative Language corpus by KonradBRG, Cree Wikipedia, the FineWeb-2, FinePDFs, FineTranslations, GlotCC and GlotStoryBook releases, Tatoeba, the Internet Archive's public-domain Cree books, and the GiellaLT lang-crk lexicon and public texts from ALTLab at the University of Alberta, with the Maskwacîs Education Schools Commission and First Nations University. The orthography tables follow GiellaLT's Latn to Cans and Cans to Latn transducers.</p>
+    <p class="paper-p">The song notes are Archer Pechawis's own. They are read from <code>song_notes/</code> to build grounded question and answer examples and are not redistributed as a text corpus.</p>
+    <div class="paper-note" style="margin-top:18px"><b>The licence follows the data.</b> Because part of the corpus is NonCommercial ShareAlike, the adapter and the model card carry CC BY-NC-SA 4.0, while the base weights keep Qwen's own licence. The report card records the same terms beside every source, so a redistribution can be checked against the material it came from rather than guessed at.</div>
   </section>
 
   <section class="paper-card">
@@ -334,9 +337,9 @@
     <p class="paper-num"><b>12</b> Training</p>
     <h2 class="paper-h2">Three passes, each with one job</h2>
     <p class="paper-lede">Continued pretraining teaches the language. Instruction tuning teaches the shape of the answers. Preference tuning teaches it to prefer the faithful answer over the fluent one.</p>
-    <p class="paper-p"><strong>Continued pretraining</strong> reads the cleaned Cree text as packed 2,048-token windows, with no padding wasted between documents. Ten percent of the blocks are English, drawn from a held-out Wikipedia slice, and that replay is the reason the model still follows an English instruction after a week of Cree. Three passes at a learning rate of 2e-4.</p>
-    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, word glosses, grounded answers from the song notes, questions the notes cannot answer, and ordinary conversation about the project. That mix is what makes one model work for every request instead of one narrow skill. Two passes at 1.5e-4, deliberately lower, because over-training this stage flattens every reply into the same shape.</p>
-    <p class="paper-p"><strong>Preference tuning</strong> builds its pairs from the training translations. The gold sentence is the chosen answer; the rejected one has a dropped final clause, a flattened long vowel, an English word pushed in, a changed number, or its word order reversed. Those are the failures a fluent model actually makes. The objective is DPO with a beta of 0.1, and the reference is the same model with its adapters switched off, so no second copy is loaded.</p>
+    <p class="paper-p"><strong>Continued pretraining</strong> reads the cleaned Cree text as packed 1,024-token windows, with no padding wasted between documents. Ten percent of the blocks are English, drawn from a held-out Wikipedia slice, and that replay is the reason the model still follows an English instruction after a week of Cree. Two passes at a learning rate of 2e-4, over 3,751 packed blocks.</p>
+    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, word glosses, grounded answers from the song notes, questions the notes cannot answer, and ordinary conversation about the project. That mix is what makes one model work for every request instead of one narrow skill. Two passes at 1.5e-4, lower, because over-training this stage flattens every reply into the same shape.</p>
+    <p class="paper-p"><strong>Preference tuning</strong> builds its pairs from the training translations. The gold sentence is the chosen answer; the rejected one has a dropped final clause, a flattened long vowel, an English word pushed in, a changed number, or its word order reversed. Those are the failures a fluent model actually makes. The objective is DPO with a beta of 0.1. The reference is a frozen copy of the instruction-tuned adapter, loaded beside the policy, so preference tuning is pulled back towards what instruction tuning built rather than towards the raw base model.</p>
     <p class="paper-p">Each stage checkpoints every ten minutes and resumes from the newest checkpoint that has both its trainer state and an intact adapter header. The stage's root folder is written only after training returns, so an interrupted stage never looks finished. That is what makes a dropped SSH session a pause rather than a restart.</p>
 
     <figure class="paper-figure">
@@ -350,8 +353,8 @@
             <rect x="50" y="96" width="300" height="180" rx="7" fill="#16233f" stroke="#34517f"/>
             <text x="70" y="124" fill="#e8edf7" font-size="12">continued pretraining</text>
             <text x="70" y="146" fill="#8195b8">Cree text, 10% English replay</text>
-            <text x="70" y="166" fill="#8195b8">packed 2,048-token windows</text>
-            <text x="70" y="186" fill="#8195b8">3 passes, lr 2e-4</text>
+            <text x="70" y="166" fill="#8195b8">packed 1,024-token windows</text>
+            <text x="70" y="186" fill="#8195b8">2 passes, lr 2e-4</text>
             <text x="70" y="216" fill="#8fa6ce">learns the language</text>
             <text x="70" y="246" fill="#c98b3a">adapter 1</text>
 
@@ -392,10 +395,10 @@
         <button class="paper-tab" data-cree-stage-tab="dpo" onclick="creeStage('dpo')">DPO</button>
       </div>
       <div class="paper-readout" data-cree-stage="cpt">input       running Cree text, plus English replay
-reads       packed 2,048-token windows, no padding between documents
-trains      the LoRA adapter, rank 64 on the A100 profile
+reads       packed 1,024-token windows, no padding between documents
+trains      the LoRA adapter, rank 32, alpha 64
 frozen      the base weights and the embedding table
-schedule    3 passes at 2e-4
+schedule    2 passes at 2e-4, 3,751 packed blocks
 hands on    checkpoints/cpt, the adapter SFT starts from</div>
       <div class="paper-readout" data-cree-stage="sft" hidden>input       translation, syllabics, word glosses, song notes, project conversation
 reads       the chat template, with the question masked out of the loss
@@ -405,7 +408,7 @@ schedule    2 passes at 1.5e-4
 hands on    checkpoints/sft, the adapter DPO starts from</div>
       <div class="paper-readout" data-cree-stage="dpo" hidden>input       gold sentences against five controlled corruptions
 reads       chosen and rejected answers for the same prompt
-trains      the same adapter, against a reference with its adapters off
+trains      the same adapter, against a frozen copy of the instruction-tuned adapter
 frozen      the base weights, the embedding table and the reference
 schedule    1 pass, beta 0.1
 hands on    checkpoints/dpo, the adapter the export merges</div>
@@ -414,7 +417,75 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
   </section>
 
   <section class="paper-card">
-    <p class="paper-num"><b>13</b> Measurement</p>
+    <p class="paper-num"><b>13</b> Results</p>
+    <h2 class="paper-h2">What the last run measured, and what it did not</h2>
+    <p class="paper-lede">These are the scores from the run that produced the file now installed as <code>archer:7b</code>. Base means the same model with the adapter switched off, on the same sentences, so the only thing that changed is the training.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Job</th><th>Measure</th><th>Base</th><th>Tuned</th><th>How to read it</th></tr></thead>
+        <tbody>
+          <tr><td>English to Cree</td><td>chrF++</td><td>8.24</td><td>11.60</td><td>41% more character overlap. Better, and still far from a fluent translation.</td></tr>
+          <tr><td>English to Cree</td><td>BLEU</td><td>0.45</td><td>1.68</td><td>The same story as chrF++. Low in absolute terms.</td></tr>
+          <tr><td>English to Cree</td><td>token F1</td><td>0.003</td><td>0.093</td><td>Some of the right words now appear. Most still do not.</td></tr>
+          <tr><td>English to Cree</td><td>valid Cree words</td><td>36.8%</td><td>92.4%</td><td>The strongest result here: it now writes words that exist.</td></tr>
+          <tr><td>English to Cree</td><td>English left in the reply</td><td>3.6%</td><td>13.1%</td><td>Worse, and the table says so. Producing more Cree produced more leaks.</td></tr>
+          <tr><td>Cree to English</td><td>chrF++</td><td>11.96</td><td>19.12</td><td>The easier direction, and the larger gain.</td></tr>
+          <tr><td>Cree to English</td><td>BLEU</td><td>2.45</td><td>5.02</td><td>Doubled. Use it to check a reading, not to publish one.</td></tr>
+          <tr><td>Cree to English</td><td>token F1</td><td>0.155</td><td>0.348</td><td>Roughly twice the word overlap.</td></tr>
+          <tr><td>Song notes</td><td>token F1</td><td>0.708</td><td>0.793</td><td>Answered from a section of notes held out of training.</td></tr>
+          <tr><td>Conversation</td><td>token F1</td><td>0.269</td><td>0.911</td><td>75 unseen phrasings about the project and the notes.</td></tr>
+          <tr><td>Abstention</td><td>correct refusals</td><td>0 of 3</td><td>3 of 3</td><td>Also 6 of 6 in the behaviour probe, with no false refusals.</td></tr>
+          <tr><td>Syllabics</td><td>letters in syllabics</td><td>15.2%</td><td>96.9%</td><td>Asked in English to write syllabics and it does.</td></tr>
+          <tr><td>Held-out Cree</td><td>perplexity</td><td>12,147.9</td><td>96.2</td><td>Lower is better. The largest change in the run.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-quiet" style="margin-top:12px">Run of 2026-11-02, adapter <code>dpo</code>, 120 sentence pairs the model never saw in both directions; 60 rows for the syllabics check; one section of an Archer note held out for the note question; three note questions it cannot answer and two it can. The numbers come from <code>out/creebench_report.json</code> and <code>out/llm_tests.json</code>.</p>
+
+    <div class="paper-stats">
+      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words are valid words</span></div>
+      <div class="paper-stat"><b>96.9%</b><span>of letters in syllabics when syllabics was asked</span></div>
+      <div class="paper-stat"><b>6 of 6</b><span>unanswerable note questions declined</span></div>
+      <div class="paper-stat"><b>4.72 to 3.65</b><span>tokens per Cree word after the graft</span></div>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/cree-llm-scores.png" alt="Three bar charts from the run: chrF++ in both directions, valid Cree and no English leak, and held-out perplexity, base against tuned">
+      <figcaption class="paper-caption"><b>Figure B7 · the run's own score chart.</b> The left panel is chrF++ in both directions. The middle is the share of generated words that are valid Cree, and the share of replies with no English leak. The right panel is held-out perplexity on a linear axis, which is why the tuned bar looks flat at 96 beside 12,148. The benchmark writes this image; it is copied here unchanged.</figcaption>
+    </figure>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/cree-llm-fertility.png" alt="Tokens per Cree word before and after the vocabulary graft, and the distribution of tokens per word on held-out Cree">
+      <figcaption class="paper-caption"><b>Figure B8 · what the vocabulary bought.</b> The mean falls from 4.72 pieces per Cree word to 3.65, 22.6% fewer. The histogram on the right is the same measurement sentence by sentence: the green mass sits at three and four pieces where the red mass sat at five and six.</figcaption>
+    </figure>
+
+    <h3 class="paper-h3" style="margin-top:34px">Trained against its own base, eight jobs</h3>
+    <p class="paper-p">The run writes this comparison itself and names where each bar came from. Every bar below is the base model, because that is the only earlier score measured on these sentences.</p>
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Job</th><th>Measure</th><th>This model</th><th>Its base</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>English to Cree</td><td>chrF++</td><td>11.600</td><td>8.241</td><td>ahead</td></tr>
+          <tr><td>Cree to English</td><td>chrF++</td><td>19.121</td><td>11.956</td><td>ahead</td></tr>
+          <tr><td>English to Cree</td><td>letters in SRO when SRO was asked</td><td>99.1%</td><td>98.5%</td><td>ahead</td></tr>
+          <tr><td>Song notes</td><td>token F1</td><td>0.793</td><td>0.708</td><td>ahead</td></tr>
+          <tr><td>Conversation</td><td>token F1</td><td>0.911</td><td>0.269</td><td>ahead</td></tr>
+          <tr><td>Abstention</td><td>accuracy</td><td>1.000</td><td>0.000</td><td>ahead</td></tr>
+          <tr><td>Syllabics</td><td>share of letters in syllabics</td><td>0.969</td><td>0.152</td><td>ahead</td></tr>
+          <tr><td>Held-out Cree</td><td>perplexity, lower is better</td><td>96.2</td><td>12,147.9</td><td>ahead</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="paper-note" style="margin-top:24px"><b>One comparison is still missing.</b> The old app used a separate Cree model, and that model has never been scored on these 120 sentences. So this table proves that the training improved this base on every job it measured. It does not prove that one model beats the other Cree model, and no number on this page will claim that until the same benchmark has been run on it.</div>
+
+    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words are real, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
+    <p class="paper-p">The strongest results are the ones with a right answer: refusing a question the notes cannot answer, writing the script that was asked for, and reading a note section it never saw. Conversation scoring 0.911 is real but narrower than it looks, because the 75 phrasings are all about this project and these notes.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>14</b> Measurement</p>
     <h2 class="paper-h2">Scored against its own base, not against a leaderboard</h2>
     <p class="paper-lede">The benchmark runs the same held-out sentences through the base model with the adapters off and the tuned model with them on. The only thing that changes is the training, so the comparison is paired.</p>
     <p class="paper-p">Translation is scored with chrF++ and BLEU, but also with three measures that matter more here. <strong>Validity</strong> asks whether every generated word exists in the lexicon or obeys Cree phonotactics, because an invented word is the failure a speaker notices first. <strong>Code-switch</strong> counts English leaking into a Cree answer. <strong>Syllabics</strong> checks whether the script is actually written, not just named.</p>
@@ -472,7 +543,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
             <rect x="532" y="108" width="110" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="587" y="128" fill="#dbe6ff" text-anchor="middle">Cree validity</text>
             <rect x="654" y="108" width="104" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="706" y="128" fill="#dbe6ff" text-anchor="middle">code-switch</text>
             <rect x="770" y="108" width="86" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="813" y="128" fill="#dbe6ff" text-anchor="middle">syllabics</text>
-            <text x="240" y="166" fill="#8195b8">both directions, on 203 pairs the model never saw</text>
+            <text x="240" y="166" fill="#8195b8">both directions, on 120 pairs the model never saw</text>
 
             <rect x="50" y="200" width="980" height="94" rx="7" fill="#16233f" stroke="#2a3d63"/>
             <text x="70" y="232" fill="#e8edf7" font-size="11">behaviour</text>
@@ -499,25 +570,31 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
   </section>
 
   <section class="paper-card">
-    <p class="paper-num"><b>14</b> Running it</p>
+    <p class="paper-num"><b>15</b> Running it</p>
     <h2 class="paper-h2">One file, one command, resumable</h2>
     <p class="paper-lede">The whole pipeline is a single Python file. It downloads the corpus, cleans it, builds the tokenizer, trains in three stages, benchmarks the result and exports a GGUF. Nothing in it needs Colab, Drive or a notebook.</p>
-    <p class="paper-p">On a 40 GB card the 7B recipe takes roughly two to four hours plus the corpus download. A 16 GB card uses a shorter context and a smaller adapter and takes about twice as long. A 14B run on 80 GB takes six to ten hours, and a 32B run about a day, with the merge needing a machine with enough RAM to hold two copies of the model.</p>
+    <p class="paper-p">This run used the <code>t4</code> profile on one RTX 4090 with 24 GB. The corpus took about 15 minutes on its first build, continued pretraining 1 hour 32 minutes, instruction tuning 14 hours 10 minutes, preference tuning 24 minutes and the export 4 minutes. The same recipe on a smaller card runs more slowly; a 14B or 32B run needs a larger card and enough RAM to hold two copies of the model during the merge.</p>
     <p class="paper-p">If the process stops, the same command continues it. Every finished stage is recorded against a fingerprint of its inputs and is skipped, and an interrupted training stage resumes from its newest intact checkpoint with the optimizer and the learning rate schedule. Changing the base model, the context length, the LoRA rank or the corpus invalidates exactly the stages that depended on it, so a new run cannot inherit numbers from an old one.</p>
     <p class="paper-p">The export merges the adapter into a full precision copy, converts it with llama.cpp, quantises it to Q4_K_M and writes a Modelfile beside it. That file is what makes the model a single Ollama tag on the machine that runs the app.</p>
 
     <div class="paper-readout" style="font-size:12.5px;line-height:1.9">python train_cree_llm.py --check
-python train_cree_llm.py --profile a100 --work /data/cree_llm
+python train_cree_llm.py --profile t4 --work "$HOME/cree-work" --hf-home "$HOME/cree-hf"
 
 # after the run
-mkdir -p assets/archer_llm
-cp archer-7b.Q4_K_M.gguf Modelfile assets/archer_llm/
-cd assets/archer_llm &amp;&amp; ollama create archer:7b -f Modelfile</div>
+unzip -o archer-7b.zip -d assets/archer_llm
+cd assets/archer_llm
+shasum -a 256 archer-7b.Q4_K_M.gguf   # compare with manifest.json
+ollama create archer:7b -f Modelfile</div>
     <p class="paper-p" style="margin-top:18px">The run writes <code>out/creebench_report.json</code>, <code>out/llm_tests.json</code>, a readable <code>report_card.md</code>, the plots, and an <code>out/web/</code> folder with the compact JSON bundle and the SVG charts this page is built to use. Pointing the app at the result is one line in <code>config/config.yaml</code>: <code>model: "archer:7b"</code>.</p>
+    <p class="paper-p">The file this page describes is <code>archer-7b.Q4_K_M.gguf</code>, 4.7 GB at 4.92 bits per weight, with its full SHA-256 in the archive's <code>manifest.json</code>. Testing it with <code>ollama run</code> sends no system prompt, and the persona and the evidence rule live in that system message. A bare prompt is answered by the base model's default assistant instead. Use the app, or call the same client the app uses:</p>
+    <div class="paper-readout" style="font-size:12.5px;line-height:1.9">python - &lt;&lt;'PY'
+from chat.llm_client import LocalLLMClient, LLMConfig
+print(LocalLLMClient(LLMConfig()).chat("What is this project?", []))
+PY</div>
   </section>
 
   <section class="paper-card paper-card--tight">
-    <p class="paper-num"><b>15</b> Try it</p>
+    <p class="paper-num"><b>16</b> Try it</p>
     <h2 class="paper-h2" style="font-size:26px">The bubble is on every page</h2>
     <p class="paper-p">Open the Archer Bot panel in the corner to ask a question, or use the retrieval explorer above to inspect the evidence first. The health endpoint reports whether the index built, how many chunks it holds, and whether a voice is configured, so a broken setup is visible rather than silent.</p>
     <p class="paper-p"><button class="paper-btn" onclick="openArcherChat()">Open Archer Bot</button> <button class="paper-btn ghost" onclick="ragHealth()">Check health</button></p>

@@ -35,7 +35,7 @@ DISPLAY_REG = "/usr/share/fonts/opentype/inter/Inter-Regular.otf"
 MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 SYLLABICS = "/usr/share/fonts/truetype/noto/NotoSansCanadianAboriginal-Bold.ttf"
 
-# ================================================================ palettes
+# palettes
 PALETTES = {
     "ochre": {
         "deep": (168, 62, 34),
@@ -72,7 +72,7 @@ PALETTES = {
 }
 
 
-# ================================================================ helpers
+# helpers
 def fractal(size: tuple[int, int], octaves: int = 6, seed: int = 1, gain: float = 0.52) -> np.ndarray:
     """Multi-octave value noise in 0..1, the paper/stone/cloud base."""
     rng = np.random.default_rng(seed)
@@ -260,7 +260,7 @@ def vignette(img: Image.Image, strength: float = 0.30) -> None:
     img.paste(Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB"), (0, 0))
 
 
-# ================================================================ motifs
+# motifs
 def motif_star(d: ImageDraw.ImageDraw, cx: float, cy: float, r: float, col, col2, lw: int, pts: int = 8) -> None:
     """Four-direction star (medicine wheel) built from two rotated squares."""
     for phase, c in ((0, col), (math.pi / pts, col2)):
@@ -353,7 +353,7 @@ def motif_pipeline(d: ImageDraw.ImageDraw, w: int, h: int, col, col2, lw: int) -
         d.line([(ax, ay), (bx, by)], fill=col2, width=max(1, lw // 3))
 
 
-# ================================================================ still
+# still
 # The home filmstrip card. Sized for the shape it is actually shown at: at
 # rest the card is half as wide as when it takes focus, so the artwork is
 # composed on the focused shape and the resting card shows its middle half.
@@ -457,7 +457,7 @@ def still(art: str, pal_name: str, size: tuple[int, int] = STILL, seed: int = 3)
     return img
 
 
-# ================================================================ banners
+# banners
 def banner(art: str, pal_name: str, word: str, size=(1680, 900), seed: int = 9) -> Image.Image:
     p = PALETTES[pal_name]
     w, h = size
@@ -518,7 +518,7 @@ def banner(art: str, pal_name: str, word: str, size=(1680, 900), seed: int = 9) 
     return img
 
 
-# ================================================================ thumbs
+# thumbs
 def thumb(art: str, pal_name: str, size=(160, 160), label: str = "", seed: int = 2) -> Image.Image:
     p = PALETTES[pal_name]
     img = poster_base(size, p, seed, warmth=0.4)
@@ -543,7 +543,7 @@ def thumb(art: str, pal_name: str, size=(160, 160), label: str = "", seed: int =
     return img
 
 
-# ================================================================ content
+# content
 POSTERS = [
     # motif, palette, section
     ("wave", "ochre", "demo"),

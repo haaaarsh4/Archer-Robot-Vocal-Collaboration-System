@@ -121,7 +121,7 @@ def apply_amplitude_curve_follow(audio: np.ndarray, sample_rate: int,
     troughs almost as sharply as the raw RMS did, all the way down to
     whatever min_gain was configured, audible as the robot cutting out
     and snapping back at roughly syllable rate, not as musical dynamics.
-    A slower release (default 45ms here; a caller deliberately chasing
+    A slower release (default 45ms here; a caller chasing
     syllable-by-syllable dynamics closely, e.g. a raw locked-vocable
     render, should pass something longer, see
     _render_track_single_vocable_offline in server.py, which now also
@@ -716,7 +716,7 @@ class VocableSynthesizer:
                 # Was boost-only, brightness had no way to darken the
                 # tone at all, only ever brighten it or do nothing. Fine
                 # when nothing ever pushed brightness DOWN from neutral,
-                # but contour_following now deliberately does exactly
+                # but contour_following now does exactly
                 # that on a falling phrase (see HarmonyEngine.decide),
                 # and with no cut available that half of its effect would
                 # have been completely silent, audibly identical to

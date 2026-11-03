@@ -1,7 +1,7 @@
 # The Archer model
 
 The chat tab runs one model, trained for this project by
-`Cree_LLM_Training.ipynb` and served as `archer:7b`. It does every job the
+`training/notebooks/Cree_LLM_Training.ipynb` and served as `archer:7b`. It does every job the
 assistant has:
 
 - conversation about Archer's work, the songs and this system
@@ -26,7 +26,7 @@ tokenizer and corpus are added.
 
 ## What the notebook trains
 
-`Cree_LLM_Training.ipynb` is a complete run, not a fine-tuning snippet. It
+`training/notebooks/Cree_LLM_Training.ipynb` is a complete run, not a fine-tuning snippet. It
 downloads the corpus, cleans it, builds a tokenizer, trains in three stages,
 scores the result against its own base model and against the old three-part
 setup, and exports a GGUF.
@@ -50,7 +50,7 @@ licence.
 
 ## Running it
 
-Open `Cree_LLM_Training.ipynb` in Colab. Select **Runtime → Change runtime type
+Open `training/notebooks/Cree_LLM_Training.ipynb` in Colab. Select **Runtime → Change runtime type
 → A100** for the full recipe, or set `CREE_PROFILE=t4` for a 16 GB T4. The
 notebook writes checkpoints to Google Drive when it is mounted, so a dropped
 session does not lose the run.
@@ -130,7 +130,7 @@ The full run is roughly:
 | `huge` | Qwen2.5-32B-Instruct | 2048 | about a day on an 80 GB A100; merging needs a separate machine with roughly 160 GB of RAM |
 | `smoke` | Qwen2.5-0.5B-Instruct | 384 | minutes, for checking the pipeline |
 
-The model is deliberately a 7B by default. That is the largest size whose
+The model is a 7B by default. That is the largest size whose
 Q4_K_M export runs comfortably on the laptop that runs the app, and the
 tokenizer and data work matter more here than another ten billion parameters.
 `CREE_PROFILE=big` and `CREE_PROFILE=huge` are there when you want the larger
@@ -151,7 +151,7 @@ remaining modern and reference material.
 After cleaning, the full profile has **1,124,146 words across 66,071
 sentences**, 10,934 training pairs and 203 held-out pairs, plus 57,579 lexicon
 forms. That is roughly eight times the text the previous notebook used. The
-smoke profile deliberately uses a small slice, which is why its report shows a
+smoke profile uses a small slice, which is why its report shows a
 smaller number; the full profile uses every accepted document. The tokenizer,
 the embedding initialisation, the English replay and the instruction mix are
 how the notebook gets the most out of that, and the upload folder is how it

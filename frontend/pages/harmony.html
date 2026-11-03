@@ -188,7 +188,7 @@ The singer is sounding, the tempo is calm, and the note is new. The default mode
   <section class="paper-card">
     <p class="paper-num"><b>04</b> Key and scale</p>
     <h2 class="paper-h2">The robot never sings outside the key it has inferred</h2>
-    <p class="paper-lede">Modes that invent a pitch (contour following, the fusion chord) are rounded to the nearest degree of the inferred key before anything is sung. Modes that return the singer's own note are deliberately exempt: rounding a unison is how a double ends up a few cents beside the singer instead of with them.</p>
+    <p class="paper-lede">Modes that invent a pitch (contour following, the fusion chord) are rounded to the nearest degree of the inferred key before anything is sung. Modes that return the singer's own note are exempt: rounding a unison is how a double ends up a few cents beside the singer instead of with them.</p>
     <p class="paper-p">The key is inferred once a second from the last 256 pitched frames. The distribution of pitch classes is correlated against Krumhansl–Kessler major and minor profiles, and the best-fitting root and mode become the current key. The drone is anchored to that root, not to whatever note just passed; the call-and-response answer is built from its scale degrees, not rounded into them afterwards.</p>
     <p class="paper-p">Scale lock is therefore a small, explicit exception list, not a blanket rule. It touches contour following and triadic harmony. It does not touch unison, octave, delay, timbral thickening or drone. The reason is simple: those five already have a trustworthy pitch, and the two that do not are the two that calculate.</p>
 
@@ -202,7 +202,7 @@ The singer is sounding, the tempo is calm, and the note is new. The default mode
     <p class="paper-num"><b>05</b> Voice leading</p>
     <h2 class="paper-h2">Movement is the difference between a chord and a choir</h2>
     <p class="paper-lede">When a mode needs more than one note, the voicing search prefers the inversion that moves each voice the shortest distance from where it already was. That single constraint is what makes a sequence of chords sound like voices holding a conversation instead of a keyboard being pressed.</p>
-    <p class="paper-p">The test suite generates 120 progressions, voices each chord with the project's search and with a naive root-position baseline, and measures the total semitone movement of the upper voices plus the number of parallel perfect fifths and octaves. The search cuts mean movement from 1.56 to 0.90 semitones per transition and parallel perfects from 3.89 to 3.61 per hundred transitions, while keeping a median span of nine semitones. The point is not the decimal; it is that the improvement is measured on the same progressions the baseline sees.</p>
+    <p class="paper-p">The test suite generates 120 progressions, voices each chord with the project's search and with a naive root-position baseline, and measures the total semitone movement of the upper voices plus the number of parallel perfect fifths and octaves. The search cuts mean movement from 1.56 to 0.90 semitones per transition and parallel perfects from 3.89 to 3.61 per hundred transitions, while keeping a median span of nine semitones. The improvement is measured on the same progressions the baseline sees.</p>
 
     <figure class="paper-figure">
       <img src="/static/assets/evidence/voicing-movement.svg?v=1" alt="Voice movement and parallel perfect intervals, search versus root-position baseline" loading="lazy">

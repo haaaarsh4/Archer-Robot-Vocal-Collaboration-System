@@ -88,7 +88,7 @@ NOTE_INTERVALS = {
 # median lag cannot describe a mixture -- measured on this harness's own
 # octave-reinforcement render, the autocorrelation reads 152 Hz for a render
 # holding 250 Hz plus 125 Hz, i.e. a value between its own two notes -- so for
-# these the one-note probe asserts the honest thing instead: that the input's
+# these the one-note probe asserts the accurate thing instead: that the input's
 # note is IN the render at a level that matters. Their melody following is
 # still judged over a whole song, against the hum's own curve.
 PRESENCE_ONLY_MODES = {"delayed_response", "solo_humming", "call_and_response"}
@@ -139,7 +139,7 @@ def fail(msg: str) -> None:
     print(f"  [FAIL] {msg}", flush=True)
 
 
-# ---------------------------------------------------------------- inputs ---
+# inputs
 
 def cut_mp3(path: str, start_s: float, dur_s: float) -> bytes:
     """A real excerpt of a real upload, as MP3 bytes, the way a person's file
@@ -254,7 +254,7 @@ def load_inputs(which: list[str]) -> dict[str, tuple[bytes, str]]:
     return out
 
 
-# --------------------------------------------------------------- metrics ---
+# metrics
 
 def rms(x: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(np.asarray(x, dtype=np.float64)))))
@@ -265,7 +265,7 @@ def pitch_curve(sig: np.ndarray, sr: int, hop_s: float = 0.02, win: int = 4096,
     """A per-frame f0 for a RENDER, by autocorrelation.
 
     Used for one thing only: telling whether two renders are singing the same
-    melody. It is deliberately the same estimator on both sides, because the
+    melody. It is the same estimator on both sides, because the
     absolute reading of any detector on a synthetic voice is questionable --
     the project's own RMVPE reads this harness's controlled 220 Hz tone as a
     glide from 216 Hz down to 204 Hz, i.e. the ground truth it would be judged
@@ -354,7 +354,7 @@ def analyse(x: np.ndarray, sr: int, name: str, reference: np.ndarray | None = No
     info["rail"] = int(np.sum(np.abs(x) >= 1.0))
     # 0.9995 used to be the threshold, but a PCM-16 file's loudest possible
     # sample is 32767/32768 = 0.999969, so every render that used its headroom
-    # was being reported as clipped. "Hot" is the honest reading: parked on the
+    # was being reported as clipped. "Hot" is the accurate reading: parked on the
     # ceiling.
     info["hot"] = int(np.sum(np.abs(x) >= 0.999))
     # how much of the render sits within a hair of the ceiling, i.e. is it
@@ -594,7 +594,7 @@ def note_timeline(input_array: np.ndarray, notes: list[tuple[float, float, float
     return out
 
 
-# --------------------------------------------------------------- network ---
+# network
 
 def post(endpoint: str, base: str, files: dict, data: dict, timeout: int = 1800):
     t0 = time.time()
@@ -631,7 +631,7 @@ def vocable_words(base: str) -> list[str]:
     return words
 
 
-# ------------------------------------------------------------------ sweep ---
+# sweep
 
 def check_common(tag: str, info: dict, dark: bool, resting: bool,
                  input_centroid: float | None = None) -> None:

@@ -154,7 +154,7 @@ python tools/check_cree_singsong_dataset.py \
 
 The current checkout has **2.196 h** mixed Cree singing and **0.526 h** Demucs
 pairs. For the full 27-track separation and the correct Cree fine-tune order,
-use **[GPU_RUNBOOK.md](GPU_RUNBOOK.md)**. Do not train a codec or transformer
+use **[singsong-training.md](singsong-training.md)**. Do not train a codec or transformer
 from scratch on the smoke set.
 
 `config/cree.yaml` points at the singer-disjoint `data/cree_singsong/train_audio`
@@ -469,8 +469,8 @@ http://localhost:8000/live-demo#singsong
 ```
 
 The status card should switch from “built-in band engine” to “trained cascade
-ready”.  The upload form already returns a WAV before this point — the panel
-falls back to the built-in symbolic band engine when the weights are absent —
+ready”.  The upload form already returns a WAV before this point, the panel
+falls back to the built-in symbolic band engine when the weights are absent ,
 so the completed run changes which model writes the band, not whether the panel
 works.
 

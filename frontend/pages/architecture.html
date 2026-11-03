@@ -130,7 +130,7 @@
           <tr><td>Key</td><td><code>synthesis/harmony_engine.py</code></td><td>256-pitch history → root + mode</td><td>Krumhansl–Kessler correlation, re-estimated every 43 frames (about once a second), never per note.</td></tr>
           <tr><td>Decision</td><td><code>synthesis/accompaniment_modes.py</code></td><td>context → mode, target Hz, action</td><td>Protocol silence is checked before anything musical; the rest is an ordered checklist.</td></tr>
           <tr><td>Voice</td><td><code>synthesis/vocable_synthesizer.py</code></td><td>decision → stereo audio</td><td>Vowel, texture and vibrato are applied here; the neural stage receives separate stems, never a mix.</td></tr>
-          <tr><td>Timing</td><td><code>output/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
+          <tr><td>Timing</td><td><code>core/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
         </tbody>
       </table>
     </div>
@@ -156,7 +156,7 @@
   <section class="paper-card">
     <p class="paper-num"><b>04</b> Runtime</p>
     <h2 class="paper-h2">A small family of processes, and why they are not one</h2>
-    <p class="paper-lede">The app is deliberately not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
+    <p class="paper-lede">The app is not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
 
     <figure class="paper-figure">
       <div class="plate">

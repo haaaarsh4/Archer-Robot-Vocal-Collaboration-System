@@ -4,7 +4,7 @@ Everything in this module is deterministic, dependency-free (apart from the
 standard library) and written in pitch classes (0 = C .. 11 = B).  Octaves only
 appear when we need to place notes in a register, which is the renderer's job.
 
-The vocabulary deliberately separates two things:
+The vocabulary separates two things:
 
 ``core`` qualities
     The five triads MySong (Simon, Morris & Basu, CHI 2008) models:
@@ -24,9 +24,9 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-# --------------------------------------------------------------------------- #
+# #
 # Pitch classes
-# --------------------------------------------------------------------------- #
+# #
 
 SHARP_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 FLAT_NAMES = ("C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B")
@@ -122,9 +122,9 @@ def metric_weight(offset_quarters: float, beats_per_bar: float = 4.0) -> float:
     return 0.55
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Chord qualities
-# --------------------------------------------------------------------------- #
+# #
 
 #: Full quality name -> semitone intervals above the root.
 QUALITY_INTERVALS: dict[str, tuple[int, ...]] = {
@@ -274,9 +274,9 @@ def quality_from_semitones(semitones: Iterable[int]) -> str:
     return "maj"
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Chords
-# --------------------------------------------------------------------------- #
+# #
 
 _CHORD_RE = re.compile(
     r"^\s*([A-Ga-g])([#b\u266f\u266d-]?)\s*(.*?)\s*(?:/\s*([A-Ga-g])([#b\u266f\u266d-]?)\s*)?$"
@@ -379,9 +379,9 @@ def chord_from_core_index(index: int) -> Chord:
     return Chord(root, CORE_QUALITIES[quality])
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Keys
-# --------------------------------------------------------------------------- #
+# #
 
 _MAJOR_STEPS = (0, 2, 4, 5, 7, 9, 11)
 _NATURAL_MINOR_STEPS = (0, 2, 3, 5, 7, 8, 10)
@@ -566,9 +566,9 @@ def key_from_signature(sharps: int, mode: str = "major") -> Key:
     return Key(tonic, mode)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Voicing helpers (used by the renderer and by tests)
-# --------------------------------------------------------------------------- #
+# #
 
 def chord_midi_notes(chord: Chord, octave: int = 4) -> list[int]:
     """A close-position voicing rooted at ``octave`` (C4 = 60)."""

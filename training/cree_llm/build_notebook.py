@@ -18,7 +18,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CELLS = HERE / "cells"
-OUT = HERE.parent.parent / "Cree_LLM_Training.ipynb"
+OUT = HERE.parent / "notebooks" / "Cree_LLM_Training.ipynb"
 
 
 def load_cells() -> list[dict]:

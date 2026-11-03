@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # The model: quantised base, resized vocabulary, statistically initialised new
 # embeddings, and LoRA adapters.
 #
@@ -7,7 +6,6 @@
 # initialised at random has to be learned from scratch, and with a corpus this
 # size it never fully is. Starting from the pieces it replaces means the model
 # already reads the word, and training only has to refine it.
-# ─────────────────────────────────────────────────────────────────────────────
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
@@ -25,11 +23,10 @@ NEW_TOKENS = _TOKEN_INFO["tokens"]
 NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Weights that are actually readable.
 #
 # `SafetensorError: Error while deserializing header: header too large` is not a
-# transformers bug and not a bug in this notebook. It means the first eight bytes
+# transformers bug and expected behaviour in this notebook. It means the first eight bytes
 # of a shard do not decode to a valid header length, which is what a
 # multi-gigabyte file looks like when the filesystem it was written to never
 # finished syncing it. In Colab that filesystem is almost always the Google
@@ -37,7 +34,6 @@ NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 #
 # So every shard is checked here, before transformers ever mmaps it, and a
 # damaged shard is fetched again on its own rather than re-downloading 15 GB.
-# ─────────────────────────────────────────────────────────────────────────────
 SAFETENSORS_HEADER_LIMIT = 100_000_000  # the ceiling the safetensors format itself enforces
 _WEIGHT_PATTERNS = ["*.safetensors", "*.json", "*.model", "*.txt", "*.jinja", "tokenizer*"]
 _SKIP_PATTERNS = ["*.bin", "*.h5", "*.msgpack", "*.gguf", "*.onnx", "*.onnx_data", "*.pth", "*.pt"]
@@ -330,7 +326,7 @@ def reset_stale_checkpoints() -> None:
     frozen table mixes two incompatible checkpoints, and the mismatch surfaces
     hours later. Renaming keeps the old run instead of deleting it.
     """
-    # `four_bit` is deliberately not part of this. It describes how the base was
+    # `four_bit` is not part of this. It describes how the base was
     # loaded in that session and changes not one adapter tensor, so two runs of
     # the same recipe on cards with different free memory must not move each
     # other's adapters aside. Older plan files carry the field; dropping it from
@@ -456,7 +452,7 @@ _LOADED_ADAPTER = ""
 def best_adapter(upto: str | None = None) -> Path | None:
     """The newest finished adapter at or before `upto`.
 
-    This is what keeps a fresh kernel honest. Re-running the SFT cell after a
+    This is what keeps a fresh kernel accurate. Re-running the SFT cell after a
     disconnect used to load the bare base model and quietly train instruction
     tuning without the Cree pretraining underneath it, which is worse than not
     training at all because the scores still look plausible.

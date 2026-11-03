@@ -2,7 +2,7 @@
 
 Run with:  python -m pytest tests/test_voice_clarity.py -v
 
-The fixtures are deliberately simple and made of exactly the thing the stage
+The fixtures are simple and made of exactly the thing the stage
 cares about: a voice-like harmonic body with a consonant band above it. The
 "dull" copy is that same signal through a low-pass, which is what a checkpoint
 trained on darker material does to the band the words live in. The stage is

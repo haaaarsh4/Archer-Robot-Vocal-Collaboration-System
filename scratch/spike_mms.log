@@ -1,26 +1,0 @@
-audio 8.00s rms=0.0415
-Loading weights:   0%|          | 0/1096 [00:00<?, ?it/s]Loading weights:  21%|██        | 229/1096 [00:00<00:00, 2235.03it/s]Loading weights:  42%|████▏     | 458/1096 [00:00<00:00, 2265.59it/s]Loading weights:  62%|██████▎   | 685/1096 [00:00<00:00, 2242.87it/s]Loading weights:  83%|████████▎ | 910/1096 [00:00<00:00, 2205.19it/s]Loading weights: 100%|██████████| 1096/1096 [00:00<00:00, 2339.52it/s]
-model load 1.1s
-
-===== crk-script_latin
-Traceback (most recent call last):
-  File "/home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/scratch/spike_mms.py", line 70, in <module>
-    main()
-  File "/home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/scratch/spike_mms.py", line 37, in main
-    tok = Wav2Vec2CTCTokenizer(
-          ^^^^^^^^^^^^^^^^^^^^^
-  File "/home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/.venv/lib/python3.12/site-packages/transformers/models/wav2vec2/tokenization_wav2vec2.py", line 155, in __init__
-    self.vocab = json.load(vocab_handle)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
-    return loads(fp.read(),
-           ^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
-    return _default_decoder.decode(s)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
-    raise JSONDecodeError("Expecting value", s, err.value) from None
-json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)

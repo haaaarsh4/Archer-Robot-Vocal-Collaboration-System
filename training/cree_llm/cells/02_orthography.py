@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # nêhiyawêwin orthography: SRO, syllabics, and the checks that keep a sentence
 # from being half English.
 #
@@ -7,7 +6,6 @@
 # Alberta with the Maskwacîs Education Schools Commission and First Nations
 # University). They are data, not invention, and every rule below is tested
 # against the canonical example atim -> ᐊᑎᒼ.
-# ─────────────────────────────────────────────────────────────────────────────
 
 SRO_VOWELS = ("a", "e", "i", "o")
 LONG_VOWELS = {"a": "â", "e": "ê", "i": "î", "o": "ô"}

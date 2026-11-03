@@ -316,9 +316,7 @@ class SingSongConfig:
             inference=InferenceConfig.from_dict(raw.get("inference")),
         )
 
-    # ------------------------------------------------------------------
-    # Artifact paths and honest readiness
-    # ------------------------------------------------------------------
+    # Artifact paths and accurate readiness
     def resolve(self, value: str | None) -> Path | None:
         return _as_path(value)
 

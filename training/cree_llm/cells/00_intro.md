@@ -10,7 +10,7 @@ A general model sees Cree as a long tail of rare byte sequences. Three things ch
 
 1. **The tokenizer learns Cree first.** A tokenizer trained on English splits `nêhiyawêwin` into many pieces; this one learns the actual syllables and morphemes of the language, then grafts them onto the base model with statistically initialised embeddings. Fewer tokens per word means more real text per context window, faster generation, and less room for spelling drift.
 2. **The data is curated, not scraped blindly.** Every source carries its licence, dialect and script in a provenance ledger. Restricted material in the EdTeKLA collection is excluded at the loader, not quietly copied. Near-duplicate sentences are removed, translation pairs are checked for alignment, and the test split is document-disjoint.
-3. **The model is taught to be honest.** The instruction set contains unanswerable questions whose correct answer is "I do not have notes on that", plus preference pairs that punish invented names, dropped clauses and English leaking into a Cree sentence. That is the failure mode that matters for a cultural project.
+3. **The model is taught to be faithful.** The instruction set contains unanswerable questions whose correct answer is "I do not have notes on that", plus preference pairs that punish invented names, dropped clauses and English leaking into a Cree sentence. That is the failure mode that matters for a cultural project.
 
 ## What it produces
 

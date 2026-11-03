@@ -56,7 +56,6 @@ def check(label: str, ok: bool, detail: str) -> None:
         FAILURES.append(f"{label}: {detail}")
 
 
-# ----------------------------------------------------------------------
 # what the page says it does
 
 def page_constants() -> dict:
@@ -112,7 +111,6 @@ def server_source_harmonics(cfg: HumConfig, harmonics: int, up: int = 8192) -> n
     return amp / amp[1]
 
 
-# ----------------------------------------------------------------------
 # the page's tract, in numpy. A peaking filter and a low-pass use the Q the page
 # sets; Web Audio's shelves do not use Q at all (the slope is fixed at 1), which
 # is what this uses too.
@@ -185,7 +183,6 @@ def main() -> int:
         print("FATAL: the page's humming constants could not be read")
         return 2
 
-    # ------------------------------------------------------------------
     # 1. the source
     print("\n--- the glottal source")
     check("the page sings the server's pulse shape",
@@ -207,7 +204,6 @@ def main() -> int:
           f"2nd harmonic {page_db[1]:+.1f} dB, 3rd {page_db[2]:+.1f} dB against the fundamental "
           f"(a sawtooth's would be -6 and -9.5)")
 
-    # ------------------------------------------------------------------
     # 2. the tract
     print("\n--- the murmur's tract")
     page_tract = np.zeros(len(PROBE))
@@ -237,7 +233,6 @@ def main() -> int:
     check("one low peak, then a hole", peak_hz <= 420.0 and best_high < -8.0,
           f"loudest response at {peak_hz:.0f} Hz, and the best above 1 kHz is {best_high:+.1f} dB")
 
-    # ------------------------------------------------------------------
     # 3. the air
     print("\n--- the air")
     check("the air sits inside the murmur, not over it",
@@ -248,7 +243,6 @@ def main() -> int:
     check("the air is as far under the voice as the server's", abs(air_db - cfg.breath_cap_db) <= 2.0,
           f"page {air_db:.1f} dB against the server's cap of {cfg.breath_cap_db} dB")
 
-    # ------------------------------------------------------------------
     # 4. the level
     print("\n--- the level")
     check("the trim matches the voice it replaced", 0.05 <= const["trim"] <= 0.12,

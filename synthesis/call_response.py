@@ -102,9 +102,7 @@ from typing import Optional, Sequence
 import numpy as np
 
 
-# ============================================================================
 # Scales and keys
-# ============================================================================
 
 MAJOR_SCALE = (0, 2, 4, 5, 7, 9, 11)
 MINOR_SCALE = (0, 2, 3, 5, 7, 8, 10)
@@ -270,9 +268,7 @@ def snap_to_grid(hz: float, tuning_cents: float) -> float:
     return float(440.0 * (2.0 ** ((round(snapped) * 100.0 + tuning_cents) / 1200.0)))
 
 
-# ============================================================================
 # Configuration
-# ============================================================================
 
 @dataclass
 class CallResponseCfg:
@@ -376,9 +372,7 @@ class CallResponseCfg:
         return out
 
 
-# ============================================================================
 # 1. Notes and calls
-# ============================================================================
 
 @dataclass
 class CallNote:
@@ -447,7 +441,7 @@ def segment_calls(times: np.ndarray, pitch: np.ndarray, rms: np.ndarray,
                   frame_size: Optional[int] = None) -> list[Call]:
     """A per-frame pitch curve becomes the list of phrases Archer actually sang.
 
-    The note layer is deliberately NOT written here: melody_voice.track_notes
+    The note layer is NOT written here: melody_voice.track_notes
     already does this job properly for this project, including the two things a
     naive segmenter gets wrong on real recorded voice (a detector reading an
     octave out, and vibrato splitting one note into four). It runs with the
@@ -535,9 +529,7 @@ def analyze_track(times: np.ndarray, pitch: np.ndarray, rms: np.ndarray,
     return TrackAnalysis(calls, key, tuning, median_rms, first_onset, last_end)
 
 
-# ============================================================================
 # 2. What the call did: its cadence
-# ============================================================================
 
 CADENCE_TONIC = "tonic"            # it closed: arrived home on the 1st degree
 CADENCE_WEAK_TONIC = "weak_tonic"  # the 3rd: an imperfect arrival, closed but not settled
@@ -588,9 +580,7 @@ def read_cadence(call: Call, key: Key) -> Cadence:
     return Cadence(CADENCE_OPEN, index, held, True)
 
 
-# ============================================================================
 # 3. The answer
-# ============================================================================
 
 ANSWER_RESOLVE = "resolve"      # the call hung, so the answer finishes it
 ANSWER_ECHO = "echo"            # the call closed, so the answer agrees with it
@@ -970,9 +960,7 @@ _TAKE_LENGTHS = {
 }
 
 
-# ============================================================================
 # 4. Composing the whole track
-# ============================================================================
 
 def compose_answers(track: TrackAnalysis, cfg: CallResponseCfg,
                     tempo_bpm: float = 0.0, total_duration_s: float = 0.0,
@@ -1083,9 +1071,7 @@ def _reason_text(form: str, cadence: Cadence) -> str:
     return f"the phrase hung on the {cadence.kind} cadence, so the answer walks it down to the tonic"
 
 
-# ============================================================================
 # 5. Singing an answer: the renderer
-# ============================================================================
 
 @dataclass
 class TakeData:
@@ -1532,7 +1518,7 @@ def render_call_response(times: np.ndarray, pitch: np.ndarray, rms: np.ndarray,
 
     Returns the robot's part for this track on its own (one channel, the same
     shape every other mode's offline part has), plus what it decided, so the
-    caller can refuse the render honestly when there was nothing to answer.
+    caller can refuse the render accurately when there was nothing to answer.
     """
     track = analyze_track(times, pitch, rms, frame_hop_s, cfg,
                           audio=audio, sr=sample_rate,
@@ -1554,9 +1540,7 @@ def render_call_response(times: np.ndarray, pitch: np.ndarray, rms: np.ndarray,
     return part, answers, track
 
 
-# ============================================================================
 # 6. The live path: the same rules, without a future
-# ============================================================================
 
 class LiveCallResponder:
     """Call and response one frame at a time, for the microphone.
@@ -1607,7 +1591,7 @@ class LiveCallResponder:
             if self._last_voiced_s is not None and (now_s - self._last_voiced_s) > self.cfg.phrase_gap_s:
                 self._close_phrase(now_s, beat_s)
                 self._last_voiced_s = None
-            # NOTE: the schedule is deliberately NOT trimmed here. Silence is
+            # NOTE: the schedule is NOT trimmed here. Silence is
             # what the answer is sung into, so treating it as "the singer is
             # back" would cancel every answer in its own lead-in. Only a voiced
             # frame means the singer returned early; see the branch above.

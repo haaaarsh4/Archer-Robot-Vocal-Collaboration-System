@@ -44,7 +44,7 @@ fi
 
 if [[ ! -f "$EXTRA" ]]; then
   echo "missing $EXTRA"
-  echo "Run the download/build steps in GPU_MYSONG.md section 2 first." >&2
+  echo "Run the download/build steps in docs/mysong-training.md section 2 first." >&2
   exit 2
 fi
 

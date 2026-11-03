@@ -38,20 +38,19 @@ Melody-signature overlap between the auxiliary corpus and the whole OpenEWLD cor
 
 Dev split: root 0.683 / core 0.660 / key 0.898.
 The paper's generative observation with everything else unchanged scores root 0.249
-on the same split — the discriminative tagger is what buys the accuracy.
+on the same split, the discriminative tagger is what buys the accuracy.
 
 ## Limits
 
 - the auxiliary archive is Wikifonia-derived; its files do not carry a blanket open
   licence for the underlying songs, so check before publishing derived weights;
 - one global key per song, symbolic supervision, and Western popular/jazz harmony;
-- accuracy against one reference is a lower bound on musical quality — listening
+- accuracy against one reference is a lower bound on musical quality, listening
   is the arbiter, and a held-out take has been rendered and listened to above.
 
 ## Installed in this checkout (2026-10-27)
 
-The four files above were downloaded as `mysong_large_colab.zip`
-(sha256 `f5264d076b48d8d61c7e1463cbc7ce94ccde22bb4d2f885c138dfadb74fda5ab`) and copied into `data/mysong/model/`.  They are also
+The four files above were copied into `data/mysong/model/`. They are also
 promoted to the package defaults, which is what the app, `python -m mysong.cli`
 and `tests/test_mysong.py` load:
 

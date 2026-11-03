@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Corpus acquisition.
 #
 # Every loader returns (documents, pairs) and writes one line to the provenance
@@ -11,7 +10,6 @@
 #   * NonCommercial ShareAlike material is loaded only when
 #     CFG.include_noncommercial is True, and the model is then released under
 #     the same licence in the report card.
-# ─────────────────────────────────────────────────────────────────────────────
 
 import bz2
 import unicodedata
@@ -84,7 +82,7 @@ def _add_pair(cree: str, english: str, **meta) -> None:
     PAIRS.append({"cree": cree, "english": english, **meta})
 
 
-# ── 1. EdTeKLA Cree Corpus ───────────────────────────────────────────────────
+# 1. EdTeKLA Cree Corpus
 def load_edtekla() -> None:
     url = "https://codeload.github.com/EdTeKLA/IndigenousLanguages_Corpora/tar.gz/refs/heads/master"
     archive = download(url, RAW / "edtekla.tar.gz")
@@ -151,7 +149,7 @@ def load_edtekla() -> None:
     STATUS["edtekla"] = f"ok: {used} texts"
 
 
-# ── 2. Plains Cree figurative corpus (Bloomfield 1934 + audits) ──────────────
+# 2. Plains Cree figurative corpus (Bloomfield 1934 + audits)
 def load_figurative() -> None:
     from datasets import load_dataset
 
@@ -176,7 +174,7 @@ def load_figurative() -> None:
     STATUS["figurative"] = f"ok: {n} pairs"
 
 
-# ── 3. Wikipedia in Cree ─────────────────────────────────────────────────────
+# 3. Wikipedia in Cree
 def load_wikipedia() -> None:
     from datasets import load_dataset
 
@@ -197,7 +195,7 @@ def load_wikipedia() -> None:
     STATUS["wikipedia"] = f"ok: {n} articles"
 
 
-# ── 4. FineWeb-2 Cree slices ─────────────────────────────────────────────────
+# 4. FineWeb-2 Cree slices
 def load_fineweb() -> None:
     from datasets import load_dataset
 
@@ -227,7 +225,7 @@ def load_fineweb() -> None:
     STATUS["fineweb2"] = f"ok: {n} docs"
 
 
-# ── 4a. FinePDFs Cree slices ─────────────────────────────────────────────────
+# 4a. FinePDFs Cree slices
 #
 # FinePDFs extracts text from Common Crawl PDFs. Its Cree slices are small but
 # they are the densest modern prose available: 430 Latin-script documents and
@@ -263,7 +261,7 @@ def load_finepdfs() -> None:
     STATUS["finepdfs"] = f"ok: {n} docs"
 
 
-# ── 4b. FineTranslations Cree documents ──────────────────────────────────────
+# 4b. FineTranslations Cree documents
 #
 # FineTranslations pairs each FineWeb-2 document with an English translation.
 # The Cree side is human web text; the English side is machine translation, so
@@ -315,7 +313,7 @@ def load_finetranslations() -> None:
     STATUS["finetranslations"] = f"ok: {n_pairs} aligned chunks from {n_docs} documents"
 
 
-# ── 4c. GlotCC Cree slices ───────────────────────────────────────────────────
+# 4c. GlotCC Cree slices
 def load_glotcc() -> None:
     from datasets import load_dataset
 
@@ -343,7 +341,7 @@ def load_glotcc() -> None:
     STATUS["glotcc"] = f"ok: {n} docs"
 
 
-# ── 4d. Tatoeba Cree sentences ───────────────────────────────────────────────
+# 4d. Tatoeba Cree sentences
 def load_tatoeba() -> None:
     url = "https://downloads.tatoeba.org/exports/per_language/crk/crk_sentences.tsv.bz2"
     path = download(url, RAW / "tatoeba_crk.tsv.bz2")
@@ -365,7 +363,7 @@ def load_tatoeba() -> None:
     STATUS["tatoeba"] = f"ok: {n} sentences"
 
 
-# ── 4e. GlotStoryBook Cree rows ──────────────────────────────────────────────
+# 4e. GlotStoryBook Cree rows
 def load_storybook() -> None:
     from datasets import load_dataset
 
@@ -391,7 +389,7 @@ def load_storybook() -> None:
     STATUS["storybook"] = f"ok: {n} paragraphs"
 
 
-# ── 4f. Public-domain historical Cree books ───────────────────────────────────
+# 4f. Public-domain historical Cree books
 #
 # The modern web has almost no Plains Cree prose: FineWeb-2 carries 192 Cree
 # documents in total, and Cree Wikipedia has 187 articles. The nineteenth
@@ -602,7 +600,7 @@ def load_archive() -> None:
     STATUS["archive"] = f"ok: {n} books, {rejected} rejected"
 
 
-# ── 4g. Plains Cree phrase recordings ────────────────────────────────────────
+# 4g. Plains Cree phrase recordings
 def load_plainscree() -> None:
     from datasets import load_dataset
 
@@ -629,7 +627,7 @@ def load_plainscree() -> None:
     STATUS["plainscree"] = f"ok: {n} phrases"
 
 
-# ── 5. This project's own data and notes ─────────────────────────────────────
+# 5. This project's own data and notes
 def load_project() -> None:
     # 5a. The aligned sentences already curated in the repository. The file also
     #     contains dictionary frequency rows; those are filtered below.
@@ -699,7 +697,7 @@ def load_project() -> None:
            "project-owned", "plains", "Latn", f"{len(notes)} song notes, parallel pairs, Watkins 1865")
 
 
-# ── 6. GiellaLT lexicon (validity only, not running text) ────────────────────
+# 6. GiellaLT lexicon (validity only, not running text)
 def load_giellalt() -> None:
     url = "https://codeload.github.com/giellalt/lang-crk/tar.gz/refs/heads/main"
     archive = download(url, RAW / "lang-crk.tar.gz")
@@ -742,7 +740,7 @@ def load_giellalt() -> None:
     STATUS["giellalt"] = f"ok: {len(LEXICON)} forms"
 
 
-# ── 7. Anything the user drops in ────────────────────────────────────────────
+# 7. Anything the user drops in
 def load_uploads() -> None:
     dirs = [Path(os.environ.get("CREE_UPLOAD_DIR", ROOT / "uploads"))]
     if IN_COLAB:
@@ -767,7 +765,7 @@ def load_uploads() -> None:
         STATUS["uploads"] = f"ok: {n} paragraphs"
 
 
-# ── run every loader independently ───────────────────────────────────────────
+# run every loader independently
 # On Drive this whole section is skipped once it has produced files. It is the
 # slowest part of the notebook (network, archive index, PDF extraction) and none
 # of it changes between sessions, so repeating it after a disconnect only burns
@@ -807,7 +805,7 @@ else:
             log(f"{name}: {STATUS.get(name, 'ok')}  ({time.time() - t0:.1f}s)")
         except Exception as exc:
             STATUS[name] = f"failed: {type(exc).__name__}: {exc}"
-            log(f"{name}: FAILED — {exc}")
+            log(f"{name}: FAILED: {exc}")
 
     write_jsonl(RAW / "docs.jsonl", DOCS)
     write_jsonl(RAW / "pairs.jsonl", PAIRS)

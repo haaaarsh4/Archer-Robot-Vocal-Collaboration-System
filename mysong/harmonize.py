@@ -65,9 +65,9 @@ _EPS = 1e-12
 _CONFIDENCE_TEMPERATURE_PER_BEAT = 10.0
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Public result types
-# --------------------------------------------------------------------------- #
+# #
 
 @dataclass
 class Style:
@@ -228,9 +228,9 @@ class Harmonization:
         }
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Small helpers
-# --------------------------------------------------------------------------- #
+# #
 
 def _phase_bucket(beat: float, beats_per_bar: float) -> int:
     phase = float(beat) % float(beats_per_bar)
@@ -258,9 +258,9 @@ def _softmax(values: Sequence[float]) -> np.ndarray:
     return exp / total if total > 0 else np.full_like(exp, 1.0 / len(exp))
 
 
-# --------------------------------------------------------------------------- #
+# #
 # The decoder
-# --------------------------------------------------------------------------- #
+# #
 
 @dataclass
 class _Decoded:
@@ -893,9 +893,9 @@ class Harmonizer:
         return Chord(chord.root, best_quality), alternatives, confidence
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Convenience functions
-# --------------------------------------------------------------------------- #
+# #
 
 def harmonize(
     melody: Melody | Sequence[NoteEvent],

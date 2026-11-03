@@ -14,7 +14,7 @@ It learns, from the corpus, that some pitch-class sets imply a root, that
 downbeats matter more than passing notes, and that rare triads are rare.  The
 weights are exported to plain numpy arrays, so inference needs no scikit-learn.
 
-The classifier is deliberately small: 52 features, 60 classes, a few thousand
+The classifier is small: 52 features, 60 classes, a few thousand
 weights.  It trains in about fifteen seconds on a laptop CPU and cannot
 plausibly memorise a song.  That matters because the same corpus supplies both
 the classifier and the transition matrix; a transformer would need far more

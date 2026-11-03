@@ -1,6 +1,6 @@
 """Estimate the MySong potentials from a lead-sheet corpus.
 
-The trainer is deliberately transparent: every potential is a normalised count
+The trainer is transparent: every potential is a normalised count
 table with an explicit, music-theoretic prior.  Nothing here needs a GPU, and
 the whole model fits in a few hundred kilobytes.
 
@@ -88,9 +88,9 @@ class TrainConfig:
     notes: list[str] = field(default_factory=list)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Priors
-# --------------------------------------------------------------------------- #
+# #
 
 def _normalise_rows(counts: np.ndarray, alpha: float = 0.0, prior: np.ndarray | None = None) -> np.ndarray:
     if prior is None:
@@ -221,9 +221,9 @@ def bass_base(qualities: Sequence[str] | None = None) -> np.ndarray:
     return np.asarray([0.72, 0.14, 0.10, 0.03, 0.01], dtype=np.float64)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Counting
-# --------------------------------------------------------------------------- #
+# #
 
 def _phase_bucket(offset: float, beats_per_bar: float) -> int:
     phase = float(offset) % float(beats_per_bar)
@@ -340,9 +340,9 @@ def _meter_index(beats_per_bar: float, meters: Sequence[float]) -> int:
     return int(np.argmin(np.abs(values - float(beats_per_bar))))
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Fitting
-# --------------------------------------------------------------------------- #
+# #
 
 def fit_model(
     songs: Sequence[Song],

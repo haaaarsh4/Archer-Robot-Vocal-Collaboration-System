@@ -123,11 +123,10 @@ _COMB_LOG = math.log10(_COMB_PEAK)
 # comment in _harmonic_fit). Measured across it: at 72 cents the reference track
 # gave 271 "held" frames whose 90th percentile was 15 cents, at 36 cents 226
 # frames at the same 15 cents -- and a slide take that is one long portamento
-# stops having held frames at all, which is the honest answer for it.
+# stops having held frames at all, which is the accurate answer for it.
 _HELD_TOLERANCE = 0.03
 
 
-# ============================================================
 # CONFIG
 
 
@@ -416,7 +415,7 @@ class HumConfig:
     # Measured on this project's own solo vocal takes over their loudest three
     # seconds: 0.26 at the 10th percentile and 0.96-11519 at the median. So the
     # threshold sits in the gap between them, three times the loudest drum
-    # reading and under the quietest voice one. It is deliberately blunt about
+    # reading and under the quietest voice one. It is blunt about
     # what a hum will follow: a bass instrument with no voice over it is not
     # something a hum should be humming either.
     voice_gate: bool = True
@@ -457,7 +456,6 @@ class HumConfig:
         return out
 
 
-# ============================================================
 # MELODY
 
 
@@ -474,7 +472,7 @@ def _local_register(f0: np.ndarray, voiced: np.ndarray, win_frames: int) -> np.n
     """The pitch register a listening ear would say this passage is in.
 
     A median of the nearby voiced pitches, in log frequency, per frame. This is
-    the reference the octave repair folds toward, and it is deliberately a
+    the reference the octave repair folds toward, and it is a
     MEDIAN of a whole window rather than the previous frame: folding against
     the previous frame is a chain that walks a melody down into the cellar the
     moment two adjacent frames disagree by an octave (measured on a real low
@@ -913,7 +911,6 @@ def track_melody(audio: np.ndarray, sample_rate: int, cfg: Optional[HumConfig] =
                                 frame_size=frame_size), full_audio, sample_rate, cfg)
 
 
-# ============================================================
 # DSP HELPERS
 
 
@@ -1031,7 +1028,6 @@ def _rosenberg(phase_frac: np.ndarray, open_quotient: float) -> np.ndarray:
     return out
 
 
-# ============================================================
 # THE HUM
 
 
@@ -1406,7 +1402,6 @@ def _voice_gated(audio: np.ndarray, sample_rate: int, mel: "Melody",
                   rms=mel.rms, frame_size=mel.frame_size)
 
 
-# ============================================================
 # SMALL SIGNAL HELPERS
 
 
@@ -1514,7 +1509,6 @@ def _soft_limit(y: np.ndarray, ceiling: float) -> np.ndarray:
     return out
 
 
-# ============================================================
 # MEASUREMENTS (used by the self-test and by the server's logging)
 
 
@@ -1577,7 +1571,7 @@ def hum_measurements(hum: np.ndarray, source: np.ndarray, sample_rate: int,
             out["pct_within_100_cents"] = round(float(np.mean(np.abs(cents) <= 100.0) * 100.0), 1)
         out["voiced_frame_agreement"] = round(float(np.mean(both) * 100.0), 1)
 
-    # 2. WHAT THE HUMS ON. The synth-fidelity question, and it is deliberately
+    # 2. WHAT THE HUMS ON. The synth-fidelity question, and it is 
     #    NOT answered by the melody tracker: that would be the tracker checking
     #    the tracker through the synthesizer, and a closed-mouth hum is exactly
     #    the signal an autocorrelation detector misreads (on this project's low
@@ -1958,7 +1952,6 @@ def _harmonic_fit(x: np.ndarray, sample_rate: int, f0_curve_hz: np.ndarray, hop_
     }
 
 
-# ============================================================
 # SELF-TEST
 
 
@@ -1975,7 +1968,7 @@ def _selftest(paths: Optional[list[str]] = None, out_dir: str = "/tmp") -> int:
     # never plays.
     cfg = HumConfig.from_config()
     sources = paths or [
-        "music samples/shortlorezarchersongs/Suzanne Kite Fm 120.mp3",
+        "data/audio/shortlorezarchersongs/Suzanne Kite Fm 120.mp3",
         "synthesis/source_takes/Lalanana.wav",
     ]
     sources = [p for p in sources if os.path.exists(p)]

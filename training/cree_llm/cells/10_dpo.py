@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Preference tuning for faithfulness.
 #
 # The one model can be fluent and still be wrong: a dropped negation, a changed
@@ -7,7 +6,6 @@
 # becomes a rejected answer while the faithful one is chosen. The objective is
 # DPO, with the reference being the same model with its adapters switched off,
 # so no second copy is needed.
-# ─────────────────────────────────────────────────────────────────────────────
 CFG.dpo_enabled = CFG.dpo_enabled and CFG.dpo_epochs > 0
 
 pairs_train = read_jsonl(PROC / "parallel_train.jsonl")
@@ -57,11 +55,11 @@ for row in pairs_train:
 
 # Abstention is part of the same skill. A note answer that fills a gap with a
 # plausible invention is the failure this project cares about most, so the
-# honest reply is chosen and an invented one is rejected.
+# accurate reply is chosen and an invented one is rejected.
 # The title that belongs to `_horse_context`, which is not necessarily the
 # first note: the first section of the first note can be the held-out one.
 _abstain_title = _horse_title
-for question, honest, invented in [
+for question, accurate, invented in [
     (f"What key was {_abstain_title} recorded in?",
      "The notes do not say what key it was recorded in.",
      f"It was recorded in D major, in {_abstain_title}, at 92 BPM."),
@@ -73,7 +71,7 @@ for question, honest, invented in [
      "It was written in 2019 after a trip to Batoche, and it began as a round."),
 ]:
     prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
-    prefs.append({"prompt": prompt, "chosen": honest, "rejected": invented})
+    prefs.append({"prompt": prompt, "chosen": accurate, "rejected": invented})
 
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]

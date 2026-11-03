@@ -7,7 +7,7 @@ the eight fine streams.  Both use fixed sinusoidal positional encodings (the
 paper replaces T5's relative bias with these), pre-RMSNorm, gated GEGLU
 feed-forwards, and a tied output embedding.
 
-The implementation deliberately exposes an incremental decoding path with a
+The implementation exposes an incremental decoding path with a
 per-layer KV cache.  Generating 2250 + 4000 tokens one at a time is the normal
 inference mode; recomputing the whole prefix for every token would make a
 10-second clip cost minutes even on a GPU.

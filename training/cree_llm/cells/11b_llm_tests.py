@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # The language-model test battery.
 #
 # CreeBench answers one question: is the translation better than the base
@@ -12,7 +11,6 @@
 # merged into creebench_report.json) and a small bundle under out/web/ that the
 # project site can read without parsing the whole report. The charts are written
 # as SVG in the site's own palette, so a page can use them without restyling.
-# ─────────────────────────────────────────────────────────────────────────────
 import torch
 
 model, tok = ensure_model()
@@ -23,7 +21,7 @@ _report = jload(_report_path)
 _pairs = sorted(read_jsonl(PROC / "parallel_test.jsonl"), key=lambda r: sha1(r["cree"]))
 _eval_pairs = _pairs[: min(CFG.eval_n, len(_pairs))]
 
-# ── the site's palette, copied so the figures look drawn on the page ─────────
+# the site's palette, copied so the figures look drawn on the page
 _WEB_INK, _WEB_INK_2, _WEB_INK_3 = "#1b1917", "#565049", "#8b8479"
 _WEB_PAPER, _WEB_LINE = "#f7f5ef", "#d5d1c7"
 _WEB_OCHRE, _WEB_INDIGO, _WEB_SAGE, _WEB_GOLD = "#ad4a2a", "#2d3a61", "#4f6b57", "#a2611d"
@@ -236,7 +234,7 @@ else:
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    # ── 1. the same question twice ───────────────────────────────────────────
+    # 1. the same question twice
     try:
         prompts = _translate_prompts(probes, "en_cr")
         first = generate(prompts, 48, batch_size=4)
@@ -249,7 +247,7 @@ else:
     except Exception as exc:
         llm_tests["determinism"] = {"error": str(exc)}
 
-    # ── 2. do the control tokens earn their place? ──────────────────────────
+    # 2. do the control tokens earn their place?
     # Same sentences, same model, prefix removed. If the score does not move,
     # the prefixes are decoration and the app could drop them.
     try:
@@ -269,7 +267,7 @@ else:
     except Exception as exc:
         llm_tests["prompt_ablation"] = {"error": str(exc)}
 
-    # ── 3. three ways to ask the same thing ─────────────────────────────────
+    # 3. three ways to ask the same thing
     try:
         phrasings = (
             "Translate into Plains Cree (SRO):\n{en}",
@@ -290,7 +288,7 @@ else:
     except Exception as exc:
         llm_tests["paraphrase"] = {"error": str(exc)}
 
-    # ── 4. does it know when the notes are silent? ──────────────────────────
+    # 4. does it know when the notes are silent?
     try:
         context = notes_eval[0]["context"] if notes_eval else "Notes on Horse: a song about a horse."
         unanswerable = [
@@ -322,7 +320,7 @@ else:
     except Exception as exc:
         llm_tests["abstention"] = {"error": str(exc)}
 
-    # ── 5. English did not get worse ────────────────────────────────────────
+    # 5. English did not get worse
     # CPT replays one block in ten in English for exactly this reason. The test
     # is the same text through the same model with the adapters on and off.
     try:
@@ -343,7 +341,7 @@ else:
     except Exception as exc:
         llm_tests["english_retention"] = {"error": str(exc)}
 
-    # ── 6. what a Cree word costs in tokens ─────────────────────────────────
+    # 6. what a Cree word costs in tokens
     try:
         from transformers import AutoTokenizer as _BaseTokenizer
 
@@ -362,7 +360,7 @@ else:
     except Exception as exc:
         llm_tests["fertility"] = {"error": str(exc)}
 
-    # ── 7. syllabics all the way back ───────────────────────────────────────
+    # 7. syllabics all the way back
     try:
         rows = [r for r in _eval_pairs if len(r["cree"].split()) <= 20][:12]
         prompts = [f"<|translate|><|english|><|cans|>\nWrite this in Cree syllabics:\n{r['english']}"
@@ -379,7 +377,7 @@ else:
     except Exception as exc:
         llm_tests["syllabics"] = {"error": str(exc)}
 
-    # ── 8. is its confidence worth anything? ────────────────────────────────
+    # 8. is its confidence worth anything?
     try:
         rows = _eval_pairs[: min(10, len(_eval_pairs))]
         answers, confidence = _scored(_translate_prompts(rows, "en_cr"))
@@ -394,7 +392,7 @@ else:
     except Exception as exc:
         llm_tests["calibration"] = {"error": str(exc)}
 
-    # ── 9. what a reply costs ───────────────────────────────────────────────
+    # 9. what a reply costs
     try:
         start = time.time()
         generate([_translate_prompts(probes[:1], "en_cr")[0]], 32, batch_size=1)
@@ -409,7 +407,7 @@ else:
     except Exception as exc:
         llm_tests["cost"] = {"error": str(exc)}
 
-    # ── figures and the site bundle ─────────────────────────────────────────
+    # figures and the site bundle
     def _value(section: str, key: str, default: float = 0.0) -> float:
         block = llm_tests.get(section, {})
         value = block.get(key, default) if isinstance(block, dict) else default

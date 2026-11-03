@@ -538,5 +538,5 @@ chat:
   ollama_url: http://127.0.0.1:11434
   model: archer:7b
   gguf_path: null                # archer-7b.Q4_K_M.gguf, used only for llama_cpp
-  temperature: 0.3
+  temperature: 0.0               # greedy decoding; the model is a 7B and a stray sample reads as a wrong answer
   max_tokens: 500

@@ -295,7 +295,10 @@ window.creeLicence = function (kind, btn) {
   });
   document.querySelectorAll('[data-licence-filter]').forEach(b => b.classList.toggle('is-on', b === btn));
   const count = document.getElementById('cree-licence-count');
-  if (count) count.textContent = 'Showing ' + shown + ' of 15 collections.';
+  if (count) {
+    const total = document.querySelectorAll('#cree-licence-table tbody tr').length;
+    count.textContent = 'Showing ' + shown + ' of ' + total + ' collections.';
+  }
 };
 
 window.creeStage = function (name) {

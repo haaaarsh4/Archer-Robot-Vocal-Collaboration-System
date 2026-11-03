@@ -107,20 +107,20 @@ recording to be removed, remove it from future runs.
 
 Other Cree singing examples (all rights reserved unless stated):
 
-- Young Spirit, *Mewasinsational – Cree Round Dance Songs* —
+- Young Spirit, *Mewasinsational – Cree Round Dance Songs*,
   https://canyonrecords.bandcamp.com/album/mewasinsational-cree-round-dance-songs
   (includes “Cree Prayer Song”; stream or paid download, no stems)
-- Northern Cree, *Ewipihcihk – Cree Round Dance Songs* —
+- Northern Cree, *Ewipihcihk – Cree Round Dance Songs*,
   https://canyonrecords.bandcamp.com/album/ewipihcihk-cree-round-dance-songs
-- Northern Cree, *It's A Cree Thing – Cree Round Dance Songs* —
+- Northern Cree, *It's A Cree Thing – Cree Round Dance Songs*,
   https://canyonrecords.bandcamp.com/album/its-a-cree-thing-cree-round-dance-songs
-- Northern Cree, *When It's Cold – Cree Round Dance Songs* —
+- Northern Cree, *When It's Cold – Cree Round Dance Songs*,
   https://canyonrecords.bandcamp.com/album/when-its-cold-cree-round-dance-songs
-- Northern Cree Handgame Singers, *Onion Lake: Plains Cree Handgame Songs* —
+- Northern Cree Handgame Singers, *Onion Lake: Plains Cree Handgame Songs*,
   SICC store listing: https://store.sicc.sk.ca/products/onion-lake-plains-cree-handgame-songs-cree
-- William Burn Stick, “Plains Cree Prisoner's Song” —
+- William Burn Stick, “Plains Cree Prisoner's Song”,
   https://www.youtube.com/watch?v=SAWj65gltfY (Smithsonian Folkways recording)
-- Northern Cree, Tiny Desk (Home) Concert —
+- Northern Cree, Tiny Desk (Home) Concert,
   https://www.youtube.com/watch?v=maDO3z41wXA
 
 These are for listening and rights conversations. Buying an album or streaming a
@@ -269,7 +269,7 @@ Public archives worth talking to (none of these is an open training license):
 - Canadian Museum of History, Cree songs recorded by Christian Leden:
   https://www.historymuseum.ca/collections/archive/3351891
 
-The honest conclusion after the public-source search: there is **no openly
+Conclusion after the public-source search: there is **no openly
 licensed Plains Cree corpus with studio-isolated vocal/instrumental pairs**.
 The 2.196-hour CC BY corpus is real, but it is mixed; its 0.526 hours of Demucs
 stems are approximations. A production model still needs commissioned or
@@ -290,12 +290,12 @@ specifically; a SingSong pair does not automatically grant that.
 
 ## 7. Training plan
 
-### Stage A — base model
+### Stage A, base model
 
 Train the general model on MUSDB18-HQ as already documented. This gives the
 codec, semantic codebook, stage 1+2 and fine model a working starting point.
 
-### Stage B — Cree adaptation
+### Stage B, Cree adaptation
 
 1. **Codec**: reuse the base codec unchanged. 2.196 h is too little to train a
    codec, and re-training it would make the Cree stage checkpoints incompatible
@@ -318,7 +318,7 @@ codec, semantic codebook, stage 1+2 and fine model a working starting point.
    round dance / powwow / folk / other if the dataset has enough examples per
    style. Without style labels, the model will average them.
 
-### Stage C — evaluation
+### Stage C, evaluation
 
 - Held-out **singers**, not just held-out songs.
 - Cree-speaking listeners compare outputs; preference and appropriateness, not
@@ -336,20 +336,20 @@ codec, semantic codebook, stage 1+2 and fine model a working starting point.
 The current pipeline assumes a flat MUSDB-style corpus. A Cree dataset needs:
 
 - a metadata-aware dataset reader (`metadata.jsonl`, not directory-name
-  inference) — **not implemented**; the reader walks
+  inference), **not implemented**; the reader walks
   `data/cree_singsong/train_audio` and ignores the metadata beyond the
   singer-disjoint views;
-- singer-disjoint split logic — **done** in `tools/fetch_cree_songs.py`, which
+- singer-disjoint split logic, **done** in `tools/fetch_cree_songs.py`, which
   writes `metadata.jsonl` and the `train_audio` / `dev_audio` / `test_audio`
   views;
-- a Cree training profile — **done**: `config/cree.yaml` (not a section inside
+- a Cree training profile, **done**: `config/cree.yaml` (not a section inside
   `config/config.yaml`);
-- optional style conditioning — not implemented;
-- a private-data path excluded from git — **done**: `data/cree_songs/`,
+- optional style conditioning, not implemented;
+- a private-data path excluded from git, **done**: `data/cree_songs/`,
   `data/cree_singsong/` and `checkpoints/` are git-ignored;
-- a weighted mixed Cree/general corpus loader — not implemented, so the
+- a weighted mixed Cree/general corpus loader, not implemented, so the
   fine-tune is Cree-only;
-- an evaluation manifest that records consent/licence IDs — the per-track
+- an evaluation manifest that records consent/licence IDs, the per-track
   `license`, `license_url` and `consent_id` fields in `metadata.jsonl` serve this
   role.
 
@@ -362,7 +362,7 @@ not a reason to skip the remaining schema work.
 1. Reuse the MUSDB codec unchanged, re-fit the semantic k-means on the 2.196 h
    CC BY corpus, and smoke-test the paired path on the 0.526 h of Demucs stems
    before running the full separation and fine-tune in
-   [GPU_RUNBOOK.md](../GPU_RUNBOOK.md).
+   [singsong-training.md](singsong-training.md).
 2. Separate more of the CC BY mixes (GPU makes this practical), or replace the
    approximations with commissioned multitracks.
 3. Collect **5 hours** of paired stems across **at least 5 singers** and **at

@@ -70,9 +70,7 @@ def main() -> int:
     track = sys.argv[1] if len(sys.argv) > 1 else "frontend/assets/audio/hummingbird.mp3"
     cfg = HumConfig.from_config()
 
-    # ------------------------------------------------------------------
     print("\n=== one rule, two implementations (the page's constants)")
-    # ------------------------------------------------------------------
     for name, server_value in (("HUM_VOICE_RATIO_MIN", cfg.voice_ratio_min),
                                ("HUM_VOICE_BAND_LO_HZ", cfg.voice_band_lo_hz),
                                ("HUM_VOICE_BAND_HI_HZ", cfg.voice_band_hi_hz),
@@ -88,9 +86,7 @@ def main() -> int:
           "isLikelyVoiceFrame is asked of the analyser every frame and voiceHere guards "
           "whether the robot sounds at all")
 
-    # ------------------------------------------------------------------
     print("\n=== what a drum measures, and what a voice measures")
-    # ------------------------------------------------------------------
     y, sr = sf.read(track, dtype="float32", always_2d=False)
     if y.ndim > 1:
         y = y.mean(axis=1)
@@ -112,9 +108,7 @@ def main() -> int:
               f"{solo * 100:.0f}% of {SOLO_TAKE}'s frames pass; a gate that silences a "
               f"solo singer would be worse than the drum it is there to stop")
 
-    # ------------------------------------------------------------------
     print("\n=== the render: quiet where there is no voice, there where there is")
-    # ------------------------------------------------------------------
     hum = render_hum_track(y, sr, cfg)
     rows = []
     for t0 in np.arange(0.0, len(y) / sr - 2.0, 2.0):

@@ -152,9 +152,9 @@ class Song:
         )
 
 
-# --------------------------------------------------------------------------- #
+# #
 # MusicXML -> Song
-# --------------------------------------------------------------------------- #
+# #
 
 def _slug(text: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-").lower()
@@ -418,9 +418,9 @@ def parse_musicxml(path: str | Path, *, song_id: str | None = None) -> Song:
     )
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Corpus handling
-# --------------------------------------------------------------------------- #
+# #
 
 def find_scores(root: str | Path = DEFAULT_CORPUS) -> list[Path]:
     root = Path(root)

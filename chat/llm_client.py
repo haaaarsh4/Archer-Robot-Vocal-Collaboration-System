@@ -29,7 +29,7 @@ class LLMConfig:
     model: str = "archer:7b"
     gguf_path: str | None = None
     n_ctx: int = 4096
-    temperature: float = 0.3
+    temperature: float = 0.0
     max_tokens: int = 500
     timeout_s: float = 120.0
 

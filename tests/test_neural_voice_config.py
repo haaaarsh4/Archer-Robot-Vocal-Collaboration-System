@@ -56,7 +56,7 @@ def test_index_and_transpose_slots_line_up_with_the_models():
         "transpose_semitones must be positional with model_paths, or the "
         "missing voices all fall back to 0 semitones"
     )
-    # female3 has no retrieval index today, so its slot is deliberately empty
+    # female3 has no retrieval index today, so its slot is empty
     # and must be read as 'no index', never as a path. If a matching index is
     # trained later, that is an improvement rather than a regression -- but it
     # has to belong to the voice in that slot, not be copied from another one.

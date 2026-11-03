@@ -38,7 +38,7 @@ Two conventions the tables carry, both worth knowing before reading output:
   * The converter treats a plain `e` as `ê` (`LengthSymbol` in the source
     rules), because Plains Cree writes its one e-sound long. A word written
     `nehiyawewin` therefore comes back `nêhiyawêwin`, and that is the
-    converter's behaviour, not a bug in it.
+    converter's behaviour, expected behaviour in it.
   * `/` and `.` are positional: a final consonant has its own glyph (the "final"
     series), while the same consonant before a vowel is part of that syllable's
     glyph. `atim` is a-ti-m, three glyphs: ᐊ ᑎ ᒼ.
@@ -65,7 +65,7 @@ __all__ = [
     "describe", "orthography_self_test",
 ]
 
-# --------------------------------------------------------------- the tables ---
+# the tables
 # Vowel order used by the whole syllabics block: a, e, i, o, then the long
 # vowels â, ê, î, ô in the same order. The FST rule files spell out every
 # combination; the tables below hold the same content as data.
@@ -190,7 +190,7 @@ def fold_doubled_vowels(text: str, ee: str = "ê") -> str:
     """Fold a doubled-vowel spelling onto the diacritic one.
 
     ``ee`` is the one ambiguous pair and is `ê` by default; pass ``ee="î"`` for
-    a text that uses it for long i. Folding is deliberately NOT part of
+    a text that uses it for long i. Folding is NOT part of
     :func:`normalize_sro`: a doubled vowel is a different convention, not a
     different spelling of the same letter, and silently rewriting it would
     make the engine's output unfaithful to whatever the singer's own spelling
@@ -232,7 +232,7 @@ def looks_like_syllabics(text: str) -> bool:
     return any(is_syllabics(ch) for ch in str(text))
 
 
-# ------------------------------------------------------------- the converters ---
+# the converters
 
 def to_syllabics(sro: str) -> str:
     """Standard Roman Orthography to syllabics, the itwêwina rules.
@@ -305,7 +305,7 @@ def to_sro(syllabics: str, long_vowels: str = "circumflex") -> str:
     return text
 
 
-# ------------------------------------------------------------------ families ---
+# families
 
 _VOWEL_CHARS = set("aeiouâêîô")
 _LONG_CHARS = set("âêîô")
@@ -389,7 +389,7 @@ def syllables_to_sro(syllables: list[str]) -> str:
     return "".join(syllables)
 
 
-# ------------------------------------------------------ anglicized respelling ---
+# anglicized respelling
 #
 # One English spelling per Cree sound. This is the part a reader actually
 # pronounces, so the choices are the ones Cree teaching material uses for
@@ -516,7 +516,7 @@ def _phrase_syllables(sro: str) -> list[str]:
     return syllables
 
 
-# ---------------------------------------------------------------- self-test ---
+# self-test
 
 def orthography_self_test(verbose: bool = False) -> dict:
     """The checks that make this module trustworthy, runnable from a shell.
@@ -614,7 +614,7 @@ def orthography_self_test(verbose: bool = False) -> dict:
         # Words spelled with the English `ch` digraph (a variant of `c` in a
         # few of this corpus's files, not standard SRO) are skipped: the
         # converter has no `ch` rule and writes c-final + h-final + a vowel for
-        # them, which is the honest thing to do with a spelling it does not know.
+        # them, which is the accurate thing to do with a spelling it does not know.
         if "ch" in word:
             continue
         word_syllables = syllabify(word)

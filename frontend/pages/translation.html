@@ -66,7 +66,7 @@
     <p class="paper-lede">Whisper's <code>language="cr"</code> is not a Plains Cree decoder. It selects the English decoder and attaches a Cree language tag, and what comes back for sung Cree is English words that sound vaguely like the vowels. The project measured that, stopped using it for Cree, and built a separate path.</p>
     <p class="paper-p">The Cree path uses Meta's MMS-1b-all with both <code>crk</code> adapters, a lexicon and a character model built from this project's own Cree texts, and a CTC beam search constrained so it cannot emit an English word. Before recognition, Demucs can isolate the vocal from the accompaniment, and a harmonic vocal hint keeps the sung pitch content from being discarded by the separator.</p>
     <p class="paper-p">English speech still goes through faster-whisper, because for English it is excellent. The demo below lets you choose which language is being spoken. The transcript is shown as it arrives, followed by the checked version, so a rough guess never gets mistaken for a final reading.</p>
-    <p class="paper-p">Silence is handled explicitly. A span with no voiced frames is not sent to the recogniser at all; it is labelled as silence, which is both faster and more honest than asking a language model to transcribe a breath.</p>
+    <p class="paper-p">Silence is handled explicitly. A span with no voiced frames is not sent to the recogniser at all; it is labelled as silence, which is both faster and clearer than asking a language model to transcribe a breath.</p>
 
     <figure class="paper-figure">
       <img src="/static/assets/evidence/asr-wer.svg?v=1" alt="Word error rate across 40 spoken test utterances" loading="lazy">
@@ -109,7 +109,7 @@
     <h2 class="paper-h2">Building a translator where almost no parallel text exists</h2>
     <p class="paper-lede">There is no off-the-shelf Plains Cree–English model to fine-tune. The translation layer is a transformer encoder–decoder trained from scratch on the material that could be assembled and permissioned: community-contributed text from the Cree corpus, aligned sentences, and vocabulary from Watkins' 1865 dictionary.</p>
     <p class="paper-p">Cree is polysynthetic, so a single word can carry what English needs a clause to say. Tokenisation is therefore the first engineering problem, not an afterthought. The project uses a Cree-aware segmentation step (Morfessor and a finite-state analyser where available) before a shared SentencePiece vocabulary, so the model sees morphemes rather than an arbitrary split of a long word.</p>
-    <p class="paper-p">At inference, the model decodes with beam search, keeping several candidate sentences alive at each step and returning the highest-scoring complete one. The model is deliberately small, because a large model on a small corpus memorises the corpus rather than learning to generalise.</p>
+    <p class="paper-p">At inference, the model decodes with beam search, keeping several candidate sentences alive at each step and returning the highest-scoring complete one. The model is small, because a large model on a small corpus memorises the corpus rather than learning to generalise.</p>
 
     <figure class="paper-figure">
       <div class="plate">
@@ -173,7 +173,7 @@
       <div class="paper-stat"><b>3</b><span>states the stage can return</span></div>
     </div>
 
-    <p class="paper-p">The three states are deliberately asymmetric. <strong>Joy</strong> takes a major third if arousal is above 0.5, a perfect fifth if it is calm, and a triangle wave with no vibrato. <strong>Grief</strong> takes a minor third, a plain sine and a 3.5 Hz vibrato, the only state that gets one. <strong>Neutral</strong> holds a perfect fifth, a sine, no vibrato, and the resting LED. The LED eyes follow the same state: green and wide, indigo and narrow, or muted.</p>
+    <p class="paper-p">The three states are asymmetric. <strong>Joy</strong> takes a major third if arousal is above 0.5, a perfect fifth if it is calm, and a triangle wave with no vibrato. <strong>Grief</strong> takes a minor third, a plain sine and a 3.5 Hz vibrato, the only state that gets one. <strong>Neutral</strong> holds a perfect fifth, a sine, no vibrato, and the resting LED. The LED eyes follow the same state: green and wide, indigo and narrow, or muted.</p>
 
     <div class="paper-grid three" style="margin-top:24px">
       <div class="paper-tile" style="border-color:rgba(5,150,105,.35)"><div class="paper-label" style="color:#059669">valence &gt; 0.15</div><h3 class="paper-h3">Joy</h3><p class="paper-p">Major third or perfect fifth. Triangle. No vibrato. Green eyes, pupil at its widest.</p></div>

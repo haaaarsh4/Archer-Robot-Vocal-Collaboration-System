@@ -8,7 +8,7 @@ the whole song sees both sides of every beat and makes those decisions with
 context.  On held-out OpenEWLD it raises root accuracy from about 0.57 to 0.64
 with the same decoder.
 
-The model is deliberately small (two 128-unit layers, roughly 0.6 MB) and is
+The model is small (two 128-unit layers, roughly 0.6 MB) and is
 trained from scratch on the corpus.  Training uses a validation split carved
 out of the training songs, never the dev or test split.  Inference needs
 PyTorch; if it is unavailable the package falls back to the numpy classifier,

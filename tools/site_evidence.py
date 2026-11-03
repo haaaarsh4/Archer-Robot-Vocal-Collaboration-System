@@ -2,7 +2,7 @@
 """Measure the site's claims on large, reproducible samples.
 
 Every number printed on the site comes out of this file.  The tests are
-deliberately adversarial: vibrato, breath noise, quiet takes, tempo
+adversarial: vibrato, breath noise, quiet takes, tempo
 ambiguity, borrowed notes, dense mixes.  Each suite returns a plain dict and
 writes one or more SVG charts into ``frontend/assets/evidence``.
 
@@ -51,9 +51,9 @@ SAGE = "#4f6b57"
 GOLD = "#a2611d"
 
 
-# --------------------------------------------------------------------------- #
+# #
 # SVG helpers
-# --------------------------------------------------------------------------- #
+# #
 
 def _esc(text: str) -> str:
     return (str(text).replace("&", "&amp;").replace("<", "&lt;")
@@ -217,9 +217,9 @@ def chart_paired(name: str, labels: list[str], first: list[float], second: list[
     return _write_svg(name, "".join(parts), width, height)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Signal generators
-# --------------------------------------------------------------------------- #
+# #
 
 def sung_tone(f0: float, seconds: float = 1.6, *, sr: int = SR,
               vibrato_cents: float = 22.0, vibrato_hz: float = 5.3,
@@ -316,9 +316,9 @@ def melody_tone(notes: list[int], *, sr: int = SR, note_s: float = 0.36,
     return out.astype(np.float32), truth
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Suites
-# --------------------------------------------------------------------------- #
+# #
 
 def _smoother_trial(detector, f0: float, frames: int, outlier_rate: float,
                     rng: np.random.Generator) -> tuple[list[float], list[float]]:

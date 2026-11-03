@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # CreeBench: the same test, before and after.
 #
 # Every number below is computed on data the model never trained on, with the
@@ -11,7 +10,6 @@
 #   code-switch  how often English leaks into a Cree answer
 #   abstention   whether the model says "the notes do not say" instead of
 #                inventing a fact
-# ─────────────────────────────────────────────────────────────────────────────
 import sacrebleu
 from collections import Counter
 from contextlib import nullcontext
@@ -249,7 +247,7 @@ else:
     else:
         results["external"] = None
 
-    # ── syllabics: can it write the script, not just name it? ────────────────────
+    # syllabics: can it write the script, not just name it?
     syl_rows = [r for r in eval_pairs if len(r["cree"].split()) <= 20][: min(60, len(eval_pairs))]
     if syl_rows:
         syl_prompts = [f"<|translate|><|english|><|cans|>\nWrite this in Cree syllabics:\n{r['english']}" for r in syl_rows]
@@ -270,7 +268,7 @@ else:
         results["tuned"]["syllabics"] = {"n": 0, "script_share": 0.0}
         results["base"]["syllabics"] = {"n": 0, "script_share": 0.0}
 
-    # ── grounded note reading and abstention ─────────────────────────────────────
+    # grounded note reading and abstention
     # Both are measured with the adapters on *and off*. The old system answered
     # song questions with the general model reading retrieved notes, so the
     # adapter-free run is that system, on the same notes and the same questions.
@@ -307,7 +305,7 @@ else:
         }
     results["tuned"]["abstention"]["answers"] = abs_hyp
 
-    # ── conversation about the project ───────────────────────────────────────────
+    # conversation about the project
     # Asked three ways the training set never used. A model that only answers the
     # exact wording it memorised is not holding a conversation.
     project_eval = read_jsonl(PROC / "sft_project_eval.jsonl")
@@ -327,7 +325,7 @@ else:
             for r, h in zip(project_eval, proj_hyp)
         ]
 
-    # ── does it deny being Archer? ──────────────────────────────────────────────
+    # does it deny being Archer?
     persona_probes = jload(PROC / "persona_probes.json") if (PROC / "persona_probes.json").exists() else []
     if persona_probes:
         _denial = re.compile(r"\b(no|not|never|neither)\b", re.I)
@@ -340,7 +338,7 @@ else:
                 "answers": [{"q": q, "a": h[:200]} for q, h in zip(persona_probes, hyps)],
             }
 
-    # ── perplexity on held-out Cree ──────────────────────────────────────────────
+    # perplexity on held-out Cree
     @torch.no_grad()
     def perplexity(texts: list[str], use_adapters: bool) -> float:
         model.eval()
@@ -361,13 +359,16 @@ else:
     results["tuned"]["perplexity"] = round(perplexity(ppl_texts, True), 3)
     results["base"]["perplexity"] = round(perplexity(ppl_texts, False), 3)
 
-    # ── the bar: beat every piece of the old setup ──────────────────────────────
+    # the bar: the best score measured before this model
     # The old app was not one model. It was a general model, a separate Cree
     # model and a retrieval index, with a router choosing between them. A single
     # model that replaces all three has to beat the best of those pieces on each
-    # job, so the bar is computed here instead of assumed: for every measure,
-    # the strongest score any of the old parts produced, and the gap to this
-    # model. `meets` is the honest verdict, printed even when it is false.
+    # job, so the bar is computed here instead of assumed: for every measure, the
+    # strongest score this run actually measured from an older part, and the gap
+    # to this model. Only the base and, when `--external-model` is given, that
+    # model enter the comparison. The separate Cree model is not in the bar
+    # unless it was scored too, and `bar_from` says which one set it, so the
+    # table cannot pass an unmeasured model off as beaten.
     _ext = results.get("external") if isinstance(results.get("external"), dict) else None
     _ext_ok = bool(_ext and "en_cr" in _ext)
 
@@ -416,10 +417,10 @@ else:
         "rows": bars,
         "met": met,
         "total": len(bars),
-        "verdict": f"meets or beats the old setup on {met} of {len(bars)} measures",
+        "verdict": f"meets or beats the best measured score on {met} of {len(bars)} measures",
     }
 
-    # ── latency, measured rather than guessed ────────────────────────────────────
+    # latency, measured rather than guessed
     def latency(prompt: str, n: int = 32) -> float:
         start = time.time()
         generate([prompt], n, batch_size=1, use_adapters=True)
@@ -430,7 +431,7 @@ else:
 
     jdump(OUT / "creebench_report.json", results)
 
-    # ── print the table ──────────────────────────────────────────────────────────
+    # print the table
     def row(name: str, base: dict, tuned: dict, keys: list[str]) -> str:
         parts = [f"{name:22s}"]
         for key in keys:
@@ -475,7 +476,7 @@ else:
 
     _h2h = results.get("head_to_head") or {}
     if _h2h.get("rows"):
-        print("\nthe bar: the best of the old setup on each job")
+        print("\nthe bar: the best score measured before this model on each job")
         for item in _h2h["rows"]:
             mark = "ok  " if item["meets"] else "MISS"
             print(f"  {mark} {item['task']:14s} {item['measure']:12s} "
@@ -483,7 +484,7 @@ else:
         print(f"  {_h2h['verdict']}")
     print("=" * 78)
 
-    # ── figure ───────────────────────────────────────────────────────────────────
+    # figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 3, figsize=(13, 3.6))

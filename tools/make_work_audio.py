@@ -5,7 +5,7 @@ The About page's list is a player: a row's play button plays a real take from
 this project, in the artist's own voice, and a row that has only footage opens
 the work's video on the artist's own page instead. This script is the first
 half of that, it copies everything Archer has delivered in
-`music samples/shortlorezarchersongs/` into the frontend's own asset folder,
+`data/audio/shortlorezarchersongs/` into the frontend's own asset folder,
 under the slug its row is keyed by:
 
   * frontend/assets/audio/ahasiw.mp3           Ahasiw
@@ -22,7 +22,7 @@ under the slug its row is keyed by:
 Copies rather than re-encodes, at the bitrate they were delivered in: Horse is
 twelve megabytes and Halfbred thirty, full performances, and a re-encode of an
 mp3 only ever loses. Sources are read only, and nothing is deleted from
-`music samples/`.
+`data/audio/`.
 
 Usage:  .venv/bin/python tools/make_work_audio.py
 """
@@ -35,10 +35,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "music samples" / "shortlorezarchersongs"
+SRC = ROOT / "data" / "audio" / "shortlorezarchersongs"
 OUT = ROOT / "frontend" / "assets" / "audio"
 
-# row slug -> the file in `music samples/` it is played from
+# row slug -> the file in `data/audio/shortlorezarchersongs/` it is played from
 RECORDINGS = {
     "ahasiw": "Ahasiw F 120.mp3",
     "aim": "AIM - Db 125.mp3",

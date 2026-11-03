@@ -38,9 +38,9 @@ import numpy as np
 from mysong.harmonize import ChordSegment, Harmonization
 from mysong.theory import Chord, voice_leading_cost
 
-# --------------------------------------------------------------------------- #
+# #
 # Data
-# --------------------------------------------------------------------------- #
+# #
 
 @dataclass
 class ArrangementNote:
@@ -197,9 +197,9 @@ class Arrangement:
         return path
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Voicing
-# --------------------------------------------------------------------------- #
+# #
 
 def _chord_pitch_classes(chord: Chord) -> list[int]:
     pcs = list(dict.fromkeys(chord.pitch_classes(False)))
@@ -295,9 +295,9 @@ def choose_voicings(
     return chosen
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Patterns
-# --------------------------------------------------------------------------- #
+# #
 
 def _swing_offset(beat: float, swing: float) -> float:
     """Delay the second eighth of every beat by up to a triplet feel."""
@@ -716,9 +716,9 @@ def _drum_pattern(
     return notes
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Arrangement assembly
-# --------------------------------------------------------------------------- #
+# #
 
 def arrange(
     harmony: Harmonization,
@@ -772,9 +772,9 @@ def arrange(
     )
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Synthesis
-# --------------------------------------------------------------------------- #
+# #
 
 def _adsr(n: int, sr: int, attack: float, decay: float, sustain: float, release: float) -> np.ndarray:
     """A compact ADSR envelope for one note of ``n`` samples."""
@@ -1016,9 +1016,9 @@ def _render_arrangement_synth(
     return buffer.astype(np.float32)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # SoundFont rendering
-# --------------------------------------------------------------------------- #
+# #
 
 _SOUNDFONT_CANDIDATES = (
     "/usr/share/sounds/sf2/FluidR3_GM.sf2",
@@ -1215,9 +1215,9 @@ def render_arrangement(
     return _render_arrangement_synth(arrangement, sample_rate=sample_rate, seed=seed)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Mixing with the voice
-# --------------------------------------------------------------------------- #
+# #
 
 #: The band every path uses unless it is told otherwise: the hand drum this
 #: project's artist has sung with since 1982, not a generic pop kit.
@@ -1393,9 +1393,9 @@ def mix_stems(stems: dict[str, np.ndarray], sample_rate: int) -> np.ndarray:
     return _soft_limit(out)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Standard MIDI File
-# --------------------------------------------------------------------------- #
+# #
 
 def _vlq(value: int) -> bytes:
     if value < 0:

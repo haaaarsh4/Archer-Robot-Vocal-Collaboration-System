@@ -1,6 +1,6 @@
 """Regression tests for the MySong harmonizer.
 
-These are deliberately small: a synthetic melody for the decoder, a few
+These are small: a synthetic melody for the decoder, a few
 hundred corpus songs for the key classifier, and a random-weight tagger for
 the inference path.  None of them trains a neural network.
 """

@@ -100,7 +100,7 @@ class HarmonyEngine:
         # while also nudging vowel_color toward the bright end (see decide()
         # below) is what actually makes it sound like the vowel itself is
         # shifting (toward "ee"/"ah" rising, toward "oh"/"oo" falling),
-        # not just a tone-control sweep. Deliberately large (was 0.30)
+        # not just a tone-control sweep. large (was 0.30)
         # a subtle EQ nudge disappears against a real mix; this needs to
         # be unmistakable, not tasteful.
         #
@@ -410,7 +410,7 @@ class HarmonyEngine:
             # meant to thicken, not harmonize). Guarantee a doubled voice
             # here regardless of whatever Voice Texture the person has
             # picked, Solo would otherwise silently erase this mode's
-            # whole character, and use the mode's own tight, deliberately
+            # whole character, and use the mode's own tight, 
             # narrow detune (synthesis.timbral_detune_cents in config.yaml,
             # previously read from config but never actually applied
             # anywhere) instead of the chosen texture's generic, wider,
@@ -431,7 +431,7 @@ class HarmonyEngine:
             # moving ensemble, guaranteed doubling here regardless of
             # whatever Voice Texture is selected (Solo would otherwise
             # leave it as one thin low note), but with the drone's OWN
-            # tight, deliberately narrow detune (a soft, slow beating
+            # tight, narrow detune (a soft, slow beating
             # like a tanpura or two singers holding the same low note
             # not the wider chorus-y spread meant for a moving melodic
             # duet/choir). Jitter is capped very low: on a note that's
@@ -492,7 +492,6 @@ class HarmonyEngine:
                 0.0, 1.0,
             ))
 
-        # ------------------------------------------------------------------
         # HOW A LOWER HARMONY VOICE IS SUNG, in the two modes where a part sits
         # away from the singer's own notes: octave_reinforcement (a whole line an
         # octave down) and drone_support (one held note under a phrase). Both of
@@ -511,7 +510,6 @@ class HarmonyEngine:
         #      the note is in absolute terms, the less of it there is (a level
         #      trim the synthesizer applies after its own normalisation, since
         #      that normalisation would otherwise undo it).
-        # ------------------------------------------------------------------
         level_trim_db = 0.0
         if mode == AccompanimentMode.OCTAVE and self.mode_functions.octave_semitones < 0:
             depth = float(np.clip(abs(self.mode_functions.octave_semitones) / 12.0, 0.0, 1.5))
@@ -592,7 +590,7 @@ class HarmonyEngine:
     # his exact pitch to whatever scale degree was closest, every single
     # frame, even when he was singing perfectly in tune with himself just
     # not with the engine's own inferred scale. CALL_RESPONSE and TRIADIC
-    # are deliberately left OUT of this set: they invent a genuinely new
+    # are left OUT of this set: they invent a genuinely new
     # pitch relationship (resolving toward an inferred tonic, or a fixed
     # chordal interval) that scale-lock is legitimately meant to keep
     # in-key. CONTOUR is handled specially just below, since it's a
@@ -765,7 +763,7 @@ class HarmonyEngine:
              when the caller has locked this engine to one specific
              recorded word (the frontend's "one word, not Mix" picker),
              every single one of the priorities below is skipped
-             entirely. This is deliberately checked before even the rare
+             entirely. This is checked before even the rare
              set, so a locked choice is never silently swapped out for a
              surprise word.
           1. An occasional deliberate "surprise" word from
@@ -981,7 +979,7 @@ class HarmonyEngine:
 
         This engine's own brightness math runs in a 0-1 "brightness"
         unit space (see PhonemeProfile/HarmonyDecision), not dB, the
-        conversion below is a deliberately simple, approximately-linear
+        conversion below is a simple, approximately-linear
         mapping (dB / 10.0) that matches the *10.0 scale
         vocable_synthesizer.py's _apply_phoneme_shaping already uses to
         turn a brightness delta into a shelf gain. It is not an exact

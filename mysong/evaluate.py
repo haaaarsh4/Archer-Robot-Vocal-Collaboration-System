@@ -2,7 +2,7 @@
 
 Melody harmonization has no single correct answer, so accuracy against the
 corpus's chord symbols is a lower bound on musical quality, not a verdict.
-It is still the only honest way to compare models without a listening panel,
+It is still the only accurate way to compare models without a listening panel,
 and it catches regressions.
 
 Metrics

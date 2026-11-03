@@ -43,7 +43,7 @@ DEFAULT_TEXTURE = {
     # Easy to revert to VoiceTexture.SOLO if you want it drier.
     AccompanimentMode.CONTOUR:       VoiceTexture.DUET,
     AccompanimentMode.DRONE:         VoiceTexture.DUET,
-    # A solo answering voice, deliberately: the answer is one other singer (or
+    # A solo answering voice, : the answer is one other singer (or
     # one small group, if Duet/Choir is picked in the panel) answering Archer,
     # not a section doubling him. The mode's own contrast comes from where the
     # answer sits and how it is phrased, see synthesis/call_response.py.
@@ -248,7 +248,7 @@ class ModeFunctions:
         #                down from reading as "the same thing, but dark and
         #                muddy". The octave voice has half the fundamental and
         #                keeps its own vocal tract, so its energy sits lower and
-        #                needs the presence put back deliberately.
+        #                needs the presence put back .
         #   * narrow  -- the vowel colour is pulled toward the bright/front end,
         #                which slides the voice's formant peak up (see
         #                VocableSynthesizer._apply_phoneme_shaping), the same
@@ -304,7 +304,7 @@ class ModeFunctions:
         # window) needed to call the melody "moving" and commit to a step.
         self.contour_move_threshold_semis = float(mcfg.get("contour_move_threshold_semitones", 1.5))
         # Trend magnitude below which it's considered "settled" again and
-        # glides back to unison. Deliberately lower than the move
+        # glides back to unison. lower than the move
         # threshold (hysteresis) so it doesn't flicker in and out right
         # at the boundary.
         self.contour_release_threshold_semis = float(mcfg.get("contour_release_threshold_semitones", 0.5))

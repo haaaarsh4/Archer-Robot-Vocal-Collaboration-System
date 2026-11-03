@@ -426,9 +426,7 @@ if getattr(ARGS, "expanded", None):
 # cell 01_setup
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Configuration. One place for every knob; every later cell reads from here.
-# ─────────────────────────────────────────────────────────────────────────────
 
 import gc
 import hashlib
@@ -499,7 +497,7 @@ _PRESETS = {
                 max_cpt_packs=100_000, max_sft=100_000),
     # One 24 GB card (RTX 4090, A10): the 14B in nf4 at a shorter context. This
     # is the largest base that fits a single 24 GB card; the merge runs on CPU
-    # and needs about 64 GB of system RAM. Slower than the 7B, and deliberately
+    # and needs about 64 GB of system RAM. Slower than the 7B, and 
     # not chosen by `auto`, because it is a different bet on quality vs time.
     "big24": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=1024, lora_r=32,
                   cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=180,
@@ -574,7 +572,7 @@ MODEL_TAG = next(
 )
 MODEL_STEM = f"archer-{MODEL_TAG}"
 
-# ── where everything lives ────────────────────────────────────────────────────
+# where everything lives
 if IN_COLAB and os.environ.get("CREE_USE_DRIVE", "1") == "1":
     try:
         from google.colab import drive  # type: ignore
@@ -599,7 +597,7 @@ PLOTS = OUT / "plots"
 for d in (RAW, PROC, CKPT, OUT, PLOTS):
     d.mkdir(parents=True, exist_ok=True)
 
-# ── where the Hugging Face cache lives ────────────────────────────────────────
+# where the Hugging Face cache lives
 # Model weights are never cached on Drive. Drive's FUSE mount does not reliably
 # finish writing multi-gigabyte binary files, and a shard that reads back with a
 # damaged header is exactly the `SafetensorError: header too large` that stops
@@ -712,7 +710,7 @@ def download(url: str, dest: Path, timeout: int = 120) -> Path:
     return dest
 
 
-# ── crash-safe run state ─────────────────────────────────────────────────────
+# crash-safe run state
 # Colab ends a runtime without asking: a closed tab, an idle timeout, a GPU
 # reset. So every step that takes longer than a minute leaves two traces on
 # Drive. A stage marker records that the step finished, and periodic
@@ -917,7 +915,6 @@ _apply_overrides()
 # cell 02_orthography
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # nêhiyawêwin orthography: SRO, syllabics, and the checks that keep a sentence
 # from being half English.
 #
@@ -926,7 +923,6 @@ _apply_overrides()
 # Alberta with the Maskwacîs Education Schools Commission and First Nations
 # University). They are data, not invention, and every rule below is tested
 # against the canonical example atim -> ᐊᑎᒼ.
-# ─────────────────────────────────────────────────────────────────────────────
 
 SRO_VOWELS = ("a", "e", "i", "o")
 LONG_VOWELS = {"a": "â", "e": "ê", "i": "î", "o": "ô"}
@@ -1170,7 +1166,6 @@ print("  nêhiyawêwin ->", to_syllabics("nêhiyawêwin"))
 # cell 03_corpus
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Corpus acquisition.
 #
 # Every loader returns (documents, pairs) and writes one line to the provenance
@@ -1183,7 +1178,6 @@ print("  nêhiyawêwin ->", to_syllabics("nêhiyawêwin"))
 #   * NonCommercial ShareAlike material is loaded only when
 #     CFG.include_noncommercial is True, and the model is then released under
 #     the same licence in the report card.
-# ─────────────────────────────────────────────────────────────────────────────
 
 import bz2
 import unicodedata
@@ -1256,7 +1250,7 @@ def _add_pair(cree: str, english: str, **meta) -> None:
     PAIRS.append({"cree": cree, "english": english, **meta})
 
 
-# ── 1. EdTeKLA Cree Corpus ───────────────────────────────────────────────────
+# 1. EdTeKLA Cree Corpus
 def load_edtekla() -> None:
     url = "https://codeload.github.com/EdTeKLA/IndigenousLanguages_Corpora/tar.gz/refs/heads/master"
     archive = download(url, RAW / "edtekla.tar.gz")
@@ -1323,7 +1317,7 @@ def load_edtekla() -> None:
     STATUS["edtekla"] = f"ok: {used} texts"
 
 
-# ── 2. Plains Cree figurative corpus (Bloomfield 1934 + audits) ──────────────
+# 2. Plains Cree figurative corpus (Bloomfield 1934 + audits)
 def load_figurative() -> None:
     from datasets import load_dataset
 
@@ -1348,7 +1342,7 @@ def load_figurative() -> None:
     STATUS["figurative"] = f"ok: {n} pairs"
 
 
-# ── 3. Wikipedia in Cree ─────────────────────────────────────────────────────
+# 3. Wikipedia in Cree
 def load_wikipedia() -> None:
     from datasets import load_dataset
 
@@ -1369,7 +1363,7 @@ def load_wikipedia() -> None:
     STATUS["wikipedia"] = f"ok: {n} articles"
 
 
-# ── 4. FineWeb-2 Cree slices ─────────────────────────────────────────────────
+# 4. FineWeb-2 Cree slices
 def load_fineweb() -> None:
     from datasets import load_dataset
 
@@ -1399,7 +1393,7 @@ def load_fineweb() -> None:
     STATUS["fineweb2"] = f"ok: {n} docs"
 
 
-# ── 4a. FinePDFs Cree slices ─────────────────────────────────────────────────
+# 4a. FinePDFs Cree slices
 #
 # FinePDFs extracts text from Common Crawl PDFs. Its Cree slices are small but
 # they are the densest modern prose available: 430 Latin-script documents and
@@ -1435,7 +1429,7 @@ def load_finepdfs() -> None:
     STATUS["finepdfs"] = f"ok: {n} docs"
 
 
-# ── 4b. FineTranslations Cree documents ──────────────────────────────────────
+# 4b. FineTranslations Cree documents
 #
 # FineTranslations pairs each FineWeb-2 document with an English translation.
 # The Cree side is human web text; the English side is machine translation, so
@@ -1487,7 +1481,7 @@ def load_finetranslations() -> None:
     STATUS["finetranslations"] = f"ok: {n_pairs} aligned chunks from {n_docs} documents"
 
 
-# ── 4c. GlotCC Cree slices ───────────────────────────────────────────────────
+# 4c. GlotCC Cree slices
 def load_glotcc() -> None:
     from datasets import load_dataset
 
@@ -1515,7 +1509,7 @@ def load_glotcc() -> None:
     STATUS["glotcc"] = f"ok: {n} docs"
 
 
-# ── 4d. Tatoeba Cree sentences ───────────────────────────────────────────────
+# 4d. Tatoeba Cree sentences
 def load_tatoeba() -> None:
     url = "https://downloads.tatoeba.org/exports/per_language/crk/crk_sentences.tsv.bz2"
     path = download(url, RAW / "tatoeba_crk.tsv.bz2")
@@ -1537,7 +1531,7 @@ def load_tatoeba() -> None:
     STATUS["tatoeba"] = f"ok: {n} sentences"
 
 
-# ── 4e. GlotStoryBook Cree rows ──────────────────────────────────────────────
+# 4e. GlotStoryBook Cree rows
 def load_storybook() -> None:
     from datasets import load_dataset
 
@@ -1563,7 +1557,7 @@ def load_storybook() -> None:
     STATUS["storybook"] = f"ok: {n} paragraphs"
 
 
-# ── 4f. Public-domain historical Cree books ───────────────────────────────────
+# 4f. Public-domain historical Cree books
 #
 # The modern web has almost no Plains Cree prose: FineWeb-2 carries 192 Cree
 # documents in total, and Cree Wikipedia has 187 articles. The nineteenth
@@ -1774,7 +1768,7 @@ def load_archive() -> None:
     STATUS["archive"] = f"ok: {n} books, {rejected} rejected"
 
 
-# ── 4g. Plains Cree phrase recordings ────────────────────────────────────────
+# 4g. Plains Cree phrase recordings
 def load_plainscree() -> None:
     from datasets import load_dataset
 
@@ -1801,7 +1795,7 @@ def load_plainscree() -> None:
     STATUS["plainscree"] = f"ok: {n} phrases"
 
 
-# ── 5. This project's own data and notes ─────────────────────────────────────
+# 5. This project's own data and notes
 def load_project() -> None:
     # 5a. The aligned sentences already curated in the repository. The file also
     #     contains dictionary frequency rows; those are filtered below.
@@ -1871,7 +1865,7 @@ def load_project() -> None:
            "project-owned", "plains", "Latn", f"{len(notes)} song notes, parallel pairs, Watkins 1865")
 
 
-# ── 6. GiellaLT lexicon (validity only, not running text) ────────────────────
+# 6. GiellaLT lexicon (validity only, not running text)
 def load_giellalt() -> None:
     url = "https://codeload.github.com/giellalt/lang-crk/tar.gz/refs/heads/main"
     archive = download(url, RAW / "lang-crk.tar.gz")
@@ -1914,7 +1908,7 @@ def load_giellalt() -> None:
     STATUS["giellalt"] = f"ok: {len(LEXICON)} forms"
 
 
-# ── 7. Anything the user drops in ────────────────────────────────────────────
+# 7. Anything the user drops in
 def load_uploads() -> None:
     dirs = [Path(os.environ.get("CREE_UPLOAD_DIR", ROOT / "uploads"))]
     if IN_COLAB:
@@ -1939,7 +1933,7 @@ def load_uploads() -> None:
         STATUS["uploads"] = f"ok: {n} paragraphs"
 
 
-# ── run every loader independently ───────────────────────────────────────────
+# run every loader independently
 # On Drive this whole section is skipped once it has produced files. It is the
 # slowest part of the notebook (network, archive index, PDF extraction) and none
 # of it changes between sessions, so repeating it after a disconnect only burns
@@ -1979,7 +1973,7 @@ else:
             log(f"{name}: {STATUS.get(name, 'ok')}  ({time.time() - t0:.1f}s)")
         except Exception as exc:
             STATUS[name] = f"failed: {type(exc).__name__}: {exc}"
-            log(f"{name}: FAILED — {exc}")
+            log(f"{name}: FAILED: {exc}")
 
     write_jsonl(RAW / "docs.jsonl", DOCS)
     write_jsonl(RAW / "pairs.jsonl", PAIRS)
@@ -2014,7 +2008,6 @@ if _stop_after('corpus'):
 # cell 04_clean
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Cleaning, deduplication and splitting.
 #
 # Three failures destroy a low-resource model, and each is handled explicitly:
@@ -2022,7 +2015,6 @@ if _stop_after('corpus'):
 #   2. The same sentence in train and test -> exact + near-duplicate removal,
 #      then a document-disjoint split, then a second leakage check.
 #   3. Bag-of-words files pretending to be prose -> rejected by shape.
-# ─────────────────────────────────────────────────────────────────────────────
 
 DOCS = read_jsonl(RAW / "docs.jsonl")
 PAIRS = read_jsonl(RAW / "pairs.jsonl")
@@ -2133,7 +2125,7 @@ def norm_key(text: str) -> str:
     return re.sub(r"[^\wâêîô]+", "", normalize_sro(text))
 
 
-# ── documents -> sentences ───────────────────────────────────────────────────
+# documents -> sentences
 # The splits are the thing every later cell reads, so they are built once and
 # then read back. Rebuilding them is not just slow: the near-duplicate filter is
 # randomised by insertion order, so a second build could produce slightly
@@ -2151,7 +2143,7 @@ if all(f.exists() for f in _SPLIT_FILES) and stage_done("clean", _CLEAN_KEY, req
     stats = jload(PROC / "stats.json")
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 else:
-    # ── documents -> sentences ───────────────────────────────────────────────────
+    # documents -> sentences
     NOTES = [d for d in DOCS if d["kind"] == "song-notes"]
     DOCS = [d for d in DOCS if d["kind"] != "song-notes"]
 
@@ -2199,7 +2191,7 @@ else:
 
     log(f"sentences kept {len(sentences)}  rejected {rejected}")
 
-    # ── pairs: deduplicate, then split by document ───────────────────────────────
+    # pairs: deduplicate, then split by document
     _PRIORITY = {"edtekla": 0, "figurative": 1, "project": 2, "watkins1865": 3}
 
     pairs_by_cree: dict[str, dict] = {}
@@ -2245,7 +2237,7 @@ else:
     for row in pairs:
         row["split"] = assign(group_of(row))
 
-    # ── leakage guard: nothing in dev/test may be a near-duplicate of train ──────
+    # leakage guard: nothing in dev/test may be a near-duplicate of train
     train_guard = NearDup(threshold=0.8)
     for row in sentences:
         if row["split"] == "train":
@@ -2264,7 +2256,7 @@ else:
             leaked += 1
     log(f"moved {leaked} near-duplicates out of dev/test")
 
-    # ── a tiny dev/test split must still exist ───────────────────────────────────
+    # a tiny dev/test split must still exist
     def ensure_split(rows: list[dict], minimum: int) -> None:
         """Top up the test split by moving whole groups, never single rows.
 
@@ -2321,7 +2313,7 @@ else:
     jdump(PROC / "stats.json", stats)
     print(json.dumps(stats, indent=2, ensure_ascii=False))
 
-    # ── integrity assertions: the rest of the notebook relies on these ───────────
+    # integrity assertions: the rest of the notebook relies on these
     assert lm["train"] and lm["test"], "empty LM split"
     assert tr["train"] and tr["test"], "empty pair split"
     _train_keys = {norm_key(r["text"]) for r in lm["train"]}
@@ -2331,7 +2323,7 @@ else:
                for r in lm["test"]), "English in LM test"
     print("\nintegrity checks passed: splits are disjoint and language-checked")
 
-    # ── composition figure ───────────────────────────────────────────────────────
+    # composition figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))
@@ -2363,7 +2355,6 @@ if _stop_after('clean'):
 # cell 05_tokenizer
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # A tokenizer that knows Cree.
 #
 # The base model's tokenizer was trained mostly on English. For a language with
@@ -2376,7 +2367,6 @@ if _stop_after('clean'):
 # model's byte-level vocabulary, and the surviving pieces are added as ordinary
 # tokens. The next cell initialises their embeddings from the pieces the base
 # model already knows, so a new token starts life already meaning something.
-# ─────────────────────────────────────────────────────────────────────────────
 
 from transformers import AutoTokenizer
 from sentencepiece import SentencePieceTrainer
@@ -2551,7 +2541,7 @@ else:
         "old_size": old_size,
     })
 
-    # ── figure ───────────────────────────────────────────────────────────────────
+    # figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))
@@ -2589,7 +2579,6 @@ if _stop_after('tokenizer'):
 # cell 06_model
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # The model: quantised base, resized vocabulary, statistically initialised new
 # embeddings, and LoRA adapters.
 #
@@ -2598,7 +2587,6 @@ if _stop_after('tokenizer'):
 # initialised at random has to be learned from scratch, and with a corpus this
 # size it never fully is. Starting from the pieces it replaces means the model
 # already reads the word, and training only has to refine it.
-# ─────────────────────────────────────────────────────────────────────────────
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
@@ -2616,11 +2604,10 @@ NEW_TOKENS = _TOKEN_INFO["tokens"]
 NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Weights that are actually readable.
 #
 # `SafetensorError: Error while deserializing header: header too large` is not a
-# transformers bug and not a bug in this notebook. It means the first eight bytes
+# transformers bug and expected behaviour in this notebook. It means the first eight bytes
 # of a shard do not decode to a valid header length, which is what a
 # multi-gigabyte file looks like when the filesystem it was written to never
 # finished syncing it. In Colab that filesystem is almost always the Google
@@ -2628,7 +2615,6 @@ NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 #
 # So every shard is checked here, before transformers ever mmaps it, and a
 # damaged shard is fetched again on its own rather than re-downloading 15 GB.
-# ─────────────────────────────────────────────────────────────────────────────
 SAFETENSORS_HEADER_LIMIT = 100_000_000  # the ceiling the safetensors format itself enforces
 _WEIGHT_PATTERNS = ["*.safetensors", "*.json", "*.model", "*.txt", "*.jinja", "tokenizer*"]
 _SKIP_PATTERNS = ["*.bin", "*.h5", "*.msgpack", "*.gguf", "*.onnx", "*.onnx_data", "*.pth", "*.pt"]
@@ -2921,7 +2907,7 @@ def reset_stale_checkpoints() -> None:
     frozen table mixes two incompatible checkpoints, and the mismatch surfaces
     hours later. Renaming keeps the old run instead of deleting it.
     """
-    # `four_bit` is deliberately not part of this. It describes how the base was
+    # `four_bit` is not part of this. It describes how the base was
     # loaded in that session and changes not one adapter tensor, so two runs of
     # the same recipe on cards with different free memory must not move each
     # other's adapters aside. Older plan files carry the field; dropping it from
@@ -3047,7 +3033,7 @@ _LOADED_ADAPTER = ""
 def best_adapter(upto: str | None = None) -> Path | None:
     """The newest finished adapter at or before `upto`.
 
-    This is what keeps a fresh kernel honest. Re-running the SFT cell after a
+    This is what keeps a fresh kernel accurate. Re-running the SFT cell after a
     disconnect used to load the bare base model and quietly train instruction
     tuning without the Cree pretraining underneath it, which is worse than not
     training at all because the scores still look plausible.
@@ -3355,7 +3341,6 @@ print("model helpers ready")
 # cell 07_cpt
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Continued pretraining (CPT).
 #
 # Instruction tuning alone teaches a model what to say, not how the language
@@ -3373,7 +3358,6 @@ print("model helpers ready")
 # not rebuilt and the English replay is not downloaded again, the trained
 # adapter is loaded, and the cell moves on. If it was interrupted, the trainer
 # continues from its last checkpoint on Drive.
-# ─────────────────────────────────────────────────────────────────────────────
 _CPT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
@@ -3442,7 +3426,6 @@ if _stop_after('cpt'):
 # cell 08_sft_data
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Instruction data for the one Archer model.
 #
 # There is a single model. It is not a Cree model sitting beside a general one,
@@ -3453,18 +3436,20 @@ if _stop_after('cpt'):
 #   orthography    SRO <-> syllabics, so it can write Cree rather than name it
 #   explain        a Cree word and its English meaning, from the aligned pairs
 #   song notes     grounded answers, with the song named, from Archer's notes
-#   abstention     questions the notes cannot answer, answered honestly
+#   abstention     questions the notes cannot answer, answered accurately
 #   project        conversation about Archer, this system and its limits
 #   persona        who the assistant is, and just as importantly who it is not
 #
 # Held-out song notes and held-out sentence pairs never enter this set.
-# ─────────────────────────────────────────────────────────────────────────────
 
 # The same string the app sends, in chat/archer_prompt.py. A test compares the
 # two, because a system prompt that drifts from training moves the model off the
 # distribution it learned.
 SYSTEM = (
     "You are Archer's assistant, running entirely on the user's own machine. "
+    "You are warm and plain spoken. If someone greets you or asks how you are, "
+    "answer in one or two short sentences in the first person, and ask what they "
+    "need. Do not describe the project or list your jobs unless they ask. "
     "You do four jobs: you talk about Archer's work and this system, you answer "
     "questions about Archer's songs from the notes you are given, you translate "
     "between English and nêhiyawêwin in Standard Roman Orthography and syllabics, "
@@ -3562,7 +3547,7 @@ def usable_watkins(cree: str, english: str) -> bool:
 
 watkins_used = 0
 
-# ── translation and script conversion from aligned pairs ─────────────────────
+# translation and script conversion from aligned pairs
 for i, row in enumerate(train_pairs):
     cree, english = row["cree"], row["english"]
     if norm_key(cree) in test_guard or norm_key(english) in test_guard:
@@ -3584,9 +3569,9 @@ for i, row in enumerate(train_pairs):
         examples.append(chat(SYSTEM, f"<|translate|><|english|><|cans|>\n{rc(rng, CANS_INSTRUCTIONS)}\n{english}", to_syllabics(cree), "translate_en_cans"))
         examples.append(chat(SYSTEM, f"<|translate|><|cree|><|english|>\n<|cans|>\n{rc(rng, SRO_INSTRUCTIONS)}\n{to_syllabics(cree)}", english, "translate_cans_en"))
 
-# ── word explanation, from short aligned pairs ────────────────────────────────
+# word explanation, from short aligned pairs
 # The lexicon the pipeline builds records frequencies, not meanings. The short
-# aligned pairs are the honest source of a gloss: a single word mapped to a
+# aligned pairs are the accurate source of a gloss: a single word mapped to a
 # short English phrase by the corpus itself. Long pairs are skipped, so this
 # cannot turn a sentence into a dictionary entry.
 _gloss_seen: set[str] = set()
@@ -3612,7 +3597,7 @@ for row in train_pairs:
     ):
         examples.append(chat(SYSTEM, f"<|song|>\n{question}", f"{cree} means {english}.", "explain"))
 
-# ── orthography practice on running sentences ────────────────────────────────
+# orthography practice on running sentences
 for i, row in enumerate(lm_train):
     sent = row["text"]
     if norm_key(sent) in test_guard or len(sent.split()) > 25:
@@ -3623,7 +3608,7 @@ for i, row in enumerate(lm_train):
         cans = to_syllabics(sent)
         examples.append(chat(SYSTEM, f"<|cans|><|sro|>\n{rc(rng, SRO_INSTRUCTIONS)}\n{cans}", to_sro(cans), "orthography"))
 
-# ── song notes: grounded answers and honest abstention ───────────────────────
+# song notes: grounded answers and accurate abstention
 def sections(markdown: str) -> tuple[str, dict[str, str]]:
     title = ""
     m = re.search(r"^#\s+(.+)$", markdown, re.M)
@@ -3726,7 +3711,7 @@ for row, title, secs in note_rows:
     if _horse_context:
         break
 # The retrieval layer can also return only passages about other songs. That is
-# a different failure from an empty result, and the honest answer names the
+# a different failure from an empty result, and the accurate answer names the
 # mismatch instead of answering with the wrong song's notes.
 for row, title, secs in note_rows[:3]:
     own = title or row["doc_id"]
@@ -3763,7 +3748,7 @@ for question, answer in [
 ]:
     examples.append(chat(SYSTEM, f"<|song|>\n{question}", answer, "abstain"))
 
-# ── the project, the system and its limits ───────────────────────────────────
+# the project, the system and its limits
 # One model answers everything, so it also has to know what it is and what it
 # will not claim. These are short, checkable statements about this project, not
 # invented biography. Anything about a specific song belongs in the notes
@@ -3908,6 +3893,14 @@ for fact, answer in PROJECT_QA:
 for greeting, answer in [
     ("Hello", "Hello. Ask me about a song, a Cree word, or how this system works."),
     ("Hi", "Hi. Ask me about a song, a Cree word, or how this system works."),
+    ("How are you?", "I am well, thank you. What can I help you with?"),
+    ("How is it going?", "It is going well, thanks. What can I help you with?"),
+    ("How are you doing?", "I am doing well, thanks. What can I help you with?"),
+    ("What's up?", "Not much. What would you like to know?"),
+    ("Good morning", "Good morning. What can I help you with?"),
+    ("Good afternoon", "Good afternoon. What can I help you with?"),
+    ("Nice to meet you", "Nice to meet you too. What would you like to know?"),
+    ("I'm good, thanks", "Good to hear. What can I help you with?"),
     ("Thank you", "You're welcome."),
     ("Thanks", "You're welcome."),
     ("Goodbye", "Goodbye."),
@@ -3955,7 +3948,7 @@ examples.extend([
     chat(SYSTEM, "<|translate|><|english|><|sro|>\nTranslate into Plains Cree (SRO):\nthe river is cold", "sîpiy kîsow.", "translate_en_cr"),
 ])
 
-# ── de-duplicate and split ───────────────────────────────────────────────────
+# de-duplicate and split
 uniq: dict[str, dict] = {}
 for ex in examples:
     # The whole conversation, not just its first turn: a multi-turn example can
@@ -3986,7 +3979,7 @@ for task, factor in {"project": 4, "persona": 3, "explain": 2, "song_notes": 2}.
 rng.shuffle(train)
 print(f"rare-task weighting: {_before_weighting:,} -> {len(train):,} training examples")
 
-# ── the conversation benchmark ───────────────────────────────────────────────
+# the conversation benchmark
 # The project answers are trained, so scoring them with the same wording would
 # measure memorisation. These phrasings never enter training: they test whether
 # the answer survives being asked a different way, which is what a conversation
@@ -4078,7 +4071,6 @@ plt.show()
 # cell 09_sft
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Supervised instruction tuning.
 #
 # Only the assistant's tokens contribute to the loss. The schedule is short and
@@ -4090,7 +4082,6 @@ plt.show()
 # kernel has no memory of CPT, so the adapter is loaded from Drive explicitly;
 # training instruction-following on an untuned base would produce a model that
 # answers neatly in English and cannot write Cree at all.
-# ─────────────────────────────────────────────────────────────────────────────
 train_rows = read_jsonl(PROC / "sft_train.jsonl")
 val_rows = read_jsonl(PROC / "sft_val.jsonl")
 
@@ -4154,7 +4145,7 @@ def reply(prompt: str, max_new_tokens: int = 120, system: str = SYSTEM) -> str:
     return tok.decode(new, skip_special_tokens=True).strip()
 
 
-print("\n── held-out prompts, after tuning ──")
+print("\nHeld-out prompts, after tuning")
 for row in val_rows[: (1 if SMOKE else 4)]:
     question = row["messages"][1]["content"]
     print(f"\nQ: {question[:180]}")
@@ -4171,7 +4162,6 @@ if _stop_after('sft'):
 # cell 10_dpo
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Preference tuning for faithfulness.
 #
 # The one model can be fluent and still be wrong: a dropped negation, a changed
@@ -4180,7 +4170,6 @@ if _stop_after('sft'):
 # becomes a rejected answer while the faithful one is chosen. The objective is
 # DPO, with the reference being the same model with its adapters switched off,
 # so no second copy is needed.
-# ─────────────────────────────────────────────────────────────────────────────
 CFG.dpo_enabled = CFG.dpo_enabled and CFG.dpo_epochs > 0
 
 pairs_train = read_jsonl(PROC / "parallel_train.jsonl")
@@ -4230,11 +4219,11 @@ for row in pairs_train:
 
 # Abstention is part of the same skill. A note answer that fills a gap with a
 # plausible invention is the failure this project cares about most, so the
-# honest reply is chosen and an invented one is rejected.
+# accurate reply is chosen and an invented one is rejected.
 # The title that belongs to `_horse_context`, which is not necessarily the
 # first note: the first section of the first note can be the held-out one.
 _abstain_title = _horse_title
-for question, honest, invented in [
+for question, accurate, invented in [
     (f"What key was {_abstain_title} recorded in?",
      "The notes do not say what key it was recorded in.",
      f"It was recorded in D major, in {_abstain_title}, at 92 BPM."),
@@ -4246,7 +4235,7 @@ for question, honest, invented in [
      "It was written in 2019 after a trip to Batoche, and it began as a round."),
 ]:
     prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
-    prefs.append({"prompt": prompt, "chosen": honest, "rejected": invented})
+    prefs.append({"prompt": prompt, "chosen": accurate, "rejected": invented})
 
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]
@@ -4487,7 +4476,6 @@ if _stop_after('dpo'):
 # cell 11_eval
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # CreeBench: the same test, before and after.
 #
 # Every number below is computed on data the model never trained on, with the
@@ -4500,7 +4488,6 @@ if _stop_after('dpo'):
 #   code-switch  how often English leaks into a Cree answer
 #   abstention   whether the model says "the notes do not say" instead of
 #                inventing a fact
-# ─────────────────────────────────────────────────────────────────────────────
 import sacrebleu
 from collections import Counter
 from contextlib import nullcontext
@@ -4738,7 +4725,7 @@ else:
     else:
         results["external"] = None
 
-    # ── syllabics: can it write the script, not just name it? ────────────────────
+    # syllabics: can it write the script, not just name it?
     syl_rows = [r for r in eval_pairs if len(r["cree"].split()) <= 20][: min(60, len(eval_pairs))]
     if syl_rows:
         syl_prompts = [f"<|translate|><|english|><|cans|>\nWrite this in Cree syllabics:\n{r['english']}" for r in syl_rows]
@@ -4759,7 +4746,7 @@ else:
         results["tuned"]["syllabics"] = {"n": 0, "script_share": 0.0}
         results["base"]["syllabics"] = {"n": 0, "script_share": 0.0}
 
-    # ── grounded note reading and abstention ─────────────────────────────────────
+    # grounded note reading and abstention
     # Both are measured with the adapters on *and off*. The old system answered
     # song questions with the general model reading retrieved notes, so the
     # adapter-free run is that system, on the same notes and the same questions.
@@ -4796,7 +4783,7 @@ else:
         }
     results["tuned"]["abstention"]["answers"] = abs_hyp
 
-    # ── conversation about the project ───────────────────────────────────────────
+    # conversation about the project
     # Asked three ways the training set never used. A model that only answers the
     # exact wording it memorised is not holding a conversation.
     project_eval = read_jsonl(PROC / "sft_project_eval.jsonl")
@@ -4816,7 +4803,7 @@ else:
             for r, h in zip(project_eval, proj_hyp)
         ]
 
-    # ── does it deny being Archer? ──────────────────────────────────────────────
+    # does it deny being Archer?
     persona_probes = jload(PROC / "persona_probes.json") if (PROC / "persona_probes.json").exists() else []
     if persona_probes:
         _denial = re.compile(r"\b(no|not|never|neither)\b", re.I)
@@ -4829,7 +4816,7 @@ else:
                 "answers": [{"q": q, "a": h[:200]} for q, h in zip(persona_probes, hyps)],
             }
 
-    # ── perplexity on held-out Cree ──────────────────────────────────────────────
+    # perplexity on held-out Cree
     @torch.no_grad()
     def perplexity(texts: list[str], use_adapters: bool) -> float:
         model.eval()
@@ -4850,13 +4837,16 @@ else:
     results["tuned"]["perplexity"] = round(perplexity(ppl_texts, True), 3)
     results["base"]["perplexity"] = round(perplexity(ppl_texts, False), 3)
 
-    # ── the bar: beat every piece of the old setup ──────────────────────────────
+    # the bar: the best score measured before this model
     # The old app was not one model. It was a general model, a separate Cree
     # model and a retrieval index, with a router choosing between them. A single
     # model that replaces all three has to beat the best of those pieces on each
-    # job, so the bar is computed here instead of assumed: for every measure,
-    # the strongest score any of the old parts produced, and the gap to this
-    # model. `meets` is the honest verdict, printed even when it is false.
+    # job, so the bar is computed here instead of assumed: for every measure, the
+    # strongest score this run actually measured from an older part, and the gap
+    # to this model. Only the base and, when `--external-model` is given, that
+    # model enter the comparison. The separate Cree model is not in the bar
+    # unless it was scored too, and `bar_from` says which one set it, so the
+    # table cannot pass an unmeasured model off as beaten.
     _ext = results.get("external") if isinstance(results.get("external"), dict) else None
     _ext_ok = bool(_ext and "en_cr" in _ext)
 
@@ -4905,10 +4895,10 @@ else:
         "rows": bars,
         "met": met,
         "total": len(bars),
-        "verdict": f"meets or beats the old setup on {met} of {len(bars)} measures",
+        "verdict": f"meets or beats the best measured score on {met} of {len(bars)} measures",
     }
 
-    # ── latency, measured rather than guessed ────────────────────────────────────
+    # latency, measured rather than guessed
     def latency(prompt: str, n: int = 32) -> float:
         start = time.time()
         generate([prompt], n, batch_size=1, use_adapters=True)
@@ -4919,7 +4909,7 @@ else:
 
     jdump(OUT / "creebench_report.json", results)
 
-    # ── print the table ──────────────────────────────────────────────────────────
+    # print the table
     def row(name: str, base: dict, tuned: dict, keys: list[str]) -> str:
         parts = [f"{name:22s}"]
         for key in keys:
@@ -4964,7 +4954,7 @@ else:
 
     _h2h = results.get("head_to_head") or {}
     if _h2h.get("rows"):
-        print("\nthe bar: the best of the old setup on each job")
+        print("\nthe bar: the best score measured before this model on each job")
         for item in _h2h["rows"]:
             mark = "ok  " if item["meets"] else "MISS"
             print(f"  {mark} {item['task']:14s} {item['measure']:12s} "
@@ -4972,7 +4962,7 @@ else:
         print(f"  {_h2h['verdict']}")
     print("=" * 78)
 
-    # ── figure ───────────────────────────────────────────────────────────────────
+    # figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 3, figsize=(13, 3.6))
@@ -5009,7 +4999,6 @@ else:
 # cell 11b_llm_tests
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # The language-model test battery.
 #
 # CreeBench answers one question: is the translation better than the base
@@ -5023,7 +5012,6 @@ else:
 # merged into creebench_report.json) and a small bundle under out/web/ that the
 # project site can read without parsing the whole report. The charts are written
 # as SVG in the site's own palette, so a page can use them without restyling.
-# ─────────────────────────────────────────────────────────────────────────────
 import torch
 
 model, tok = ensure_model()
@@ -5034,7 +5022,7 @@ _report = jload(_report_path)
 _pairs = sorted(read_jsonl(PROC / "parallel_test.jsonl"), key=lambda r: sha1(r["cree"]))
 _eval_pairs = _pairs[: min(CFG.eval_n, len(_pairs))]
 
-# ── the site's palette, copied so the figures look drawn on the page ─────────
+# the site's palette, copied so the figures look drawn on the page
 _WEB_INK, _WEB_INK_2, _WEB_INK_3 = "#1b1917", "#565049", "#8b8479"
 _WEB_PAPER, _WEB_LINE = "#f7f5ef", "#d5d1c7"
 _WEB_OCHRE, _WEB_INDIGO, _WEB_SAGE, _WEB_GOLD = "#ad4a2a", "#2d3a61", "#4f6b57", "#a2611d"
@@ -5247,7 +5235,7 @@ else:
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
 
-    # ── 1. the same question twice ───────────────────────────────────────────
+    # 1. the same question twice
     try:
         prompts = _translate_prompts(probes, "en_cr")
         first = generate(prompts, 48, batch_size=4)
@@ -5260,7 +5248,7 @@ else:
     except Exception as exc:
         llm_tests["determinism"] = {"error": str(exc)}
 
-    # ── 2. do the control tokens earn their place? ──────────────────────────
+    # 2. do the control tokens earn their place?
     # Same sentences, same model, prefix removed. If the score does not move,
     # the prefixes are decoration and the app could drop them.
     try:
@@ -5280,7 +5268,7 @@ else:
     except Exception as exc:
         llm_tests["prompt_ablation"] = {"error": str(exc)}
 
-    # ── 3. three ways to ask the same thing ─────────────────────────────────
+    # 3. three ways to ask the same thing
     try:
         phrasings = (
             "Translate into Plains Cree (SRO):\n{en}",
@@ -5301,7 +5289,7 @@ else:
     except Exception as exc:
         llm_tests["paraphrase"] = {"error": str(exc)}
 
-    # ── 4. does it know when the notes are silent? ──────────────────────────
+    # 4. does it know when the notes are silent?
     try:
         context = notes_eval[0]["context"] if notes_eval else "Notes on Horse: a song about a horse."
         unanswerable = [
@@ -5333,7 +5321,7 @@ else:
     except Exception as exc:
         llm_tests["abstention"] = {"error": str(exc)}
 
-    # ── 5. English did not get worse ────────────────────────────────────────
+    # 5. English did not get worse
     # CPT replays one block in ten in English for exactly this reason. The test
     # is the same text through the same model with the adapters on and off.
     try:
@@ -5354,7 +5342,7 @@ else:
     except Exception as exc:
         llm_tests["english_retention"] = {"error": str(exc)}
 
-    # ── 6. what a Cree word costs in tokens ─────────────────────────────────
+    # 6. what a Cree word costs in tokens
     try:
         from transformers import AutoTokenizer as _BaseTokenizer
 
@@ -5373,7 +5361,7 @@ else:
     except Exception as exc:
         llm_tests["fertility"] = {"error": str(exc)}
 
-    # ── 7. syllabics all the way back ───────────────────────────────────────
+    # 7. syllabics all the way back
     try:
         rows = [r for r in _eval_pairs if len(r["cree"].split()) <= 20][:12]
         prompts = [f"<|translate|><|english|><|cans|>\nWrite this in Cree syllabics:\n{r['english']}"
@@ -5390,7 +5378,7 @@ else:
     except Exception as exc:
         llm_tests["syllabics"] = {"error": str(exc)}
 
-    # ── 8. is its confidence worth anything? ────────────────────────────────
+    # 8. is its confidence worth anything?
     try:
         rows = _eval_pairs[: min(10, len(_eval_pairs))]
         answers, confidence = _scored(_translate_prompts(rows, "en_cr"))
@@ -5405,7 +5393,7 @@ else:
     except Exception as exc:
         llm_tests["calibration"] = {"error": str(exc)}
 
-    # ── 9. what a reply costs ───────────────────────────────────────────────
+    # 9. what a reply costs
     try:
         start = time.time()
         generate([_translate_prompts(probes[:1], "en_cr")[0]], 32, batch_size=1)
@@ -5420,7 +5408,7 @@ else:
     except Exception as exc:
         llm_tests["cost"] = {"error": str(exc)}
 
-    # ── figures and the site bundle ─────────────────────────────────────────
+    # figures and the site bundle
     def _value(section: str, key: str, default: float = 0.0) -> float:
         block = llm_tests.get(section, {})
         value = block.get(key, default) if isinstance(block, dict) else default
@@ -5557,14 +5545,12 @@ if _stop_after('eval'):
 # cell 12_report
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # The report card.
 #
 # A model without a data card is a rumour. This writes down what went in, what
 # was excluded and why, how it was trained, what it scores, and what it must not
 # be used for. It is generated from the run's own files, so it cannot drift from
 # the numbers in the notebook.
-# ─────────────────────────────────────────────────────────────────────────────
 report = jload(OUT / "creebench_report.json")
 stats = jload(PROC / "stats.json")
 tok_audit = jload(PROC / "tokenizer_audit.json")
@@ -5631,7 +5617,7 @@ lines = [
 if SMOKE:
     lines += [
         "> **Smoke run.** This report came from the tiny CPU profile, whose job is to",
-        "> prove the pipeline runs. It deliberately uses a small slice of the corpus",
+        "> prove the pipeline runs. It uses a small slice of the corpus",
         "> and a 0.5B model, so the word count and scores below are not the model.",
         "> The `t4`, `big24`, `a100`, `big` and `huge` profiles use the complete corpus",
         "> and the 7B, 14B or 32B base model.",
@@ -5654,14 +5640,16 @@ _h2h = report.get("head_to_head") or {}
 if _h2h.get("rows"):
     lines += [
         "",
-        "### Against the setup this replaces",
+        "### Against the best score measured before it",
         "",
         "The old app was a general model, a separate Cree model and a retrieval index, "
-        "with a router choosing between them. The bar below is the best score any of "
-        "those pieces got on each job, measured on the same held-out data. The "
-        "`From` column names which part set the bar.",
+        "with a router choosing between them. The bar below is the best score on each "
+        "job from a measurement this run actually made, and the `From` column says "
+        "which model set it. In a run without `--external-model` every bar is this "
+        "model's own base, so the table measures the training rather than a win over "
+        "the separate Cree model, which has not been scored on these sentences.",
         "",
-        "| Job | Measure | This model | Best of the old setup | From | Verdict |",
+        "| Job | Measure | This model | Best measured before | From | Verdict |",
         "|---|---|---:|---:|---|---|",
     ]
     for _row in _h2h["rows"]:
@@ -5812,7 +5800,7 @@ lines += [
 print((OUT / "report_card.md").read_text(encoding="utf-8")[:2800])
 print(f"\nwrote {OUT / 'report_card.md'}")
 
-# ── the run is only finished when these are true ─────────────────────────────
+# the run is only finished when these are true
 assert (OUT / "creebench_report.json").exists()
 assert t["en_cr"]["chrf++"] == t["en_cr"]["chrf++"], "NaN translation score"
 assert t["perplexity"] > 0
@@ -5826,7 +5814,6 @@ if _stop_after('report'):
 # cell 13_export
 # ════════════════════════════════════════════════════════════════════════════
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Export: adapter -> merged weights -> GGUF -> Ollama.
 #
 # llama.cpp cannot apply a LoRA that adds vocabulary, and this model adds Cree
@@ -5834,7 +5821,6 @@ if _stop_after('report'):
 # model first, and the merged directory is what gets converted. Merging needs
 # roughly twice the model's fp16 size in RAM or VRAM; the cell says which device
 # it chose and stops with a clear message if neither has room.
-# ─────────────────────────────────────────────────────────────────────────────
 from peft import PeftModel
 
 # The merged fp16 model is an intermediate, not an artifact: it is 15.2 GB for
@@ -5847,7 +5833,7 @@ EXPORT.mkdir(parents=True, exist_ok=True)
 
 # The file this cell actually shipped. Stays None on a scoring run or a smoke
 # run, where nothing is quantised and the closing instructions must still print
-# something honest instead of raising.
+# something accurate instead of raising.
 final_gguf: Path | None = None
 
 
@@ -6028,7 +6014,7 @@ else:
     if final_gguf is not None:
         log(f"{final_gguf.name} already built ({final_gguf.stat().st_size / 1e9:.2f} GB), skipping conversion")
     else:
-        # ── llama.cpp: convert, then quantise ────────────────────────────────
+        # llama.cpp: convert, then quantise
         LLAMA = RAW / "llama.cpp"
         if not (LLAMA / "convert_hf_to_gguf.py").exists():
             subprocess.run(["git", "clone", "--depth", "1",
@@ -6036,7 +6022,7 @@ else:
         # Only the one package the converter needs and the runtime does not
         # already have. Installing llama.cpp's full requirements here can upgrade
         # numpy or transformers under the not-yet-saved report, so it is
-        # deliberately scoped.
+        # scoped.
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gguf"], check=True)
 
         # The f16 is an intermediate, and a run that died after converting
@@ -6127,7 +6113,7 @@ else:
             except Exception as exc:
                 print(f"[note] automatic download failed ({exc}); use the Files pane")
 
-print("\n── install the one model on the machine that runs the app ──")
+print("\nInstall the model on the machine that runs the app")
 _shipped = final_gguf.name if final_gguf is not None else f"{MODEL_STEM}.Q4_K_M.gguf"
 print(textwrap.dedent(f"""
     mkdir -p assets/archer_llm

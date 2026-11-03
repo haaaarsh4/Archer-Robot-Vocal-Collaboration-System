@@ -67,7 +67,7 @@ class Track:
         return f"https://www.youtube.com/watch?v={self.youtube_id}"
 
 
-# A deliberately conservative list: every entry is either an explicitly Cree
+# A conservative list: every entry is either an explicitly Cree
 # group/performer, a Cree-language song, or a Cree round-dance recording. The
 # long Little Island Cree video is a full round-dance set, not one song.
 TRACKS: tuple[Track, ...] = (

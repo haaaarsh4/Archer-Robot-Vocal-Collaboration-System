@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Export: adapter -> merged weights -> GGUF -> Ollama.
 #
 # llama.cpp cannot apply a LoRA that adds vocabulary, and this model adds Cree
@@ -6,7 +5,6 @@
 # model first, and the merged directory is what gets converted. Merging needs
 # roughly twice the model's fp16 size in RAM or VRAM; the cell says which device
 # it chose and stops with a clear message if neither has room.
-# ─────────────────────────────────────────────────────────────────────────────
 from peft import PeftModel
 
 # The merged fp16 model is an intermediate, not an artifact: it is 15.2 GB for
@@ -19,7 +17,7 @@ EXPORT.mkdir(parents=True, exist_ok=True)
 
 # The file this cell actually shipped. Stays None on a scoring run or a smoke
 # run, where nothing is quantised and the closing instructions must still print
-# something honest instead of raising.
+# something accurate instead of raising.
 final_gguf: Path | None = None
 
 
@@ -200,7 +198,7 @@ else:
     if final_gguf is not None:
         log(f"{final_gguf.name} already built ({final_gguf.stat().st_size / 1e9:.2f} GB), skipping conversion")
     else:
-        # ── llama.cpp: convert, then quantise ────────────────────────────────
+        # llama.cpp: convert, then quantise
         LLAMA = RAW / "llama.cpp"
         if not (LLAMA / "convert_hf_to_gguf.py").exists():
             subprocess.run(["git", "clone", "--depth", "1",
@@ -208,7 +206,7 @@ else:
         # Only the one package the converter needs and the runtime does not
         # already have. Installing llama.cpp's full requirements here can upgrade
         # numpy or transformers under the not-yet-saved report, so it is
-        # deliberately scoped.
+        # scoped.
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gguf"], check=True)
 
         # The f16 is an intermediate, and a run that died after converting
@@ -299,7 +297,7 @@ else:
             except Exception as exc:
                 print(f"[note] automatic download failed ({exc}); use the Files pane")
 
-print("\n── install the one model on the machine that runs the app ──")
+print("\nInstall the model on the machine that runs the app")
 _shipped = final_gguf.name if final_gguf is not None else f"{MODEL_STEM}.Q4_K_M.gguf"
 print(textwrap.dedent(f"""
     mkdir -p assets/archer_llm

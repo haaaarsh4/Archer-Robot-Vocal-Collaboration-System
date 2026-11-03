@@ -127,9 +127,7 @@ def main() -> int:
 
     notes = [220.00, 277.18, 329.63]      # A3, C#4, E4 -- a small live phrase
     with TestClient(server.app) as client:
-        # ------------------------------------------------------------------
         # 1. the LIVE NEURAL door: one note per request, the page's own body
-        # ------------------------------------------------------------------
         print("\n=== live Neural: one note at a time (/api/neural/render) ===")
         hum_neural: dict[float, np.ndarray] = {}
         for hz in notes:
@@ -190,9 +188,7 @@ def main() -> int:
                   f"above 2.5 kHz vs the hum's {hum_sp['centroid_hz']:.0f} Hz / "
                   f"{hum_sp['hf_ratio'] * 100:.2f}% on the same note")
 
-    # ----------------------------------------------------------------------
     # 2. the LIVE DSP door: the synthesizer asked for one note, then topped up
-    # ----------------------------------------------------------------------
     print("\n=== live DSP: one note, then a mid-note top-up (legato) ===")
     synth = VocableSynthesizer()
     note_s = 1.0
@@ -218,12 +214,10 @@ def main() -> int:
               f"median {pi['median_cents']} cents, octave-out {pi['octave_pct']}%")
         prev = hz
 
-    # ----------------------------------------------------------------------
     # 3. a HELD note, the way the live loop holds one: the same note asked for
     # again and again by top-ups. This is the one thing a hum does that a word
     # cannot (a word restarts, a hum just keeps going), so it is measured on
     # the voice's own output, where nothing but the hum is in the signal.
-    # ----------------------------------------------------------------------
     print("\n=== live DSP: a HELD note, chunk after chunk ===")
     held_hz, chunk_s = 329.63, 0.6
     n_chunk = int(chunk_s * sample_rate)
@@ -295,7 +289,7 @@ def main() -> int:
           f"median {pi2['median_cents']} cents, octave-out {pi2['octave_pct']}%")
 
     # and the same again through the DEFAULT path (_render_hum crossfades a new
-    # note and deliberately does not crossfade a top-up), which is the one the
+    # note and does not crossfade a top-up), which is the one the
     # live engine is on.
     synth3 = VocableSynthesizer()
     pieces = [np.asarray(synth3.synthesize(decision), dtype=np.float32)]

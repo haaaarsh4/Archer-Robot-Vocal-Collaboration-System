@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Instruction data for the one Archer model.
 #
 # There is a single model. It is not a Cree model sitting beside a general one,
@@ -9,18 +8,20 @@
 #   orthography    SRO <-> syllabics, so it can write Cree rather than name it
 #   explain        a Cree word and its English meaning, from the aligned pairs
 #   song notes     grounded answers, with the song named, from Archer's notes
-#   abstention     questions the notes cannot answer, answered honestly
+#   abstention     questions the notes cannot answer, answered accurately
 #   project        conversation about Archer, this system and its limits
 #   persona        who the assistant is, and just as importantly who it is not
 #
 # Held-out song notes and held-out sentence pairs never enter this set.
-# ─────────────────────────────────────────────────────────────────────────────
 
 # The same string the app sends, in chat/archer_prompt.py. A test compares the
 # two, because a system prompt that drifts from training moves the model off the
 # distribution it learned.
 SYSTEM = (
     "You are Archer's assistant, running entirely on the user's own machine. "
+    "You are warm and plain spoken. If someone greets you or asks how you are, "
+    "answer in one or two short sentences in the first person, and ask what they "
+    "need. Do not describe the project or list your jobs unless they ask. "
     "You do four jobs: you talk about Archer's work and this system, you answer "
     "questions about Archer's songs from the notes you are given, you translate "
     "between English and nêhiyawêwin in Standard Roman Orthography and syllabics, "
@@ -118,7 +119,7 @@ def usable_watkins(cree: str, english: str) -> bool:
 
 watkins_used = 0
 
-# ── translation and script conversion from aligned pairs ─────────────────────
+# translation and script conversion from aligned pairs
 for i, row in enumerate(train_pairs):
     cree, english = row["cree"], row["english"]
     if norm_key(cree) in test_guard or norm_key(english) in test_guard:
@@ -140,9 +141,9 @@ for i, row in enumerate(train_pairs):
         examples.append(chat(SYSTEM, f"<|translate|><|english|><|cans|>\n{rc(rng, CANS_INSTRUCTIONS)}\n{english}", to_syllabics(cree), "translate_en_cans"))
         examples.append(chat(SYSTEM, f"<|translate|><|cree|><|english|>\n<|cans|>\n{rc(rng, SRO_INSTRUCTIONS)}\n{to_syllabics(cree)}", english, "translate_cans_en"))
 
-# ── word explanation, from short aligned pairs ────────────────────────────────
+# word explanation, from short aligned pairs
 # The lexicon the pipeline builds records frequencies, not meanings. The short
-# aligned pairs are the honest source of a gloss: a single word mapped to a
+# aligned pairs are the accurate source of a gloss: a single word mapped to a
 # short English phrase by the corpus itself. Long pairs are skipped, so this
 # cannot turn a sentence into a dictionary entry.
 _gloss_seen: set[str] = set()
@@ -168,7 +169,7 @@ for row in train_pairs:
     ):
         examples.append(chat(SYSTEM, f"<|song|>\n{question}", f"{cree} means {english}.", "explain"))
 
-# ── orthography practice on running sentences ────────────────────────────────
+# orthography practice on running sentences
 for i, row in enumerate(lm_train):
     sent = row["text"]
     if norm_key(sent) in test_guard or len(sent.split()) > 25:
@@ -179,7 +180,7 @@ for i, row in enumerate(lm_train):
         cans = to_syllabics(sent)
         examples.append(chat(SYSTEM, f"<|cans|><|sro|>\n{rc(rng, SRO_INSTRUCTIONS)}\n{cans}", to_sro(cans), "orthography"))
 
-# ── song notes: grounded answers and honest abstention ───────────────────────
+# song notes: grounded answers and accurate abstention
 def sections(markdown: str) -> tuple[str, dict[str, str]]:
     title = ""
     m = re.search(r"^#\s+(.+)$", markdown, re.M)
@@ -282,7 +283,7 @@ for row, title, secs in note_rows:
     if _horse_context:
         break
 # The retrieval layer can also return only passages about other songs. That is
-# a different failure from an empty result, and the honest answer names the
+# a different failure from an empty result, and the accurate answer names the
 # mismatch instead of answering with the wrong song's notes.
 for row, title, secs in note_rows[:3]:
     own = title or row["doc_id"]
@@ -319,7 +320,7 @@ for question, answer in [
 ]:
     examples.append(chat(SYSTEM, f"<|song|>\n{question}", answer, "abstain"))
 
-# ── the project, the system and its limits ───────────────────────────────────
+# the project, the system and its limits
 # One model answers everything, so it also has to know what it is and what it
 # will not claim. These are short, checkable statements about this project, not
 # invented biography. Anything about a specific song belongs in the notes
@@ -464,6 +465,14 @@ for fact, answer in PROJECT_QA:
 for greeting, answer in [
     ("Hello", "Hello. Ask me about a song, a Cree word, or how this system works."),
     ("Hi", "Hi. Ask me about a song, a Cree word, or how this system works."),
+    ("How are you?", "I am well, thank you. What can I help you with?"),
+    ("How is it going?", "It is going well, thanks. What can I help you with?"),
+    ("How are you doing?", "I am doing well, thanks. What can I help you with?"),
+    ("What's up?", "Not much. What would you like to know?"),
+    ("Good morning", "Good morning. What can I help you with?"),
+    ("Good afternoon", "Good afternoon. What can I help you with?"),
+    ("Nice to meet you", "Nice to meet you too. What would you like to know?"),
+    ("I'm good, thanks", "Good to hear. What can I help you with?"),
     ("Thank you", "You're welcome."),
     ("Thanks", "You're welcome."),
     ("Goodbye", "Goodbye."),
@@ -511,7 +520,7 @@ examples.extend([
     chat(SYSTEM, "<|translate|><|english|><|sro|>\nTranslate into Plains Cree (SRO):\nthe river is cold", "sîpiy kîsow.", "translate_en_cr"),
 ])
 
-# ── de-duplicate and split ───────────────────────────────────────────────────
+# de-duplicate and split
 uniq: dict[str, dict] = {}
 for ex in examples:
     # The whole conversation, not just its first turn: a multi-turn example can
@@ -542,7 +551,7 @@ for task, factor in {"project": 4, "persona": 3, "explain": 2, "song_notes": 2}.
 rng.shuffle(train)
 print(f"rare-task weighting: {_before_weighting:,} -> {len(train):,} training examples")
 
-# ── the conversation benchmark ───────────────────────────────────────────────
+# the conversation benchmark
 # The project answers are trained, so scoring them with the same wording would
 # measure memorisation. These phrasings never enter training: they test whether
 # the answer survives being asked a different way, which is what a conversation

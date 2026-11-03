@@ -7,7 +7,7 @@ its own module, rather than inline in server.py, because every piece here is
 pure DSP on plain numpy arrays, no server state, no config, no model, so
 it can be reasoned about and tested on its own.
 
-There are four separate problems, and they are deliberately solved
+There are four separate problems, and they are solved
 separately:
 
 0. THE RECORDING'S OWN PITCH MOVES, AND ONE SHIFT CANNOT FOLLOW IT.
@@ -167,9 +167,7 @@ OCTAVE_SUBHARMONIC_RATIO = 0.35
 PITCH_MEDIAN_FRAMES = 3
 
 
-# ============================================================================
 # Part 1: pitch curve -> notes
-# ============================================================================
 
 def _fold_toward(hz: float, ref: float) -> float:
     """The octave of `hz` that sits closest to `ref`."""
@@ -193,7 +191,7 @@ def _octave_evidence(hz_high: float, seg: np.ndarray, sr: int) -> bool:
     real (return False, keep folding); weak energy there means the high
     reading is its own fundamental (return True, adopt it).
 
-    This is deliberately a narrow, two-probe test. A full harmonic-series
+    This is a narrow, two-probe test. A full harmonic-series
     score was tried in this project and was not trustworthy on real recorded
     voice, where the harmonics are dense and the valleys shallow; two fixed
     probes on the one ambiguity that actually matters survive that.
@@ -724,7 +722,7 @@ def shift_for_note(note_hz: float, base_hz: float, octave_k: int,
     So a note that is hopelessly out of range is sung in the octave of the
     take that fits instead: it stays exactly in tune with the track, at an
     octave from where the melody sits, which is what a real singer does when
-    a line leaves their range. The fold is deliberately the LAST resort: it
+    a line leaves their range. The fold is the LAST resort: it
     only happens once clipping would leave the note more than
     FOLD_OVER_CLIP_SEMITONES out, because a small clip is a small tuning
     error while a fold moves the note to a different octave of the melody
@@ -739,9 +737,7 @@ def shift_for_note(note_hz: float, base_hz: float, octave_k: int,
     return float(np.clip(semis, -max_semitones, max_semitones))
 
 
-# ============================================================================
 # Part 2: formant-preserving pitch shift
-# ============================================================================
 
 class FormantPreservingShifter:
     """Shift takes by arbitrary semitone amounts, computing each one at most once.
@@ -800,9 +796,7 @@ def _formant_preserving_shift(audio: np.ndarray, sr: int, n_steps: float) -> np.
         return np.asarray(audio, dtype=np.float32)
 
 
-# ============================================================================
 # Part 3: shaping one note like a sung note
-# ============================================================================
 
 def apply_cents_curve(audio: np.ndarray, sr: int, cents: np.ndarray) -> np.ndarray:
     """Re-read `audio` at a time-varying speed given by a per-sample cents curve.
@@ -1019,7 +1013,6 @@ def normalize_loudness(audio: np.ndarray, sr: int, target_rms: float = 0.11,
     return audio.astype(np.float32)
 
 
-# ============================================================================
 # Part 3b: flattening the take's own pitch movement
 #
 # Measured on this project's own takes, every recorded syllable carries a
@@ -1044,14 +1037,13 @@ def normalize_loudness(audio: np.ndarray, sr: int, target_rms: float = 0.11,
 # FAST movement (the singer's own vibrato and micro-movement, which is most
 # of what makes a voice sound alive), and only the slow part is removed
 # (re-read at a varying rate, the same trick apply_cents_curve already uses).
-# The fast part deliberately stays: flattening a syllable all the way to a
+# The fast part stays: flattening a syllable all the way to a
 # dead-flat line is exactly what makes a render sound like a sampler instead
 # of a person, and keeping the take's own vibrato is free. The deliberate
 # musical movement added on top, the portamento into a note, the vibrato
 # that fades in on a held note, the slow drift, is then built on the SONG's
 # pitches by cents_curve_for_note, and at a much smaller depth than the
 # take's, because the take's own movement is already there.
-# ============================================================================
 
 FLATTEN_HOP_S = 0.008
 FLATTEN_WIN_S = 0.045

@@ -1,11 +1,9 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # The report card.
 #
 # A model without a data card is a rumour. This writes down what went in, what
 # was excluded and why, how it was trained, what it scores, and what it must not
 # be used for. It is generated from the run's own files, so it cannot drift from
 # the numbers in the notebook.
-# ─────────────────────────────────────────────────────────────────────────────
 report = jload(OUT / "creebench_report.json")
 stats = jload(PROC / "stats.json")
 tok_audit = jload(PROC / "tokenizer_audit.json")
@@ -72,7 +70,7 @@ lines = [
 if SMOKE:
     lines += [
         "> **Smoke run.** This report came from the tiny CPU profile, whose job is to",
-        "> prove the pipeline runs. It deliberately uses a small slice of the corpus",
+        "> prove the pipeline runs. It uses a small slice of the corpus",
         "> and a 0.5B model, so the word count and scores below are not the model.",
         "> The `t4`, `big24`, `a100`, `big` and `huge` profiles use the complete corpus",
         "> and the 7B, 14B or 32B base model.",
@@ -95,14 +93,16 @@ _h2h = report.get("head_to_head") or {}
 if _h2h.get("rows"):
     lines += [
         "",
-        "### Against the setup this replaces",
+        "### Against the best score measured before it",
         "",
         "The old app was a general model, a separate Cree model and a retrieval index, "
-        "with a router choosing between them. The bar below is the best score any of "
-        "those pieces got on each job, measured on the same held-out data. The "
-        "`From` column names which part set the bar.",
+        "with a router choosing between them. The bar below is the best score on each "
+        "job from a measurement this run actually made, and the `From` column says "
+        "which model set it. In a run without `--external-model` every bar is this "
+        "model's own base, so the table measures the training rather than a win over "
+        "the separate Cree model, which has not been scored on these sentences.",
         "",
-        "| Job | Measure | This model | Best of the old setup | From | Verdict |",
+        "| Job | Measure | This model | Best measured before | From | Verdict |",
         "|---|---|---:|---:|---|---|",
     ]
     for _row in _h2h["rows"]:
@@ -253,7 +253,7 @@ lines += [
 print((OUT / "report_card.md").read_text(encoding="utf-8")[:2800])
 print(f"\nwrote {OUT / 'report_card.md'}")
 
-# ── the run is only finished when these are true ─────────────────────────────
+# the run is only finished when these are true
 assert (OUT / "creebench_report.json").exists()
 assert t["en_cr"]["chrf++"] == t["en_cr"]["chrf++"], "NaN translation score"
 assert t["perplexity"] > 0

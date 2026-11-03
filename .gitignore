@@ -1,55 +1,46 @@
-# Python virtual environments
+# Python
 .venv/
 venv/
 env/
-.testdeps/
-
-# Python cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
-# ML models and model weights
+# Model weights and local model caches
 data/models/
-assets/rmvpe/
-assets/synthesis_models/
+assets/archer_llm/
+assets/cree_llm/
 assets/female2/
 assets/female3/
-
+assets/hubert/
+assets/rmvpe/
+assets/synthesis_models/
 *.pt
 *.pth
 *.bin
 *.safetensors
 *.ckpt
 *.onnx
-
-# Model/cache directories
+*.gguf
 .cache/
 huggingface/
 **/models--*/
 
-# audio files
-synthesis/VocalSet11
-synthesis/source_takes
-synthesis/(DSP) Robot Vocals
-
-# Local model-audition renders (output/model_auditions/)
-output/model_auditions/
-
-# SingSong training artifacts and corpora
-checkpoints/
-data/singsong/
-# Cree recordings are consent-controlled and must stay out of git.
+# Local audio sources and training data
+synthesis/VocalSet11/
+synthesis/source_takes/
+synthesis/(DSP) Robot Vocals/
 data/cree_songs/
 data/cree_singsong/
+data/singsong/
+checkpoints/
 renders/
 
-# macOS
-.DS_Store
-# Cree LLM training (Cree_LLM_Training.ipynb)
+# Training work folders
 training/.venv/
 cree_llm_work/
-assets/cree_llm/
-assets/archer_llm/
-*.gguf
+
+# Operating system files
+.DS_Store
 
 .freebuff/

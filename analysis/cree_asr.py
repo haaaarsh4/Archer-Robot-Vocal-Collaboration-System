@@ -103,7 +103,7 @@ _VOWELS = set("aeiouâêîô")# The letters the Latin adapter can emit that nêh
 # (`biscuit`, proper names); the model keeps the output dimension it was trained
 # with, so they stay in the vocabulary and their probability is forced to the
 # floor before decoding instead. That is the mechanism that makes an English word
-# unrepresentable rather than merely unlikely. `r` and `l` are deliberately NOT
+# unrepresentable rather than merely unlikely. `r` and `l` are NOT
 # here: both are real nêhiyawêwin letters in the western dialects, which this
 # project's own corpus uses.
 _NON_CREE_SYMBOLS = set("dbfgvxjquz") | {"9", "7", "6", "8", "0"}
@@ -124,9 +124,7 @@ _BLANK_FOLD_SYMBOLS = set("-‐—–'") | set("‘’") | {"​"}
 _JUNK_TOKENS = {"<pad>", "<s>", "</s>", "<unk>", ""}
 
 
-# --------------------------------------------------------------------------
 # configuration
-# --------------------------------------------------------------------------
 
 @dataclass
 class CreeASRConfig:
@@ -136,7 +134,7 @@ class CreeASRConfig:
     best on this project's gold set (native-speaker recordings from the corpus,
     an MMS-TTS round trip, and the Archer takes). They are named here rather than
     inlined so the harness can sweep them, and so a caller can trade accuracy for
-    latency deliberately instead of by accident.
+    latency instead of by accident.
     """
 
     # -- acoustic model
@@ -252,15 +250,13 @@ class CreeASRConfig:
         return max(1, min(8, os.cpu_count() or 4))
 
 
-# --------------------------------------------------------------------------
 # results
-# --------------------------------------------------------------------------
 
 @dataclass
 class TranscriptSegment:
     """One stretch of singing, in all three scripts.
 
-    `kind` is the honest part of this dataclass. "cree" means the decoder found
+    `kind` is the accurate part of this dataclass. "cree" means the decoder found
     real nêhiyawêwin words it is confident in; "vocable" means it found sung
     syllables that are not words of the language (way, hay, hoo) and says so
     instead of pretending; "mixed" means both in one breath; "uncertain" means
@@ -334,9 +330,7 @@ class CreeTranscript:
         }
 
 
-# --------------------------------------------------------------------------
 # audio conditioning and vocal isolation
-# --------------------------------------------------------------------------
 
 def _harmonic_vocal_hint(audio: np.ndarray, sr: int = SAMPLE_RATE) -> np.ndarray:
     """A cheap stand-in for source separation.
@@ -402,7 +396,7 @@ def isolate_vocals(audio: np.ndarray, sr: int = SAMPLE_RATE,
     """Return `(vocals, method)`. Never raises; falls back and reports the path taken.
 
     `"auto"` means "separate if you can, otherwise hand over the mixture" -- and
-    deliberately not "otherwise run hpss", because measuring the two on this
+    not "otherwise run hpss", because measuring the two on this
     project's own recordings showed hpss to be worse than doing nothing on a solo
     voice (see :func:`_harmonic_vocal_hint`)."""
     y = np.asarray(audio, dtype=np.float32)
@@ -466,7 +460,7 @@ def find_voiced_spans(audio: np.ndarray, cfg: CreeASRConfig,
                       sr: int = SAMPLE_RATE) -> list[tuple[float, float]]:
     """Where in the take is there a voice at all?
 
-    Frame energy in dB against a floor, deliberately *not* a VAD: a speech VAD
+    Frame energy in dB against a floor, *not* a VAD: a speech VAD
     drops sustained singing, which is precisely the audio this module exists to
     transcribe. The floor is the higher of an absolute one and a relative one, so
     a quiet take still yields spans, and short spans are merged so a melody's own
@@ -510,9 +504,7 @@ def find_voiced_spans(audio: np.ndarray, cfg: CreeASRConfig,
             for s, e in merged if e - s >= cfg.min_segment_seconds]
 
 
-# --------------------------------------------------------------------------
 # the acoustic model
-# --------------------------------------------------------------------------
 
 class MMSCreeASR:
     """MMS-1b-all with the Plains Cree adapters, giving posteriors over SRO.
@@ -727,9 +719,7 @@ def _token_to_sro(token: str) -> str:
     return macron_to_circumflex(token)
 
 
-# --------------------------------------------------------------------------
 # the decoder
-# --------------------------------------------------------------------------
 
 class CTCDecoder:
     """Prefix beam search over CTC posteriors, fused with a nêhiyawêwin text model.
@@ -908,7 +898,7 @@ class CTCDecoder:
         # It is not a courtesy: the beam prunes by a score that includes the
         # language model, and on one hard span that is enough to walk away from a
         # reading the acoustics clearly support. Scoring the candidate the same
-        # way and keeping whichever wins is the honest resolution.
+        # way and keeping whichever wins is the accurate resolution.
         greedy_text = _tidy("".join(self._pieces_from(work, pieces)))
         if greedy_text and greedy_text not in seen:
             results.append((self.score(work, pieces, greedy_text)[2], greedy_text))
@@ -974,7 +964,7 @@ class CTCDecoder:
                       lm_cache) -> tuple[float, str, str]:
         """One emitted symbol's cost, `(charge, new_history, new_word)`.
 
-        Deliberately the *only* place the language model's opinion is expressed,
+        the *only* place the language model's opinion is expressed,
         so that the search and :meth:`score` charge a transcription identically.
         A second copy of this arithmetic is how a decoder comes to rank its own
         best hypothesis below one it rejected, and then no measurement made on
@@ -1134,7 +1124,7 @@ class CTCDecoder:
         algorithm over the label sequence interleaved with blanks, which is the
         probability that the model, marginalising over every alignment, produced
         this text. That is the quantity the beam approximates, so computing it
-        exactly is what allows an honest test of whether the beam found the best
+        exactly is what allows an accurate test of whether the beam found the best
         hypothesis. Costs O(frames x labels) and is used only for measurement.
         """
         cfg = self.cfg
@@ -1333,14 +1323,12 @@ class LexiconTrie:
         return text in self.words
 
 
-# --------------------------------------------------------------------------
 # vocables: sung syllables that are not words
-# --------------------------------------------------------------------------
 
 # The syllables these song traditions actually sing, written the way nêhiyawêwin
 # writes them. This is the inventory the recogniser snaps to, so a sustained
 # "whaa-hey-yo" comes back as `wâ-hê-yo` rather than as whatever four vowels the
-# phone model happened to name. It is deliberately short and open: a vocable that
+# phone model happened to name. It is short and open: a vocable that
 # is not in it still decodes -- through the syllable mapping below -- it just does
 # not snap to a canonical spelling.
 VOCABLE_INVENTORY: tuple[str, ...] = (
@@ -1574,7 +1562,7 @@ class VocableRecognizer:
         A syllable already in the inventory stays exactly as recognised. One that
         is close takes the inventory's spelling, which is what keeps `haj` from
         being written when the singer is singing `hay`. One with no near
-        neighbour is kept as recognised: an honest syllable beats a familiar
+        neighbour is kept as recognised: an accurate syllable beats a familiar
         wrong one, and that is the whole reason this path exists.
         """
         import difflib
@@ -1625,9 +1613,7 @@ def _syllable_key(syllable: str) -> str:
     return f"{onset[:1]}|{nucleus}|{coda[:1]}"
 
 
-# --------------------------------------------------------------------------
 # the transcriber that ties it together
-# --------------------------------------------------------------------------
 
 class CreeTranscriber:
     """End to end: a take in, a nêhiyawêwin transcript in three scripts out."""
@@ -1735,7 +1721,7 @@ class CreeTranscriber:
                          notes: list[str],
                          posteriors: dict[str, np.ndarray] | None = None
                          ) -> TranscriptSegment | None:
-        """Read one span, and decide honestly how much of it to claim.
+        """Read one span, and decide accurately how much of it to claim.
 
         Two readings are produced and then compared on the evidence rather than
         on taste: the **acoustic** reading, which is a search over the language
@@ -1825,7 +1811,7 @@ class CreeTranscriber:
         decoder = self.decoder()
         cfg = self.cfg
 
-        # ---- every adapter's readings, gathered into one candidate set
+        # every adapter's readings, gathered into one candidate set
         order: list[str] = []                # candidate texts, in the order found
         seen: set[str] = set()
         best_per_adapter: dict[str, str] = {}
@@ -1846,7 +1832,7 @@ class CreeTranscriber:
                     seen.add(text)
                     order.append(text)
 
-        # ---- cross-scoring: ask *every* adapter about *every* candidate
+        # cross-scoring: ask *every* adapter about *every* candidate
         #
         # This is the part that makes the ensemble worth having. A beam search can
         # only score the texts its own model produced, so on its own each adapter
@@ -1923,7 +1909,7 @@ def text_confidence(lm: CreTextModel, text: str, agreeing: bool,
                     cfg: CreeASRConfig) -> float:
     """How much of a decode should be believed, as a number in [0, 1].
 
-    Deliberately *not* the acoustic model's own softmax. On singing a CTC model is
+    *not* the acoustic model's own softmax. On singing a CTC model is
     confidently wrong -- that is exactly how the previous pipeline produced fluent
     English that nobody sang, and no threshold on its confidence would have
     caught it. What is measured here instead is how much of the output *is* the
@@ -2009,9 +1995,7 @@ def _merge_adjacent(segments: list[TranscriptSegment], cfg: CreeASRConfig
     return out
 
 
-# --------------------------------------------------------------------------
 # process-wide instance
-# --------------------------------------------------------------------------
 
 _TRANSCRIBER: CreeTranscriber | None = None
 _TRANSCRIBER_LOCK = threading.Lock()

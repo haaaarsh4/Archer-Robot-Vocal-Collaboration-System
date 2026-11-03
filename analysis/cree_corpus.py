@@ -18,7 +18,7 @@ rather than more audio:
     built from syllables the language actually uses.
 
 Those three are fused into the CTC beam search in analysis/cree_asr.py. This
-module is only the text side, and it is deliberately buildable offline: the
+module is only the text side, and it is buildable offline: the
 corpus is this project's own `data/PlainsCree/`, plus whatever optional lexicon
 files have been dropped into `data/models/cree/lm/`.
 
@@ -107,7 +107,7 @@ def cree_letters_only(word: str) -> bool:
     return all(ch in CREE_LETTERS for ch in word)
 
 
-# --------------------------------------------------------------- corpus read ---
+# corpus read
 
 def _tokens_from_line(line: str, fold_doubled: bool) -> list[str]:
     """Normalize one line of corpus text and return its Cree tokens.
@@ -204,7 +204,7 @@ def read_corpus(root: pathlib.Path | None = None,
     return counts, report
 
 
-# ----------------------------------------------------------------- the model ---
+# the model
 
 def _syllable_parts(syllable: str) -> tuple[str, str, str] | None:
     """Split one syllable into (onset, nucleus, coda), or None if unparseable.
@@ -257,7 +257,7 @@ class CreTextModel:
         self._word_alpha = 0.35
         self._word_denom = self.total_words + self._word_alpha * max(1, len(words))
 
-        # ---- phonotactics, read out of the lexicon itself
+        # phonotactics, read out of the lexicon itself
         onsets: Counter = Counter()
         codas: Counter = Counter()
         nuclei: Counter = Counter()
@@ -278,7 +278,7 @@ class CreTextModel:
         self._prob_cache: dict[str, dict[str, float]] = {}
         self._word_logprob_cache: dict[str, float] = {}
 
-        # ---- baselines the decoder measures *against*, not against zero
+        # baselines the decoder measures *against*, not against zero
         #
         # An absolute log-probability is the wrong thing to add to an acoustic
         # score. Both get more negative as a transcription gets longer, so a term
@@ -313,7 +313,7 @@ class CreTextModel:
             out += p * math.log(p)
         return out
 
-    # ------------------------------------------------------------ lexicon ---
+    # lexicon
 
     def is_known(self, word: str) -> bool:
         return word in self.words
@@ -345,7 +345,7 @@ class CreTextModel:
     def unknown_word_logprob(self) -> float:
         return math.log(self._word_alpha / self._word_denom)
 
-    # -------------------------------------------------------- phonotactics ---
+    # phonotactics
 
     def is_legal_word(self, word: str) -> bool:
         """Could this be a nêhiyawêwin word the lexicon has never seen?
@@ -435,7 +435,7 @@ class CreTextModel:
             return -20.0
         return self.phonotactic_score(word) / len(syllables)
 
-    # ------------------------------------------------------ character LM ---
+    # character LM
 
     def row(self, history: str) -> dict[str, float]:
         """The cached `log P(char | history)` row, one dictionary per history.
@@ -588,7 +588,7 @@ class CreTextModel:
         floor = self._floor
         return {ch: max(math.log(p), floor) if p > 0 else floor for ch, p in lower.items()}
 
-    # ----------------------------------------------------------- reporting ---
+    # reporting
 
     def stats(self) -> dict:
         return {
@@ -602,7 +602,7 @@ class CreTextModel:
             **{k: v for k, v in self.report.items() if k != "sources"},
         }
 
-    # ------------------------------------------------------------ storage ---
+    # storage
 
     def to_json(self) -> dict:
         return {
@@ -625,7 +625,7 @@ class CreTextModel:
                    discount=meta.get("discount", 0.75))
 
 
-# ------------------------------------------------------------------- build ---
+# build
 
 def _build_char_ngrams(words: Counter, order: int) -> dict[str, dict[str, int]]:
     """Count character n-grams over each word, padded with `^` and `$`.
