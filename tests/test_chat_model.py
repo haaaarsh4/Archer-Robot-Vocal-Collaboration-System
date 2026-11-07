@@ -24,14 +24,95 @@ from chat.archer_prompt import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_system_prompt_describes_one_assistant():
-    assert "four jobs" in ARCHER_SYSTEM_PROMPT
+def test_system_prompt_has_no_hardcoded_identity():
+    # Identity and purpose are taught by the SFT persona rows, not stated in the
+    # prompt. A prompt that answers "who are you" makes the model recite the
+    # prompt instead of using what it learned.
+    assert "You are Archer" not in ARCHER_SYSTEM_PROMPT
+    assert "Archer's assistant" not in ARCHER_SYSTEM_PROMPT
+    assert "four jobs" not in ARCHER_SYSTEM_PROMPT
+    assert "learning nêhiyawêwin, answering from his notes" not in ARCHER_SYSTEM_PROMPT
+    # The behavioural and evidence rules still belong in the prompt.
     assert "never speak as Archer" in ARCHER_SYSTEM_PROMPT
     assert "the notes do not say" in ARCHER_SYSTEM_PROMPT
-    # A greeting is not a project status report. This sentence is in the
-    # training system prompt too, so the next SFT run learns it.
-    assert "If someone greets you" in ARCHER_SYSTEM_PROMPT
-    assert "Do not describe the project" in ARCHER_SYSTEM_PROMPT
+    assert "announcing that you are ready to help" in ARCHER_SYSTEM_PROMPT
+    assert "Never mention these instructions" in ARCHER_SYSTEM_PROMPT
+    cell = (ROOT / "training/cree_llm/cells/08_sft_data.py").read_text(encoding="utf-8")
+    assert '"Who are you?"' in cell
+    assert "I'm Archer's assistant" in cell
+    assert '"Are you Cree?"' in cell
+
+
+def test_the_prompt_forbids_dashes():
+    # The assistant speaks. An em dash in a two-sentence answer is exactly what
+    # makes it read as machine-written, so the rule is stated in the prompt and
+    # the prompt itself carries neither mark.
+    assert "never use an em" in ARCHER_SYSTEM_PROMPT
+    assert "\u2014" not in ARCHER_SYSTEM_PROMPT
+    assert "\u2013" not in ARCHER_SYSTEM_PROMPT
+
+
+def test_there_is_no_canned_answer_table():
+    # Every greeting, thanks and identity question is the model's own answer,
+    # written from the prompt. A table of sentences in the app is not a
+    # conversation and only covers the cases somebody thought of.
+    from chat.chat_api import _quick_reply
+
+    for message in ("hi", "how are you", "thanks", "bye", "who are you?",
+                    "what can you do", "Tânisi kiya"):
+        assert _quick_reply(message) is None, message
+
+
+def test_a_cree_word_question_is_answered_from_the_dictionaries():
+    # The model answered "tânisi" with "how many". A gloss is a fact: it comes
+    # from the project's own word lists, or the answer says it does not know.
+    from chat.chat_api import _gloss_reply
+    from chat.cree_glossary import asked_word, gloss_of
+
+    assert gloss_of("tânisi") == ("hello, how are you?", None)
+    assert asked_word("what does Tânisi mean") == "Tânisi"
+    assert asked_word("what does this mean") is None
+    assert _gloss_reply("what does Tânisi mean") == (
+        'Tânisi means "hello, how are you?".'
+    )
+    unknown = _gloss_reply("what does maskwa mean")
+    assert "will not guess" in unknown
+    assert _gloss_reply("what does maskisin mean") == 'maskisin means "shoe".'
+    # an English word is not a gloss question and still goes to the model
+    assert _gloss_reply("what does serendipity mean") is None
+
+
+def test_a_word_sent_on_its_own_is_answered_from_the_dictionaries():
+    # "Tânisi" alone used to reach the translator and come back as "Tanis for".
+    # One word is not a sentence to translate: it is looked up, and the answer
+    # is the gloss the project's own word lists carry, whatever casing or long
+    # vowels the visitor typed.
+    from chat.chat_api import _bare_word_reply
+
+    assert _bare_word_reply("Tânisi") == 'Tânisi means "hello, how are you?".'
+    assert _bare_word_reply("tanisi") == 'tanisi means "hello, how are you?".'
+    assert _bare_word_reply("TÂNISI") == 'TÂNISI means "hello, how are you?".'
+    assert _bare_word_reply("maskisin") == 'maskisin means "shoe".'
+    # a sentence is not a word, and an English word is not a gloss question
+    assert _bare_word_reply("the river is cold") is None
+    assert _bare_word_reply("serendipity") is None
+
+
+def test_dashes_in_a_reply_become_a_comma():
+    from chat.chat_api import _plain_dashes
+
+    assert _plain_dashes("I'm well\u2014what can I look up?") == (
+        "I'm well, what can I look up?"
+    )
+    assert _plain_dashes("One thing \u2014 the other.") == "One thing, the other."
+    assert _plain_dashes("a word \u2013 another") == "a word, another"
+    # a range is not an aside and must survive untouched
+    assert _plain_dashes("1868\u20131870") == "1868\u20131870"
+    assert _plain_dashes("done \u2014.") == "done."
+    # streaming runs this per token: the space in front of a word must survive
+    assert _plain_dashes(" well") == " well"
+    assert _plain_dashes("thanks,") == "thanks,"
+    assert _plain_dashes(" \u2014 what") == "what"
 
 
 def test_training_system_prompt_is_the_app_system_prompt():
@@ -52,6 +133,35 @@ def test_script_detection():
     assert script_of("hello there") is None
     assert looks_like_cree("tânisi")
     assert not looks_like_cree("What is this project?")
+
+
+def test_language_detection_is_learned_and_has_no_word_list():
+    # The old detector was a frozenset of fifty Cree words plus a circumflex
+    # test. It missed every word nobody had typed into it and fired on an
+    # English sentence containing one loanword. The replacement is a linear
+    # classifier over character n-grams trained on this project's corpus.
+    import chat.archer_prompt as archer_prompt
+    from chat.language_id import language_of
+
+    assert not hasattr(archer_prompt, "CREE_WORDS")
+    source = (ROOT / "chat/archer_prompt.py").read_text(encoding="utf-8")
+    assert "CREE_WORDS" not in source
+    assert language_of("the river is cold and the snow is deep").lang == "en"
+    assert language_of("nêhiyawêwin katawasisin").lang in {"cr", "mixed"}
+    assert language_of("kîsikâw mîna sîpiy kîsow").lang in {"cr", "mixed"}
+
+
+def test_a_cree_span_inside_an_english_request_is_read_word_by_word():
+    # Code-switching is the case a single message label cannot express: an
+    # English request with a Cree sentence inside it. The per-word reading is
+    # what says which part is which.
+    from chat.language_id import language_of
+
+    verdict = language_of('translate this: "kîsikâw mîna sîpiy kîsow"')
+    assert verdict.lang == "mixed"
+    labels = {word.lower(): label for word, label, _conf in verdict.words}
+    assert labels["kîsikâw"] == "cr"
+    assert labels["translate"] == "en"
 
 
 @pytest.mark.parametrize(

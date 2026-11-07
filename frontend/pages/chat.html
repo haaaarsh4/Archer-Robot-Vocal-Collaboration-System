@@ -428,7 +428,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
           <tr><td>English to Cree</td><td>chrF++</td><td>8.24</td><td>11.60</td><td>41% more character overlap. Better, and still far from a fluent translation.</td></tr>
           <tr><td>English to Cree</td><td>BLEU</td><td>0.45</td><td>1.68</td><td>The same story as chrF++. Low in absolute terms.</td></tr>
           <tr><td>English to Cree</td><td>token F1</td><td>0.003</td><td>0.093</td><td>Some of the right words now appear. Most still do not.</td></tr>
-          <tr><td>English to Cree</td><td>valid Cree words</td><td>36.8%</td><td>92.4%</td><td>The strongest result here: it now writes words that exist.</td></tr>
+          <tr><td>English to Cree</td><td>Cree words passing a spelling check</td><td>36.8%</td><td>92.4%</td><td>A phonotactic test, not a dictionary: it shows the shape of the language, not that every word is attested.</td></tr>
           <tr><td>English to Cree</td><td>English left in the reply</td><td>3.6%</td><td>13.1%</td><td>Worse, and the table says so. Producing more Cree produced more leaks.</td></tr>
           <tr><td>Cree to English</td><td>chrF++</td><td>11.96</td><td>19.12</td><td>The easier direction, and the larger gain.</td></tr>
           <tr><td>Cree to English</td><td>BLEU</td><td>2.45</td><td>5.02</td><td>Doubled. Use it to check a reading, not to publish one.</td></tr>
@@ -444,7 +444,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
     <p class="paper-quiet" style="margin-top:12px">Run of 2026-11-02, adapter <code>dpo</code>, 120 sentence pairs the model never saw in both directions; 60 rows for the syllabics check; one section of an Archer note held out for the note question; three note questions it cannot answer and two it can. The numbers come from <code>out/creebench_report.json</code> and <code>out/llm_tests.json</code>.</p>
 
     <div class="paper-stats">
-      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words are valid words</span></div>
+      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words pass a Cree spelling check</span></div>
       <div class="paper-stat"><b>96.9%</b><span>of letters in syllabics when syllabics was asked</span></div>
       <div class="paper-stat"><b>6 of 6</b><span>unanswerable note questions declined</span></div>
       <div class="paper-stat"><b>4.72 to 3.65</b><span>tokens per Cree word after the graft</span></div>
@@ -480,7 +480,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
 
     <div class="paper-note" style="margin-top:24px"><b>One comparison is still missing.</b> The old app used a separate Cree model, and that model has never been scored on these 120 sentences. So this table proves that the training improved this base on every job it measured. It does not prove that one model beats the other Cree model, and no number on this page will claim that until the same benchmark has been run on it.</div>
 
-    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words are real, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
+    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words pass a Cree spelling check, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
     <p class="paper-p">The strongest results are the ones with a right answer: refusing a question the notes cannot answer, writing the script that was asked for, and reading a note section it never saw. Conversation scoring 0.911 is real but narrower than it looks, because the 75 phrasings are all about this project and these notes.</p>
   </section>
 

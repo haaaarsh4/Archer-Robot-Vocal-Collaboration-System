@@ -1203,8 +1203,44 @@
 <link rel="stylesheet" href="/static/fonts/fonts.css?v=11">    <link rel="stylesheet" href="/static/assets/site.css?v=91">
 <link rel="stylesheet" href="/static/assets/paper.css?v=12">
 <link rel="stylesheet" href="/static/assets/archer-chat.css?v=2">
+<link rel="stylesheet" href="/static/assets/access.css?v=1">
+<!-- The door's own script, in the head and blocking on purpose: it reads the
+     session stamp and puts `archer-gated` on <html> before the body is parsed,
+     so a cold deep link never paints a readable page for a frame and then
+     covers it. -->
+<script src="/static/assets/access.js?v=1"></script>
 </head>
 <body class="is-entering">
+
+<!-- ===================== THE DOOR =====================
+     The first thing in the body, so it is the first thing parsed and the first
+     thing painted. It stays `hidden` for a visitor whose session is still
+     live; access.js is what decides, and access.css is what blurs the sheet
+     behind it. The wordmark and the line of caps under it are the masthead's
+     own face and size, so the door reads as the front of this site and not as
+     a dialog that happens to be on it. -->
+<div id="archer-gate" class="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title" hidden>
+  <div class="gate-veil" aria-hidden="true"></div>
+  <form class="gate-card" id="gate-form" novalidate>
+    <p class="gate-kicker">Private access</p>
+    <h1 class="gate-sig" id="gate-title">Archer Pechawis</h1>
+    <p class="gate-sub">Vocal collaboration system</p>
+    <span class="gate-rule" aria-hidden="true"></span>
+    <label class="gate-label" for="gate-input">Password</label>
+    <div class="gate-field">
+      <input class="gate-input" id="gate-input" type="password" name="password"
+             autocomplete="current-password" spellcheck="false" autocapitalize="off"
+             autocorrect="off" aria-describedby="gate-msg" placeholder="Enter the password">
+      <button class="gate-reveal" id="gate-reveal" type="button" aria-pressed="false">Show</button>
+    </div>
+    <p class="gate-msg" id="gate-msg" role="status" aria-live="polite"></p>
+    <button class="gate-submit" id="gate-submit" type="submit">
+      <span>Enter the site</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+    <p class="gate-foot">Kept open on this device while you are using it, and closed after thirty quiet minutes.</p>
+  </form>
+</div>
 
 <!-- ============================================================
      Archer Chat Widget (floating button + slide-in panel)
@@ -3120,7 +3156,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
           <tr><td>English to Cree</td><td>chrF++</td><td>8.24</td><td>11.60</td><td>41% more character overlap. Better, and still far from a fluent translation.</td></tr>
           <tr><td>English to Cree</td><td>BLEU</td><td>0.45</td><td>1.68</td><td>The same story as chrF++. Low in absolute terms.</td></tr>
           <tr><td>English to Cree</td><td>token F1</td><td>0.003</td><td>0.093</td><td>Some of the right words now appear. Most still do not.</td></tr>
-          <tr><td>English to Cree</td><td>valid Cree words</td><td>36.8%</td><td>92.4%</td><td>The strongest result here: it now writes words that exist.</td></tr>
+          <tr><td>English to Cree</td><td>Cree words passing a spelling check</td><td>36.8%</td><td>92.4%</td><td>A phonotactic test, not a dictionary: it shows the shape of the language, not that every word is attested.</td></tr>
           <tr><td>English to Cree</td><td>English left in the reply</td><td>3.6%</td><td>13.1%</td><td>Worse, and the table says so. Producing more Cree produced more leaks.</td></tr>
           <tr><td>Cree to English</td><td>chrF++</td><td>11.96</td><td>19.12</td><td>The easier direction, and the larger gain.</td></tr>
           <tr><td>Cree to English</td><td>BLEU</td><td>2.45</td><td>5.02</td><td>Doubled. Use it to check a reading, not to publish one.</td></tr>
@@ -3136,7 +3172,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
     <p class="paper-quiet" style="margin-top:12px">Run of 2026-11-02, adapter <code>dpo</code>, 120 sentence pairs the model never saw in both directions; 60 rows for the syllabics check; one section of an Archer note held out for the note question; three note questions it cannot answer and two it can. The numbers come from <code>out/creebench_report.json</code> and <code>out/llm_tests.json</code>.</p>
 
     <div class="paper-stats">
-      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words are valid words</span></div>
+      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words pass a Cree spelling check</span></div>
       <div class="paper-stat"><b>96.9%</b><span>of letters in syllabics when syllabics was asked</span></div>
       <div class="paper-stat"><b>6 of 6</b><span>unanswerable note questions declined</span></div>
       <div class="paper-stat"><b>4.72 to 3.65</b><span>tokens per Cree word after the graft</span></div>
@@ -3172,7 +3208,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
 
     <div class="paper-note" style="margin-top:24px"><b>One comparison is still missing.</b> The old app used a separate Cree model, and that model has never been scored on these 120 sentences. So this table proves that the training improved this base on every job it measured. It does not prove that one model beats the other Cree model, and no number on this page will claim that until the same benchmark has been run on it.</div>
 
-    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words are real, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
+    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words pass a Cree spelling check, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
     <p class="paper-p">The strongest results are the ones with a right answer: refusing a question the notes cannot answer, writing the script that was asked for, and reading a note section it never saw. Conversation scoring 0.911 is real but narrower than it looks, because the 75 phrasings are all about this project and these notes.</p>
   </section>
 
@@ -13168,6 +13204,19 @@ let archerChatTab = 'ask';
 let archerChatMode = 'text';
 let archerChatHistory = [];
 
+// A stable id for this browser, so the server can remember the conversation
+// even when the page is refreshed and its in-memory history is gone.
+const archerSessionId = (() => {
+  try {
+    let id = localStorage.getItem('archer_session');
+    if (!id) {
+      id = 's-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('archer_session', id);
+    }
+    return id;
+  } catch (e) { return 'local'; }
+})();
+
 function toggleArcherChat() {
   archerChatOpen = !archerChatOpen;
   document.getElementById('archer-chat-panel').classList.toggle('open', archerChatOpen);
@@ -13232,10 +13281,7 @@ function archerAppendMessage(role, text, opts = {}) {
   div.className = `ac-msg ${role}`;
   div.textContent = text;
   if (opts.sources && opts.sources.length) {
-    const src = document.createElement('span');
-    src.className = 'ac-sources';
-    src.textContent = `from: ${opts.sources.join(', ')}`;
-    div.appendChild(src);
+    archerAttachSources(div, opts.sources);
   }
   if (opts.audioBase64) {
     const audio = document.createElement('audio');
@@ -13250,6 +13296,7 @@ function archerAppendMessage(role, text, opts = {}) {
 
 function archerShowTyping() {
   const body = document.getElementById('ac-body-ask');
+  if (!body || document.getElementById('ac-typing-indicator')) return;
   const div = document.createElement('div');
   div.className = 'ac-typing';
   div.id = 'ac-typing-indicator';
@@ -13263,6 +13310,183 @@ function archerHideTyping() {
   if (el) el.remove();
 }
 
+function archerAttachSources(el, sources) {
+  if (!el || !sources || !sources.length) return;
+  const src = document.createElement('span');
+  src.className = 'ac-sources';
+  src.append('from: ');
+  sources.forEach((source, index) => {
+    if (index) src.append(', ');
+    if (/^https?:\/\//i.test(source)) {
+      const a = document.createElement('a');
+      a.href = source;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = source.replace(/^https?:\/\//i, '').slice(0, 60);
+      src.appendChild(a);
+    } else {
+      src.append(source);
+    }
+  });
+  el.appendChild(src);
+}
+
+// A correction is the only signal that says the model was wrong and what the
+// right answer was. It goes to the server, which stores it against this turn
+// and exports it as a DPO pair and a regression case.
+function archerAttachFeedback(el, turnId, question, reply) {
+  if (!el || !turnId) return;
+  const box = document.createElement('span');
+  box.className = 'ac-feedback';
+  box.style.cssText = 'display:block;margin-top:6px;font-size:11px;opacity:.85';
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.textContent = 'Helpful';
+  up.style.cssText = 'margin-right:6px;cursor:pointer';
+  up.onclick = () => archerSendFeedback(box, turnId, 'up', '');
+  const down = document.createElement('button');
+  down.type = 'button';
+  down.textContent = 'Wrong';
+  down.style.cssText = 'cursor:pointer';
+  down.onclick = () => {
+    const correction = window.prompt('What should the answer have been?');
+    if (correction === null) return;
+    archerSendFeedback(box, turnId, 'down', correction);
+  };
+  box.append(up, down);
+  el.appendChild(box);
+}
+
+async function archerSendFeedback(box, turnId, rating, correction) {
+  box.textContent = 'Saving…';
+  try {
+    const resp = await fetch('/api/chat/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: archerSessionId,
+        turn_id: turnId,
+        rating: rating,
+        correction: correction,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+    box.textContent = rating === 'up'
+      ? 'Thanks.'
+      : 'Saved. I will use that correction from now on.';
+  } catch (e) {
+    box.textContent = 'Could not save feedback: ' + e.message;
+  }
+}
+
+// THE PANEL READS THE ANSWER AS IT IS WRITTEN. The backend sends one
+// `data: {...}` frame per piece of text, and the first frame turns the typing
+// dots into a message that grows under them, so on a slow machine the answer
+// starts after a second instead of after the whole reply has been generated.
+// The frames are the same answer /api/chat gives: same route, same notes, same
+// model. If the stream cannot be opened at all (an older backend, a proxy that
+// buffers it), the panel falls back to the one-shot endpoint and behaves as it
+// always did.
+async function archerAskStreaming(payload) {
+  const resp = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok || !resp.body) {
+    const err = new Error('stream unavailable');
+    err.streamed = false;
+    throw err;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  const body = document.getElementById('ac-body-ask');
+  let buffer = '';
+  let reply = '';
+  let el = null;
+  let final = null;
+
+  const handleFrame = (frame) => {
+    const line = frame.split('\n').find((l) => l.startsWith('data:'));
+    if (!line) return;
+    let evt;
+    try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { return; }
+
+    if (evt.type === 'token') {
+      if (!el) { archerHideTyping(); el = archerAppendMessage('bot', ''); }
+      reply += evt.text;
+      el.textContent = reply;
+      body.scrollTop = body.scrollHeight;
+    } else if (evt.type === 'done') {
+      final = evt;
+      if (evt.reply) reply = evt.reply;
+    } else if (evt.type === 'error') {
+      const err = new Error(evt.error || 'Chat failed.');
+      err.streamed = reply.length > 0;
+      throw err;
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      handleFrame(buffer.slice(0, cut));
+      buffer = buffer.slice(cut + 2);
+    }
+  }
+
+  archerHideTyping();
+  if (!el) {
+    const err = new Error('The model returned nothing.');
+    err.streamed = false;
+    throw err;
+  }
+  el.textContent = reply;
+  archerAttachSources(el, final && final.sources);
+  if (final && final.turn_id) {
+    archerAttachFeedback(el, final.turn_id, payload.message, reply);
+  }
+  archerChatHistory.push({ role: 'assistant', content: reply });
+}
+
+async function archerAskOnce(payload) {
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    archerHideTyping();
+
+    if (!resp.ok || data.error) {
+      archerAppendMessage('error', data.error || 'Something went wrong.');
+      return;
+    }
+
+    const el = archerAppendMessage('bot', data.reply, {
+      sources: data.sources,
+      audioBase64: data.audio_base64,
+    });
+    if (data.turn_id) {
+      archerAttachFeedback(el, data.turn_id, payload.message, data.reply);
+    }
+    archerChatHistory.push({ role: 'assistant', content: data.reply });
+
+    if (data.audio_error) {
+      archerAppendMessage('system', data.audio_error);
+    }
+  } catch (e) {
+    archerHideTyping();
+    archerAppendMessage('error', `Couldn't reach the local backend: ${e.message}`);
+  }
+}
+
 async function sendArcherChatMessage() {
   const input = document.getElementById('ac-input');
   const message = input.value.trim();
@@ -13274,36 +13498,37 @@ async function sendArcherChatMessage() {
   archerChatHistory.push({ role: 'user', content: message });
   archerShowTyping();
 
-  try {
-    const resp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        history: archerChatHistory.slice(0, -1),
-        mode: archerChatMode,
-      }),
-    });
-    const data = await resp.json();
-    archerHideTyping();
+  const payload = {
+    message,
+    history: archerChatHistory.slice(0, -1),
+    mode: archerChatMode,
+    session_id: archerSessionId,
+  };
 
-    if (!resp.ok || data.error) {
-      archerAppendMessage('error', data.error || 'Something went wrong.');
+  /* A spoken reply comes back as base64 audio with the text attached, which is
+     a finished thing rather than something to read as it appears. */
+  if (archerChatMode === 'audio') {
+    await archerAskOnce(payload);
+    return;
+  }
+
+  try {
+    await archerAskStreaming(payload);
+  } catch (e) {
+    if (e && e.streamed) {
+      archerHideTyping();
+      archerAppendMessage('error', e.message || 'The stream stopped before the answer did.');
       return;
     }
-
-    archerAppendMessage('bot', data.reply, {
-      sources: data.sources,
-      audioBase64: data.audio_base64,
-    });
-    archerChatHistory.push({ role: 'assistant', content: data.reply });
-
-    if (data.audio_error) {
-      archerAppendMessage('system', data.audio_error);
-    }
-  } catch (e) {
-    archerHideTyping();
-    archerAppendMessage('error', `Couldn't reach the local backend: ${e.message}`);
+    /* THE DOTS STAY UP WHILE THE FALLBACK ANSWERS.
+       A backend that has no /api/chat/stream answers with a 404 in a
+       millisecond, so the panel drops to the one-shot endpoint. Hiding the
+       typing dots on the way into that fallback is what left the panel blank
+       and silent for the whole wait: the visitor saw their own message and
+       nothing else. The dots are re-shown here (idempotently) and only come
+       down when the one-shot reply, or its error, arrives. */
+    archerShowTyping();
+    await archerAskOnce(payload);
   }
 }
 

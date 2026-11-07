@@ -1,5 +1,11 @@
 # The Archer model
 
+`docs/pipeline-best-chatbot.md` is the end to end pipeline for the strongest
+version of this model: Qwen3-14B base, the data programme that reaches 20M tokens
+(morphology synthesis from the FST, back-translation, held-out contamination
+audits), CPT to SFT to DPO, and the acceptance numbers a run must hit before it
+ships.
+
 The chat tab runs one model, trained for this project by
 `training/notebooks/Cree_LLM_Training.ipynb` and served as `archer:7b`. It does every job the
 assistant has:
@@ -42,6 +48,14 @@ setup, and exports a GGUF.
 | Preference tuning | DPO on faithfulness pairs: dropped clauses, changed numbers, English leaks, flattened vowels | fluency is not fidelity |
 | CreeBench | chrF++, BLEU, token F1, lexicon validity, code-switch, abstention, perplexity, latency | one BLEU number hides the failures a speaker hears first |
 | Export | merge, convert to GGUF, Q4_K_M, Modelfile | the app runs on a laptop |
+
+Validity is reported twice. `lexicon_validity` counts only words attested in
+the project's lexicon. `validity` also accepts anything matching Cree
+phonotactics, because a held-out sentence can contain a real form the lexicon
+missed. That fallback cannot tell a word from an invention: `mâtawâ pîkwâc`
+passes the phonotactic test and is not Cree. The gate is on
+`lexicon_validity`; the looser number is kept only so earlier figures remain
+comparable.
 
 The notebook's report card records every source and its licence. NoDerivatives
 material in the EdTeKLA collection is excluded at the loader; NonCommercial

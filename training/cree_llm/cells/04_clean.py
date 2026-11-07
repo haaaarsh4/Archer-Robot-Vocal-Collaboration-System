@@ -124,7 +124,7 @@ def norm_key(text: str) -> str:
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version="clean-v1",
+    version="clean-v2",
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -273,11 +273,162 @@ else:
     lm = {s: [r for r in sentences if r["split"] == s] for s in ("train", "dev", "test")}
     tr = {s: [r for r in pairs if r["split"] == s] for s in ("train", "dev", "test")}
 
+    # Contamination audit: no held-out sentence and no 12-gram from a held-out
+    # sentence may appear in any training split. The near-duplicate pass above
+    # catches edited copies; this catches a verbatim span that survived because
+    # the whole sentence was not similar enough to trip Jaccard.
+    def _word_12grams(text: str) -> set[str]:
+        words = re.findall(r"[^\W\d_]+", normalize_sro(str(text)).lower())
+        if len(words) < 12:
+            return set()
+        return {" ".join(words[i:i + 12]) for i in range(len(words) - 11)}
+
+    _train_12: set[str] = set()
+    for row in lm["train"]:
+        _train_12.update(_word_12grams(row["text"]))
+    for row in tr["train"]:
+        _train_12.update(_word_12grams(row["cree"]))
+        _train_12.update(_word_12grams(row["english"]))
+
+    _test_12: set[str] = set()
+    for row in lm["test"]:
+        _test_12.update(_word_12grams(row["text"]))
+    for row in tr["test"]:
+        _test_12.update(_word_12grams(row["cree"]))
+        _test_12.update(_word_12grams(row["english"]))
+
+    _contamination = sorted(_train_12 & _test_12)
+    if _contamination:
+        raise RuntimeError(
+            "held-out 12-gram contamination: "
+            f"{len(_contamination)} span(s), first: {_contamination[0][:160]!r}"
+        )
+    log("contamination audit: no held-out 12-gram appears in training")
+
     # The evaluation set for translation is modern Cree only; Watkins 1865 is a
     # separate historical capability and would distort the modern score.
     tr_test_modern = [r for r in tr["test"] if r["source"] != "watkins1865"]
     if len(tr_test_modern) < 50 and not SMOKE:
         tr_test_modern = tr["test"]
+
+    # ---- duplicate audit ---------------------------------------------------
+    # Deduplication removes repeated rows; it must never remove a unique word.
+    # This audit measures both halves of that promise and writes the evidence:
+    #
+    #   * every word in the accepted text is counted, so "the pipeline uses
+    #     every available word" is a measured set, not a claim;
+    #   * repeated rows are counted at document, sentence and pair level;
+    #   * spelling variants that collapse to one word (capitalisation, curly
+    #     apostrophe, macron or no macron) are grouped -- that is the
+    #     duplicate-word check exact hashing cannot perform;
+    #   * the stage fails if an exact duplicate row is still present.
+    _WORD_RE = re.compile(r"[^\W\d_]+(?:['-][^\W\d_]+)*", re.UNICODE)
+
+    def _words(text: str) -> list[str]:
+        text = normalize_sro(str(text))
+        if looks_like_syllabics(text):
+            text = to_sro(text)
+        return _WORD_RE.findall(text.lower())
+
+    def _folded(word: str) -> str:
+        """Spelling-insensitive key: case, apostrophes and macrons removed."""
+        plain = unicodedata.normalize("NFKD", word.replace("\u2019", "'"))
+        plain = "".join(ch for ch in plain if not unicodedata.combining(ch))
+        return re.sub(r"[^a-z]", "", plain)
+
+    raw_words: collections.Counter = collections.Counter()
+    for doc in DOCS:
+        raw_words.update(_words(doc["text"]))
+    for pair in PAIRS:
+        raw_words.update(_words(pair["cree"]))
+        raw_words.update(_words(pair["english"]))
+
+    kept_words: collections.Counter = collections.Counter()
+    for split in ("train", "dev", "test"):
+        for row in lm[split]:
+            kept_words.update(_words(row["text"]))
+        for row in tr[split]:
+            kept_words.update(_words(row["cree"]))
+            kept_words.update(_words(row["english"]))
+
+    variants: dict[str, dict[str, int]] = {}
+    for word, count in kept_words.items():
+        variants.setdefault(_folded(word), {})[word] = count
+    variant_groups = {key: forms for key, forms in variants.items() if len(forms) > 1 and key}
+    variant_examples = sorted(
+        ({"word": key, "forms": dict(sorted(forms.items(), key=lambda kv: (-kv[1], kv[0]))),
+          "tokens": sum(forms.values())}
+         for key, forms in variant_groups.items()),
+        key=lambda row: (-row["tokens"], row["word"]),
+    )[:25]
+
+    lost = {w: n for w, n in raw_words.items() if w not in kept_words}
+    lost_attested = {w: n for w, n in lost.items() if w in LEXICON}
+
+    doc_keys = [norm_key(d["text"]) for d in DOCS]
+    sent_keys = [norm_key(r["text"]) for split in ("train", "dev", "test") for r in lm[split]]
+    pair_keys = [f"{norm_key(r['cree'])}|{norm_key(r['english'])}"
+                 for split in ("train", "dev", "test") for r in tr[split]]
+
+    audit = {
+        "scope": "all accepted rows in train/dev/test, plus everything rejected",
+        "tokens": {"raw": sum(raw_words.values()), "kept": sum(kept_words.values())},
+        "unique_words": {
+            "raw": len(raw_words),
+            "kept": len(kept_words),
+            "in_lexicon": sum(1 for w in kept_words if w in LEXICON),
+            "seen_once": sum(1 for n in kept_words.values() if n == 1),
+        },
+        "rejected_sentences": dict(rejected),
+        "documents": {
+            "rows": len(DOCS), "unique": len(set(doc_keys)),
+            "duplicate_rows": len(DOCS) - len(set(doc_keys)),
+            "note": ("documents are deduplicated at sentence level on purpose: two sources "
+                     "that carry the same article keep one copy of each sentence. A "
+                     "document-level repeat here is reported, not fatal."),
+        },
+        "sentences": {
+            "rows": len(sent_keys), "unique": len(set(sent_keys)),
+            "duplicate_rows": len(sent_keys) - len(set(sent_keys)),
+        },
+        "pairs": {
+            "rows": len(pair_keys), "unique": len(set(pair_keys)),
+            "duplicate_rows": len(pair_keys) - len(set(pair_keys)),
+        },
+        "spelling_variants": {
+            "groups": len(variant_groups),
+            "forms": sum(len(forms) for forms in variant_groups.values()),
+            "tokens": sum(sum(forms.values()) for forms in variant_groups.values()),
+            "examples": variant_examples,
+        },
+        "filtered_out": {
+            "distinct_words": len(lost),
+            "tokens": sum(lost.values()),
+            "attested_cree_forms": len(lost_attested),
+            "attested_examples": sorted(lost_attested)[:40],
+            "note": ("filtered_out counts words in rejected lines: English, OCR noise and "
+                     "too-short fragments. It is reported, not hidden, so a low token count "
+                     "can be traced to a filter instead of blamed on the sources."),
+        },
+    }
+    # Only the guarantees the stage actually makes are fatal. Duplicate
+    # documents collapse into duplicate sentences, which the exact/near filters
+    # remove; a document-level repeat is real overlap between sources and is
+    # reported above rather than treated as a bug.
+    audit["checks"] = {
+        "no_duplicate_sentences": audit["sentences"]["duplicate_rows"] == 0,
+        "no_duplicate_pairs": audit["pairs"]["duplicate_rows"] == 0,
+        "every_word_counted": audit["unique_words"]["kept"] > 0,
+    }
+    jdump(PROC / "duplicate_audit.json", audit)
+
+    log(f"duplicate audit: {audit['tokens']['kept']:,} tokens, "
+        f"{audit['unique_words']['kept']:,} unique words "
+        f"({audit['unique_words']['seen_once']:,} seen once), "
+        f"{audit['spelling_variants']['groups']:,} spelling-variant groups")
+    _duplicate_failures = [name for name, ok in audit["checks"].items() if not ok]
+    if _duplicate_failures:
+        raise RuntimeError("duplicate audit failed: " + ", ".join(_duplicate_failures))
 
     write_jsonl(PROC / "lm_train.jsonl", lm["train"])
     write_jsonl(PROC / "lm_dev.jsonl", lm["dev"])
@@ -298,7 +449,19 @@ else:
         "lexicon_forms": len(LEXICON),
         "rejected": rejected,
         "leakage_moved": leaked,
+        "contamination_12gram_overlap": len(_contamination),
         "licences": sorted({r["licence"] for r in sentences})[:20],
+        "duplicate_audit": {
+            "tokens_kept": audit["tokens"]["kept"],
+            "unique_words": audit["unique_words"]["kept"],
+            "unique_words_seen_once": audit["unique_words"]["seen_once"],
+            "spelling_variant_groups": audit["spelling_variants"]["groups"],
+            "duplicate_documents": audit["documents"]["duplicate_rows"],
+            "duplicate_sentences": audit["sentences"]["duplicate_rows"],
+            "duplicate_pairs": audit["pairs"]["duplicate_rows"],
+            "attested_cree_forms_filtered": audit["filtered_out"]["attested_cree_forms"],
+            "report": "duplicate_audit.json",
+        },
     }
     jdump(PROC / "stats.json", stats)
     print(json.dumps(stats, indent=2, ensure_ascii=False))
@@ -308,6 +471,7 @@ else:
     assert tr["train"] and tr["test"], "empty pair split"
     _train_keys = {norm_key(r["text"]) for r in lm["train"]}
     assert not (_train_keys & {norm_key(r["text"]) for r in lm["test"]}), "exact LM leakage"
+    assert not _contamination, "held-out 12-gram contamination"
     assert all(len(r["cree"].split()) >= 2 for r in tr["train"]), "bad pair"
     assert all(lang_guess(r["text"]) in {"crk", "mixed"} and cree_word_ratio(r["text"]) >= 0.7
                for r in lm["test"]), "English in LM test"

@@ -1,0 +1,16 @@
+{
+  "rows": 24900,
+  "training": 22414,
+  "held_out": 2486,
+  "sentence_accuracy": 0.9957,
+  "sentence_baseline_diacritic": 0.8199,
+  "word_accuracy": 0.7535,
+  "marked_word_accuracy": 1.0,
+  "sentence_confusion": {
+    "cr->cr": 640,
+    "en->en": 286,
+    "cr->mixed": 1,
+    "cr->en": 3
+  },
+  "model_bytes": 745921
+}

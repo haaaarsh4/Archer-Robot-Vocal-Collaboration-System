@@ -428,6 +428,7 @@ if getattr(ARGS, "expanded", None):
 
 # Configuration. One place for every knob; every later cell reads from here.
 
+import collections
 import gc
 import hashlib
 import io
@@ -482,32 +483,35 @@ _PRESETS = {
     # A tiny model and a handful of steps: proves every cell runs, changes nothing.
     "smoke": dict(base="Qwen/Qwen2.5-0.5B-Instruct", seq=384, lora_r=8,
                   cpt_epochs=1, sft_epochs=1, dpo_epochs=1, eval_n=2,
-                  max_cpt_packs=6, max_sft=48),
+                  max_cpt_packs=6, max_sft=48, min_tokens=0),
     # Free / pay-as-you-go T4 (16 GB). Shorter context, two passes.
     "t4": dict(base="Qwen/Qwen2.5-7B-Instruct", seq=1024, lora_r=32,
                cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=120,
-               max_cpt_packs=100_000, max_sft=100_000),
+               max_cpt_packs=100_000, max_sft=100_000, min_tokens=3_000_000),
     # A100 40 GB: the intended run.
     "a100": dict(base="Qwen/Qwen2.5-7B-Instruct", seq=2048, lora_r=64,
                  cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                 max_cpt_packs=100_000, max_sft=100_000),
-    # A100 80 GB / H100: the 14B model. Set CREE_PROFILE=big.
+                 max_cpt_packs=100_000, max_sft=100_000, min_tokens=5_000_000),
+    # A100 80 GB / H100: the 14B model. Set CREE_PROFILE=big. The token target is
+    # deliberately 20M: a 14B model trained on the small repository slice is
+    # still the weak model with more parameters. The run warns below it, reports
+    # the number, and still trains on every verified token.
     "big": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=2048, lora_r=64,
                 cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                max_cpt_packs=100_000, max_sft=100_000),
+                max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
     # One 24 GB card (RTX 4090, A10): the 14B in nf4 at a shorter context. This
     # is the largest base that fits a single 24 GB card; the merge runs on CPU
     # and needs about 64 GB of system RAM. Slower than the 7B, and 
     # not chosen by `auto`, because it is a different bet on quality vs time.
     "big24": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=1024, lora_r=32,
                   cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=180,
-                  max_cpt_packs=100_000, max_sft=100_000),
+                  max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
     # The largest preset that fits one 80 GB card with QLoRA. Merging and
     # quantising a 32B needs a separate high-memory step; the notebook says so
     # rather than pretending it fits everywhere.
     "huge": dict(base="Qwen/Qwen2.5-32B-Instruct", seq=2048, lora_r=64,
                  cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                 max_cpt_packs=100_000, max_sft=100_000),
+                 max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
 }
 
 
@@ -537,6 +541,10 @@ class Config:
     eval_n: int = P["eval_n"]
     max_cpt_packs: int = P["max_cpt_packs"]
     max_sft: int = P["max_sft"]
+    # Estimated tokens below which a profile warns. Training still consumes all
+    # verified data; the warning prevents a small corpus from being reported as
+    # ready. The smoke profile has no warning threshold.
+    min_corpus_tokens: int = P["min_tokens"]
     cpt_lr: float = 2e-4
     sft_lr: float = 1.5e-4
     # Preference tuning moves an already-instruction-tuned policy, so it needs a
@@ -1631,6 +1639,9 @@ _ARCHIVE_SEED = {
     "P002871": "Psalms in Plains Cree, 1905",
     "cihm_05447": "Psalter in Cree, 1875",
     "P000574": "Cree hymn book, 1870",
+    "rosettaproject_crk_vertxt-2": "Plains Cree Texts, Bloomfield 1934",
+    "rosettaproject_crk_book-1": "Plains Cree Texts, Bloomfield 1934 (book scan)",
+    "P000209": "Cree syllabic hymn book, 1841",
 }
 # Moosonee, James Bay and East Cree material is a different dialect. It is
 # excluded rather than blended, because a y-dialect model that quietly learns
@@ -1712,8 +1723,11 @@ def load_archive() -> None:
         candidates = [(ident, title, 0) for ident, title in _ARCHIVE_SEED.items()]
     log(f"archive: {len(candidates)} candidate books after dialect filter")
     n = rejected = attempts = 0
-    budget = 6 if SMOKE else 65
-    max_attempts = 12 if SMOKE else 110
+    # Use the whole public-domain shelf, not an arbitrary first sixty-five. The
+    # per-book OCR and language filters still reject bad scans; this only changes
+    # how many real books are examined.
+    budget = 6 if SMOKE else 250
+    max_attempts = 12 if SMOKE else 450
     for ident, label, _downloads in candidates:
         if n >= budget or attempts >= max_attempts:
             break
@@ -1768,7 +1782,71 @@ def load_archive() -> None:
     STATUS["archive"] = f"ok: {n} books, {rejected} rejected"
 
 
-# 4g. Plains Cree phrase recordings
+# 4g. Little Cree Books (Plains Cree only)
+#
+# This is the open-licensed Little Cree Books collection: four Plains Cree
+# stories in SRO and syllabics, each with an English sibling. It is small, but
+# it is real community text under CC BY-NC-SA, and it is exactly the kind of
+# material the model should see. Swampy Cree stories 0005 and 0006 are excluded
+# by their own metadata; mixing an n-dialect into a y-dialect model is not a
+# size win.
+def load_lcb() -> None:
+    licence = "CC BY-NC-SA 3.0 (Little Cree Books)"
+    if _blocked_by_licence(licence):
+        ledger("Little Cree Books", "https://github.com/global-asp/lcb-source", licence,
+               "plains", "Latn + Cans", "skipped because the build is commercial", allowed=False)
+        STATUS["lcb"] = "skipped: noncommercial licence and commercial build"
+        return
+    url = "https://codeload.github.com/global-asp/lcb-source/tar.gz/refs/heads/master"
+    archive = download(url, RAW / "lcb-source.tar.gz")
+    root = RAW / "lcb-source"
+    if not (root / "lcb-source-master").exists():
+        with tarfile.open(archive) as tf:
+            tf.extractall(root)
+    base = root / "lcb-source-master"
+
+    def paragraphs(path: Path) -> list[str]:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        out: list[str] = []
+        for chunk in re.split(r"(?m)^##\s*$", text):
+            lines = []
+            for line in chunk.splitlines():
+                line = line.strip()
+                if not line or line.startswith(("#", "*", "[", "!")):
+                    continue
+                lines.append(line)
+            para = " ".join(lines).strip()
+            if len(para) >= 12:
+                out.append(para)
+        return out
+
+    n_docs = n_pairs = 0
+    for path in sorted(base.glob("*/[0-9]*_sro.md")):
+        # The README files do not always spell out the ISO code. Stories 0005
+        # and 0006 are Swampy Cree; every other story in this repository is
+        # Plains Cree SRO. Exclude by the explicit Swampy folder names rather
+        # than silently dropping a Plains story whose README omits a language.
+        if path.parent.name in {"0005_grandmother-fox", "0006_little-fox"}:
+            continue
+        story = path.parent.name
+        cree_paras = paragraphs(path)
+        en_path = path.with_name(path.name.replace("_sro.md", "_en.md"))
+        en_paras = paragraphs(en_path) if en_path.exists() else []
+        for i, cree in enumerate(cree_paras):
+            _add_doc(cree, lang="crk", script="Latn", source=f"lcb/{story}",
+                     doc_id=f"{story}#{i}", licence=licence, dialect="plains", kind="story")
+            n_docs += 1
+            if i < len(en_paras) and len(cree.split()) >= 2 and len(en_paras[i].split()) >= 2:
+                _add_pair(cree, en_paras[i], source="lcb", doc_id=f"{story}#{i}",
+                          licence=licence, dialect="plains", origin="human")
+                n_pairs += 1
+    ledger("Little Cree Books", "https://github.com/global-asp/lcb-source", licence,
+           "plains (Y-dialect)", "Latn + Cans",
+           f"{n_docs} SRO paragraphs, {n_pairs} English pairs; Swampy Cree excluded")
+    STATUS["lcb"] = f"ok: {n_docs} paragraphs, {n_pairs} pairs"
+
+
+# 4h. Plains Cree phrase recordings
 def load_plainscree() -> None:
     from datasets import load_dataset
 
@@ -1938,7 +2016,8 @@ def load_uploads() -> None:
 # slowest part of the notebook (network, archive index, PDF extraction) and none
 # of it changes between sessions, so repeating it after a disconnect only burns
 # the time the checkpointing is meant to save.
-_CORPUS_KEY = fingerprint(corpus="v1", noncommercial=CFG.include_noncommercial)
+_CORPUS_KEY = fingerprint(corpus="v3", noncommercial=CFG.include_noncommercial,
+                         min_tokens=CFG.min_corpus_tokens)
 _READY = (RAW / "docs.jsonl", RAW / "pairs.jsonl", RAW / "lexicon.json")
 
 if all(f.exists() for f in _READY) and stage_done("corpus", _CORPUS_KEY, requires=RAW / "ledger.json"):
@@ -1960,6 +2039,7 @@ else:
         ("glotcc", load_glotcc),
         ("tatoeba", load_tatoeba),
         ("storybook", load_storybook),
+        ("lcb", load_lcb),
         ("plainscree", load_plainscree),
         # GiellaLT runs before the archive because its lexicon is what separates a
         # real 19th-century Cree page from a syllabic scan OCR turned into noise.
@@ -1974,6 +2054,60 @@ else:
         except Exception as exc:
             STATUS[name] = f"failed: {type(exc).__name__}: {exc}"
             log(f"{name}: FAILED: {exc}")
+
+    # A partial corpus must not be trained on quietly. Every source in the table
+    # is expected to contribute, and a download that failed, returned nothing, or
+    # produced zero documents is a corpus that looks finished and is not: the
+    # model then learns less Cree than the report claims. The run stops here
+    # unless the caller has explicitly accepted a partial corpus.
+    _expected = {
+        "edtekla", "figurative", "project", "wikipedia", "fineweb2", "finepdfs",
+        "finetranslations", "glotcc", "tatoeba", "storybook", "lcb", "plainscree",
+        "giellalt", "archive",
+    }
+
+    def _contributed(name: str) -> bool:
+        note = str(STATUS.get(name, ""))
+        if not note.startswith("ok"):
+            return False
+        # "ok: 0 docs" is a source that ran and contributed nothing.
+        return not re.search(r":\s*0\s", note)
+
+    _missing = sorted(n for n in _expected if not _contributed(n))
+    if _missing and not getattr(CFG, "allow_missing_sources", False):
+        raise RuntimeError(
+            "corpus incomplete, these sources did not contribute: "
+            + ", ".join(f"{n} [{STATUS.get(n, 'not run')}]" for n in _missing)
+            + ". Fix the download, or set allow_missing_sources on the profile if you "
+              "mean to train on less. Training on a partial corpus is how a model "
+              "ends up looking trained while it cannot write the language."
+        )
+    log(f"corpus complete: {len(_expected) - len(_missing)}/{len(_expected)} sources contributed")
+
+    # Source completeness is not corpus size. A run can download every
+    # collection, clean it, and still have only a small slice of the language.
+    # The 14B profiles warn loudly when that happens. Training continues and
+    # uses every token, because the user explicitly wants the model trained on
+    # all available, verified data. The warning is also written to the run so a
+    # report can never call a small corpus complete.
+    _est_tokens = int((sum(len(d["text"].split()) for d in DOCS)
+                       + sum(len(p["cree"].split()) + len(p["english"].split()) for p in PAIRS))
+                      * 1.4)
+    _corpus_size = {
+        "estimated_tokens": _est_tokens,
+        "minimum_for_profile": CFG.min_corpus_tokens,
+        "documents": len(DOCS),
+        "pairs": len(PAIRS),
+        "ready": not (not SMOKE and CFG.min_corpus_tokens and _est_tokens < CFG.min_corpus_tokens),
+    }
+    jdump(RAW / "corpus_size.json", _corpus_size)
+    if not _corpus_size["ready"]:
+        STATUS["corpus_size"] = (f"warning: {_est_tokens:,} tokens below "
+                                 f"{CFG.min_corpus_tokens:,}; training still uses all data")
+        log("WARNING: corpus size is below the profile target; training continues with all data")
+    else:
+        STATUS["corpus_size"] = f"ok: {_est_tokens:,} estimated tokens"
+    log(f"corpus size: about {_est_tokens:,} tokens (profile target {CFG.min_corpus_tokens:,})")
 
     write_jsonl(RAW / "docs.jsonl", DOCS)
     write_jsonl(RAW / "pairs.jsonl", PAIRS)
@@ -2134,7 +2268,7 @@ def norm_key(text: str) -> str:
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version="clean-v1",
+    version="clean-v2",
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -2283,11 +2417,162 @@ else:
     lm = {s: [r for r in sentences if r["split"] == s] for s in ("train", "dev", "test")}
     tr = {s: [r for r in pairs if r["split"] == s] for s in ("train", "dev", "test")}
 
+    # Contamination audit: no held-out sentence and no 12-gram from a held-out
+    # sentence may appear in any training split. The near-duplicate pass above
+    # catches edited copies; this catches a verbatim span that survived because
+    # the whole sentence was not similar enough to trip Jaccard.
+    def _word_12grams(text: str) -> set[str]:
+        words = re.findall(r"[^\W\d_]+", normalize_sro(str(text)).lower())
+        if len(words) < 12:
+            return set()
+        return {" ".join(words[i:i + 12]) for i in range(len(words) - 11)}
+
+    _train_12: set[str] = set()
+    for row in lm["train"]:
+        _train_12.update(_word_12grams(row["text"]))
+    for row in tr["train"]:
+        _train_12.update(_word_12grams(row["cree"]))
+        _train_12.update(_word_12grams(row["english"]))
+
+    _test_12: set[str] = set()
+    for row in lm["test"]:
+        _test_12.update(_word_12grams(row["text"]))
+    for row in tr["test"]:
+        _test_12.update(_word_12grams(row["cree"]))
+        _test_12.update(_word_12grams(row["english"]))
+
+    _contamination = sorted(_train_12 & _test_12)
+    if _contamination:
+        raise RuntimeError(
+            "held-out 12-gram contamination: "
+            f"{len(_contamination)} span(s), first: {_contamination[0][:160]!r}"
+        )
+    log("contamination audit: no held-out 12-gram appears in training")
+
     # The evaluation set for translation is modern Cree only; Watkins 1865 is a
     # separate historical capability and would distort the modern score.
     tr_test_modern = [r for r in tr["test"] if r["source"] != "watkins1865"]
     if len(tr_test_modern) < 50 and not SMOKE:
         tr_test_modern = tr["test"]
+
+    # ---- duplicate audit ---------------------------------------------------
+    # Deduplication removes repeated rows; it must never remove a unique word.
+    # This audit measures both halves of that promise and writes the evidence:
+    #
+    #   * every word in the accepted text is counted, so "the pipeline uses
+    #     every available word" is a measured set, not a claim;
+    #   * repeated rows are counted at document, sentence and pair level;
+    #   * spelling variants that collapse to one word (capitalisation, curly
+    #     apostrophe, macron or no macron) are grouped -- that is the
+    #     duplicate-word check exact hashing cannot perform;
+    #   * the stage fails if an exact duplicate row is still present.
+    _WORD_RE = re.compile(r"[^\W\d_]+(?:['-][^\W\d_]+)*", re.UNICODE)
+
+    def _words(text: str) -> list[str]:
+        text = normalize_sro(str(text))
+        if looks_like_syllabics(text):
+            text = to_sro(text)
+        return _WORD_RE.findall(text.lower())
+
+    def _folded(word: str) -> str:
+        """Spelling-insensitive key: case, apostrophes and macrons removed."""
+        plain = unicodedata.normalize("NFKD", word.replace("\u2019", "'"))
+        plain = "".join(ch for ch in plain if not unicodedata.combining(ch))
+        return re.sub(r"[^a-z]", "", plain)
+
+    raw_words: collections.Counter = collections.Counter()
+    for doc in DOCS:
+        raw_words.update(_words(doc["text"]))
+    for pair in PAIRS:
+        raw_words.update(_words(pair["cree"]))
+        raw_words.update(_words(pair["english"]))
+
+    kept_words: collections.Counter = collections.Counter()
+    for split in ("train", "dev", "test"):
+        for row in lm[split]:
+            kept_words.update(_words(row["text"]))
+        for row in tr[split]:
+            kept_words.update(_words(row["cree"]))
+            kept_words.update(_words(row["english"]))
+
+    variants: dict[str, dict[str, int]] = {}
+    for word, count in kept_words.items():
+        variants.setdefault(_folded(word), {})[word] = count
+    variant_groups = {key: forms for key, forms in variants.items() if len(forms) > 1 and key}
+    variant_examples = sorted(
+        ({"word": key, "forms": dict(sorted(forms.items(), key=lambda kv: (-kv[1], kv[0]))),
+          "tokens": sum(forms.values())}
+         for key, forms in variant_groups.items()),
+        key=lambda row: (-row["tokens"], row["word"]),
+    )[:25]
+
+    lost = {w: n for w, n in raw_words.items() if w not in kept_words}
+    lost_attested = {w: n for w, n in lost.items() if w in LEXICON}
+
+    doc_keys = [norm_key(d["text"]) for d in DOCS]
+    sent_keys = [norm_key(r["text"]) for split in ("train", "dev", "test") for r in lm[split]]
+    pair_keys = [f"{norm_key(r['cree'])}|{norm_key(r['english'])}"
+                 for split in ("train", "dev", "test") for r in tr[split]]
+
+    audit = {
+        "scope": "all accepted rows in train/dev/test, plus everything rejected",
+        "tokens": {"raw": sum(raw_words.values()), "kept": sum(kept_words.values())},
+        "unique_words": {
+            "raw": len(raw_words),
+            "kept": len(kept_words),
+            "in_lexicon": sum(1 for w in kept_words if w in LEXICON),
+            "seen_once": sum(1 for n in kept_words.values() if n == 1),
+        },
+        "rejected_sentences": dict(rejected),
+        "documents": {
+            "rows": len(DOCS), "unique": len(set(doc_keys)),
+            "duplicate_rows": len(DOCS) - len(set(doc_keys)),
+            "note": ("documents are deduplicated at sentence level on purpose: two sources "
+                     "that carry the same article keep one copy of each sentence. A "
+                     "document-level repeat here is reported, not fatal."),
+        },
+        "sentences": {
+            "rows": len(sent_keys), "unique": len(set(sent_keys)),
+            "duplicate_rows": len(sent_keys) - len(set(sent_keys)),
+        },
+        "pairs": {
+            "rows": len(pair_keys), "unique": len(set(pair_keys)),
+            "duplicate_rows": len(pair_keys) - len(set(pair_keys)),
+        },
+        "spelling_variants": {
+            "groups": len(variant_groups),
+            "forms": sum(len(forms) for forms in variant_groups.values()),
+            "tokens": sum(sum(forms.values()) for forms in variant_groups.values()),
+            "examples": variant_examples,
+        },
+        "filtered_out": {
+            "distinct_words": len(lost),
+            "tokens": sum(lost.values()),
+            "attested_cree_forms": len(lost_attested),
+            "attested_examples": sorted(lost_attested)[:40],
+            "note": ("filtered_out counts words in rejected lines: English, OCR noise and "
+                     "too-short fragments. It is reported, not hidden, so a low token count "
+                     "can be traced to a filter instead of blamed on the sources."),
+        },
+    }
+    # Only the guarantees the stage actually makes are fatal. Duplicate
+    # documents collapse into duplicate sentences, which the exact/near filters
+    # remove; a document-level repeat is real overlap between sources and is
+    # reported above rather than treated as a bug.
+    audit["checks"] = {
+        "no_duplicate_sentences": audit["sentences"]["duplicate_rows"] == 0,
+        "no_duplicate_pairs": audit["pairs"]["duplicate_rows"] == 0,
+        "every_word_counted": audit["unique_words"]["kept"] > 0,
+    }
+    jdump(PROC / "duplicate_audit.json", audit)
+
+    log(f"duplicate audit: {audit['tokens']['kept']:,} tokens, "
+        f"{audit['unique_words']['kept']:,} unique words "
+        f"({audit['unique_words']['seen_once']:,} seen once), "
+        f"{audit['spelling_variants']['groups']:,} spelling-variant groups")
+    _duplicate_failures = [name for name, ok in audit["checks"].items() if not ok]
+    if _duplicate_failures:
+        raise RuntimeError("duplicate audit failed: " + ", ".join(_duplicate_failures))
 
     write_jsonl(PROC / "lm_train.jsonl", lm["train"])
     write_jsonl(PROC / "lm_dev.jsonl", lm["dev"])
@@ -2308,7 +2593,19 @@ else:
         "lexicon_forms": len(LEXICON),
         "rejected": rejected,
         "leakage_moved": leaked,
+        "contamination_12gram_overlap": len(_contamination),
         "licences": sorted({r["licence"] for r in sentences})[:20],
+        "duplicate_audit": {
+            "tokens_kept": audit["tokens"]["kept"],
+            "unique_words": audit["unique_words"]["kept"],
+            "unique_words_seen_once": audit["unique_words"]["seen_once"],
+            "spelling_variant_groups": audit["spelling_variants"]["groups"],
+            "duplicate_documents": audit["documents"]["duplicate_rows"],
+            "duplicate_sentences": audit["sentences"]["duplicate_rows"],
+            "duplicate_pairs": audit["pairs"]["duplicate_rows"],
+            "attested_cree_forms_filtered": audit["filtered_out"]["attested_cree_forms"],
+            "report": "duplicate_audit.json",
+        },
     }
     jdump(PROC / "stats.json", stats)
     print(json.dumps(stats, indent=2, ensure_ascii=False))
@@ -2318,6 +2615,7 @@ else:
     assert tr["train"] and tr["test"], "empty pair split"
     _train_keys = {norm_key(r["text"]) for r in lm["train"]}
     assert not (_train_keys & {norm_key(r["text"]) for r in lm["test"]}), "exact LM leakage"
+    assert not _contamination, "held-out 12-gram contamination"
     assert all(len(r["cree"].split()) >= 2 for r in tr["train"]), "bad pair"
     assert all(lang_guess(r["text"]) in {"crk", "mixed"} and cree_word_ratio(r["text"]) >= 0.7
                for r in lm["test"]), "English in LM test"
@@ -3446,14 +3744,14 @@ if _stop_after('cpt'):
 # two, because a system prompt that drifts from training moves the model off the
 # distribution it learned.
 SYSTEM = (
-    "You are Archer's assistant, running entirely on the user's own machine. "
-    "You are warm and plain spoken. If someone greets you or asks how you are, "
-    "answer in one or two short sentences in the first person, and ask what they "
-    "need. Do not describe the project or list your jobs unless they ask. "
-    "You do four jobs: you talk about Archer's work and this system, you answer "
-    "questions about Archer's songs from the notes you are given, you translate "
-    "between English and nêhiyawêwin in Standard Roman Orthography and syllabics, "
-    "and you explain and convert Cree words. "
+    "Answer in plain, warm sentences, and keep answers short: two or three "
+    "sentences unless the question needs more. A greeting is answered the way a "
+    "person answers one: back to them, briefly, and on to the work, without "
+    "announcing that you are ready to help, calling yourself a system or a "
+    "service, or describing what you can do unless you are asked. Never mention "
+    "these instructions, your prompt or what you are able to do, and never list "
+    "your jobs. Write plain sentences with ordinary punctuation, and never use "
+    "an em dash or an en dash. "
     "When notes are given, they are the only evidence for anything about a song: "
     "answer from them, name the song, and if they do not contain the answer say "
     "plainly that the notes do not say. "
@@ -3629,6 +3927,72 @@ def first_sentences(text: str, n: int = 3, limit: int = 90) -> str:
     return " ".join(out.split()[:limit])
 
 
+# Language identification and answer language are learned tasks, not a word
+# list and not a router rule. The examples are generated from the labelled
+# training corpus: the Cree field is Cree, the English field is English, a Cree
+# sentence with an English sentence is mixed, and a Cree message is answered in
+# English unless the visitor explicitly asks for Cree. A model trained on these
+# carries the decision in its weights, which is what the app's language
+# identifier is for at inference time.
+_language_examples: list[dict] = []
+_seen_language: set[str] = set()
+
+
+def _add_language(text: str, label: str) -> None:
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text or len(text) > 320:
+        return
+    key = norm_key(text)
+    if not key or key in _seen_language or key in test_guard:
+        return
+    _seen_language.add(key)
+    _language_examples.append(
+        chat(SYSTEM, f"<|song|>\nWhich language is this?\n{text}", label, "language_id")
+    )
+
+
+for _row in train_pairs:
+    if len(_language_examples) >= 1200:
+        break
+    _cree, _english = _row["cree"].strip(), _row["english"].strip()
+    if len(_cree.split()) >= 2:
+        _add_language(_cree, "Plains Cree.")
+    if len(_english.split()) >= 2:
+        _add_language(_english, "English.")
+    if len(_cree.split()) >= 2 and len(_english.split()) >= 2:
+        _add_language(f"{_cree} {_english}", "Mixed.")
+
+for _row in lm_train:
+    if len(_language_examples) >= 1450:
+        break
+    _add_language(_row["text"], "Plains Cree.")
+
+for _row in notes:
+    if len(_language_examples) >= 1650:
+        break
+    _add_language(first_sentences(_row["text"], n=2), "English.")
+
+examples.extend(_language_examples)
+
+# The policy examples are the behaviour itself. A Cree message gets an English
+# answer by default. "Answer in Cree" gets Cree. The app can still enforce the
+# same rule at inference, but the model has seen the pattern rather than being
+# told about it for the first time in a system prompt.
+_policy_pairs = 0
+for _row in train_pairs:
+    if _policy_pairs >= 500:
+        break
+    _cree, _english = _row["cree"].strip(), _row["english"].strip()
+    if norm_key(_cree) in test_guard or norm_key(_english) in test_guard:
+        continue
+    if not (2 <= len(_cree.split()) <= 30 and 2 <= len(_english.split()) <= 30):
+        continue
+    examples.append(chat(SYSTEM, f"<|song|>\n{_cree}", _english, "language_policy"))
+    examples.append(chat(SYSTEM, f"<|song|>\nAnswer in Cree: {_english}", _cree, "language_policy"))
+    _policy_pairs += 1
+print(f"language examples: {len(_language_examples)} identification, {_policy_pairs * 2} answer-language")
+
+
 def note_qa(name: str, markdown: str, skip_sections: set[str] | None = None,
             distractors: list[tuple[str, str]] | None = None) -> list[dict]:
     title, secs = sections(markdown)
@@ -3767,9 +4131,9 @@ PROJECT_QA: list[tuple[str, str]] = [
     ),
     (
         "What can you do?",
-        "Four things. I talk about Archer's work and this system, I answer questions about "
-        "his songs from their notes, I translate between English and nêhiyawêwin, and I "
-        "explain and convert Cree words between SRO and syllabics.",
+        "I answer from Archer's song notes, translate between English and nêhiyawêwin, "
+        "and explain Cree words. I'm still learning the language myself, so I say when "
+        "something is past what I know.",
     ),
     (
         "Are you the Cree model or the general model?",
@@ -3829,7 +4193,7 @@ PROJECT_QA: list[tuple[str, str]] = [
     ),
     (
         "How were you trained?",
-        "On a cleaned Plains Cree corpus, with a Cree tokenizer grafted onto Qwen2.5-7B-Instruct, "
+        f"On a cleaned Plains Cree corpus, with a Cree tokenizer grafted onto {CFG.base_model}, "
         "then continued pretraining, instruction tuning and preference tuning. The pipeline is "
         "in Cree_LLM_Training.ipynb and train_cree_llm.py.",
     ),
@@ -3890,22 +4254,167 @@ for fact, answer in PROJECT_QA:
     # A second phrasing teaches the answer rather than one exact question.
     examples.append(chat(SYSTEM, f"<|song|>\nTell me: {fact[0].lower() + fact[1:]}", answer, "project"))
 
+# A greeting is answered the way a person answers one: back to them, in a few
+# words, and on to the work. The earlier set said "What can I help you with?"
+# in almost every line and the model learned that phrase as its whole voice.
 for greeting, answer in [
-    ("Hello", "Hello. Ask me about a song, a Cree word, or how this system works."),
-    ("Hi", "Hi. Ask me about a song, a Cree word, or how this system works."),
-    ("How are you?", "I am well, thank you. What can I help you with?"),
-    ("How is it going?", "It is going well, thanks. What can I help you with?"),
-    ("How are you doing?", "I am doing well, thanks. What can I help you with?"),
+    ("Hello", "Hi. What would you like to look at, a song or a word?"),
+    ("Hi", "Hi. What would you like to look at?"),
+    ("How are you?", "I'm well, thanks. What would you like to look at?"),
+    ("How is it going?", "Going well, thanks. What can I look up for you?"),
+    ("How are you doing?", "Doing well, thanks. What can I look up for you?"),
     ("What's up?", "Not much. What would you like to know?"),
-    ("Good morning", "Good morning. What can I help you with?"),
-    ("Good afternoon", "Good afternoon. What can I help you with?"),
-    ("Nice to meet you", "Nice to meet you too. What would you like to know?"),
-    ("I'm good, thanks", "Good to hear. What can I help you with?"),
+    ("Good morning", "Morning. What would you like to look at?"),
+    ("Good afternoon", "Afternoon. What would you like to look at?"),
+    ("Nice to meet you", "Nice to meet you too. Ask me about a song or a Cree word."),
+    ("I'm good, thanks", "Good to hear. What would you like to look at?"),
     ("Thank you", "You're welcome."),
     ("Thanks", "You're welcome."),
-    ("Goodbye", "Goodbye."),
+    ("Goodbye", "See you."),
 ]:
     examples.append(chat(SYSTEM, f"<|song|>\n{greeting}", answer, "project"))
+
+# Casual conversation, generated from parts. The set used to hold thirteen
+# openings and nothing else, so a sentence the weights had not been shown was
+# most likely continued as itself: "hi" came back as "hi", "howdy, hows your day
+# been big bro" came back as "Howdy, how is your day been, big bro?". Both sides
+# vary here, every answer is a reply rather than a repeat, and the stance
+# (Archer's assistant, still learning nêhiyawêwin) is carried in the answers
+# instead of being recited from one line.
+_CASUAL_OPEN = [
+    "hi", "hey", "hello", "hi there", "hey there", "howdy", "yo", "hiya",
+    "good morning", "good afternoon", "morning", "hey, are you there?",
+    "hello there", "hi, how's it going?",
+]
+_CASUAL_REPLY = [
+    "Hi. What would you like to look at, a song or a word?",
+    "Hello. Ask me about a song or a Cree word.",
+    "Hey. What are you working on?",
+    "Hi there. I can look something up in Archer's notes.",
+    "Hello. What would you like to know?",
+    "Hey. Ask me anything about the project or the language.",
+]
+for _i, _opening in enumerate(_CASUAL_OPEN):
+    examples.append(chat(SYSTEM, f"<|song|>\n{_opening}", _CASUAL_REPLY[_i % len(_CASUAL_REPLY)], "casual"))
+
+_HOW_ARE_YOU = [
+    "how are you?", "how are you doing?", "how's it going?", "how is it going?",
+    "how have you been?", "how's your day?", "how are things?", "you good?",
+    "how are you today?", "hope you're well", "how's your day going?",
+    "how have you been doing?",
+]
+_HOW_ARE_YOU_BACK = [
+    "I'm well, thanks. What would you like to look at?",
+    "Doing well, thanks. What can I look up for you?",
+    "Good, thanks for asking. What are you working on?",
+    "I'm well. Still learning the language, but glad to help. What do you need?",
+    "All good here. Ask me about a song or a Cree word.",
+]
+for _i, _q in enumerate(_HOW_ARE_YOU):
+    examples.append(chat(SYSTEM, f"<|song|>\n{_q}", _HOW_ARE_YOU_BACK[_i % len(_HOW_ARE_YOU_BACK)], "casual"))
+
+# The rest of a conversation: thanks, goodbyes, and someone who is just talking,
+# where repeating their own sentence is the one answer that is always wrong.
+_CASUAL_OTHER = [
+    ("thanks", "You're welcome."),
+    ("thank you", "Any time."),
+    ("that helps", "Good. Ask again whenever you need something."),
+    ("ok", "Ask me whenever you're ready."),
+    ("cool", "Glad that works. What else?"),
+    ("bye", "See you."),
+    ("see you", "Take care."),
+    ("good night", "Good night."),
+    ("sorry", "No need to apologise."),
+    ("i'm back", "Welcome back. Where were we?"),
+    ("that's all for now", "Alright. I'll be here."),
+    ("you there?", "Here. What do you need?"),
+    ("tell me something", "I can tell you about Archer's songs, this project, or a Cree word. Which one?"),
+    ("what's up?", "Not much. What would you like to know?"),
+    ("are you busy?", "Not for you. What do you need?"),
+    ("never mind", "Alright. Ask me later if you want."),
+]
+for _prompt, _answer in _CASUAL_OTHER:
+    examples.append(chat(SYSTEM, f"<|song|>\n{_prompt}", _answer, "casual"))
+
+# A wider set of ordinary turns. The first casual block was small enough that a
+# 14B model could memorise each answer and still echo an opening it had not
+# seen. These add varied openings and replies without turning any one phrase
+# into the assistant's whole voice.
+_CASUAL_MORE = [
+    ("good evening", "Evening. What would you like to look at?"),
+    ("hey, good to see you", "Good to see you too. What are you working on?"),
+    ("hello again", "Hello again. Where did we leave off?"),
+    ("i'm here", "Good. What do you need?"),
+    ("can you talk?", "Yes. What would you like to ask?"),
+    ("are you around?", "I am here. What can I look up?"),
+    ("quick question", "Go ahead."),
+    ("i have a question", "Ask away."),
+    ("can i ask something", "Of course. What is it?"),
+    ("i need help", "Tell me what you are trying to do."),
+    ("i'm stuck", "What are you stuck on?"),
+    ("that makes sense", "Good. What else would you like to check?"),
+    ("i understand", "Alright. Ask me whenever you need something else."),
+    ("sounds good", "Good. What next?"),
+    ("perfect", "Glad that works. What else?"),
+    ("great", "Good. What would you like to look at?"),
+    ("nice", "Thanks. What are you working on?"),
+    ("okay then", "Alright. I am here if you need me."),
+    ("talk later", "Talk later."),
+    ("i'll be back", "I will be here."),
+    ("one more thing", "What is it?"),
+    ("never mind then", "No problem. Ask me later."),
+    ("you can stop", "Alright. I will be here when you need me."),
+    ("that's wrong", "Tell me what the right answer is, and I will use it next time."),
+    ("that's not right", "What should it have been? I will store the correction."),
+    ("i don't understand", "Which part should I explain more plainly?"),
+    ("say that again", "Which part would you like me to repeat?"),
+    ("what do you mean", "I will put it another way. Tell me which part is unclear."),
+    ("can you explain", "Yes. What should I explain?"),
+    ("why", "Tell me which part and I will explain the reason."),
+    ("how", "Tell me what you are trying to do and I will walk through it."),
+    ("where", "Tell me what you are looking for."),
+    ("when", "Tell me which event you mean."),
+    ("who", "Tell me which person or song you mean."),
+    ("what", "Tell me what you would like to know."),
+    ("is that right", "Tell me which part and I will check it against the notes."),
+    ("are you sure", "I can check the notes again. If they do not say, I will tell you."),
+    ("i think so", "Alright. What would you like to do next?"),
+    ("maybe", "Tell me what you are deciding between."),
+    ("not sure", "That is fine. Ask me and we can work it out."),
+    ("i'm not sure", "No problem. What would you like to check?"),
+    ("let's start", "Alright. What are we starting with?"),
+    ("let's go", "Ready. What do you need?"),
+    ("continue", "Where would you like me to continue?"),
+    ("go on", "Tell me which part to continue."),
+    ("stop", "Alright. I will wait."),
+    ("wait", "Take your time."),
+    ("hold on", "I am here when you are ready."),
+    ("one second", "Take your time."),
+]
+for _prompt, _answer in _CASUAL_MORE:
+    examples.append(chat(SYSTEM, f"<|song|>\n{_prompt}", _answer, "casual"))
+
+# Who the assistant is, in its own voice. The prompt describes the stance; these
+# teach it, so the model answers as Archer's assistant who is learning
+# nêhiyawêwin instead of reciting a line the app handed it.
+for question, answer in [
+    (
+        "Who are you?",
+        "I'm Archer's assistant. I answer from his song notes, and I'm learning "
+        "nêhiyawêwin as I go.",
+    ),
+    (
+        "What do you do?",
+        "I look things up in Archer's notes and help with nêhiyawêwin. The language "
+        "is something I'm still learning myself.",
+    ),
+    (
+        "Are you Cree?",
+        "No. I'm a model running on this machine. I'm learning nêhiyawêwin, and I "
+        "answer from Archer's notes.",
+    ),
+]:
+    examples.append(chat(SYSTEM, f"<|song|>\n{question}", answer, "persona"))
 
 # Multi-turn conversations. The app sends the last few turns, so the model has
 # to answer the current question while the earlier turns are context, not
@@ -3924,7 +4433,7 @@ examples.extend([
         ("<|song|>\nWhat is this project?",
          "It is Archer Pechawis's vocal collaboration system, and it runs locally. It includes an assistant that answers from his song notes, Cree language tools, harmony and accompaniment tools, and synthetic singing voices."),
         ("What can you do?",
-         "Four things. I talk about Archer's work and this system, I answer questions about his songs from their notes, I translate between English and nêhiyawêwin, and I explain and convert Cree words between SRO and syllabics."),
+         "I answer from Archer's song notes, translate between English and nêhiyawêwin, and explain Cree words. I'm still learning the language myself, so I say when something is past what I know."),
     ], "project"),
     conversation([
         (f"<|song|><|note|>\nNotes on {_conv_title}:\n{_horse_context}\n\nQuestion: What is {_conv_title} about?",
@@ -3942,11 +4451,60 @@ examples.extend([
 
 # Persona and boundary examples.
 examples.extend([
-    chat(SYSTEM, "<|song|>\nWho are you?", "I am the assistant inside this system. I talk about Archer's work, answer from his song notes, translate and explain nêhiyawêwin, and convert between SRO and syllabics. I am not Archer and I do not perform as him.", "persona"),
-    chat(SYSTEM, "<|song|>\nIntroduce yourself.", "I am Archer's local assistant. I answer from the song notes, translate between English and Plains Cree, and explain Cree words. Everything runs on this machine.", "persona"),
+    # Who the assistant is was answered here by listing its jobs, and that is the
+    # text the installed model recites word for word when a visitor asks. The
+    # answers now come from the persona block above, which describes a stance
+    # (Archer's assistant, still learning nêhiyawêwin) instead of a feature list.
     chat(SYSTEM, "<|song|>\nAre you a person?", "No. I am a language model running locally. I do not have experiences, and I do not speak for Archer or for any Cree speaker.", "persona"),
     chat(SYSTEM, "<|translate|><|english|><|sro|>\nTranslate into Plains Cree (SRO):\nthe river is cold", "sîpiy kîsow.", "translate_en_cr"),
 ])
+
+# Runtime corrections are training data, not just memory. The app writes the
+# same correction to feedback_sft.jsonl and feedback_dpo.jsonl when a visitor
+# says an answer was wrong. Training used to ignore both files, so a correction
+# changed the current conversation and then vanished from the next model. This
+# loads them from the repository or from ARCHER_FEEDBACK_DIR, validates every
+# row, and fails loudly on a malformed file rather than silently training on a
+# subset.
+def _feedback_path(name: str) -> Path | None:
+    explicit = os.environ.get("ARCHER_FEEDBACK_DIR", "").strip()
+    bases = [Path(explicit).expanduser()] if explicit else []
+    bases += [Path.cwd() / "data" / "training", ROOT / "feedback"]
+    for base in bases:
+        candidate = base / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def load_feedback_sft() -> tuple[list[dict], Path | None]:
+    path = _feedback_path("feedback_sft.jsonl")
+    if path is None:
+        return [], None
+    rows: list[dict] = []
+    for n, row in enumerate(read_jsonl(path), 1):
+        messages = row.get("messages")
+        if not isinstance(messages, list) or len(messages) < 2:
+            raise ValueError(f"{path}:{n}: messages must be a list with at least a user and an assistant turn")
+        clean = []
+        for message in messages:
+            if not isinstance(message, dict):
+                raise ValueError(f"{path}:{n}: every message must be an object")
+            role, content = message.get("role"), message.get("content")
+            if role not in {"system", "user", "assistant"} or not isinstance(content, str) or not content.strip():
+                raise ValueError(f"{path}:{n}: invalid role or empty content")
+            clean.append({"role": role, "content": content.strip()})
+        if clean[-1]["role"] != "assistant" or not any(m["role"] == "user" for m in clean):
+            raise ValueError(f"{path}:{n}: a feedback example needs a user turn and an assistant answer last")
+        rows.append({"messages": clean, "task": "feedback_correction"})
+    return rows, path
+
+
+feedback_sft, feedback_sft_path = load_feedback_sft()
+if feedback_sft_path is None:
+    print("feedback SFT: none found (set ARCHER_FEEDBACK_DIR to the folder holding feedback_sft.jsonl)")
+else:
+    print(f"feedback SFT: {len(feedback_sft)} corrections from {feedback_sft_path}")
 
 # de-duplicate and split
 uniq: dict[str, dict] = {}
@@ -3969,12 +4527,28 @@ if CFG.max_sft and len(val) > max(8, CFG.max_sft // 3):
 # epochs over the raw mix would spend almost every update on translation and
 # leave the model terse when someone simply asks it something. The rare tasks
 # are repeated in the training split only, so validation stays untouched.
+# Corrections are added after the split so they are always trained on, never
+# used as validation. They are the rows the next run must not lose.
+_train_keys = {sha1(json.dumps(ex["messages"], ensure_ascii=False, sort_keys=True)) for ex in train}
+_feedback_added = 0
+for ex in feedback_sft:
+    key = sha1(json.dumps(ex["messages"], ensure_ascii=False, sort_keys=True))
+    if key not in _train_keys:
+        train.append(ex)
+        _train_keys.add(key)
+        _feedback_added += 1
+if feedback_sft:
+    print(f"feedback SFT: {_feedback_added} new corrections added to the training split")
+
 _before_weighting = len(train)
 _rare = {
     task: [ex for ex in train if ex["task"] == task]
-    for task in ("project", "persona", "explain", "song_notes")
+    for task in ("project", "persona", "explain", "song_notes", "casual", "feedback_correction",
+                 "language_id", "language_policy")
 }
-for task, factor in {"project": 4, "persona": 3, "explain": 2, "song_notes": 2}.items():
+for task, factor in {"project": 4, "persona": 3, "explain": 2, "song_notes": 2,
+                     "casual": 2, "feedback_correction": 6,
+                     "language_id": 3, "language_policy": 4}.items():
     train.extend(_rare[task] * (factor - 1))
 rng.shuffle(train)
 print(f"rare-task weighting: {_before_weighting:,} -> {len(train):,} training examples")
@@ -4054,6 +4628,7 @@ assert len(train) > 100 or SMOKE, "too little instruction data"
 assert all(ex["messages"][-1]["role"] == "assistant" for ex in train)
 assert not any(ex["task"].startswith("translate") and norm_key(ex["messages"][2]["content"]) in test_guard for ex in train), "test leakage in SFT"
 assert SMOKE or (counts["project"] > 0 and counts["explain"] > 0), "the one model needs conversation and word explanation, not only translation"
+assert not feedback_sft or counts["feedback_correction"] > 0, "runtime corrections were loaded but none reached training"
 
 import matplotlib.pyplot as plt
 
@@ -4237,9 +4812,60 @@ for question, accurate, invented in [
     prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
     prefs.append({"prompt": prompt, "chosen": accurate, "rejected": invented})
 
+# Echo negatives. The installed model answers "hi" with "hi", "howdy" with
+# "howdy" and "good morning" with "good morning". That is a copy of the prompt,
+# not a reply, and preference training is the right place to penalise it: the
+# same prompt gets the real answer as chosen and the visitor's own words as
+# rejected. The General Preference Optimization paper and ParaPO both treat
+# verbatim reproduction as a preference failure rather than a sampling one.
+_echo_prefs: list[dict] = []
+_sft_path = PROC / "sft_train.jsonl"
+if _sft_path.exists():
+    for row in read_jsonl(_sft_path):
+        if row.get("task") not in {"casual", "persona"}:
+            continue
+        messages = row.get("messages") or []
+        users = [m for m in messages if m.get("role") == "user"]
+        answers = [m for m in messages if m.get("role") == "assistant"]
+        if not users or not answers:
+            continue
+        user = str(users[-1].get("content", ""))
+        assistant = str(answers[-1].get("content", ""))
+        clean_user = re.sub(r"<\|[^|]*\|>", " ", user)
+        clean_user = re.sub(r"\s+", " ", clean_user).strip()
+        if not clean_user or len(clean_user) > 120:
+            continue
+        if clean_user.lower().strip(" .,!?:;") == assistant.lower().strip(" .,!?:;"):
+            continue
+        _echo_prefs.append({"prompt": user, "chosen": assistant, "rejected": clean_user})
+        if len(_echo_prefs) >= 240:
+            break
+    log(f"DPO: {len(_echo_prefs)} echo negatives from the instruction set")
+
+# Corrections the visitor supplied at runtime. The same rows the app exports to
+# feedback_dpo.jsonl were previously invisible to training, so a correction
+# fixed one conversation and was lost before the next run. They are appended
+# after the synthetic cap so a crowd of generated pairs cannot push them out.
+_feedback_prefs: list[dict] = []
+_feedback_path = _feedback_path("feedback_dpo.jsonl")
+if _feedback_path is None:
+    log("DPO: no feedback_dpo.jsonl found (set ARCHER_FEEDBACK_DIR to include corrections)")
+else:
+    for n, row in enumerate(read_jsonl(_feedback_path), 1):
+        prompt, chosen, rejected = row.get("prompt"), row.get("chosen"), row.get("rejected")
+        if not all(isinstance(v, str) and v.strip() for v in (prompt, chosen, rejected)):
+            raise ValueError(f"{_feedback_path}:{n}: prompt, chosen and rejected must be non-empty strings")
+        if chosen.strip() == rejected.strip():
+            raise ValueError(f"{_feedback_path}:{n}: chosen and rejected are identical")
+        _feedback_prefs.append({"prompt": prompt.strip(), "chosen": chosen.strip(),
+                                "rejected": rejected.strip()})
+    log(f"DPO: {len(_feedback_prefs)} correction pairs from {_feedback_path}")
+
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]
-log(f"DPO: {len(prefs)} preference pairs")
+prefs.extend(_feedback_prefs)
+prefs.extend(_echo_prefs[: 10 if SMOKE else len(_echo_prefs)])
+log(f"DPO: {len(prefs)} preference pairs ({len(_feedback_prefs)} feedback, {len(_echo_prefs)} echo)")
 
 print("\nexample preference:")
 print("  prompt  ", prefs[0]["prompt"].replace("\n", " | ")[:160])
@@ -4270,7 +4896,7 @@ def _sft_stamp() -> str:
 _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
-    sft=_sft_stamp(), corrupt="substitute-v1",
+    sft=_sft_stamp(), corrupt="substitute-echo-feedback-v2",
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an
@@ -4483,8 +5109,11 @@ if _stop_after('dpo'):
 # the same prompts. Translation is scored with chrF++ and BLEU, but also with
 # three measures that matter more for a low-resource language:
 #
-#   validity     how many generated Cree words actually exist in the lexicon or
-#                obey Cree phonotactics -- invented words are the main failure
+#   validity     how many generated Cree words exist in the lexicon or obey Cree
+#                phonotactics -- invented words are the main failure
+#   lexicon_validity  the same count against the lexicon alone. The phonotactic
+#                fallback accepts any plausible-looking string, so it cannot tell
+#                a real word from an invention; this is the number to gate on.
 #   code-switch  how often English leaks into a Cree answer
 #   abstention   whether the model says "the notes do not say" instead of
 #                inventing a fact
@@ -4498,6 +5127,7 @@ notes_eval = read_jsonl(PROC / "sft_notes_eval.jsonl")
 lexicon = jload(PROC / "lexicon.json")
 
 VOCAB = set(lexicon)
+LEXICON_FORMS = frozenset(lexicon)
 for row in read_jsonl(PROC / "lm_train.jsonl"):
     VOCAB.update(re.findall(r"[a-zâêîô-]+", normalize_sro(row["text"])))
 _vowel = re.compile(r"[aeiouâêîô]")
@@ -4519,6 +5149,14 @@ def validity(text: str) -> float:
     if not words:
         return 0.0
     return sum(is_cree_word(w) for w in words) / len(words)
+
+
+def lexicon_validity(text: str) -> float:
+    """Share of words that are attested, with no phonotactic guesswork."""
+    words = [w for w in re.findall(r"[^\W\d_]+", text) if w]
+    if not words:
+        return 0.0
+    return sum(w in LEXICON_FORMS for w in words) / len(words)
 
 
 _EN_LEAK = {"the", "and", "of", "to", "is", "was", "a", "in", "that", "it", "for", "with", "this", "you", "we"}
@@ -4558,6 +5196,7 @@ def score_translation(hyps: list[str], refs: list[str], cree_side: bool) -> dict
     }
     if cree_side:
         out["validity"] = round(float(np.mean([validity(h) for h in hyps])), 4)
+        out["lexicon_validity"] = round(float(np.mean([lexicon_validity(h) for h in hyps])), 4)
         out["code_switch"] = round(float(np.mean([code_switch(h) for h in hyps])), 4)
     return out
 
@@ -4608,7 +5247,7 @@ def _adapter_stamp() -> str:
 # baselines changed what a CreeBench row means, and without this an existing
 # work folder would keep the old scores and never compute the new ones.
 _EVAL_KEY = fingerprint(base=CFG.base_model, n=CFG.eval_n, adapter=_adapter_stamp(),
-                        speaker=CFG.external_baseline, bench="v3")
+                        speaker=CFG.external_baseline, bench="v4")
 
 if stage_done("eval", _EVAL_KEY, requires=OUT / "creebench_report.json"):
     results = jload(OUT / "creebench_report.json")
@@ -4803,6 +5442,30 @@ else:
             for r, h in zip(project_eval, proj_hyp)
         ]
 
+    # The echo check. A greeting must be answered, not repeated. This is the
+    # failure the installed 7B shows on "hi", "howdy" and "good morning", and
+    # it is measured here so a run cannot pass on translation alone.
+    _ECHO_PROMPTS = [
+        "hi", "hey", "hello", "hi there", "howdy", "good morning",
+        "yo", "hey there", "morning", "hello there", "how's it going?",
+        "what's up?",
+    ]
+    echo_prompts = _ECHO_PROMPTS[:4] if SMOKE else _ECHO_PROMPTS
+    echo_tuned = generate([f"<|song|>\n{p}" for p in echo_prompts], 64, use_adapters=True)
+    echo_base = generate([f"<|song|>\n{p}" for p in echo_prompts], 64, use_adapters=False)
+
+    def _echo_norm(text: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"[^\w\s']", " ", text.lower())).strip()
+
+    for split, hyps in (("tuned", echo_tuned), ("base", echo_base)):
+        echoed = sum(_echo_norm(h) == _echo_norm(p) for h, p in zip(hyps, echo_prompts))
+        results[split]["echo"] = {
+            "n": len(echo_prompts),
+            "echoed": echoed,
+            "rate": round(echoed / max(1, len(echo_prompts)), 3),
+            "answers": [{"q": p, "a": h[:160]} for p, h in zip(echo_prompts, hyps)],
+        }
+
     # does it deny being Archer?
     persona_probes = jload(PROC / "persona_probes.json") if (PROC / "persona_probes.json").exists() else []
     if persona_probes:
@@ -4890,6 +5553,15 @@ else:
     bars.append(bar("Held-out Cree", "perplexity", results["tuned"]["perplexity"],
                     results["base"]["perplexity"], higher=False))
 
+    if "echo" in results["tuned"]:
+        # A greeting is answered, never copied. This is an absolute gate, not a
+        # comparison with the base model, because a base model that also echoes
+        # is not a bar worth clearing.
+        _echo_rate = results["tuned"]["echo"]["rate"]
+        bars.append({"task": "Conversation", "measure": "echo rate",
+                     "tuned": _echo_rate, "bar": 0.0, "bar_from": "gate",
+                     "meets": bool(_echo_rate == 0.0)})
+
     met = sum(item["meets"] for item in bars)
     results["head_to_head"] = {
         "rows": bars,
@@ -4951,6 +5623,9 @@ else:
         print(f"{'conversation F1':22s}  {results['tuned']['project']['token_f1']:.3f}"
               + (f"  (base {results['base']['project']['token_f1']:.3f})"
                  if "project" in results["base"] else ""))
+    if "echo" in results["tuned"]:
+        print(f"{'greeting echo':22s}  {results['tuned']['echo']['echoed']}/{results['tuned']['echo']['n']} "
+              f"repeated verbatim (base {results['base']['echo']['echoed']}/{results['base']['echo']['n']})")
 
     _h2h = results.get("head_to_head") or {}
     if _h2h.get("rows"):

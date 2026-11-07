@@ -73,9 +73,60 @@ for question, accurate, invented in [
     prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
     prefs.append({"prompt": prompt, "chosen": accurate, "rejected": invented})
 
+# Echo negatives. The installed model answers "hi" with "hi", "howdy" with
+# "howdy" and "good morning" with "good morning". That is a copy of the prompt,
+# not a reply, and preference training is the right place to penalise it: the
+# same prompt gets the real answer as chosen and the visitor's own words as
+# rejected. The General Preference Optimization paper and ParaPO both treat
+# verbatim reproduction as a preference failure rather than a sampling one.
+_echo_prefs: list[dict] = []
+_sft_path = PROC / "sft_train.jsonl"
+if _sft_path.exists():
+    for row in read_jsonl(_sft_path):
+        if row.get("task") not in {"casual", "persona"}:
+            continue
+        messages = row.get("messages") or []
+        users = [m for m in messages if m.get("role") == "user"]
+        answers = [m for m in messages if m.get("role") == "assistant"]
+        if not users or not answers:
+            continue
+        user = str(users[-1].get("content", ""))
+        assistant = str(answers[-1].get("content", ""))
+        clean_user = re.sub(r"<\|[^|]*\|>", " ", user)
+        clean_user = re.sub(r"\s+", " ", clean_user).strip()
+        if not clean_user or len(clean_user) > 120:
+            continue
+        if clean_user.lower().strip(" .,!?:;") == assistant.lower().strip(" .,!?:;"):
+            continue
+        _echo_prefs.append({"prompt": user, "chosen": assistant, "rejected": clean_user})
+        if len(_echo_prefs) >= 240:
+            break
+    log(f"DPO: {len(_echo_prefs)} echo negatives from the instruction set")
+
+# Corrections the visitor supplied at runtime. The same rows the app exports to
+# feedback_dpo.jsonl were previously invisible to training, so a correction
+# fixed one conversation and was lost before the next run. They are appended
+# after the synthetic cap so a crowd of generated pairs cannot push them out.
+_feedback_prefs: list[dict] = []
+_feedback_path = _feedback_path("feedback_dpo.jsonl")
+if _feedback_path is None:
+    log("DPO: no feedback_dpo.jsonl found (set ARCHER_FEEDBACK_DIR to include corrections)")
+else:
+    for n, row in enumerate(read_jsonl(_feedback_path), 1):
+        prompt, chosen, rejected = row.get("prompt"), row.get("chosen"), row.get("rejected")
+        if not all(isinstance(v, str) and v.strip() for v in (prompt, chosen, rejected)):
+            raise ValueError(f"{_feedback_path}:{n}: prompt, chosen and rejected must be non-empty strings")
+        if chosen.strip() == rejected.strip():
+            raise ValueError(f"{_feedback_path}:{n}: chosen and rejected are identical")
+        _feedback_prefs.append({"prompt": prompt.strip(), "chosen": chosen.strip(),
+                                "rejected": rejected.strip()})
+    log(f"DPO: {len(_feedback_prefs)} correction pairs from {_feedback_path}")
+
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]
-log(f"DPO: {len(prefs)} preference pairs")
+prefs.extend(_feedback_prefs)
+prefs.extend(_echo_prefs[: 10 if SMOKE else len(_echo_prefs)])
+log(f"DPO: {len(prefs)} preference pairs ({len(_feedback_prefs)} feedback, {len(_echo_prefs)} echo)")
 
 print("\nexample preference:")
 print("  prompt  ", prefs[0]["prompt"].replace("\n", " | ")[:160])
@@ -106,7 +157,7 @@ def _sft_stamp() -> str:
 _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
-    sft=_sft_stamp(), corrupt="substitute-v1",
+    sft=_sft_stamp(), corrupt="substitute-echo-feedback-v2",
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an

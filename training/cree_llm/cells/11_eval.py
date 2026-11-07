@@ -5,8 +5,11 @@
 # the same prompts. Translation is scored with chrF++ and BLEU, but also with
 # three measures that matter more for a low-resource language:
 #
-#   validity     how many generated Cree words actually exist in the lexicon or
-#                obey Cree phonotactics -- invented words are the main failure
+#   validity     how many generated Cree words exist in the lexicon or obey Cree
+#                phonotactics -- invented words are the main failure
+#   lexicon_validity  the same count against the lexicon alone. The phonotactic
+#                fallback accepts any plausible-looking string, so it cannot tell
+#                a real word from an invention; this is the number to gate on.
 #   code-switch  how often English leaks into a Cree answer
 #   abstention   whether the model says "the notes do not say" instead of
 #                inventing a fact
@@ -20,6 +23,7 @@ notes_eval = read_jsonl(PROC / "sft_notes_eval.jsonl")
 lexicon = jload(PROC / "lexicon.json")
 
 VOCAB = set(lexicon)
+LEXICON_FORMS = frozenset(lexicon)
 for row in read_jsonl(PROC / "lm_train.jsonl"):
     VOCAB.update(re.findall(r"[a-zâêîô-]+", normalize_sro(row["text"])))
 _vowel = re.compile(r"[aeiouâêîô]")
@@ -41,6 +45,14 @@ def validity(text: str) -> float:
     if not words:
         return 0.0
     return sum(is_cree_word(w) for w in words) / len(words)
+
+
+def lexicon_validity(text: str) -> float:
+    """Share of words that are attested, with no phonotactic guesswork."""
+    words = [w for w in re.findall(r"[^\W\d_]+", text) if w]
+    if not words:
+        return 0.0
+    return sum(w in LEXICON_FORMS for w in words) / len(words)
 
 
 _EN_LEAK = {"the", "and", "of", "to", "is", "was", "a", "in", "that", "it", "for", "with", "this", "you", "we"}
@@ -80,6 +92,7 @@ def score_translation(hyps: list[str], refs: list[str], cree_side: bool) -> dict
     }
     if cree_side:
         out["validity"] = round(float(np.mean([validity(h) for h in hyps])), 4)
+        out["lexicon_validity"] = round(float(np.mean([lexicon_validity(h) for h in hyps])), 4)
         out["code_switch"] = round(float(np.mean([code_switch(h) for h in hyps])), 4)
     return out
 
@@ -130,7 +143,7 @@ def _adapter_stamp() -> str:
 # baselines changed what a CreeBench row means, and without this an existing
 # work folder would keep the old scores and never compute the new ones.
 _EVAL_KEY = fingerprint(base=CFG.base_model, n=CFG.eval_n, adapter=_adapter_stamp(),
-                        speaker=CFG.external_baseline, bench="v3")
+                        speaker=CFG.external_baseline, bench="v4")
 
 if stage_done("eval", _EVAL_KEY, requires=OUT / "creebench_report.json"):
     results = jload(OUT / "creebench_report.json")
@@ -325,6 +338,30 @@ else:
             for r, h in zip(project_eval, proj_hyp)
         ]
 
+    # The echo check. A greeting must be answered, not repeated. This is the
+    # failure the installed 7B shows on "hi", "howdy" and "good morning", and
+    # it is measured here so a run cannot pass on translation alone.
+    _ECHO_PROMPTS = [
+        "hi", "hey", "hello", "hi there", "howdy", "good morning",
+        "yo", "hey there", "morning", "hello there", "how's it going?",
+        "what's up?",
+    ]
+    echo_prompts = _ECHO_PROMPTS[:4] if SMOKE else _ECHO_PROMPTS
+    echo_tuned = generate([f"<|song|>\n{p}" for p in echo_prompts], 64, use_adapters=True)
+    echo_base = generate([f"<|song|>\n{p}" for p in echo_prompts], 64, use_adapters=False)
+
+    def _echo_norm(text: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"[^\w\s']", " ", text.lower())).strip()
+
+    for split, hyps in (("tuned", echo_tuned), ("base", echo_base)):
+        echoed = sum(_echo_norm(h) == _echo_norm(p) for h, p in zip(hyps, echo_prompts))
+        results[split]["echo"] = {
+            "n": len(echo_prompts),
+            "echoed": echoed,
+            "rate": round(echoed / max(1, len(echo_prompts)), 3),
+            "answers": [{"q": p, "a": h[:160]} for p, h in zip(echo_prompts, hyps)],
+        }
+
     # does it deny being Archer?
     persona_probes = jload(PROC / "persona_probes.json") if (PROC / "persona_probes.json").exists() else []
     if persona_probes:
@@ -412,6 +449,15 @@ else:
     bars.append(bar("Held-out Cree", "perplexity", results["tuned"]["perplexity"],
                     results["base"]["perplexity"], higher=False))
 
+    if "echo" in results["tuned"]:
+        # A greeting is answered, never copied. This is an absolute gate, not a
+        # comparison with the base model, because a base model that also echoes
+        # is not a bar worth clearing.
+        _echo_rate = results["tuned"]["echo"]["rate"]
+        bars.append({"task": "Conversation", "measure": "echo rate",
+                     "tuned": _echo_rate, "bar": 0.0, "bar_from": "gate",
+                     "meets": bool(_echo_rate == 0.0)})
+
     met = sum(item["meets"] for item in bars)
     results["head_to_head"] = {
         "rows": bars,
@@ -473,6 +519,9 @@ else:
         print(f"{'conversation F1':22s}  {results['tuned']['project']['token_f1']:.3f}"
               + (f"  (base {results['base']['project']['token_f1']:.3f})"
                  if "project" in results["base"] else ""))
+    if "echo" in results["tuned"]:
+        print(f"{'greeting echo':22s}  {results['tuned']['echo']['echoed']}/{results['tuned']['echo']['n']} "
+              f"repeated verbatim (base {results['base']['echo']['echoed']}/{results['base']['echo']['n']})")
 
     _h2h = results.get("head_to_head") or {}
     if _h2h.get("rows"):

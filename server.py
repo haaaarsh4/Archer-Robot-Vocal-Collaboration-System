@@ -72,7 +72,30 @@ async def _prewarm_rmvpe():
         except Exception as e:
             print(f"[startup] RMVPE pre-warm failed: {e}")
 
+        threading.Thread(target=_load, daemon=True).start()
+
+
+@app.on_event("startup")
+async def _warm_chat_model():
+    """Load the chat model once, at startup, and ask Ollama to hold it.
+
+    A 4.7 GB model that is loaded on the first question makes the first question
+    of a session the slowest thing on the site; loading it here moves that cost
+    to boot, where nothing is waiting on it and the console says it happened.
+    """
+
+    def _load():
+        try:
+            from chat.chat_api import warm_chat_model
+            if warm_chat_model():
+                print("[startup] Archer chat model loaded and held.")
+            else:
+                print("[startup] Archer chat model not warmed (see the log above).")
+        except Exception as e:  # noqa: BLE001 - the site still runs without chat
+            print(f"[startup] chat model warm-up failed: {e}")
+
     threading.Thread(target=_load, daemon=True).start()
+
 
 broadcast_queue: _queue.Queue = _queue.Queue(maxsize=64)
 pipeline_running = False
