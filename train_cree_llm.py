@@ -2282,19 +2282,32 @@ def leak_key(text: str) -> str:
     return " ".join(_LEAK_SEPARATOR.sub(" ", text).split())
 
 
-def leak_sentences(value):
-    """Every sentence inside a row, whatever shape the row is."""
+# Only text fields may be compared. A held-out row also carries `source` and
+# `licence`, and treating those as held-out text deleted 63,494 of 91,283 rows:
+# every Watkins row shares the licence string with the one held-out Watkins row.
+_LEAK_TEXT_FIELDS = ("text", "cree", "english", "question", "answer", "context", "content")
+# A single word is not a sentence. Half the benchmark rows have a one-word
+# English answer ("yes"), and matching those would delete every abstention
+# example in the instruction data without hiding a single real test sentence.
+_LEAK_MIN_WORDS = 2
+
+
+def leak_sentences(value, fields=_LEAK_TEXT_FIELDS):
+    """Sentences from a row's text fields, ignoring metadata."""
     if isinstance(value, str):
         for piece in _LEAK_SENTENCE_END.split(value):
             key = leak_key(piece)
-            if key:
+            if len(key.split()) >= _LEAK_MIN_WORDS:
                 yield key
     elif isinstance(value, dict):
-        for item in value.values():
-            yield from leak_sentences(item)
+        for key, item in value.items():
+            if key in fields:
+                yield from leak_sentences(item, fields)
+            elif isinstance(item, (dict, list, tuple)):
+                yield from leak_sentences(item, fields)
     elif isinstance(value, (list, tuple)):
         for item in value:
-            yield from leak_sentences(item)
+            yield from leak_sentences(item, fields)
 
 
 def held_out_keys() -> set[str]:
@@ -2688,6 +2701,14 @@ else:
     lm["dev"] = without_held_out(lm["dev"], _heldout)
     tr["train"] = without_held_out(tr["train"], _heldout)
     tr["dev"] = without_held_out(tr["dev"], _heldout)
+    _lm_dropped = _lm_before - len(lm["train"])
+    if _lm_before and _lm_dropped / _lm_before > 0.02:
+        raise RuntimeError(
+            f"held-out purge would delete {_lm_dropped:,} of {_lm_before:,} lm rows "
+            f"({100 * _lm_dropped / _lm_before:.1f}%). The test set cannot explain "
+            "that, so the guard is matching something it should not. Nothing was "
+            "written."
+        )
     log(f"held-out purge: {_lm_before - len(lm['train'])} lm and "
         f"{_tr_before - len(tr['train'])} pair train rows repeated the test set")
 
@@ -4733,8 +4754,14 @@ _leak_keys = held_out_keys()
 _train_before, _val_before = len(train), len(val)
 train = without_held_out(train, _leak_keys)
 val = without_held_out(val, _leak_keys)
+_sft_dropped = _train_before - len(train)
+if _train_before and _sft_dropped / _train_before > 0.05:
+    raise RuntimeError(
+        f"SFT: the held-out guard would drop {_sft_dropped:,} of {_train_before:,} "
+        "instruction rows, which is far more than the test set can explain"
+    )
 if len(train) != _train_before or len(val) != _val_before:
-    log(f"SFT: dropped {_train_before - len(train)} train and "
+    log(f"SFT: dropped {_sft_dropped} train and "
         f"{_val_before - len(val)} validation rows that quoted a held-out sentence")
 
 write_jsonl(PROC / "sft_train.jsonl", train)

@@ -25,6 +25,10 @@ import re
 from pathlib import Path
 
 TRAINING_FILES = ("lm_train.jsonl", "sft_train.jsonl", "parallel_train.jsonl")
+# A one-word answer is not a sentence: many held-out rows answer "yes", and
+# counting that as a leak says nothing about generalisation while making every
+# abstention example in the training data look like a leak.
+_MIN_WORDS = 2
 _HELD_OUT_DEFAULT = "parallel_test.jsonl"
 # Anything that is not a letter, apostrophe or hyphen is a separator, so
 # "kîsikâw." and "kîsikâw" compare equal.
@@ -66,7 +70,7 @@ def sentences(path: Path) -> set[str]:
             for value in _strings(row):
                 for piece in _SENTENCE_END.split(value):
                     text = normalise(piece)
-                    if text:
+                    if len(text.split()) >= _MIN_WORDS:
                         out.add(text)
     return out
 
@@ -133,7 +137,7 @@ def main() -> int:
     for row in rows:
         for side in ("cree", "english"):
             text = normalise(_SENTENCE_END.split(str(row.get(side) or ""))[0])
-            if not text:
+            if len(text.split()) < _MIN_WORDS:
                 continue
             words = text.split()
             head = " ".join(words[:8]) if len(words) >= 8 else ""
