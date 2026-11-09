@@ -1,7 +1,13 @@
 # The Archer model
 
+`docs/pipeline-best-chatbot.md` is the end to end pipeline for the strongest
+version of this model: Qwen3-14B base, the data programme that reaches 20M tokens
+(morphology synthesis from the FST, back-translation, held-out contamination
+audits), CPT to SFT to DPO, and the acceptance numbers a run must hit before it
+ships.
+
 The chat tab runs one model, trained for this project by
-`Cree_LLM_Training.ipynb` and served as `archer:7b`. It does every job the
+`training/notebooks/Cree_LLM_Training.ipynb` and served as `archer:14b`. It does every job the
 assistant has:
 
 - conversation about Archer's work, the songs and this system
@@ -26,7 +32,7 @@ tokenizer and corpus are added.
 
 ## What the notebook trains
 
-`Cree_LLM_Training.ipynb` is a complete run, not a fine-tuning snippet. It
+`training/notebooks/Cree_LLM_Training.ipynb` is a complete run, not a fine-tuning snippet. It
 downloads the corpus, cleans it, builds a tokenizer, trains in three stages,
 scores the result against its own base model and against the old three-part
 setup, and exports a GGUF.
@@ -43,6 +49,14 @@ setup, and exports a GGUF.
 | CreeBench | chrF++, BLEU, token F1, lexicon validity, code-switch, abstention, perplexity, latency | one BLEU number hides the failures a speaker hears first |
 | Export | merge, convert to GGUF, Q4_K_M, Modelfile | the app runs on a laptop |
 
+Validity is reported twice. `lexicon_validity` counts only words attested in
+the project's lexicon. `validity` also accepts anything matching Cree
+phonotactics, because a held-out sentence can contain a real form the lexicon
+missed. That fallback cannot tell a word from an invention: `mâtawâ pîkwâc`
+passes the phonotactic test and is not Cree. The gate is on
+`lexicon_validity`; the looser number is kept only so earlier figures remain
+comparable.
+
 The notebook's report card records every source and its licence. NoDerivatives
 material in the EdTeKLA collection is excluded at the loader; NonCommercial
 ShareAlike material is included only while the model itself carries that
@@ -50,7 +64,7 @@ licence.
 
 ## Running it
 
-Open `Cree_LLM_Training.ipynb` in Colab. Select **Runtime → Change runtime type
+Open `training/notebooks/Cree_LLM_Training.ipynb` in Colab. Select **Runtime → Change runtime type
 → A100** for the full recipe, or set `CREE_PROFILE=t4` for a 16 GB T4. The
 notebook writes checkpoints to Google Drive when it is mounted, so a dropped
 session does not lose the run.
@@ -130,7 +144,7 @@ The full run is roughly:
 | `huge` | Qwen2.5-32B-Instruct | 2048 | about a day on an 80 GB A100; merging needs a separate machine with roughly 160 GB of RAM |
 | `smoke` | Qwen2.5-0.5B-Instruct | 384 | minutes, for checking the pipeline |
 
-The model is deliberately a 7B by default. That is the largest size whose
+The model is a 7B by default. That is the largest size whose
 Q4_K_M export runs comfortably on the laptop that runs the app, and the
 tokenizer and data work matter more here than another ten billion parameters.
 `CREE_PROFILE=big` and `CREE_PROFILE=huge` are there when you want the larger
@@ -151,7 +165,7 @@ remaining modern and reference material.
 After cleaning, the full profile has **1,124,146 words across 66,071
 sentences**, 10,934 training pairs and 203 held-out pairs, plus 57,579 lexicon
 forms. That is roughly eight times the text the previous notebook used. The
-smoke profile deliberately uses a small slice, which is why its report shows a
+smoke profile uses a small slice, which is why its report shows a
 smaller number; the full profile uses every accepted document. The tokenizer,
 the embedding initialisation, the English replay and the instruction mix are
 how the notebook gets the most out of that, and the upload folder is how it
@@ -162,29 +176,29 @@ than another ten billion parameters.
 
 ```bash
 mkdir -p assets/archer_llm
-cp archer-7b.Q4_K_M.gguf assets/archer_llm/
+cp archer-14b.Q4_K_M.gguf assets/archer_llm/
 cp Modelfile assets/archer_llm/
-cd assets/archer_llm && ollama create archer:7b -f Modelfile
+cd assets/archer_llm && ollama create archer:14b -f Modelfile
 ```
 
 `config/config.yaml` already points at that tag:
 
 ```yaml
 chat:
-  model: archer:7b
+  model: archer:14b
   temperature: 0.3
   max_tokens: 500
 ```
 
 For `chat.backend: llama_cpp`, set `chat.gguf_path` to the same
-`archer-7b.Q4_K_M.gguf` file. It is the same model, not a smaller fallback.
+`archer-14b.Q4_K_M.gguf` file. It is the same model, not a smaller fallback.
 
 If the tag is missing, the chat returns a 503 with the `ollama create` command.
 It does not answer from another model, because another model would not be this
 assistant. Every reply reports the model and the task it used:
 
 ```json
-{"reply": "...", "task": "song_notes", "language": "english", "model": "archer:7b", "sources": ["Horse.md"]}
+{"reply": "...", "task": "song_notes", "language": "english", "model": "archer:14b", "sources": ["Horse.md"]}
 ```
 
 `task` is `song_notes`, `chat`, `translate` or `orthography`. It describes the

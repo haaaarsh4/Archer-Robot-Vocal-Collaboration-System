@@ -52,9 +52,7 @@ class SingSongEngine:
         self.load_error: str | None = None
         self.load_seconds: float | None = None
 
-    # ------------------------------------------------------------------
     # Loading and status
-    # ------------------------------------------------------------------
     @staticmethod
     def _resolve_device(value: str) -> torch.device:
         if value in (None, "", "auto"):
@@ -128,9 +126,7 @@ class SingSongEngine:
             )
         return model.to(self.device, dtype=self.dtype).eval()
 
-    # ------------------------------------------------------------------
     # Generation
-    # ------------------------------------------------------------------
     @torch.no_grad()
     def generate(
         self,
@@ -142,7 +138,7 @@ class SingSongEngine:
         """Generate an instrumental for a mono vocal waveform.
 
         Returns ``instrumental`` and ``mix`` at ``sample_rate`` plus metadata.
-        The input vocal is never codec-round-tripped; the paper deliberately
+        The input vocal is never codec-round-tripped; the paper 
         mixes the original waveform with the decoded instrumental.
         """
         if not self.loaded:

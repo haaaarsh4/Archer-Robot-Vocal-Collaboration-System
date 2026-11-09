@@ -244,7 +244,7 @@ window.ragHealth = async function () {
       '\nnote floor: ' + Number(d.note_floor).toFixed(2) +
       '\nmodel: ' + (d.model || 'not set') + ' via ' + d.backend +
       '\ninstalled: ' + (d.model_installed === true ? 'yes'
-        : d.model_installed === false ? 'no, run ollama create archer:7b -f Modelfile'
+        : d.model_installed === false ? 'no, run ollama create ' + (d.model || 'the exported tag') + ' -f Modelfile'
         : 'cannot tell, the backend did not answer') +
       '\nspoken replies: ' + (d.tts_ready ? 'Piper voice configured' : 'text replies, with spoken replies available when a Piper voice is set');
   } catch (e) {
@@ -295,7 +295,10 @@ window.creeLicence = function (kind, btn) {
   });
   document.querySelectorAll('[data-licence-filter]').forEach(b => b.classList.toggle('is-on', b === btn));
   const count = document.getElementById('cree-licence-count');
-  if (count) count.textContent = 'Showing ' + shown + ' of 15 collections.';
+  if (count) {
+    const total = document.querySelectorAll('#cree-licence-table tbody tr').length;
+    count.textContent = 'Showing ' + shown + ' of ' + total + ' collections.';
+  }
 };
 
 window.creeStage = function (name) {

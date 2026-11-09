@@ -1,0 +1,347 @@
+/* ============================================================
+   Archer Pechawis, Vocal Collaboration System
+   The door.
+
+   These rules are loaded after site.css, so every value here comes
+   out of the same token block the rest of the site is set in: the
+   paper, the ink, the ochre, the hairline, the house easing curves
+   and the two faces the wordmark and the captions already wear.
+
+   Nothing in this file is a second design. The card is one plate on
+   the paper: a hairline, a radius of the same 22px the site's cards
+   use, one soft shadow, the signature set in Mr De Haviland at the
+   size the top bar sets it, and the caption under it in the same
+   8.5px mono at 0.34em the bar's own caption uses, because that
+   pair is what the masthead is and the door should look like the
+   masthead.
+
+   While the door is up, the sheet behind it is blurred at the
+   source (a filter on #frame) and then blurred again by the veil's
+   own backdrop, under a tint of the paper. Two blurs is not an
+   accident: one alone leaves the type behind the card reading as
+   ghosts and the second settles it into colour and shape, which is
+   what the reference does to a page it has covered.
+   ============================================================ */
+
+/* ========================================================== 1. the shut sheet */
+
+html.archer-gated { overflow: hidden; }
+html.archer-gated body { overflow: hidden !important; }
+
+/* The sheet, the bar and the chat button are the whole of what can be on
+   screen. The transition is declared on the element, not on the gated state, so
+   lifting the door brings the page back into focus over the same 0.7s the card
+   takes to leave. */
+#frame, .topbar { transition: filter 0.7s var(--ease, cubic-bezier(0.22, 1, 0.36, 1)); }
+
+/* THE FIRST FRAME OF A GATED PAGE IS PAPER, NOT A HALF-DRAWN PAGE.
+
+   The head script puts `archer-gated` on <html> before the body is parsed, so
+   the page never paints readable words. But the door itself does not exist
+   until the body is parsed and does not animate in until it is in the
+   document: for the first few frames there was a blurred sheet with nothing
+   over it, which on a refresh read as a page that had failed halfway. The blur
+   used to be part of `archer-gated` and is now part of `gate-ready`, which
+   script adds one frame after the card is in place.
+
+   Until then a sheet of paper covers the window, from the first paint, and
+   fades as the veil and the card arrive. Paper, then a door on it; never a
+   blurred page with no door. */
+html.archer-gated body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  /* the site's own paper, not the card's: the first frame should be the colour
+     the page already is, so the cover fading leaves no step in tone */
+  background: var(--paper, #e7e5df);
+  transition: opacity 0.45s var(--ease);
+}
+html.archer-gated.gate-ready body::before { opacity: 0; }
+
+html.archer-gated.gate-ready #frame,
+html.archer-gated.gate-ready .topbar { filter: blur(14px) saturate(0.9); }
+html.archer-gated.gate-ready #archer-chat-fab { filter: blur(12px); }
+
+/* THE PAGE BEHIND THE DOOR DOES NOT ARRIVE WHILE THE DOOR IS UP.
+
+   The home page plays a staged arrival of its own (site.css, "the landing
+   arrival"): the plates come up one after another over about two and a half
+   seconds. A first visit is exactly when it plays, and behind a blurred veil
+   the tail of it reads as a page still assembling, then finishes after the
+   door is open and the visitor has been looking at the card for a while. The
+   arrival is skipped outright while the sheet is gated: what sits behind the
+   card is the finished front door, still, and signing in lands on a page at
+   rest. A visit that is already signed in never sees the door, and still gets
+   its arrival. */
+html.archer-gated body.is-entering .film-card,
+html.archer-gated body.is-entering .film-caption,
+html.archer-gated body.is-entering .eq-btn,
+html.archer-gated body.is-entering .sig-sub,
+html.archer-gated body.is-entering .nav-status { animation: none; }
+
+/* ========================================================== 2. the door itself */
+
+#archer-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+#archer-gate[hidden] { display: none; }
+
+.gate-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(231, 229, 223, 0.46);
+  -webkit-backdrop-filter: blur(2px) saturate(1.02);
+  backdrop-filter: blur(2px) saturate(1.02);
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+}
+#archer-gate.is-open .gate-veil { opacity: 1; }
+/* no backdrop-filter (an old browser, or a GPU that refuses it): the tint has
+   to do the whole job on its own, so it does it more heavily */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .gate-veil { background: rgba(231, 229, 223, 0.9); }
+}
+
+/* ========================================================== 3. the card */
+
+.gate-card {
+  position: relative;
+  width: min(92vw, 458px);
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  background: var(--paper-2, #f0efe8);
+  border: 1px solid var(--line, rgba(27, 25, 23, 0.14));
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--shadow-2, 0 20px 60px rgba(38, 30, 20, 0.2));
+  padding: 42px 42px 28px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(18px) scale(0.986);
+  transition: opacity 0.5s var(--ease-stage, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform 0.8s var(--ease-stage, cubic-bezier(0.16, 1, 0.3, 1)),
+              border-color 0.3s var(--ease);
+}
+#archer-gate.is-open .gate-card { opacity: 1; transform: none; }
+
+/* the card's lines arrive one after another, the way the menu panel's do:
+   the same 36ms of daylight between them, off the same curve */
+.gate-card > * {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.32s var(--ease), transform 0.5s var(--ease);
+}
+#archer-gate.is-open .gate-card > * {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--g, 0) * 55ms + 90ms);
+}
+.gate-kicker { --g: 0; }
+.gate-sig { --g: 1; }
+.gate-sub { --g: 2; }
+.gate-rule { --g: 3; }
+.gate-label { --g: 4; }
+.gate-field { --g: 5; }
+.gate-msg { --g: 6; }
+.gate-submit { --g: 7; }
+.gate-foot { --g: 8; }
+
+.gate-kicker {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.6;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+/* the masthead, at the bar's own face: the signature, then the line of caps
+   under it. The sizes are the home bar's, pulled down enough to sit in a card. */
+.gate-sig {
+  font-family: var(--sig);
+  font-size: 54px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink);
+  margin: 14px 0 0;
+}
+.gate-sub {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 11px 0 0;
+  white-space: nowrap;
+}
+
+.gate-rule {
+  display: block;
+  width: 46px;
+  height: 1px;
+  margin: 26px auto 24px;
+  background: var(--line);
+}
+
+/* ========================================================== 4. the one field */
+
+.gate-label {
+  display: block;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 2px;
+}
+.gate-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.3s var(--ease);
+}
+.gate-field:focus-within { border-bottom-color: var(--ink); }
+
+/* site.css dresses every input as a filled box with a hairline and a focus
+   ring. The door's one field is an underline instead: the box is the card, and
+   the line under the field is the only rule it needs, so the focus ring and the
+   fill are cleared here as well as at rest. */
+.gate-input,
+.gate-input:focus {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 0 11px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  -webkit-text-security: none;
+}
+.gate-input::placeholder {
+  font-family: var(--sans);
+  font-size: 14px;
+  letter-spacing: -0.005em;
+  color: var(--ink-3);
+  opacity: 0.85;
+}
+/* Chrome draws a yellow box on an autofilled password; the sheet is paper */
+.gate-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 40px var(--paper-2) inset;
+}
+
+.gate-reveal {
+  flex: none;
+  padding: 8px 0 10px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.gate-reveal:hover, .gate-reveal:focus-visible { color: var(--ochre); }
+.gate-reveal:focus-visible { outline: 1px solid var(--ink-3); outline-offset: 3px; }
+
+/* A message slot that is always there, so the card does not jump a line the
+   first time something goes wrong. */
+.gate-msg {
+  min-height: 18px;
+  margin: 11px 0 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ochre);
+}
+
+/* ========================================================== 5. the way in */
+
+.gate-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: background-color 0.3s var(--ease), transform 0.2s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.gate-submit:hover { background: var(--ochre); }
+.gate-submit:active { transform: scale(0.995); }
+.gate-submit:focus-visible { outline: 1px solid var(--ink-3); outline-offset: 3px; }
+.gate-submit svg { width: 15px; height: 15px; flex: none; }
+.gate-submit[disabled] { background: var(--paper-3); color: var(--ink-3); cursor: default; }
+
+.gate-foot {
+  margin: 17px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+/* ========================================================== 6. wrong */
+
+.gate-card.is-wrong {
+  border-color: rgba(165, 50, 28, 0.36);
+  animation: gate-shake 0.46s var(--ease) both;
+}
+@keyframes gate-shake {
+  0%, 100% { transform: translateX(0); }
+  18%      { transform: translateX(-7px); }
+  38%      { transform: translateX(6px); }
+  58%      { transform: translateX(-4px); }
+  78%      { transform: translateX(3px); }
+}
+
+/* ========================================================== 7. small screens */
+
+@media (max-width: 560px) {
+  #archer-gate { padding: 18px; }
+  .gate-card { padding: 34px 24px 22px; }
+  .gate-sig { font-size: 46px; }
+  .gate-sub { font-size: 8px; letter-spacing: 0.28em; }
+  .gate-rule { margin: 22px auto 20px; }
+}
+@media (max-height: 560px) {
+  #archer-gate { align-items: flex-start; }
+}
+
+/* ========================================================== 8. no motion */
+
+@media (prefers-reduced-motion: reduce) {
+  #frame, .topbar, .gate-veil, .gate-card, .gate-card > * {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
+  .gate-card.is-wrong { animation: none; }
+}

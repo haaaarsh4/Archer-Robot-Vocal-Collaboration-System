@@ -244,7 +244,7 @@ def main() -> int:
     say("")
     ok = True
     # What the join must not do is drop the line out. Both schemes cross the
-    # two chunks, so neither is expected to, and the honest reading of the
+    # two chunks, so neither is expected to, and the accurate reading of the
     # numbers above is which one lands closer to the line's own level and
     # whether either clicks.
     if abs(n["level_db"]) > 3.0 and not n["quiet_source"]:

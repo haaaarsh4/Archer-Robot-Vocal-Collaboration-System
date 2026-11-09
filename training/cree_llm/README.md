@@ -3,7 +3,7 @@
 This pipeline trains the one chat model the app runs, covering conversation,
 song-note answers, translation, orthography and word explanation in a single
 adapter. The notebook to open in Colab is
-**[`Cree_LLM_Training.ipynb`](../../Cree_LLM_Training.ipynb)** in the repository
+**[`Cree_LLM_Training.ipynb`](../notebooks/Cree_LLM_Training.ipynb)** in the repository
 root. It is generated from the files in `cells/`. Edit the
 cell sources, never the notebook, then rebuild:
 
@@ -120,5 +120,5 @@ are generated from the run's own report and licence ledger, not retyped.
 | `build_notebook.py` | assembles and validates the `.ipynb` |
 | `build_trainer.py` | assembles and validates the standalone `.py` |
 | `run_cells.py` | executes the cell sources outside Colab |
-| `../../Cree_LLM_Training.ipynb` | the generated notebook, this is the file you run in Colab |
+| `../notebooks/Cree_LLM_Training.ipynb` | the generated notebook, this is the file you run in Colab |
 | `../../train_cree_llm.py` | the generated trainer, the file you run on a server |

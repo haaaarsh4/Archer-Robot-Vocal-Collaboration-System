@@ -130,7 +130,7 @@
           <tr><td>Key</td><td><code>synthesis/harmony_engine.py</code></td><td>256-pitch history → root + mode</td><td>Krumhansl–Kessler correlation, re-estimated every 43 frames (about once a second), never per note.</td></tr>
           <tr><td>Decision</td><td><code>synthesis/accompaniment_modes.py</code></td><td>context → mode, target Hz, action</td><td>Protocol silence is checked before anything musical; the rest is an ordered checklist.</td></tr>
           <tr><td>Voice</td><td><code>synthesis/vocable_synthesizer.py</code></td><td>decision → stereo audio</td><td>Vowel, texture and vibrato are applied here; the neural stage receives separate stems, never a mix.</td></tr>
-          <tr><td>Timing</td><td><code>output/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
+          <tr><td>Timing</td><td><code>core/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
         </tbody>
       </table>
     </div>
@@ -156,7 +156,7 @@
   <section class="paper-card">
     <p class="paper-num"><b>04</b> Runtime</p>
     <h2 class="paper-h2">A small family of processes, and why they are not one</h2>
-    <p class="paper-lede">The app is deliberately not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
+    <p class="paper-lede">The app is not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
 
     <figure class="paper-figure">
       <div class="plate">
@@ -222,7 +222,7 @@
       <div class="stack-row"><div class="stack-name">aubio<span>pitch + level</span></div><div class="stack-why">YIN and dBFS in a small C library with Python bindings, fast enough to run every frame on a CPU. A pure-Python YIN was measured against it and lost on both speed and octave stability.</div><div class="stack-buys"><b>Buys:</b> a real-time detector with no GPU. <b>Costs:</b> a native dependency that has to be installed, not pip-imported from pure Python.</div></div>
       <div class="stack-row"><div class="stack-name">PyTorch<span>neural models</span></div><div class="stack-why">RMVPE, the RVC sidecar, the Cree tagger and the SingSong models are all torch graphs. One runtime means one checkpoint format, one device switch and one set of tensor contracts.</div><div class="stack-buys"><b>Buys:</b> GPU when available, CPU when not. <b>Costs:</b> a large install, kept out of the base requirement file where possible.</div></div>
       <div class="stack-row"><div class="stack-name">Vanilla JS + Web Audio<span>frontend</span></div><div class="stack-why">The site is a set of documents with small live instruments, not a single-page application. There is no build step, no bundler and no framework to upgrade; every page is readable in view-source and loads instantly from disk.</div><div class="stack-buys"><b>Buys:</b> zero build risk and direct access to the audio graph. <b>Costs:</b> shared behaviour lives in plain functions and has to be kept tidy by hand.</div></div>
-      <div class="stack-row"><div class="stack-name">Ollama or llama.cpp<span>chat</span></div><div class="stack-why">A local instruct model is the only way to answer questions about Archer's notes without sending them anywhere. There is one chat model, <code>archer:7b</code>, and it answers conversation, song-note questions, translation and script conversion; it is installed from a single export. Ollama manages that model's lifecycle; llama.cpp is the single-process alternative for the same GGUF.</div><div class="stack-buys"><b>Buys:</b> privacy and offline operation. <b>Costs:</b> the model has to be installed once, and the app must explain that clearly when it is absent.</div></div>
+      <div class="stack-row"><div class="stack-name">Ollama or llama.cpp<span>chat</span></div><div class="stack-why">A local instruct model is the only way to answer questions about Archer's notes without sending them anywhere. There is one chat model, <code>archer:14b</code>, and it answers conversation, song-note questions, translation and script conversion; it is installed from a single export. Ollama manages that model's lifecycle; llama.cpp is the single-process alternative for the same GGUF.</div><div class="stack-buys"><b>Buys:</b> privacy and offline operation. <b>Costs:</b> the model has to be installed once, and the app must explain that clearly when it is absent.</div></div>
       <div class="stack-row"><div class="stack-name">FluidSynth + SoundFont<span>band</span></div><div class="stack-why">A sampled piano, bass and drum kit sound like instruments; an additive oscillator sounds like a test signal. FluidSynth renders a MIDI arrangement through a General MIDI bank, and the MIDI file remains editable in any DAW.</div><div class="stack-buys"><b>Buys:</b> an arrangement that can be listened to as music. <b>Costs:</b> an optional native library; the numpy synth stays as the deterministic fallback.</div></div>
     </div>
   </section>
@@ -257,8 +257,162 @@
     <p class="paper-caption">The demo reports the nearest equal-tempered note and the cents deviation. A reading inside ±15 cents is drawn as in tune; the bar shows the raw deviation before any smoothing.</p>
   </section>
 
+  <section class="paper-card">
+    <p class="paper-num"><b>08</b> The language layer</p>
+    <h2 class="paper-h2">Two pipelines: one answers a message, one builds the model that answers it</h2>
+    <p class="paper-lede">The chat panel is not a prompt wrapped around a model. A message is identified, routed, given evidence, answered and then checked, and the model doing the answering came out of a second pipeline whose every stage is recorded in a ledger. These two figures are those pipelines, with the file that owns each step.</p>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 470" role="img" aria-label="Chat answer path: message, learned language identifier, router, evidence, archer:14b, then the task, output language and guardrail decisions">
+          <defs>
+            <marker id="c4-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker>
+            <linearGradient id="c4-glow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2b4d"/><stop offset="1" stop-color="#111a2e"/></linearGradient>
+          </defs>
+          <rect width="1080" height="470" fill="#0b1120"/>
+          <text x="40" y="52" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="24" font-weight="600">The answer path</text>
+          <text x="40" y="76" fill="#7d90b3" font-family="Space Mono, monospace" font-size="10.5" letter-spacing="2">ARCHER BOT / ONE MESSAGE, ONE PROMPT, ONE MODEL</text>
+
+          <rect x="40" y="120" width="176" height="104" rx="8" fill="url(#c4-glow)" stroke="#2a3d63"/>
+          <text x="128" y="158" fill="#e8edf7" font-size="13" text-anchor="middle">Visitor message</text>
+          <text x="128" y="180" fill="#8195b8" font-size="10" text-anchor="middle">any language, any script</text>
+          <text x="128" y="198" fill="#8195b8" font-size="10" text-anchor="middle">English · SRO · syllabics</text>
+
+          <rect x="250" y="120" width="176" height="104" rx="8" fill="url(#c4-glow)" stroke="#2a3d63"/>
+          <text x="338" y="152" fill="#e8edf7" font-size="13" text-anchor="middle">Language identifier</text>
+          <text x="338" y="172" fill="#8195b8" font-size="10" text-anchor="middle">char 2–5-grams, logistic</text>
+          <text x="338" y="188" fill="#8195b8" font-size="10" text-anchor="middle">12,499 Cree · 9,915 English</text>
+          <text x="338" y="206" fill="#e0a06a" font-size="10" text-anchor="middle">cr · en · mixed · und</text>
+
+          <rect x="460" y="120" width="176" height="104" rx="8" fill="url(#c4-glow)" stroke="#2a3d63"/>
+          <text x="548" y="152" fill="#e8edf7" font-size="13" text-anchor="middle">Router</text>
+          <text x="548" y="172" fill="#8195b8" font-size="10" text-anchor="middle">task, payload, language</text>
+          <text x="548" y="188" fill="#8195b8" font-size="10" text-anchor="middle">unwraps “translate this:”</text>
+          <text x="548" y="206" fill="#8195b8" font-size="10" text-anchor="middle">resolves “that” from history</text>
+
+          <rect x="670" y="120" width="176" height="104" rx="8" fill="url(#c4-glow)" stroke="#2a3d63"/>
+          <text x="758" y="152" fill="#e8edf7" font-size="13" text-anchor="middle">Evidence</text>
+          <text x="758" y="172" fill="#8195b8" font-size="10" text-anchor="middle">song notes · memory</text>
+          <text x="758" y="188" fill="#8195b8" font-size="10" text-anchor="middle">web results</text>
+          <text x="758" y="206" fill="#8195b8" font-size="10" text-anchor="middle">context, never a new task</text>
+
+          <rect x="880" y="120" width="176" height="104" rx="8" fill="url(#c4-glow)" stroke="#3b5c96"/>
+          <text x="968" y="152" fill="#f2f5fb" font-size="13" text-anchor="middle" font-weight="600">archer:14b</text>
+          <text x="968" y="172" fill="#8195b8" font-size="10" text-anchor="middle">Ollama on 11434</text>
+          <text x="968" y="188" fill="#8195b8" font-size="10" text-anchor="middle">Qwen2.5-14B + LoRA</text>
+          <text x="968" y="206" fill="#8195b8" font-size="10" text-anchor="middle">no router inside it</text>
+
+          <path d="M216 172 H244" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c4-arrow)"/>
+          <path d="M426 172 H454" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c4-arrow)"/>
+          <path d="M636 172 H664" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c4-arrow)"/>
+          <path d="M846 172 H874" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c4-arrow)"/>
+
+          <text x="128" y="244" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">POST /api/chat</text>
+          <text x="338" y="244" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">chat/language_id.py</text>
+          <text x="548" y="244" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">chat/archer_prompt.py</text>
+          <text x="758" y="244" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">chat/rag_index.py</text>
+          <text x="968" y="244" fill="#6f86aa" font-family="Space Mono, monospace" font-size="9" text-anchor="middle">config.yaml → chat.model</text>
+
+          <rect x="40" y="286" width="320" height="104" rx="8" fill="#0f1728" stroke="#34517f"/>
+          <text x="58" y="312" fill="#9fb0cc" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="1.5">TASK</text>
+          <text x="58" y="334" fill="#e8edf7" font-size="11.5">chat · song_notes · translate · orthography</text>
+          <text x="58" y="354" fill="#8195b8" font-size="9.5">Decided from the message, not from a menu.</text>
+          <text x="58" y="370" fill="#8195b8" font-size="9.5">“How do you say river in Cree?” sends river.</text>
+
+          <rect x="380" y="286" width="320" height="104" rx="8" fill="#0f1728" stroke="#34517f"/>
+          <text x="398" y="312" fill="#9fb0cc" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="1.5">OUTPUT LANGUAGE</text>
+          <text x="398" y="334" fill="#e8edf7" font-size="11.5">Cree in, Cree out. English in, English out.</text>
+          <text x="398" y="354" fill="#8195b8" font-size="9.5">A Cree message is answered in Cree without</text>
+          <text x="398" y="370" fill="#8195b8" font-size="9.5">being asked. “Answer in English” is obeyed.</text>
+
+          <rect x="720" y="286" width="336" height="104" rx="8" fill="#0f1728" stroke="#34517f"/>
+          <text x="738" y="312" fill="#9fb0cc" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="1.5">GUARDS BEFORE IT IS SHOWN</text>
+          <text x="738" y="334" fill="#e8edf7" font-size="11.5">Copied English, loops and script are caught</text>
+          <text x="738" y="354" fill="#8195b8" font-size="9.5">An English answer that arrives in Cree is retried.</text>
+          <text x="738" y="370" fill="#8195b8" font-size="9.5">A Cree answer is paired with its English reading.</text>
+
+          <text x="40" y="436" fill="#6f86aa" font-family="Space Mono, monospace" font-size="10" letter-spacing="1.5">FIG. A4</text>
+          <text x="1056" y="436" fill="#6f86aa" font-family="Space Mono, monospace" font-size="10" text-anchor="end" letter-spacing="1.5">LANGUAGE IS LEARNED, NOT LISTED</text>
+        </svg>
+        <div class="plate-foot"><span>Figure A4 · the answer path</span><span>solid border = the model itself</span></div>
+      </div>
+      <figcaption class="paper-caption"><b>The identifier is the first thing that touches a message.</b> It is not a list of Cree words: it is a linear classifier over character n-grams, trained on this project's own corpus, which is what lets it read a word nobody wrote into a list. It returns a message label, a per-word reading and the share of decided words that are Cree, and the router answers in the language the visitor used. The four boxes before the model are all Python in this repository; only the last one is weights.</figcaption>
+    </figure>
+
+    <figure class="paper-figure">
+      <div class="plate">
+        <svg viewBox="0 0 1080 430" role="img" aria-label="Training pipeline: corpus, clean, tokenizer, continued pretraining, instruction tuning, preference tuning, evaluation and export, with the size of each stage">
+          <defs>
+            <marker id="c5-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#6f8cff"/></marker>
+            <marker id="c5-arrow-w" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e0a06a"/></marker>
+            <linearGradient id="c5-glow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2b4d"/><stop offset="1" stop-color="#111a2e"/></linearGradient>
+          </defs>
+          <rect width="1080" height="430" fill="#0b1120"/>
+          <text x="40" y="52" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="24" font-weight="600">The training pipeline</text>
+          <text x="40" y="76" fill="#7d90b3" font-family="Space Mono, monospace" font-size="10.5" letter-spacing="2">ONE COMMAND / EIGHT STAGES / A LEDGER THAT SURVIVES A DISCONNECT</text>
+
+          <rect x="40" y="110" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="145" y="140" fill="#e8edf7" font-size="12.5" text-anchor="middle">corpus</text>
+          <text x="145" y="162" fill="#8195b8" font-size="10" text-anchor="middle">12,661 documents</text>
+          <text x="145" y="180" fill="#8195b8" font-size="10" text-anchor="middle">13,842 aligned pairs</text>
+
+          <rect x="300" y="110" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="405" y="140" fill="#e8edf7" font-size="12.5" text-anchor="middle">clean</text>
+          <text x="405" y="162" fill="#8195b8" font-size="10" text-anchor="middle">67,154 sentences</text>
+          <text x="405" y="180" fill="#8195b8" font-size="10" text-anchor="middle">leakage + contamination repair</text>
+
+          <rect x="560" y="110" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="665" y="140" fill="#e8edf7" font-size="12.5" text-anchor="middle">tokenizer</text>
+          <text x="665" y="162" fill="#8195b8" font-size="10" text-anchor="middle">3,949 grafted tokens</text>
+          <text x="665" y="180" fill="#8195b8" font-size="10" text-anchor="middle">fertility −23.1%</text>
+
+          <rect x="820" y="110" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="925" y="140" fill="#e8edf7" font-size="12.5" text-anchor="middle">cpt</text>
+          <text x="925" y="162" fill="#8195b8" font-size="10" text-anchor="middle">3,695 packed examples</text>
+          <text x="925" y="180" fill="#8195b8" font-size="10" text-anchor="middle">462 steps · 137 min</text>
+
+          <rect x="40" y="250" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="145" y="280" fill="#e8edf7" font-size="12.5" text-anchor="middle">sft</text>
+          <text x="145" y="302" fill="#8195b8" font-size="10" text-anchor="middle">7,268 steps · 14.4 h</text>
+          <text x="145" y="320" fill="#8195b8" font-size="10" text-anchor="middle">completion-only loss</text>
+
+          <rect x="300" y="250" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="405" y="280" fill="#e8edf7" font-size="12.5" text-anchor="middle">dpo</text>
+          <text x="405" y="302" fill="#8195b8" font-size="10" text-anchor="middle">faithfulness pairs</text>
+          <text x="405" y="320" fill="#8195b8" font-size="10" text-anchor="middle">53 min</text>
+
+          <rect x="560" y="250" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#2a3d63"/>
+          <text x="665" y="280" fill="#e8edf7" font-size="12.5" text-anchor="middle">eval</text>
+          <text x="665" y="302" fill="#8195b8" font-size="10" text-anchor="middle">CreeBench, base vs tuned</text>
+          <text x="665" y="320" fill="#e0a06a" font-size="10" text-anchor="middle">9 of 9 measures</text>
+
+          <rect x="820" y="250" width="210" height="92" rx="8" fill="url(#c5-glow)" stroke="#3b5c96"/>
+          <text x="925" y="280" fill="#f2f5fb" font-size="12.5" text-anchor="middle" font-weight="600">export</text>
+          <text x="925" y="302" fill="#8195b8" font-size="10" text-anchor="middle">merge → Q4_K_M</text>
+          <text x="925" y="320" fill="#8195b8" font-size="10" text-anchor="middle">8.4 GB GGUF + Modelfile</text>
+
+          <path d="M250 156 H294" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M510 156 H554" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M770 156 H814" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M250 296 H294" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M510 296 H554" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M770 296 H814" stroke="#6f8cff" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow)"/>
+          <path d="M925 202 V226 H145 V244" stroke="#e0a06a" stroke-dasharray="5 4" fill="none" marker-end="url(#c5-arrow-w)"/>
+
+          <text x="40" y="388" fill="#8195b8" font-size="10.5">Each finished stage is marked in run_state.json against a fingerprint of its inputs, so a re-run skips it; an interrupted stage resumes from its newest checkpoint-</text>
+          <text x="40" y="404" fill="#8195b8" font-size="10.5">N with optimizer and scheduler state, which is why a closed laptop costs minutes rather than the run.</text>
+
+          <text x="40" y="392" fill="#6f86aa" font-family="Space Mono, monospace" font-size="0" letter-spacing="1.5">.</text>
+          <text x="1056" y="424" fill="#6f86aa" font-family="Space Mono, monospace" font-size="10" text-anchor="end" letter-spacing="1.5">FIG. A5 / RUN 2026-11-08</text>
+        </svg>
+        <div class="plate-foot"><span>Figure A5 · the training pipeline</span><span>times are this machine, not estimates</span></div>
+      </div>
+      <figcaption class="paper-caption"><b>Nothing is written from memory.</b> Every number in this figure comes from <code>run_state.json</code> and the per-stage logs of the run that produced the shipped model: 462 optimizer steps of continued pretraining in 137 minutes, 7,268 steps of instruction tuning in 14.4 hours, then preference tuning, the benchmark and the export. The ledger is why the run survived a closed laptop at step 2,183 and still finished the same morning.</figcaption>
+    </figure>
+  </section>
+
   <section class="paper-card paper-card--tight">
-    <p class="paper-num"><b>08</b> Where to go next</p>
+    <p class="paper-num"><b>09</b> Where to go next</p>
     <h2 class="paper-h2" style="font-size:26px">The map is not the territory</h2>
     <p class="paper-p">The Harmony page opens the decision engine and its ten modes. Vocable Synthesis follows a decision into actual samples, formants and the neural voice. Cree Sentiment covers the language layer, Archer Bot covers retrieval, and Measurements shows every number on this site being produced by a reproducible test.</p>
     <p class="paper-p"><a href="#" onclick="showPage('harmony'); return false;">Harmony</a> · <a href="#" onclick="showPage('synthesis'); return false;">Vocable Synthesis</a> · <a href="#" onclick="showPage('translation'); return false;">Cree Sentiment</a> · <a href="#" onclick="showPage('chat'); return false;">Archer Bot</a> · <a href="#" onclick="showPage('measurements'); return false;">Measurements</a></p>

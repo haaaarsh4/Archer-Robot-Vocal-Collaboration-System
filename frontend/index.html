@@ -1081,267 +1081,6 @@
     .demo-panel-title { font-size: 16px; }
   }
 
-/* ============================================================
-   Archer Chat Widget
-   ============================================================ */
-#archer-chat-fab {
-  position: fixed;
-  bottom: 22px;
-  right: 22px;
-  z-index: 9999;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--accent);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
-}
-#archer-chat-fab:hover { transform: scale(1.06); box-shadow: 0 8px 26px rgba(0,0,0,0.32); }
-#archer-chat-fab:active { transform: scale(0.96); }
-#archer-chat-fab svg { width: 26px; height: 26px; }
-#archer-chat-fab .fab-dot {
-  position: absolute;
-  top: 4px; right: 4px;
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--green);
-  border: 2px solid var(--bg);
-  display: none;
-}  #archer-chat-fab.has-status .fab-dot { display: block; }
-  #archer-chat-fab.is-behind { opacity: 0; transform: scale(0.78); pointer-events: none; }
-
-#archer-chat-panel {
-  position: fixed;
-  bottom: 92px;
-  left: 22px;
-  z-index: 9999;
-  width: 380px;
-  min-width: 300px;
-  max-width: calc(100vw - 44px);
-  height: 560px;
-  min-height: 360px;
-  max-height: calc(100vh - 130px);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.35);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(16px) scale(0.98);
-  pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-  font-family: var(--sans);
-}
-#archer-chat-panel.open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-#archer-chat-panel.resizing { transition: none; }
-
-#archer-chat-panel .ac-resize-handle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nesw-resize;
-  z-index: 2;
-  color: var(--muted);
-  opacity: 0.55;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 2px;
-}
-#archer-chat-panel .ac-resize-handle:hover { opacity: 1; color: var(--accent); }
-#archer-chat-panel .ac-resize-handle svg { width: 11px; height: 11px; }
-
-#archer-chat-panel .ac-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000));
-  color: #fff;
-  flex-shrink: 0;
-}
-#archer-chat-panel .ac-header .ac-title { font-weight: 600; font-size: 14.5px; line-height: 1.2; }
-#archer-chat-panel .ac-header .ac-subtitle { font-size: 11px; opacity: 0.85; font-family: var(--mono); }
-#archer-chat-panel .ac-header .ac-spacer { flex: 1; }
-#archer-chat-panel .ac-header button {
-  background: rgba(255,255,255,0.15);
-  border: none;
-  color: #fff;
-  width: 26px; height: 26px;
-  border-radius: 7px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s ease;
-}
-#archer-chat-panel .ac-header button:hover { background: rgba(255,255,255,0.28); }
-
-#archer-chat-panel .ac-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-#archer-chat-panel .ac-tab {
-  flex: 1;
-  padding: 6px 8px;
-  font-size: 12px;
-  font-family: var(--mono);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-}
-#archer-chat-panel .ac-tab.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-#archer-chat-panel .ac-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-#archer-chat-panel .ac-body::-webkit-scrollbar { width: 6px; }
-#archer-chat-panel .ac-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-#archer-chat-panel .ac-msg {
-  max-width: 86%;
-  padding: 9px 12px;
-  border-radius: 12px;
-  font-size: 13.5px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-#archer-chat-panel .ac-msg.user {
-  align-self: flex-end;
-  background: var(--accent);
-  color: #fff;
-  border-bottom-right-radius: 3px;
-}
-#archer-chat-panel .ac-msg.bot {
-  align-self: flex-start;
-  background: var(--border);
-  color: var(--text);
-  border-bottom-left-radius: 3px;
-}
-#archer-chat-panel .ac-msg.system {
-  align-self: center;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
-  text-align: center;
-  max-width: 100%;
-}
-#archer-chat-panel .ac-msg.error { border: 1px solid var(--red); color: var(--red); background: transparent; }
-#archer-chat-panel .ac-msg .ac-sources {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  opacity: 0.65;
-}
-#archer-chat-panel .ac-msg audio { width: 100%; margin-top: 6px; height: 30px; }
-
-#archer-chat-panel .ac-typing { display: flex; gap: 4px; align-self: flex-start; padding: 9px 12px; }
-#archer-chat-panel .ac-typing span {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
-  animation: ac-bounce 1.1s infinite ease-in-out;
-}
-#archer-chat-panel .ac-typing span:nth-child(2) { animation-delay: 0.15s; }
-#archer-chat-panel .ac-typing span:nth-child(3) { animation-delay: 0.3s; }
-@keyframes ac-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
-
-#archer-chat-panel .ac-inputbar {
-  border-top: 1px solid var(--border);
-  padding: 10px 12px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-#archer-chat-panel .ac-mode-row { display: flex; align-items: center; gap: 8px; font-size: 11px; font-family: var(--mono); color: var(--muted); }
-#archer-chat-panel .ac-mode-row .ac-toggle {
-  display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden;
-}
-#archer-chat-panel .ac-mode-row .ac-toggle button {
-  padding: 3px 8px; font-size: 11px; font-family: var(--mono); border: none; background: transparent;
-  color: var(--muted); cursor: pointer;
-}
-#archer-chat-panel .ac-mode-row .ac-toggle button.active { background: var(--accent); color: #fff; }
-
-#archer-chat-panel .ac-row { display: flex; align-items: flex-end; gap: 6px; }
-#archer-chat-panel .ac-row textarea {
-  flex: 1;
-  resize: none;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-family: var(--sans);
-  font-size: 13px;
-  background: var(--bg);
-  color: var(--text);
-  max-height: 90px;
-  min-height: 36px;
-}
-#archer-chat-panel .ac-row textarea:focus { outline: none; border-color: var(--accent); }
-#archer-chat-panel .ac-iconbtn {
-  width: 34px; height: 34px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-#archer-chat-panel .ac-iconbtn:hover { border-color: var(--accent); color: var(--accent); }
-#archer-chat-panel .ac-iconbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-#archer-chat-panel .ac-iconbtn.primary:hover { opacity: 0.9; }
-#archer-chat-panel .ac-iconbtn.recording { background: var(--red); border-color: var(--red); color: #fff; animation: ac-pulse 1s infinite; }
-@keyframes ac-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-#archer-chat-panel .ac-iconbtn svg { width: 16px; height: 16px; }
-#archer-chat-panel .ac-hint { font-size: 10.5px; color: var(--muted); font-family: var(--mono); text-align: center; }
-
-#archer-chat-panel .ac-sing-panel { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
-#archer-chat-panel .ac-sing-panel p { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
-#archer-chat-panel .ac-sing-record {
-  align-self: center;
-  width: 64px; height: 64px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s ease;
-}
-#archer-chat-panel .ac-sing-record.recording { background: var(--red); animation: ac-pulse 1s infinite; }
-#archer-chat-panel .ac-sing-record svg { width: 26px; height: 26px; }
-#archer-chat-panel .ac-sing-status { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
-
-@media (max-width: 520px) {
-  #archer-chat-panel { left: 12px; right: 12px; width: auto; bottom: 84px; }
-  #archer-chat-fab { right: 16px; bottom: 16px; }
-}
   .download-icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
@@ -1453,300 +1192,6 @@
     .gen-row .gen-select { width: 100%; }
   }
 
-  /* ============================================================
-     Archer Bot, in the paper palette.
-
-     The panel is the same publication as the reading pages: warm ivory,
-     ink type, a serif title, one terracotta rule and no solid colour block.
-     It opens above the button that opened it, on the same right edge, and
-     the empty state gives the first question something to start from
-     instead of a blank stretch of body.
-     ============================================================ */
-  #archer-chat-panel {
-    left: auto;
-    right: 22px;
-    bottom: 92px;
-    width: 408px;
-    height: 590px;
-    background: #f8f6f0;
-    border: 1px solid rgba(27, 25, 23, 0.14);
-    border-radius: 22px;
-    color: #1b1917;
-    box-shadow: 0 34px 90px rgba(38, 30, 20, 0.24), 0 1px 0 rgba(255, 255, 255, 0.75) inset;
-  }
-  #archer-chat-panel::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--ochre);
-    border-radius: 22px 22px 0 0;
-    z-index: 3;
-  }
-  #archer-chat-panel .ac-resize-handle { color: #8f8a80; top: 6px; right: 6px; }
-  #archer-chat-panel .ac-resize-handle:hover { color: var(--ochre); }
-
-  #archer-chat-panel .ac-header {
-    background: transparent;
-    color: #1b1917;
-    border-bottom: 1px solid rgba(27, 25, 23, 0.09);
-    padding: 20px 20px 15px;
-    gap: 12px;
-  }
-  #archer-chat-panel .ac-seal {
-    width: 36px; height: 36px;
-    flex: 0 0 36px;
-    border-radius: 50%;
-    background: var(--ochre);
-    color: #fff8f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--serif);
-    font-style: italic;
-    font-size: 21px;
-    line-height: 1;
-    padding-bottom: 2px;
-  }
-  #archer-chat-panel .ac-header .ac-title {
-    font-family: var(--serif);
-    font-style: italic;
-    font-weight: 400;
-    font-size: 25px;
-    line-height: 1;
-    letter-spacing: -0.01em;
-  }
-  #archer-chat-panel .ac-header .ac-subtitle {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #8f8a80;
-    margin-top: 5px;
-    opacity: 1;
-  }
-  #archer-chat-panel .ac-header button {
-    background: transparent;
-    border: 1px solid rgba(27, 25, 23, 0.14);
-    color: #6c665d;
-    width: 30px; height: 30px;
-    border-radius: 50%;
-  }
-  #archer-chat-panel .ac-header button:hover { background: #fffdf8; color: #1b1917; border-color: rgba(27, 25, 23, 0.32); }
-
-  #archer-chat-panel .ac-tabs {
-    background: transparent;
-    border-bottom: 1px solid rgba(27, 25, 23, 0.09);
-    padding: 0 20px;
-    gap: 20px;
-  }
-  #archer-chat-panel .ac-tab {
-    flex: 0 0 auto;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: transparent;
-    padding: 11px 0 10px;
-    font-family: var(--sans);
-    font-size: 12px;
-    letter-spacing: 0.01em;
-    color: #8f8a80;
-    text-align: left;
-  }
-  #archer-chat-panel .ac-tab:hover { color: #1b1917; }
-  #archer-chat-panel .ac-tab.active {
-    background: transparent;
-    color: #1b1917;
-    border-color: var(--ochre);
-    font-weight: 600;
-  }
-
-  #archer-chat-panel .ac-body {
-    background: #f8f6f0;
-    padding: 18px 20px;
-    gap: 11px;
-  }
-  #archer-chat-panel .ac-body::-webkit-scrollbar { width: 5px; }
-  #archer-chat-panel .ac-body::-webkit-scrollbar-thumb { background: rgba(27, 25, 23, 0.18); }
-  #archer-chat-panel .ac-msg {
-    border-radius: 15px;
-    padding: 11px 14px;
-    font-size: 13px;
-    line-height: 1.62;
-    max-width: 88%;
-  }
-  #archer-chat-panel .ac-msg.user {
-    background: #1b1917;
-    color: #f8f6f0;
-    border-bottom-right-radius: 4px;
-  }
-  #archer-chat-panel .ac-msg.bot {
-    background: #fffdf8;
-    color: #2b2721;
-    border: 1px solid rgba(27, 25, 23, 0.1);
-    border-bottom-left-radius: 4px;
-  }
-  #archer-chat-panel .ac-msg.system {
-    font-family: var(--mono);
-    font-size: 9.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #9a948a;
-    padding: 4px 0;
-  }
-  #archer-chat-panel .ac-msg.error {
-    border: 1px solid rgba(173, 74, 42, 0.35);
-    color: #9c3f23;
-    background: #fff8f2;
-  }
-  #archer-chat-panel .ac-msg .ac-sources { font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: #8f8a80; }
-  #archer-chat-panel .ac-msg audio { height: 32px; margin-top: 8px; }
-
-  /* the empty state is the first thing a visitor sees, so it carries the
-     panel instead of leaving a blank column */
-  #archer-chat-panel .ac-empty {
-    margin: auto;
-    text-align: center;
-    padding: 14px 4px 22px;
-    max-width: 306px;
-  }
-  #archer-chat-panel .ac-empty-mark {
-    width: 58px; height: 58px;
-    margin: 0 auto 18px;
-    border-radius: 50%;
-    border: 1px solid rgba(173, 74, 42, 0.28);
-    background: #fffdf8;
-    color: var(--ochre);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  #archer-chat-panel .ac-empty-mark svg { width: 27px; height: 27px; }
-  #archer-chat-panel .ac-empty-title {
-    font-family: var(--serif);
-    font-weight: 400;
-    font-size: 23px;
-    line-height: 1.18;
-    letter-spacing: -0.01em;
-    color: #1b1917;
-    margin: 0 0 8px;
-  }
-  #archer-chat-panel .ac-empty-sub {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #8f8a80;
-    margin: 0 0 20px;
-  }
-  #archer-chat-panel .ac-suggestions { display: flex; flex-direction: column; gap: 7px; }
-  #archer-chat-panel .ac-suggestions button {
-    font-family: var(--sans);
-    font-size: 12.5px;
-    line-height: 1.4;
-    text-align: left;
-    color: #3a352e;
-    background: #fffdf8;
-    border: 1px solid rgba(27, 25, 23, 0.1);
-    border-radius: 11px;
-    padding: 9px 12px;
-    cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s, color 0.15s;
-  }
-  #archer-chat-panel .ac-suggestions button:hover {
-    border-color: rgba(173, 74, 42, 0.45);
-    color: #1b1917;
-    transform: translateY(-1px);
-  }
-  #archer-chat-panel .ac-body.has-chat .ac-empty { display: none; }
-
-  #archer-chat-panel .ac-inputbar {
-    background: #f8f6f0;
-    border-top: 1px solid rgba(27, 25, 23, 0.09);
-    padding: 13px 20px 16px;
-    gap: 10px;
-  }
-  #archer-chat-panel .ac-mode-row {
-    justify-content: flex-start;
-    gap: 8px;
-    font-family: var(--mono);
-    font-size: 8.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #9a948a;
-  }
-  #archer-chat-panel .ac-mode-row .ac-toggle {
-    border: 1px solid rgba(27, 25, 23, 0.12);
-    border-radius: 999px;
-    background: #fffdf8;
-    padding: 2px;
-    gap: 2px;
-  }
-  #archer-chat-panel .ac-mode-row .ac-toggle button {
-    border: 0;
-    border-radius: 999px;
-    padding: 4px 9px;
-    font-family: var(--sans);
-    font-size: 10.5px;
-    letter-spacing: 0;
-    text-transform: none;
-    color: #8f8a80;
-  }
-  #archer-chat-panel .ac-mode-row .ac-toggle button.active { background: #1b1917; color: #f8f6f0; }
-  #archer-chat-panel .ac-send-hint { margin-left: auto; font-size: 8.5px; letter-spacing: 0.1em; }
-
-  #archer-chat-panel .ac-row { gap: 8px; }
-  #archer-chat-panel .ac-row textarea {
-    background: #fffdf8;
-    border: 1px solid rgba(27, 25, 23, 0.14);
-    border-radius: 14px;
-    padding: 11px 13px;
-    min-height: 42px;
-    font-size: 13.5px;
-    color: #1b1917;
-  }
-  #archer-chat-panel .ac-row textarea::placeholder { color: #a39d93; }
-  #archer-chat-panel .ac-row textarea:focus { border-color: rgba(173, 74, 42, 0.55); box-shadow: 0 0 0 3px rgba(173, 74, 42, 0.08); }
-  #archer-chat-panel .ac-iconbtn {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: 1px solid rgba(27, 25, 23, 0.14);
-    background: #fffdf8;
-    color: #6c665d;
-  }
-  #archer-chat-panel .ac-iconbtn:hover { border-color: rgba(27, 25, 23, 0.3); color: #1b1917; }
-  #archer-chat-panel .ac-iconbtn.primary { background: var(--ochre); border-color: var(--ochre); color: #fff8f0; }
-  #archer-chat-panel .ac-iconbtn.primary:hover { background: #933e23; border-color: #933e23; opacity: 1; }
-  #archer-chat-panel .ac-iconbtn svg { width: 17px; height: 17px; }
-
-  #archer-chat-panel .ac-typing { padding: 10px 13px; gap: 5px; }
-  #archer-chat-panel .ac-typing span { background: #8f8a80; width: 5px; height: 5px; }
-
-  #archer-chat-panel .ac-sing-panel {
-    flex: 1;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 24px 18px;
-    gap: 14px;
-    background: #fffdf8;
-    border: 1px solid rgba(27, 25, 23, 0.09);
-    border-radius: 16px;
-    box-shadow: none;
-  }
-  #archer-chat-panel .ac-sing-panel p { font-size: 12.5px; line-height: 1.65; color: #6c665d; max-width: 290px; }
-  #archer-chat-panel .ac-sing-record {
-    width: 72px; height: 72px;
-    background: var(--ochre);
-    box-shadow: 0 12px 28px rgba(173, 74, 42, 0.24);
-  }
-  #archer-chat-panel .ac-sing-record:hover { transform: scale(1.03); }
-  #archer-chat-panel .ac-sing-record.recording { background: #9c3f23; }
-  #archer-chat-panel .ac-sing-status { font-family: var(--sans); font-size: 11.5px; color: #8f8a80; }
-
-  @media (max-width: 520px) {
-    #archer-chat-panel { left: 12px; right: 12px; width: auto; bottom: 84px; }
-    #archer-chat-fab { right: 16px; bottom: 16px; }
-  }
 </style>
 <!-- The signature is not fetched here: its latin file is inlined in fonts.css,
      so it arrives with the stylesheet and first paint already has the script.
@@ -1757,8 +1202,45 @@
      so its tokens and chrome win the cascade -->
 <link rel="stylesheet" href="/static/fonts/fonts.css?v=11">    <link rel="stylesheet" href="/static/assets/site.css?v=91">
 <link rel="stylesheet" href="/static/assets/paper.css?v=12">
+<link rel="stylesheet" href="/static/assets/archer-chat.css?v=2">
+<link rel="stylesheet" href="/static/assets/access.css?v=1">
+<!-- The door's own script, in the head and blocking on purpose: it reads the
+     session stamp and puts `archer-gated` on <html> before the body is parsed,
+     so a cold deep link never paints a readable page for a frame and then
+     covers it. -->
+<script src="/static/assets/access.js?v=1"></script>
 </head>
 <body class="is-entering">
+
+<!-- ===================== THE DOOR =====================
+     The first thing in the body, so it is the first thing parsed and the first
+     thing painted. It stays `hidden` for a visitor whose session is still
+     live; access.js is what decides, and access.css is what blurs the sheet
+     behind it. The wordmark and the line of caps under it are the masthead's
+     own face and size, so the door reads as the front of this site and not as
+     a dialog that happens to be on it. -->
+<div id="archer-gate" class="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title" hidden>
+  <div class="gate-veil" aria-hidden="true"></div>
+  <form class="gate-card" id="gate-form" novalidate>
+    <p class="gate-kicker">Private access</p>
+    <h1 class="gate-sig" id="gate-title">Archer Pechawis</h1>
+    <p class="gate-sub">Vocal collaboration system</p>
+    <span class="gate-rule" aria-hidden="true"></span>
+    <label class="gate-label" for="gate-input">Password</label>
+    <div class="gate-field">
+      <input class="gate-input" id="gate-input" type="password" name="password"
+             autocomplete="current-password" spellcheck="false" autocapitalize="off"
+             autocorrect="off" aria-describedby="gate-msg" placeholder="Enter the password">
+      <button class="gate-reveal" id="gate-reveal" type="button" aria-pressed="false">Show</button>
+    </div>
+    <p class="gate-msg" id="gate-msg" role="status" aria-live="polite"></p>
+    <button class="gate-submit" id="gate-submit" type="submit">
+      <span>Enter the site</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+    <p class="gate-foot">Kept open on this device while you are using it, and closed after thirty quiet minutes.</p>
+  </form>
+</div>
 
 <!-- ============================================================
      Archer Chat Widget (floating button + slide-in panel)
@@ -1773,13 +1255,12 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M17 3h4v4M21 3l-7 7"/></svg>
   </div>
   <div class="ac-header">
-    <div class="ac-seal">A</div>
-    <div>
+    <div class="ac-head-text">
       <div class="ac-title">Archer Bot</div>
-      <div class="ac-subtitle" id="ac-subtitle">local · private · offline</div>
+      <div class="ac-subtitle" id="ac-subtitle">Notes, language, and a local voice model.</div>
     </div>
     <div class="ac-spacer"></div>
-    <button onclick="toggleArcherChat()" title="Close" aria-label="Close chat">
+    <button class="ac-close" onclick="toggleArcherChat()" title="Close" aria-label="Close chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
@@ -1792,15 +1273,25 @@
   <!-- Ask tab -->
   <div class="ac-body" id="ac-body-ask">
     <div class="ac-empty" id="ac-empty">
-      <div class="ac-empty-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4.5v15M16 8v8M20 11v2"/></svg>
-      </div>
-      <p class="ac-empty-title">Ask about Archer's songs</p>
-      <p class="ac-empty-sub">Every answer comes from the notes in this project, read on this machine.</p>
+      <p class="ac-empty-title">Ask about a song</p>
+      <p class="ac-empty-sub">Answers about the songs come from the notes in this project. When the notes do not cover something, the answer says so.</p>
+      <p class="ac-empty-hint">Try one of these</p>
       <div class="ac-suggestions">
-        <button onclick="archerAskSuggestion('What is Horse about?')">What is Horse about?</button>
-        <button onclick="archerAskSuggestion('What does the horse's warning mean?')">What does the horse's warning mean?</button>
-        <button onclick="archerAskSuggestion('When was Horse written?')">When was Horse written?</button>
+        <button onclick="archerAskSuggestion('What is Horse about?')">
+          <span class="ac-q-num">01</span>
+          <span class="ac-q-text">What is Horse about?</span>
+          <span class="ac-q-go" aria-hidden="true">&#8594;</span>
+        </button>
+        <button onclick="archerAskSuggestion('What does the warning in Horse mean?')">
+          <span class="ac-q-num">02</span>
+          <span class="ac-q-text">What does the warning in Horse mean?</span>
+          <span class="ac-q-go" aria-hidden="true">&#8594;</span>
+        </button>
+        <button onclick="archerAskSuggestion('When was Horse written?')">
+          <span class="ac-q-num">03</span>
+          <span class="ac-q-text">When was Horse written?</span>
+          <span class="ac-q-go" aria-hidden="true">&#8594;</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1808,11 +1299,18 @@
   <!-- Sing tab (hidden by default) -->
   <div class="ac-body" id="ac-body-sing" style="display:none;">
     <div class="ac-sing-panel">
-      <p>Hum or sing a rough version of your idea. It'll come back sung through a synthetic voice model (RVC voice conversion: the same melody and words you gave it, re-skinned in a synthetic timbre).</p>
-      <button class="ac-sing-record" id="ac-sing-record-btn" onclick="toggleArcherSingRecording()" title="Record">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+      <p class="ac-sing-title">Sing it back</p>
+      <p class="ac-sing-sub">Record a rough hum or line. It comes back in a synthetic voice, with your melody and words kept.</p>
+      <button class="ac-sing-record" id="ac-sing-record-btn" onclick="toggleArcherSingRecording()" title="Record a take">
+        <span class="ac-sing-mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
+        </span>
+        <span class="ac-sing-record-copy">
+          <span class="ac-sing-record-title" id="ac-sing-record-title">Record a take</span>
+          <span class="ac-sing-record-sub" id="ac-sing-record-sub">Tap to start, tap again to stop</span>
+        </span>
       </button>
-      <div class="ac-sing-status" id="ac-sing-status">Tap to record</div>
+      <div class="ac-sing-status" id="ac-sing-status">Your take stays on this machine.</div>
       <div id="ac-sing-result"></div>
     </div>
   </div>
@@ -1820,20 +1318,22 @@
   <!-- Input bar (Ask tab only) -->
   <div class="ac-inputbar" id="ac-inputbar-ask">
     <div class="ac-mode-row">
-      <span>Reply as</span>
+      <span class="ac-mode-label">Reply as</span>
       <div class="ac-toggle">
         <button id="ac-mode-text" class="active" onclick="setArcherChatMode('text')">Text</button>
+        <span class="ac-div" aria-hidden="true">/</span>
         <button id="ac-mode-audio" onclick="setArcherChatMode('audio')">Spoken</button>
       </div>
-      <span class="ac-send-hint">enter to send</span>
+      <span class="ac-send-hint">Enter sends</span>
     </div>
     <div class="ac-row">
-      <button class="ac-iconbtn" id="ac-voice-input-btn" onclick="toggleArcherVoiceInput()" title="Ask by voice">
+      <button class="ac-iconbtn" id="ac-voice-input-btn" onclick="toggleArcherVoiceInput()" title="Ask by voice" aria-label="Ask by voice">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8"/></svg>
       </button>
-      <textarea id="ac-input" rows="1" placeholder="Ask about a song..." onkeydown="archerChatKeydown(event)"></textarea>
-      <button class="ac-iconbtn primary" onclick="sendArcherChatMessage()" title="Send">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      <textarea id="ac-input" rows="1" placeholder="Ask about a song" onkeydown="archerChatKeydown(event)"></textarea>
+      <button class="ac-send" onclick="sendArcherChatMessage()" title="Send">
+        Send
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
   </div>
@@ -2137,7 +1637,7 @@
           <tr><td>Key</td><td><code>synthesis/harmony_engine.py</code></td><td>256-pitch history → root + mode</td><td>Krumhansl–Kessler correlation, re-estimated every 43 frames (about once a second), never per note.</td></tr>
           <tr><td>Decision</td><td><code>synthesis/accompaniment_modes.py</code></td><td>context → mode, target Hz, action</td><td>Protocol silence is checked before anything musical; the rest is an ordered checklist.</td></tr>
           <tr><td>Voice</td><td><code>synthesis/vocable_synthesizer.py</code></td><td>decision → stereo audio</td><td>Vowel, texture and vibrato are applied here; the neural stage receives separate stems, never a mix.</td></tr>
-          <tr><td>Timing</td><td><code>output/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
+          <tr><td>Timing</td><td><code>core/timing_sync.py</code></td><td>note → scheduled playback</td><td>70 ms base delay, beat snapping, stale notes dropped rather than played late.</td></tr>
         </tbody>
       </table>
     </div>
@@ -2163,7 +1663,7 @@
   <section class="paper-card">
     <p class="paper-num"><b>04</b> Runtime</p>
     <h2 class="paper-h2">A small family of processes, and why they are not one</h2>
-    <p class="paper-lede">The app is deliberately not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
+    <p class="paper-lede">The app is not a monolith at runtime, even though it is one repository. Each boundary below exists because something inside it is slow, optional, or likely to fail in a way that must not take the performance down with it.</p>
 
     <figure class="paper-figure">
       <div class="plate">
@@ -2229,7 +1729,7 @@
       <div class="stack-row"><div class="stack-name">aubio<span>pitch + level</span></div><div class="stack-why">YIN and dBFS in a small C library with Python bindings, fast enough to run every frame on a CPU. A pure-Python YIN was measured against it and lost on both speed and octave stability.</div><div class="stack-buys"><b>Buys:</b> a real-time detector with no GPU. <b>Costs:</b> a native dependency that has to be installed, not pip-imported from pure Python.</div></div>
       <div class="stack-row"><div class="stack-name">PyTorch<span>neural models</span></div><div class="stack-why">RMVPE, the RVC sidecar, the Cree tagger and the SingSong models are all torch graphs. One runtime means one checkpoint format, one device switch and one set of tensor contracts.</div><div class="stack-buys"><b>Buys:</b> GPU when available, CPU when not. <b>Costs:</b> a large install, kept out of the base requirement file where possible.</div></div>
       <div class="stack-row"><div class="stack-name">Vanilla JS + Web Audio<span>frontend</span></div><div class="stack-why">The site is a set of documents with small live instruments, not a single-page application. There is no build step, no bundler and no framework to upgrade; every page is readable in view-source and loads instantly from disk.</div><div class="stack-buys"><b>Buys:</b> zero build risk and direct access to the audio graph. <b>Costs:</b> shared behaviour lives in plain functions and has to be kept tidy by hand.</div></div>
-      <div class="stack-row"><div class="stack-name">Ollama or llama.cpp<span>chat</span></div><div class="stack-why">A local instruct model is the only way to answer questions about Archer's notes without sending them anywhere. There is one chat model, <code>archer:7b</code>, and it answers conversation, song-note questions, translation and script conversion; it is installed from a single export. Ollama manages that model's lifecycle; llama.cpp is the single-process alternative for the same GGUF.</div><div class="stack-buys"><b>Buys:</b> privacy and offline operation. <b>Costs:</b> the model has to be installed once, and the app must explain that clearly when it is absent.</div></div>
+      <div class="stack-row"><div class="stack-name">Ollama or llama.cpp<span>chat</span></div><div class="stack-why">A local instruct model is the only way to answer questions about Archer's notes without sending them anywhere. There is one chat model, <code>archer:14b</code>, and it answers conversation, song-note questions, translation and script conversion; it is installed from a single export. Ollama manages that model's lifecycle; llama.cpp is the single-process alternative for the same GGUF.</div><div class="stack-buys"><b>Buys:</b> privacy and offline operation. <b>Costs:</b> the model has to be installed once, and the app must explain that clearly when it is absent.</div></div>
       <div class="stack-row"><div class="stack-name">FluidSynth + SoundFont<span>band</span></div><div class="stack-why">A sampled piano, bass and drum kit sound like instruments; an additive oscillator sounds like a test signal. FluidSynth renders a MIDI arrangement through a General MIDI bank, and the MIDI file remains editable in any DAW.</div><div class="stack-buys"><b>Buys:</b> an arrangement that can be listened to as music. <b>Costs:</b> an optional native library; the numpy synth stays as the deterministic fallback.</div></div>
     </div>
   </section>
@@ -2523,7 +2023,7 @@ The singer is sounding, the tempo is calm, and the note is new. The default mode
   <section class="paper-card">
     <p class="paper-num"><b>04</b> Key and scale</p>
     <h2 class="paper-h2">The robot never sings outside the key it has inferred</h2>
-    <p class="paper-lede">Modes that invent a pitch (contour following, the fusion chord) are rounded to the nearest degree of the inferred key before anything is sung. Modes that return the singer's own note are deliberately exempt: rounding a unison is how a double ends up a few cents beside the singer instead of with them.</p>
+    <p class="paper-lede">Modes that invent a pitch (contour following, the fusion chord) are rounded to the nearest degree of the inferred key before anything is sung. Modes that return the singer's own note are exempt: rounding a unison is how a double ends up a few cents beside the singer instead of with them.</p>
     <p class="paper-p">The key is inferred once a second from the last 256 pitched frames. The distribution of pitch classes is correlated against Krumhansl–Kessler major and minor profiles, and the best-fitting root and mode become the current key. The drone is anchored to that root, not to whatever note just passed; the call-and-response answer is built from its scale degrees, not rounded into them afterwards.</p>
     <p class="paper-p">Scale lock is therefore a small, explicit exception list, not a blanket rule. It touches contour following and triadic harmony. It does not touch unison, octave, delay, timbral thickening or drone. The reason is simple: those five already have a trustworthy pitch, and the two that do not are the two that calculate.</p>
 
@@ -2537,7 +2037,7 @@ The singer is sounding, the tempo is calm, and the note is new. The default mode
     <p class="paper-num"><b>05</b> Voice leading</p>
     <h2 class="paper-h2">Movement is the difference between a chord and a choir</h2>
     <p class="paper-lede">When a mode needs more than one note, the voicing search prefers the inversion that moves each voice the shortest distance from where it already was. That single constraint is what makes a sequence of chords sound like voices holding a conversation instead of a keyboard being pressed.</p>
-    <p class="paper-p">The test suite generates 120 progressions, voices each chord with the project's search and with a naive root-position baseline, and measures the total semitone movement of the upper voices plus the number of parallel perfect fifths and octaves. The search cuts mean movement from 1.56 to 0.90 semitones per transition and parallel perfects from 3.89 to 3.61 per hundred transitions, while keeping a median span of nine semitones. The point is not the decimal; it is that the improvement is measured on the same progressions the baseline sees.</p>
+    <p class="paper-p">The test suite generates 120 progressions, voices each chord with the project's search and with a naive root-position baseline, and measures the total semitone movement of the upper voices plus the number of parallel perfect fifths and octaves. The search cuts mean movement from 1.56 to 0.90 semitones per transition and parallel perfects from 3.89 to 3.61 per hundred transitions, while keeping a median span of nine semitones. The improvement is measured on the same progressions the baseline sees.</p>
 
     <figure class="paper-figure">
       <img src="/static/assets/evidence/voicing-movement.svg?v=1" alt="Voice movement and parallel perfect intervals, search versus root-position baseline" loading="lazy">
@@ -2673,7 +2173,7 @@ The singer is sounding, the tempo is calm, and the note is new. The default mode
         </tbody>
       </table>
     </div>
-    <div class="paper-note"><b>No silent engine swap.</b> If the selected wavetable engine cannot find its files, that note is silent. It does not quietly switch to a different-sounding engine, because a wrong voice arriving unannounced is worse than an honest gap.</div>
+    <div class="paper-note"><b>No silent engine swap.</b> If the selected wavetable engine cannot find its files, that note is silent. It does not quietly switch to a different-sounding engine, because a wrong voice arriving unannounced is worse than a silent gap.</div>
   </section>
 
   <section class="paper-card">
@@ -2775,7 +2275,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
           <canvas id="fs-canvas" width="420" height="120" style="width:100%;height:120px;margin-top:12px;border-radius:8px;background:#0b1120"></canvas>
         </div>
       </div>
-      <p class="paper-caption" style="margin-top:14px">This is a browser model of the same source–filter idea: a sawtooth source through three bandpass formants, with a vibrato LFO. It is deliberately simple enough to hear each control separately. The Python engine adds the bank, the phoneme tracking and the ensemble.</p>
+      <p class="paper-caption" style="margin-top:14px">This is a browser model of the same source–filter idea: a sawtooth source through three bandpass formants, with a vibrato LFO. It is simple enough to hear each control separately. The Python engine adds the bank, the phoneme tracking and the ensemble.</p>
     </div>
   </section>
 
@@ -2784,7 +2284,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <h2 class="paper-h2">Several voices, not one voice turned up</h2>
     <p class="paper-lede">A choir preset is not a louder solo. It is several independently rendered layers, each with its own small detune, onset jitter and vocal-tract scale, mixed together and sent through a short algorithmic reverb. The differences are what the ear reads as separate people.</p>
     <p class="paper-p">The texture is chosen per mode. Unison defaults to choir, octave to duet, delayed response and call-and-response to solo, contour and drone to duet. The parameters live in <code>synthesis.texture</code>: voice count, detune spread, formant spread, jitter, reverb and level. A thirty-millisecond crossfade removes clicks at note boundaries, and the reverb is built from a handful of comb and allpass filters rather than an impulse response, so it costs almost nothing and never needs a file.</p>
-    <p class="paper-p">The detune is deliberately not random per note. It is locked per phrase, so a voice keeps its own slightly sharp or flat identity instead of wandering between notes. That is the difference between a section and a chorus effect.</p>
+    <p class="paper-p">The detune is not random per note. It is locked per phrase, so a voice keeps its own slightly sharp or flat identity instead of wandering between notes. That is the difference between a section and a chorus effect.</p>
   </section>
 
   <section class="paper-card">
@@ -2919,7 +2419,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <p class="paper-lede">Whisper's <code>language="cr"</code> is not a Plains Cree decoder. It selects the English decoder and attaches a Cree language tag, and what comes back for sung Cree is English words that sound vaguely like the vowels. The project measured that, stopped using it for Cree, and built a separate path.</p>
     <p class="paper-p">The Cree path uses Meta's MMS-1b-all with both <code>crk</code> adapters, a lexicon and a character model built from this project's own Cree texts, and a CTC beam search constrained so it cannot emit an English word. Before recognition, Demucs can isolate the vocal from the accompaniment, and a harmonic vocal hint keeps the sung pitch content from being discarded by the separator.</p>
     <p class="paper-p">English speech still goes through faster-whisper, because for English it is excellent. The demo below lets you choose which language is being spoken. The transcript is shown as it arrives, followed by the checked version, so a rough guess never gets mistaken for a final reading.</p>
-    <p class="paper-p">Silence is handled explicitly. A span with no voiced frames is not sent to the recogniser at all; it is labelled as silence, which is both faster and more honest than asking a language model to transcribe a breath.</p>
+    <p class="paper-p">Silence is handled explicitly. A span with no voiced frames is not sent to the recogniser at all; it is labelled as silence, which is both faster and clearer than asking a language model to transcribe a breath.</p>
 
     <figure class="paper-figure">
       <img src="/static/assets/evidence/asr-wer.svg?v=1" alt="Word error rate across 40 spoken test utterances" loading="lazy">
@@ -2962,7 +2462,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <h2 class="paper-h2">Building a translator where almost no parallel text exists</h2>
     <p class="paper-lede">There is no off-the-shelf Plains Cree–English model to fine-tune. The translation layer is a transformer encoder–decoder trained from scratch on the material that could be assembled and permissioned: community-contributed text from the Cree corpus, aligned sentences, and vocabulary from Watkins' 1865 dictionary.</p>
     <p class="paper-p">Cree is polysynthetic, so a single word can carry what English needs a clause to say. Tokenisation is therefore the first engineering problem, not an afterthought. The project uses a Cree-aware segmentation step (Morfessor and a finite-state analyser where available) before a shared SentencePiece vocabulary, so the model sees morphemes rather than an arbitrary split of a long word.</p>
-    <p class="paper-p">At inference, the model decodes with beam search, keeping several candidate sentences alive at each step and returning the highest-scoring complete one. The model is deliberately small, because a large model on a small corpus memorises the corpus rather than learning to generalise.</p>
+    <p class="paper-p">At inference, the model decodes with beam search, keeping several candidate sentences alive at each step and returning the highest-scoring complete one. The model is small, because a large model on a small corpus memorises the corpus rather than learning to generalise.</p>
 
     <figure class="paper-figure">
       <div class="plate">
@@ -3026,7 +2526,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
       <div class="paper-stat"><b>3</b><span>states the stage can return</span></div>
     </div>
 
-    <p class="paper-p">The three states are deliberately asymmetric. <strong>Joy</strong> takes a major third if arousal is above 0.5, a perfect fifth if it is calm, and a triangle wave with no vibrato. <strong>Grief</strong> takes a minor third, a plain sine and a 3.5 Hz vibrato, the only state that gets one. <strong>Neutral</strong> holds a perfect fifth, a sine, no vibrato, and the resting LED. The LED eyes follow the same state: green and wide, indigo and narrow, or muted.</p>
+    <p class="paper-p">The three states are asymmetric. <strong>Joy</strong> takes a major third if arousal is above 0.5, a perfect fifth if it is calm, and a triangle wave with no vibrato. <strong>Grief</strong> takes a minor third, a plain sine and a 3.5 Hz vibrato, the only state that gets one. <strong>Neutral</strong> holds a perfect fifth, a sine, no vibrato, and the resting LED. The LED eyes follow the same state: green and wide, indigo and narrow, or muted.</p>
 
     <div class="paper-grid three" style="margin-top:24px">
       <div class="paper-tile" style="border-color:rgba(5,150,105,.35)"><div class="paper-label" style="color:#059669">valence &gt; 0.15</div><h3 class="paper-h3">Joy</h3><p class="paper-p">Major third or perfect fifth. Triangle. No vibrato. Green eyes, pupil at its widest.</p></div>
@@ -3231,9 +2731,9 @@ A bright, open vowel. The first formant sits high, the second close enough to it
 
   <header class="paper-head">
     <p class="paper-kicker">Archer Bot</p>
-    <h1 class="paper-title">It only knows what <em>Archer wrote down</em></h1>
-    <p class="paper-deck">A local assistant answers questions about the songs, their meaning, their backstory and how they came together. It does not answer song questions from the model's memory. Every reply is assembled with retrieved passages of Archer's own notes placed in front of it, and the sources are returned with it. The same model translates, writes syllabics and explains Cree words; there is no second chat model behind it. The later sections of this page are how that one model was built.</p>
-    <div class="paper-meta"><span>search index: all-MiniLM-L6-v2</span><span>top 4 passages</span><span>one model · archer:7b</span><span>Ollama or llama.cpp</span></div>
+    <h1 class="paper-title">One local model, and <em>a rule about evidence</em></h1>
+    <p class="paper-deck">It answers questions about Archer's songs from Archer's own notes, and says plainly when the notes do not contain the answer. The same weights translate between English and nêhiyawêwin, write syllabics and explain Cree words, and there is no second chat model behind them. This page covers the retrieval that feeds it, the data it learned from, the three training passes, and the numbers the last run actually measured.</p>
+    <div class="paper-meta"><span>one model · archer:14b</span><span>Q4_K_M · about 9 GB</span><span>120 held-out pairs</span><span>8 of 8 jobs ahead of its base</span></div>
   </header>
 
   <section class="paper-card">
@@ -3248,7 +2748,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <p class="paper-num"><b>02</b> Indexing</p>
     <h2 class="paper-h2">Turning notes into something searchable</h2>
     <p class="paper-lede">Every <code>.md</code> and <code>.txt</code> file in <code>song_notes/</code> is read, split into chunks of roughly 900 characters along paragraph boundaries, and embedded into a 384-dimensional vector by all-MiniLM-L6-v2 on the CPU.</p>
-    <p class="paper-p">That embedding model is a search index, not a chat model. It ranks passages and never writes an answer; the one language model reads whatever the index returns. So the install has one generator, <code>archer:7b</code>, plus this small fixed encoder that ships with the retrieval dependency.</p>
+    <p class="paper-p">That embedding model is a search index, not a chat model. It ranks passages and never writes an answer; the one language model reads whatever the index returns. So the install has one generator, <code>archer:14b</code>, plus this small fixed encoder that ships with the retrieval dependency.</p>
     <p class="paper-p">The chunk size is a compromise between two failures. Too large and a passage about the wrong song dilutes the one relevant paragraph; too small and a thought gets cut before it reaches its point. Paragraph-aware splitting keeps whole thoughts together. A paragraph that is longer than one chunk is windowed instead, and the 150-character overlap covers the seam.</p>
     <p class="paper-p">Rebuilding every embedding on every start would be wasteful, so the index is incremental. Each file's content is hashed, and the hash is stored in a manifest alongside the vector offsets. On the next start, an unchanged file reuses its cached vectors; only a changed file is re-chunked and re-embedded. Changing one note does not re-read the corpus.</p>
 
@@ -3263,7 +2763,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
   <section class="paper-card">
     <p class="paper-num"><b>03</b> Retrieval</p>
     <h2 class="paper-h2">Four passages, and a floor below which nothing is used</h2>
-    <p class="paper-lede">The question is embedded with the same model and compared against every stored chunk by cosine similarity. The four closest chunks are returned, but only those above a minimum score of 0.15. A weak match is not included to fill the quota.</p>
+    <p class="paper-lede">The question is embedded with the same model and compared against every stored chunk by cosine similarity. The four closest chunks are returned, but only those above a minimum score of 0.30. A weak match is not included to fill the quota.</p>
     <p class="paper-p">Both sides of the comparison are normalised, so the dot product is the cosine. The search is exact, not approximate: there is no vector database and no index structure beyond a single matrix multiply. At the size of a song-notes folder that is faster than maintaining an approximate index, and it cannot miss a passage because of a hash collision.</p>
     <p class="paper-p">The same query returns the source filename for each chunk. Those filenames travel back to the browser with the reply, so the assistant's answer is always accompanied by the notes it came from. This is not a citation bolted on afterwards; it is the retrieval result itself.</p>
 
@@ -3316,7 +2816,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
           <path d="M640 269 H760" stroke="#6f8cff" stroke-dasharray="4 3" marker-end="url(#b-arrow)"/>
 
           <rect x="764" y="140" width="266" height="120" rx="8" fill="#0f1728" stroke="#6f8cff"/>
-          <text x="897" y="176" fill="#f2f5fb" font-size="12" text-anchor="middle">archer:7b</text>
+          <text x="897" y="176" fill="#f2f5fb" font-size="12" text-anchor="middle">archer:14b</text>
           <text x="897" y="200" fill="#8195b8" font-size="9.5" text-anchor="middle">temperature 0.3 · 500 tokens</text>
           <text x="897" y="218" fill="#8195b8" font-size="9.5" text-anchor="middle">Ollama :11434 or llama.cpp</text>
           <text x="897" y="242" fill="#e0a06a" font-size="9.5" text-anchor="middle">reply + source filenames</text>
@@ -3332,10 +2832,10 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <p class="paper-lede">The backend is a configuration choice, not a rewrite. Ollama runs as a local server and manages models by name; llama.cpp loads a GGUF file inside the Python process. Both keep every token on the machine.</p>
 
     <div class="paper-grid two" style="margin-top:26px">
-      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code> and serves the one tag, <code>archer:7b</code>, a 7-billion-parameter model quantised to run on a laptop. Create it once from the exported Modelfile, then the app only sends HTTP to localhost. If the server is not running, or the tag is missing, the endpoint says which, with the command that fixes it.</p></div>
+      <div class="paper-tile"><div class="paper-label">Default</div><h3 class="paper-h3">Ollama</h3><p class="paper-p">Listens on <code>127.0.0.1:11434</code> and serves the one tag, <code>archer:14b</code>, a 14-billion-parameter model quantised to Q4_K_M: about 9 GB on disk, 4,096 tokens of context, and the same weights for every job on this page. Create it once from the exported Modelfile, then the app only sends HTTP to localhost. If the server is not running, or the tag is missing, the endpoint says which, with the command that fixes it.</p></div>
       <div class="paper-tile"><div class="paper-label">Alternative</div><h3 class="paper-h3">llama.cpp</h3><p class="paper-p">Loads a <code>.gguf</code> file in-process. One less service to start, at the cost of the app holding the model's memory. Useful on a machine where installing a background server is inconvenient, or where the model file is already managed by hand.</p></div>
     </div>
-    <p class="paper-p" style="margin-top:18px">Generation is deliberately conservative: temperature 0.3, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
+    <p class="paper-p" style="margin-top:18px">Generation is conservative: temperature 0.3, at most 500 new tokens. A grounded answer should sound like a knowledgeable person speaking briefly, not like a model performing fluency. The cap also keeps a reply from turning into an essay that outruns the four passages it was given.</p>
     <p class="paper-p">There is one model behind both backends, one tag and one GGUF. Ollama and llama.cpp are two ways to serve it, not two assistants. Section 08 is what that model does and how one prompt selects the job.</p>
   </section>
 
@@ -3365,6 +2865,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <p class="paper-lede">There is no router and no second chat model. Conversation, song notes, translation, syllabics and word explanations are one set of weights, selected by the task prefix in the prompt.</p>
     <p class="paper-p">The earlier design split the assistant in two: a general model for conversation and a Cree model for language. Every question became a routing decision, the install had two tags, and an English question about a Cree word could land on the model that was worse at it. This version puts every behaviour in one instruction set, so the model learns what a translation looks like, what a notes answer looks like and what ordinary conversation looks like in the same adapter.</p>
     <p class="paper-p">Retrieval still runs on every question, but it decides whether notes are in the prompt, not which model answers. A passage above the 0.30 relevance floor is attached under <code>Notes on &lt;song&gt;:</code>; below it, the question takes the no-notes path. A translation request is never padded with song prose.</p>
+    <p class="paper-p">The request is unwrapped before it reaches the model. "How do you say river in Cree?" becomes the training shape with <code>river</code> after the header, and "Write tânisi in Cree syllabics" sends <code>tânisi</code>. The model learned the sentence to act on, not the question that asked for it, and handing it the whole question makes it translate the question instead.</p>
     <p class="paper-p">The response reports the task, the model tag and the notes used. <code>task</code> is the prompt shape, not a backend choice: <code>song_notes</code>, <code>chat</code>, <code>translate</code> or <code>orthography</code>. If the one model is not installed, the chat returns a 503 with the <code>ollama create</code> line. There is nothing else to fall back to, and answering as another model would not be this assistant.</p>
 
     <figure class="paper-figure">
@@ -3395,7 +2896,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
             <text x="596" y="255" fill="#8195b8" font-size="9.5" text-anchor="end">orthography</text>
 
             <rect x="660" y="96" width="370" height="184" rx="8" fill="#0f1728" stroke="#6f8cff"/>
-            <text x="845" y="138" fill="#f2f5fb" font-size="15" text-anchor="middle">archer:7b</text>
+            <text x="845" y="138" fill="#f2f5fb" font-size="15" text-anchor="middle">archer:14b</text>
             <text x="845" y="164" fill="#8195b8" font-size="9.5" text-anchor="middle">one GGUF · one Ollama tag</text>
             <text x="845" y="186" fill="#8195b8" font-size="9.5" text-anchor="middle">the same weights for every task</text>
             <text x="845" y="208" fill="#8195b8" font-size="9.5" text-anchor="middle">no router · no second model</text>
@@ -3426,9 +2927,9 @@ A bright, open vowel. The first formant sits high, the second close enough to it
   <section class="paper-card">
     <p class="paper-num"><b>09</b> The base</p>
     <h2 class="paper-h2">A capable base, taught a second language and every task</h2>
-    <p class="paper-lede">A model trained from nothing on a million words has to learn the language and the task at the same time. This one starts from Qwen2.5-7B-Instruct, which already holds a conversation and follows an instruction, and adds a small set of weights, a Cree vocabulary and the instruction mix for all four jobs. The base is the starting point for training, not a second model that ships: the app loads the merged result as <code>archer:7b</code> and nothing else.</p>
-    <p class="paper-p">The added weights are LoRA adapters: low-rank matrices attached to the attention and feed-forward projections, trained while the base weights stay exactly as they were. Rank 64 on an A100, rank 32 on a 16 GB card. There is no second copy of the model, and the adapter file is a few hundred megabytes instead of fifteen gigabytes, which is why a run can be stopped, moved and resumed like an ordinary file.</p>
-    <p class="paper-p">The vocabulary is the part that matters most for a language the base model has barely seen. The base tokenizer spends over four tokens on a Cree word, splitting it into pieces that were never meant to be read together. A SentencePiece model trained on the Cree corpus, filtered and then grafted onto the existing vocabulary, spends about a third fewer tokens on the same text, and the run records the measured figure in its tokenizer audit. The full profile adds about four thousand new pieces.</p>
+    <p class="paper-lede">A model trained from nothing on a million words has to learn the language and the task at the same time. This one starts from Qwen2.5-14B-Instruct, which already holds a conversation and follows an instruction, and adds a small set of weights, a Cree vocabulary and the instruction mix for all four jobs. The base is the starting point for training, not a second model that ships: the app loads the merged result as <code>archer:14b</code> and nothing else.</p>
+    <p class="paper-p">The added weights are LoRA adapters: low-rank matrices attached to the attention and feed-forward projections, trained while the base weights stay exactly as they were. The run described here used rank 32 with alpha 64 on one 24 GB card, with the base loaded in 4-bit. That is 80,740,352 trainable parameters, 1.05% of the model. The base weights never change, and the adapter is small enough to checkpoint, move and resume like an ordinary file.</p>
+    <p class="paper-p">The vocabulary is the part that matters most for a language the base model has barely seen. The base tokenizer spends 4.72 tokens on the average Cree word, splitting it into pieces that were never meant to be read together. A SentencePiece model trained on the Cree corpus, filtered and then grafted onto the existing vocabulary, spends 3.65 on the same held-out text, 22.6% fewer. The run adds 3,947 pieces and takes the vocabulary from 151,665 to 155,620, and the audit that measures the change is part of the run.</p>
     <p class="paper-p">A new token cannot start at random. It starts at the average of the base model's embeddings for the pieces it replaces, so a word that was spelled <code>n · ê · hi · yaw · ê · win</code> already means something on its first day. Random rows have to be learned from scratch, and with a corpus this size they never fully are. The table is then frozen. The input and output embedding matrices together hold about 1.1 billion parameters, and in fp32 with gradients and Adam state that is roughly 11 GB, the difference between fitting a 16 GB card and dying on the first step.</p>
 
     <figure class="paper-figure">
@@ -3475,9 +2976,9 @@ A bright, open vowel. The first formant sits high, the second close enough to it
 
   <section class="paper-card">
     <p class="paper-num"><b>10</b> The data</p>
-    <h2 class="paper-h2">Fifteen collections, one licence ledger</h2>
+    <h2 class="paper-h2">Thirteen collections, one licence ledger</h2>
     <p class="paper-lede">Everything the model learns comes from material whose licence is recorded. Each source is written down with its licence, dialect and script before a single sentence is used, and the run carries that ledger into its report.</p>
-    <p class="paper-p">The full profile keeps <strong>1,124,146 words across 66,071 sentences</strong>, <strong>10,934 aligned Cree and English pairs</strong>, <strong>203 held-out pairs</strong> for the benchmark and <strong>57,579 lexicon forms</strong> for the validity check. The smaller smoke profile deliberately uses a slice of the same pipeline, which is why its report shows smaller numbers.</p>
+    <p class="paper-p">This run kept <strong>1,121,753 words across 65,861 training sentences</strong>, <strong>10,934 aligned Cree and English pairs</strong>, a <strong>203-pair document-disjoint test split</strong> of which 120 are scored, and <strong>57,579 lexicon forms</strong> for the validity check. The smoke profile uses a slice of the same pipeline, which is why its report shows smaller numbers.</p>
     <p class="paper-p">The licence policy is part of the loader, not a note added afterwards. NoDerivatives material in the EdTeKLA collection is skipped at the source. NonCommercial ShareAlike material is used only while the released model carries that same licence. Historical books are tagged as historical, so they can teach vocabulary and spelling without being mistaken for how the language is written today.</p>
 
     <figure class="paper-figure">
@@ -3485,19 +2986,19 @@ A bright, open vowel. The first formant sits high, the second close enough to it
         <svg viewBox="0 0 1080 340" role="img" aria-label="Data funnel from fifteen collections to two hundred held-out pairs">
           <rect width="1080" height="340" fill="#0b1120"/>
           <text x="50" y="48" fill="#f2f5fb" font-family="Inter Tight, sans-serif" font-size="21" font-weight="600">What survives</text>
-          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">FIFTEEN COLLECTIONS TO ONE BENCHMARK</text>
+          <text x="50" y="70" fill="#7d90b3" font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2">THIRTEEN COLLECTIONS TO ONE BENCHMARK</text>
           <g font-family="Inter Tight, sans-serif" font-size="11">
             <text x="50" y="112" fill="#8195b8">collections</text>
             <rect x="300" y="96" width="700" height="24" rx="3" fill="#34517f"/>
-            <text x="988" y="113" fill="#f2f5fb" text-anchor="end" font-size="10">15</text>
+            <text x="988" y="113" fill="#f2f5fb" text-anchor="end" font-size="10">13</text>
 
             <text x="50" y="152" fill="#8195b8">words kept</text>
             <rect x="300" y="136" width="600" height="24" rx="3" fill="#4265a0"/>
-            <text x="888" y="153" fill="#f2f5fb" text-anchor="end" font-size="10">1,124,146</text>
+            <text x="888" y="153" fill="#f2f5fb" text-anchor="end" font-size="10">1,121,753</text>
 
             <text x="50" y="192" fill="#8195b8">sentences</text>
             <rect x="300" y="176" width="500" height="24" rx="3" fill="#5a64a8"/>
-            <text x="788" y="193" fill="#f2f5fb" text-anchor="end" font-size="10">66,071</text>
+            <text x="788" y="193" fill="#f2f5fb" text-anchor="end" font-size="10">65,861</text>
 
             <text x="50" y="232" fill="#8195b8">aligned pairs</text>
             <rect x="300" y="216" width="400" height="24" rx="3" fill="#6f8cff"/>
@@ -3515,38 +3016,40 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     </figure>
 
     <div class="paper-tabs" role="group" aria-label="Filter the ledger by licence">
-      <button class="paper-tab is-on" data-licence-filter="all" onclick="creeLicence('all', this)">All 15</button>
+      <button class="paper-tab is-on" data-licence-filter="all" onclick="creeLicence('all', this)">All 13</button>
       <button class="paper-tab" data-licence-filter="open" onclick="creeLicence('open', this)">Open 6</button>
       <button class="paper-tab" data-licence-filter="sa" onclick="creeLicence('sa', this)">ShareAlike 1</button>
       <button class="paper-tab" data-licence-filter="nc" onclick="creeLicence('nc', this)">NonCommercial 2</button>
-      <button class="paper-tab" data-licence-filter="pd" onclick="creeLicence('pd', this)">Public domain 2</button>
-      <button class="paper-tab" data-licence-filter="other" onclick="creeLicence('other', this)">Other 4</button>
+      <button class="paper-tab" data-licence-filter="pd" onclick="creeLicence('pd', this)">Public domain 1</button>
+      <button class="paper-tab" data-licence-filter="other" onclick="creeLicence('other', this)">Other 3</button>
     </div>
-    <p class="paper-quiet" id="cree-licence-count">Showing all 15 collections.</p>
+    <p class="paper-quiet" id="cree-licence-count">Showing all 13 collections.</p>
 
     <div class="paper-table-wrap">
       <table class="paper-table" id="cree-licence-table">
         <thead><tr><th>Source</th><th>What it contributes</th><th>Licence</th></tr></thead>
         <tbody>
-          <tr data-licence="nc"><td><a href="https://github.com/EdTeKLA/IndigenousLanguages_Corpora" target="_blank" rel="noopener">EdTeKLA Cree Corpus</a></td><td>Community texts, stories and lessons in SRO and syllabics. The largest single source of running Cree prose.</td><td>CC BY-NC-SA 4.0 by default, per-text READMEs; NoDerivatives subcollections skipped</td></tr>
+          <tr data-licence="nc"><td><a href="https://github.com/EdTeKLA/IndigenousLanguages_Corpora" target="_blank" rel="noopener">EdTeKLA Cree Corpus</a></td><td>Community texts, stories and lessons in SRO and syllabics. 31 texts used, 37 skipped on licence, and 25 bag-of-words files counted for vocabulary only.</td><td>CC BY-NC-SA 4.0 by default, per-text READMEs; NoDerivatives subcollections skipped</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/KonradBRG/plains-cree-figurative" target="_blank" rel="noopener">Plains Cree Figurative Language</a></td><td>Sentence pairs written to show idiom and figurative meaning, not just literal glosses.</td><td>CC BY 4.0</td></tr>
-          <tr data-licence="sa"><td><a href="https://huggingface.co/datasets/wikimedia/wikipedia" target="_blank" rel="noopener">Cree Wikipedia</a></td><td>187 articles, of which 37 survive the language filter. Encyclopedic register and modern vocabulary.</td><td>CC BY-SA 4.0</td></tr>
+          <tr data-licence="sa"><td><a href="https://huggingface.co/datasets/wikimedia/wikipedia" target="_blank" rel="noopener">Cree Wikipedia</a></td><td>37 articles survive the language filter. Encyclopedic register and modern vocabulary.</td><td>CC BY-SA 4.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-2" target="_blank" rel="noopener">FineWeb-2 Cree slices</a></td><td>192 documents and about 108,000 words of web text, the small public footprint of the language.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/finepdfs" target="_blank" rel="noopener">FinePDFs Cree slices</a></td><td>733 PDFs and about 1.19 million words of extracted text, the largest source examined.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/HuggingFaceFW/finetranslations" target="_blank" rel="noopener">FineTranslations Cree</a></td><td>582 aligned Cree and English chunks. The English side is machine translation and is treated as such.</td><td>ODC-BY 1.0</td></tr>
           <tr data-licence="open"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotCC-V1" target="_blank" rel="noopener">GlotCC Cree slices</a></td><td>Web-crawled Cree documents, used for coverage of places and names.</td><td>ODC-BY 1.0</td></tr>
-          <tr data-licence="open"><td><a href="https://tatoeba.org/" target="_blank" rel="noopener">Tatoeba Cree</a></td><td>Short everyday sentences, the register a learner actually needs.</td><td>CC BY 2.0 FR</td></tr>
-          <tr data-licence="nc"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotStoryBook" target="_blank" rel="noopener">GlotStoryBook Cree</a></td><td>Story paragraphs with a parallel English telling, useful for narrative and sentence rhythm.</td><td>CC BY-NC-SA, per row</td></tr>
-          <tr data-licence="pd"><td><a href="https://archive.org/" target="_blank" rel="noopener">Internet Archive books</a></td><td>14 public-domain books, about 612,000 words, including Bloomfield's Plains Cree Texts and Sacred Stories of the Sweet Grass Cree.</td><td>public domain, printed before 1935</td></tr>
-          <tr data-licence="other"><td><a href="https://huggingface.co/datasets/verayang/plainscree" target="_blank" rel="noopener">Plains Cree phrase recordings</a></td><td>Phrase transcriptions. The audio is not redistributed and is not used for the language model.</td><td>research dataset, transcriptions only</td></tr>
-          <tr data-licence="other"><td><a href="https://github.com/giellalt/lang-crk" target="_blank" rel="noopener">GiellaLT lang-crk</a></td><td>A community-maintained morphological lexicon for Plains Cree, the word list behind the validity measure and a weighting source for the tokenizer.</td><td>AGPL-3.0 source; word list used, not the code</td></tr>
-          <tr data-licence="pd"><td>Watkins 1865 dictionary</td><td>Historical Cree and English glosses, kept under a historical tag and capped so archaic spelling cannot crowd out modern text.</td><td>public domain</td></tr>
-          <tr data-licence="other"><td>This project's own data</td><td>Aligned pairs from the project and Archer's song notes, used for grounded question and answer examples.</td><td>project-owned</td></tr>
-          <tr data-licence="other"><td>Community uploads</td><td>Anything placed in the uploads folder, read as <code>.txt</code> or <code>.md</code> and recorded as unspecified until someone labels it.</td><td>user-provided, confirm before publishing</td></tr>
+          <tr data-licence="open"><td><a href="https://tatoeba.org/" target="_blank" rel="noopener">Tatoeba Cree</a></td><td>31 short everyday sentences, the register a learner actually needs.</td><td>CC BY 2.0 FR</td></tr>
+          <tr data-licence="nc"><td><a href="https://huggingface.co/datasets/cis-lmu/GlotStoryBook" target="_blank" rel="noopener">GlotStoryBook Cree</a></td><td>88 story paragraphs with a parallel English telling, useful for narrative and sentence rhythm.</td><td>CC BY-NC-SA, per row</td></tr>
+          <tr data-licence="pd"><td><a href="https://archive.org/" target="_blank" rel="noopener">Internet Archive books</a></td><td>12 books used from 653 documents and 456,177 Cree words, after 44 failed the dialect or OCR check. Includes Bloomfield's Plains Cree Texts and Sacred Stories of the Sweet Grass Cree.</td><td>public domain, printed before 1935</td></tr>
+          <tr data-licence="other"><td><a href="https://huggingface.co/datasets/verayang/plainscree" target="_blank" rel="noopener">Plains Cree phrase recordings</a></td><td>64 phrase transcriptions. The audio is not redistributed and is not used for the language model.</td><td>research dataset, transcriptions only</td></tr>
+          <tr data-licence="other"><td><a href="https://github.com/giellalt/lang-crk" target="_blank" rel="noopener">GiellaLT lang-crk</a></td><td>57,579 word forms from a community-maintained morphological lexicon for Plains Cree, the list behind the validity measure and a weighting source for the tokenizer.</td><td>AGPL-3.0 source; word list used, not the code</td></tr>
+          <tr data-licence="other"><td>This project's own data</td><td>709 aligned pairs, Archer's song notes, and 443 historical Watkins 1865 glosses, used for grounded question and answer examples.</td><td>project-owned</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="paper-quiet" style="margin-top:12px">Word counts are the text examined before cleaning, except the totals above, which are what survived. Fourteen of these are written to <code>ledger.json</code> by the loader; Watkins 1865 travels inside the project data entry and is listed separately here because its dialect tag and licence differ.</p>
+    <p class="paper-quiet" style="margin-top:12px">Word counts are the text examined before cleaning, except the totals above, which are what survived. All thirteen are written to <code>ledger.json</code> by the loader. Watkins 1865 travels inside the project entry, and anything placed in <code>uploads/</code> is read and recorded as unspecified until someone labels it.</p>
+
+    <p class="paper-p" style="margin-top:18px">The corpus is built on the EdTeKLA Indigenous Languages Corpora at the University of Alberta, the Plains Cree Figurative Language corpus by KonradBRG, Cree Wikipedia, the FineWeb-2, FinePDFs, FineTranslations, GlotCC and GlotStoryBook releases, Tatoeba, the Internet Archive's public-domain Cree books, and the GiellaLT lang-crk lexicon and public texts from ALTLab at the University of Alberta, with the Maskwacîs Education Schools Commission and First Nations University. The orthography tables follow GiellaLT's Latn to Cans and Cans to Latn transducers.</p>
+    <p class="paper-p">The song notes are Archer Pechawis's own. They are read from <code>song_notes/</code> to build grounded question and answer examples and are not redistributed as a text corpus.</p>
+    <div class="paper-note" style="margin-top:18px"><b>The licence follows the data.</b> Because part of the corpus is NonCommercial ShareAlike, the adapter and the model card carry CC BY-NC-SA 4.0, while the base weights keep Qwen's own licence. The report card records the same terms beside every source, so a redistribution can be checked against the material it came from rather than guessed at.</div>
   </section>
 
   <section class="paper-card">
@@ -3562,9 +3065,9 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <p class="paper-num"><b>12</b> Training</p>
     <h2 class="paper-h2">Three passes, each with one job</h2>
     <p class="paper-lede">Continued pretraining teaches the language. Instruction tuning teaches the shape of the answers. Preference tuning teaches it to prefer the faithful answer over the fluent one.</p>
-    <p class="paper-p"><strong>Continued pretraining</strong> reads the cleaned Cree text as packed 2,048-token windows, with no padding wasted between documents. Ten percent of the blocks are English, drawn from a held-out Wikipedia slice, and that replay is the reason the model still follows an English instruction after a week of Cree. Three passes at a learning rate of 2e-4.</p>
-    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, word glosses, grounded answers from the song notes, questions the notes cannot answer, and ordinary conversation about the project. That mix is what makes one model work for every request instead of one narrow skill. Two passes at 1.5e-4, deliberately lower, because over-training this stage flattens every reply into the same shape.</p>
-    <p class="paper-p"><strong>Preference tuning</strong> builds its pairs from the training translations. The gold sentence is the chosen answer; the rejected one has a dropped final clause, a flattened long vowel, an English word pushed in, a changed number, or its word order reversed. Those are the failures a fluent model actually makes. The objective is DPO with a beta of 0.1, and the reference is the same model with its adapters switched off, so no second copy is loaded.</p>
+    <p class="paper-p"><strong>Continued pretraining</strong> reads the cleaned Cree text as packed 1,024-token windows, with no padding wasted between documents. Ten percent of the blocks are English, drawn from a held-out Wikipedia slice, and that replay is the reason the model still follows an English instruction after a week of Cree. Two passes at a learning rate of 2e-4, over 3,751 packed blocks.</p>
+    <p class="paper-p"><strong>Instruction tuning</strong> uses the chat template and scores only the assistant's reply. The question is context, not something to reproduce. The examples cover translation in both directions, SRO and syllabics, word glosses, grounded answers from the song notes, questions the notes cannot answer, and ordinary conversation about the project. That mix is what makes one model work for every request instead of one narrow skill. Two passes at 1.5e-4, lower, because over-training this stage flattens every reply into the same shape.</p>
+    <p class="paper-p"><strong>Preference tuning</strong> builds its pairs from the training translations. The gold sentence is the chosen answer; the rejected one has a dropped final clause, a flattened long vowel, an English word pushed in, a changed number, or its word order reversed. Those are the failures a fluent model actually makes. The objective is DPO with a beta of 0.1. The reference is a frozen copy of the instruction-tuned adapter, loaded beside the policy, so preference tuning is pulled back towards what instruction tuning built rather than towards the raw base model.</p>
     <p class="paper-p">Each stage checkpoints every ten minutes and resumes from the newest checkpoint that has both its trainer state and an intact adapter header. The stage's root folder is written only after training returns, so an interrupted stage never looks finished. That is what makes a dropped SSH session a pause rather than a restart.</p>
 
     <figure class="paper-figure">
@@ -3578,8 +3081,8 @@ A bright, open vowel. The first formant sits high, the second close enough to it
             <rect x="50" y="96" width="300" height="180" rx="7" fill="#16233f" stroke="#34517f"/>
             <text x="70" y="124" fill="#e8edf7" font-size="12">continued pretraining</text>
             <text x="70" y="146" fill="#8195b8">Cree text, 10% English replay</text>
-            <text x="70" y="166" fill="#8195b8">packed 2,048-token windows</text>
-            <text x="70" y="186" fill="#8195b8">3 passes, lr 2e-4</text>
+            <text x="70" y="166" fill="#8195b8">packed 1,024-token windows</text>
+            <text x="70" y="186" fill="#8195b8">2 passes, lr 2e-4</text>
             <text x="70" y="216" fill="#8fa6ce">learns the language</text>
             <text x="70" y="246" fill="#c98b3a">adapter 1</text>
 
@@ -3620,10 +3123,10 @@ A bright, open vowel. The first formant sits high, the second close enough to it
         <button class="paper-tab" data-cree-stage-tab="dpo" onclick="creeStage('dpo')">DPO</button>
       </div>
       <div class="paper-readout" data-cree-stage="cpt">input       running Cree text, plus English replay
-reads       packed 2,048-token windows, no padding between documents
-trains      the LoRA adapter, rank 64 on the A100 profile
+reads       packed 1,024-token windows, no padding between documents
+trains      the LoRA adapter, rank 32, alpha 64
 frozen      the base weights and the embedding table
-schedule    3 passes at 2e-4
+schedule    2 passes at 2e-4, 3,751 packed blocks
 hands on    checkpoints/cpt, the adapter SFT starts from</div>
       <div class="paper-readout" data-cree-stage="sft" hidden>input       translation, syllabics, word glosses, song notes, project conversation
 reads       the chat template, with the question masked out of the loss
@@ -3633,7 +3136,7 @@ schedule    2 passes at 1.5e-4
 hands on    checkpoints/sft, the adapter DPO starts from</div>
       <div class="paper-readout" data-cree-stage="dpo" hidden>input       gold sentences against five controlled corruptions
 reads       chosen and rejected answers for the same prompt
-trains      the same adapter, against a reference with its adapters off
+trains      the same adapter, against a frozen copy of the instruction-tuned adapter
 frozen      the base weights, the embedding table and the reference
 schedule    1 pass, beta 0.1
 hands on    checkpoints/dpo, the adapter the export merges</div>
@@ -3642,7 +3145,75 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
   </section>
 
   <section class="paper-card">
-    <p class="paper-num"><b>13</b> Measurement</p>
+    <p class="paper-num"><b>13</b> Results</p>
+    <h2 class="paper-h2">What the last run measured, and what it did not</h2>
+    <p class="paper-lede">These are the scores from the run that produced the file now installed as <code>archer:14b</code>. Base means the same model with the adapter switched off, on the same sentences, so the only thing that changed is the training.</p>
+
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Job</th><th>Measure</th><th>Base</th><th>Tuned</th><th>How to read it</th></tr></thead>
+        <tbody>
+          <tr><td>English to Cree</td><td>chrF++</td><td>8.24</td><td>11.60</td><td>41% more character overlap. Better, and still far from a fluent translation.</td></tr>
+          <tr><td>English to Cree</td><td>BLEU</td><td>0.45</td><td>1.68</td><td>The same story as chrF++. Low in absolute terms.</td></tr>
+          <tr><td>English to Cree</td><td>token F1</td><td>0.003</td><td>0.093</td><td>Some of the right words now appear. Most still do not.</td></tr>
+          <tr><td>English to Cree</td><td>Cree words passing a spelling check</td><td>36.8%</td><td>92.4%</td><td>A phonotactic test, not a dictionary: it shows the shape of the language, not that every word is attested.</td></tr>
+          <tr><td>English to Cree</td><td>English left in the reply</td><td>3.6%</td><td>13.1%</td><td>Worse, and the table says so. Producing more Cree produced more leaks.</td></tr>
+          <tr><td>Cree to English</td><td>chrF++</td><td>11.96</td><td>19.12</td><td>The easier direction, and the larger gain.</td></tr>
+          <tr><td>Cree to English</td><td>BLEU</td><td>2.45</td><td>5.02</td><td>Doubled. Use it to check a reading, not to publish one.</td></tr>
+          <tr><td>Cree to English</td><td>token F1</td><td>0.155</td><td>0.348</td><td>Roughly twice the word overlap.</td></tr>
+          <tr><td>Song notes</td><td>token F1</td><td>0.708</td><td>0.793</td><td>Answered from a section of notes held out of training.</td></tr>
+          <tr><td>Conversation</td><td>token F1</td><td>0.269</td><td>0.911</td><td>75 unseen phrasings about the project and the notes.</td></tr>
+          <tr><td>Abstention</td><td>correct refusals</td><td>0 of 3</td><td>3 of 3</td><td>Also 6 of 6 in the behaviour probe, with no false refusals.</td></tr>
+          <tr><td>Syllabics</td><td>letters in syllabics</td><td>15.2%</td><td>96.9%</td><td>Asked in English to write syllabics and it does.</td></tr>
+          <tr><td>Held-out Cree</td><td>perplexity</td><td>12,147.9</td><td>96.2</td><td>Lower is better. The largest change in the run.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="paper-quiet" style="margin-top:12px">Run of 2026-11-02, adapter <code>dpo</code>, 120 sentence pairs the model never saw in both directions; 60 rows for the syllabics check; one section of an Archer note held out for the note question; three note questions it cannot answer and two it can. The numbers come from <code>out/creebench_report.json</code> and <code>out/llm_tests.json</code>.</p>
+
+    <div class="paper-stats">
+      <div class="paper-stat"><b>92.4%</b><span>of generated Cree words pass a Cree spelling check</span></div>
+      <div class="paper-stat"><b>96.9%</b><span>of letters in syllabics when syllabics was asked</span></div>
+      <div class="paper-stat"><b>6 of 6</b><span>unanswerable note questions declined</span></div>
+      <div class="paper-stat"><b>4.72 to 3.65</b><span>tokens per Cree word after the graft</span></div>
+    </div>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/cree-llm-scores.png" alt="Three bar charts from the run: chrF++ in both directions, valid Cree and no English leak, and held-out perplexity, base against tuned">
+      <figcaption class="paper-caption"><b>Figure B7 · the run's own score chart.</b> The left panel is chrF++ in both directions. The middle is the share of generated words that are valid Cree, and the share of replies with no English leak. The right panel is held-out perplexity on a linear axis, which is why the tuned bar looks flat at 96 beside 12,148. The benchmark writes this image; it is copied here unchanged.</figcaption>
+    </figure>
+
+    <figure class="paper-figure">
+      <img src="/static/assets/evidence/cree-llm-fertility.png" alt="Tokens per Cree word before and after the vocabulary graft, and the distribution of tokens per word on held-out Cree">
+      <figcaption class="paper-caption"><b>Figure B8 · what the vocabulary bought.</b> The mean falls from 4.72 pieces per Cree word to 3.65, 22.6% fewer. The histogram on the right is the same measurement sentence by sentence: the green mass sits at three and four pieces where the red mass sat at five and six.</figcaption>
+    </figure>
+
+    <h3 class="paper-h3" style="margin-top:34px">Trained against its own base, eight jobs</h3>
+    <p class="paper-p">The run writes this comparison itself and names where each bar came from. Every bar below is the base model, because that is the only earlier score measured on these sentences.</p>
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead><tr><th>Job</th><th>Measure</th><th>This model</th><th>Its base</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>English to Cree</td><td>chrF++</td><td>11.600</td><td>8.241</td><td>ahead</td></tr>
+          <tr><td>Cree to English</td><td>chrF++</td><td>19.121</td><td>11.956</td><td>ahead</td></tr>
+          <tr><td>English to Cree</td><td>letters in SRO when SRO was asked</td><td>99.1%</td><td>98.5%</td><td>ahead</td></tr>
+          <tr><td>Song notes</td><td>token F1</td><td>0.793</td><td>0.708</td><td>ahead</td></tr>
+          <tr><td>Conversation</td><td>token F1</td><td>0.911</td><td>0.269</td><td>ahead</td></tr>
+          <tr><td>Abstention</td><td>accuracy</td><td>1.000</td><td>0.000</td><td>ahead</td></tr>
+          <tr><td>Syllabics</td><td>share of letters in syllabics</td><td>0.969</td><td>0.152</td><td>ahead</td></tr>
+          <tr><td>Held-out Cree</td><td>perplexity, lower is better</td><td>96.2</td><td>12,147.9</td><td>ahead</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="paper-note" style="margin-top:24px"><b>One comparison is still missing.</b> The old app used a separate Cree model, and that model has never been scored on these 120 sentences. So this table proves that the training improved this base on every job it measured. It does not prove that one model beats the other Cree model, and no number on this page will claim that until the same benchmark has been run on it.</div>
+
+    <p class="paper-p" style="margin-top:18px">Read the translation rows plainly. chrF++ 11.60 and BLEU 1.68 for English into Cree are low. The model has learned the shape of the language: 92.4% of its Cree words pass a Cree spelling check, against 36.8% before, and it now writes syllabics when asked. It has not learned to choose the exact word and ending a fluent speaker would choose. A translation from this model is a draft to hand to a speaker, not an answer to publish. The English leak rising to 13.1% is the clearest cost of that trade, and it is left in the table rather than hidden.</p>
+    <p class="paper-p">The strongest results are the ones with a right answer: refusing a question the notes cannot answer, writing the script that was asked for, and reading a note section it never saw. Conversation scoring 0.911 is real but narrower than it looks, because the 75 phrasings are all about this project and these notes.</p>
+  </section>
+
+  <section class="paper-card">
+    <p class="paper-num"><b>14</b> Measurement</p>
     <h2 class="paper-h2">Scored against its own base, not against a leaderboard</h2>
     <p class="paper-lede">The benchmark runs the same held-out sentences through the base model with the adapters off and the tuned model with them on. The only thing that changes is the training, so the comparison is paired.</p>
     <p class="paper-p">Translation is scored with chrF++ and BLEU, but also with three measures that matter more here. <strong>Validity</strong> asks whether every generated word exists in the lexicon or obeys Cree phonotactics, because an invented word is the failure a speaker notices first. <strong>Code-switch</strong> counts English leaking into a Cree answer. <strong>Syllabics</strong> checks whether the script is actually written, not just named.</p>
@@ -3700,7 +3271,7 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
             <rect x="532" y="108" width="110" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="587" y="128" fill="#dbe6ff" text-anchor="middle">Cree validity</text>
             <rect x="654" y="108" width="104" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="706" y="128" fill="#dbe6ff" text-anchor="middle">code-switch</text>
             <rect x="770" y="108" width="86" height="30" rx="4" fill="#1b2b4d" stroke="#4265a0"/><text x="813" y="128" fill="#dbe6ff" text-anchor="middle">syllabics</text>
-            <text x="240" y="166" fill="#8195b8">both directions, on 203 pairs the model never saw</text>
+            <text x="240" y="166" fill="#8195b8">both directions, on 120 pairs the model never saw</text>
 
             <rect x="50" y="200" width="980" height="94" rx="7" fill="#16233f" stroke="#2a3d63"/>
             <text x="70" y="232" fill="#e8edf7" font-size="11">behaviour</text>
@@ -3727,25 +3298,31 @@ hands on    checkpoints/dpo, the adapter the export merges</div>
   </section>
 
   <section class="paper-card">
-    <p class="paper-num"><b>14</b> Running it</p>
+    <p class="paper-num"><b>15</b> Running it</p>
     <h2 class="paper-h2">One file, one command, resumable</h2>
     <p class="paper-lede">The whole pipeline is a single Python file. It downloads the corpus, cleans it, builds the tokenizer, trains in three stages, benchmarks the result and exports a GGUF. Nothing in it needs Colab, Drive or a notebook.</p>
-    <p class="paper-p">On a 40 GB card the 7B recipe takes roughly two to four hours plus the corpus download. A 16 GB card uses a shorter context and a smaller adapter and takes about twice as long. A 14B run on 80 GB takes six to ten hours, and a 32B run about a day, with the merge needing a machine with enough RAM to hold two copies of the model.</p>
+    <p class="paper-p">This run used the <code>t4</code> profile on one RTX 4090 with 24 GB. The corpus took about 15 minutes on its first build, continued pretraining 1 hour 32 minutes, instruction tuning 14 hours 10 minutes, preference tuning 24 minutes and the export 4 minutes. The same recipe on a smaller card runs more slowly; a 14B or 32B run needs a larger card and enough RAM to hold two copies of the model during the merge.</p>
     <p class="paper-p">If the process stops, the same command continues it. Every finished stage is recorded against a fingerprint of its inputs and is skipped, and an interrupted training stage resumes from its newest intact checkpoint with the optimizer and the learning rate schedule. Changing the base model, the context length, the LoRA rank or the corpus invalidates exactly the stages that depended on it, so a new run cannot inherit numbers from an old one.</p>
     <p class="paper-p">The export merges the adapter into a full precision copy, converts it with llama.cpp, quantises it to Q4_K_M and writes a Modelfile beside it. That file is what makes the model a single Ollama tag on the machine that runs the app.</p>
 
     <div class="paper-readout" style="font-size:12.5px;line-height:1.9">python train_cree_llm.py --check
-python train_cree_llm.py --profile a100 --work /data/cree_llm
+python train_cree_llm.py --profile big24 --work "$HOME/cree-work" --hf-home "$HOME/cree-hf"
 
 # after the run
-mkdir -p assets/archer_llm
-cp archer-7b.Q4_K_M.gguf Modelfile assets/archer_llm/
-cd assets/archer_llm &amp;&amp; ollama create archer:7b -f Modelfile</div>
-    <p class="paper-p" style="margin-top:18px">The run writes <code>out/creebench_report.json</code>, <code>out/llm_tests.json</code>, a readable <code>report_card.md</code>, the plots, and an <code>out/web/</code> folder with the compact JSON bundle and the SVG charts this page is built to use. Pointing the app at the result is one line in <code>config/config.yaml</code>: <code>model: "archer:7b"</code>.</p>
+unzip -o archer-14b.zip -d assets/archer_llm
+cd assets/archer_llm
+shasum -a 256 archer-14b.Q4_K_M.gguf   # compare with manifest.json
+ollama create archer:14b -f Modelfile</div>
+    <p class="paper-p" style="margin-top:18px">The run writes <code>out/creebench_report.json</code>, <code>out/llm_tests.json</code>, a readable <code>report_card.md</code>, the plots, and an <code>out/web/</code> folder with the compact JSON bundle and the SVG charts this page is built to use. Pointing the app at the result is one line in <code>config/config.yaml</code>: <code>model: "archer:14b"</code>.</p>
+    <p class="paper-p">The file this page describes is <code>archer-14b.Q4_K_M.gguf</code>, about 9 GB at roughly 4.9 bits per weight, with its full SHA-256 in the archive's <code>manifest.json</code>. Testing it with <code>ollama run</code> sends no system prompt, and the persona and the evidence rule live in that system message. A bare prompt is answered by the base model's default assistant instead. Use the app, or call the same client the app uses:</p>
+    <div class="paper-readout" style="font-size:12.5px;line-height:1.9">python - &lt;&lt;'PY'
+from chat.llm_client import LocalLLMClient, LLMConfig
+print(LocalLLMClient(LLMConfig()).chat("What is this project?", []))
+PY</div>
   </section>
 
   <section class="paper-card paper-card--tight">
-    <p class="paper-num"><b>15</b> Try it</p>
+    <p class="paper-num"><b>16</b> Try it</p>
     <h2 class="paper-h2" style="font-size:26px">The bubble is on every page</h2>
     <p class="paper-p">Open the Archer Bot panel in the corner to ask a question, or use the retrieval explorer above to inspect the evidence first. The health endpoint reports whether the index built, how many chunks it holds, and whether a voice is configured, so a broken setup is visible rather than silent.</p>
     <p class="paper-p"><button class="paper-btn" onclick="openArcherChat()">Open Archer Bot</button> <button class="paper-btn ghost" onclick="ragHealth()">Check health</button></p>
@@ -3903,7 +3480,7 @@ cd assets/archer_llm &amp;&amp; ollama create archer:7b -f Modelfile</div>
         </tbody>
       </table>
     </div>
-    <p class="paper-caption">The suite builds random sequences at every boundary, encodes and decodes them, and asserts that an invalid token can never be sampled at a position whose mask excludes it. The counts are the contract from the paper; the test is what keeps the implementation honest about them.</p>
+    <p class="paper-caption">The suite builds random sequences at every boundary, encodes and decodes them, and asserts that an invalid token can never be sampled at a position whose mask excludes it. The counts are the contract from the paper; the test is what keeps the implementation accurate about them.</p>
   </section>
 
   <section class="paper-card">
@@ -4053,7 +3630,7 @@ cd assets/archer_llm &amp;&amp; ollama create archer:7b -f Modelfile</div>
     <h2 class="paper-h2">Five hundred songs to prove it, four thousand to hear it</h2>
     <p class="paper-lede">The base corpus is OpenEWLD, the public-domain subset of the Essen folksong collection: 502 songs, 52,417 melody notes, 19,569 chord spans. Splits are by song, 409 train, 49 dev, 44 test. The model is deterministic given a seed.</p>
     <p class="paper-p">Five hundred lead sheets are enough to prove a decoder; making the observer strong takes more, which is why the large corpus exists. It is built from the 5,204-score AutoHarmonizer/Wikifonia archive, with two kinds of duplicate removed: normalised title and, more importantly, a transposition-invariant melody signature. Title matching alone missed 40 of the 44 test songs; the signature check removes them. The result is 4,571 extra scores with zero melody overlap against OpenEWLD train, dev or test.</p>
-    <p class="paper-p">The large tagger is trained by streaming one score at a time and keeping only the per-beat features. A naive load of five thousand songs plus the training graph exceeded 10 GB on a 27 GB laptop; the streaming path stays around 1.5 GB. The structural tables still come from OpenEWLD, which isolates the effect of the extra data and keeps the evaluation honest.</p>
+    <p class="paper-p">The large tagger is trained by streaming one score at a time and keeping only the per-beat features. A naive load of five thousand songs plus the training graph exceeded 10 GB on a 27 GB laptop; the streaming path stays around 1.5 GB. The structural tables still come from OpenEWLD, which isolates the effect of the extra data and keeps the evaluation independent.</p>
 
     <div class="paper-stats">
       <div class="paper-stat"><b>502</b><span>base songs</span></div>
@@ -4273,7 +3850,7 @@ python -m pytest tests -q               # the unit and integration tests</div>
   <div class="demo-layout">
     <div class="demo-panel" id="upload-panel">
       <div class="demo-panel-title">Upload an MP3</div>
-      <div class="demo-panel-sub">Upload any audio file. <strong>DSP (real-time)</strong> sings a wordless part from the recorded vocable takes, and the Vocable row below decides what it sings from. With <strong>Mix</strong> selected the accompaniment engine chooses per phrase across all the loaded words and the eight modes, and the whole track is rendered offline in one pass. Pick one specific word instead and that one recording is sung along the track's own melody and rhythm &mdash; except under Humming, which is a closed-mouth voice with no word in it, so the word row is inert while that mode is selected and the hum is what renders. Both are offline renders and both take a moment: about half a minute on a fifty second track here. Your file is the track: it plays back exactly as you uploaded it, untouched, and TRACK VOLUME sets how loud it is, with 0 for the robot on its own. The one exception is the Neural engine's own re-singing modes, where the robot IS the lead voice -- there the track is the same file with its original singer separated out (you still have it, and the panel says so while it plays), because two versions of one vocal line, milliseconds apart, is a chorus effect rather than a collaboration. ROBOT VOLUME sets the robot's own part. <strong>Neural (offline render)</strong> does something different again: it takes the track's own actual audio, the real words already in it, and sends that straight through the trained voice, so what comes back is the original performance re-sung in a new voice, not a second part layered next to it. Because that pass runs on a slower model, it costs one short backend render instead of being instant.</div>
+      <div class="demo-panel-sub">Upload any audio file. <strong>DSP (real-time)</strong> sings a wordless part from the recorded vocable takes, and the Vocable row below decides what it sings from. With <strong>Mix</strong> selected the accompaniment engine chooses per phrase across all the loaded words and the eight modes, and the whole track is rendered offline in one pass. Pick one specific word instead and that one recording is sung along the track's own melody and rhythm, except under Humming, which is a closed-mouth voice with no word in it, so the word row is inert while that mode is selected and the hum is what renders. Both are offline renders and both take a moment: about half a minute on a fifty second track here. Your file is the track: it plays back exactly as you uploaded it, untouched, and TRACK VOLUME sets how loud it is, with 0 for the robot on its own. The one exception is the Neural engine's own re-singing modes, where the robot IS the lead voice -- there the track is the same file with its original singer separated out (you still have it, and the panel says so while it plays), because two versions of one vocal line, milliseconds apart, is a chorus effect rather than a collaboration. ROBOT VOLUME sets the robot's own part. <strong>Neural (offline render)</strong> does something different again: it takes the track's own actual audio, the real words already in it, and sends that straight through the trained voice, so what comes back is the original performance re-sung in a new voice, not a second part layered next to it. Because that pass runs on a slower model, it costs one short backend render instead of being instant.</div>
       <div class="demo-racks">
         <!-- Rail A is the robot's own voice: which detector reads the pitch,
              which engine sings, which model, and how it renders. Rail B is
@@ -4501,7 +4078,7 @@ python -m pytest tests -q               # the unit and integration tests</div>
             <input type="range" class="volume-slider" id="demo-robot-vol" min="0" max="150" value="100" step="5" oninput="setDemoRobotVolume(this.value)">
             <span class="volume-value" id="demo-robot-vol-value">100%</span>
           </div>
-          <div class="volume-row" id="demo-track-volume-row" title="How loud the track plays under the robot's singing, and the track is always your uploaded file itself, played back exactly as it came in, never a re-recorded or vocal-removed version of it. Live in every engine and every mode; set it to 0 and you are left with the robot alone. Purely a playback mix control, independent of Robot volume.">
+          <div class="volume-row" id="demo-track-volume-row" title="How loud the track plays under the robot's singing. The track is your uploaded file itself, exactly as it came in, in every engine and every mode except the Neural engine's own re-singing modes: there the robot sings your line, so what plays under it is the same file with your original singer separated out (the instruments, and no second voice), and with Sing along with instruments set to Off nothing plays under it at all. Live in every engine and every mode; set it to 0 and you are left with the robot alone. Purely a playback mix control, independent of Robot volume.">
             <span class="volume-label">TRACK VOLUME</span>
             <input type="range" class="volume-slider" id="demo-source-vol" min="0" max="150" value="78" step="5" oninput="setDemoSourceVolume(this.value)">
             <span class="volume-value" id="demo-source-vol-value">78%</span>
@@ -4703,15 +4280,15 @@ python -m pytest tests -q               # the unit and integration tests</div>
 
     <!-- SingSong is not a separate destination. It is a second generative
          instrument in the same rack as the live collaboration panels above:
-         one upload, one output mode, one result player, and an honest model
+         one upload, one output mode, one result player, and an accurate model
          status line instead of a page that pretends it is ready. -->
     <div class="demo-panel upload-tool-source" id="singsong-panel">
-      <div class="demo-panel-title">SingSong &mdash; generated band</div>
+      <div class="demo-panel-title">SingSong, generated band</div>
       <div class="demo-panel-sub">SingSong listens to a vocal and composes an instrumental that follows it. This is a different job from the voice conversion above: the robot is not re-singing your take, it is writing a band underneath it. When the paper's trained semantic &rarr; coarse &rarr; fine cascade is installed it runs that; until then the same button writes the band with the built-in chord engine, so the panel works on a fresh clone and switches over by itself when the weights arrive.</div>
       <div class="gen-status">
         <span class="gen-dot" id="ss-status-dot"></span>
         <span class="gen-status-text" id="ss-status-text">checking model&hellip;</span>
-        <span class="gen-badge" id="ss-status-badge">&mdash;</span>
+        <span class="gen-badge" id="ss-status-badge">-</span>
       </div>
       <div class="gen-missing" id="ss-missing"></div>
       <div class="gen-grid">
@@ -4786,12 +4363,12 @@ python -m pytest tests -q               # the unit and integration tests</div>
          controls stay to the controls the pipeline actually supports, so the
          page cannot promise a knob the backend ignores. -->
     <div class="demo-panel upload-tool-source" id="mysong-panel">
-      <div class="demo-panel-title">MySong &mdash; chord accompaniment</div>
-      <div class="demo-panel-sub">MySong tracks the melody, estimates the key, chooses a chord for every span of the take, and arranges a band underneath it &mdash; hand drum, round dance, grass dance, jingle dress, M&eacute;tis fiddle or cedar flute first, with the other bands after them. It is symbolic harmony, not voice conversion: the output is a new accompaniment, mixed with your untouched vocal.</div>
+      <div class="demo-panel-title">MySong, chord accompaniment</div>
+      <div class="demo-panel-sub">MySong tracks the melody, estimates the key, chooses a chord for every span of the take, and arranges a band underneath it: hand drum, round dance, grass dance, jingle dress, M&eacute;tis fiddle or cedar flute first, with the other bands after them. It is symbolic harmony, not voice conversion: the output is a new accompaniment, mixed with your untouched vocal.</div>
       <div class="gen-status">
         <span class="gen-dot" id="ms-status-dot"></span>
         <span class="gen-status-text" id="ms-status-text">checking model&hellip;</span>
-        <span class="gen-badge" id="ms-status-badge">&mdash;</span>
+        <span class="gen-badge" id="ms-status-badge">-</span>
       </div>
       <div class="gen-error" id="ms-status-error"></div>
       <div class="gen-grid">
@@ -5905,7 +5482,7 @@ function crKeyFromHistory(noteHist, finalHist, finalHz) {
 // so without this the answer would change its mind about the key every phrase
 // and flip between two perfectly good readings mid performance. Once a key has
 // been decided it stays decided until the evidence really moves.
-// How much better a fresh reading has to be before it takes over. Deliberately
+// How much better a fresh reading has to be before it takes over. 
 // large: a few notes of melody fit two keys almost equally well (a phrase that
 // keeps coming to rest on the fifth fits its own key and the key the fifth
 // belongs to), and an answer is better served by one settled reading of the key
@@ -6720,7 +6297,7 @@ function loadVocableSampleBank(ctx) {
 // carries the bulk of any real melodic movement; a big single-grain
 // resample on top of that is what made the earlier engine's tone waver
 // away from sounding like a consistent voice, and server.py's own
-// single-vocable path deliberately avoids exactly that for the same
+// single-vocable path avoids exactly that for the same
 // reason (see _render_track_single_vocable_offline's docstring).
 class _SyllableGrainEngine {
   constructor(ctx, outputNode) {
@@ -7138,7 +6715,7 @@ class _SyllableGrainEngine {
 // attack, a new syllable or note starting, WITHIN an already-voiced
 // phrase, as distinct from a phrase's own start (which
 // _SyllableGrainEngine already detects on its own, from the voiced/
-// silent transition alone, via updateVoicing()). Deliberately simple and
+// silent transition alone, via updateVoicing()). simple and
 // cheap enough to run every animation-frame tick.
 function createOnsetDetector(opts = {}) {
   const RISE_FACTOR = opts.riseFactor ?? 1.6;     // how far above the recent floor a rise must jump to count
@@ -8373,6 +7950,8 @@ let demoUploadedFile = null;          // the raw File, kept so it can be re-POST
 // still plays in Call and response and in Humming, because in those two the
 // robot is not singing the singer's line.
 let demoBandBuffer = null;            // the separated accompaniment, decoded, or null
+let demoBandSource = null;            // the source playing it (a render may carry its own instead)
+let demoBandGain = null;              // TRACK VOLUME for that source
 let demoBandKey = null;               // the file key it belongs to, so a new upload never uses a stale one
 let demoPlayArmed = false;            // flips true the first time Play is actually clicked for this
                                        // file, ensureDemoPitchTimeline() checks this so nothing
@@ -8585,7 +8164,7 @@ function setDemoVoiceEngine(engine, btn) {
   const pitchSlider = document.getElementById('demo-octave-shift-slider');
   if (pitchSlider) {
     // This one really is inert under DSP: that renderer sings the recorded
-    // takes at their own pitch and is deliberately never re-pitched, so the
+    // takes at their own pitch and is never re-pitched, so the
     // slider stays off and now says why instead of just refusing the hand.
     pitchSlider.disabled = (engine === 'dsp');
     pitchSlider.title = (engine === 'dsp')
@@ -8923,6 +8502,11 @@ function setDemoSourceVolume(val) {
   if (demoSourceGain && demoAudioCtx) {
     demoSourceGain.gain.setTargetAtTime(demoSourceVolume, demoAudioCtx.currentTime, 0.05);
   }
+  // The separated band is the track in the Neural engine's re-singing modes, so
+  // TRACK VOLUME has to move it too, live, exactly like the upload.
+  if (demoBandGain && demoAudioCtx) {
+    demoBandGain.gain.setTargetAtTime(demoSourceVolume, demoAudioCtx.currentTime, 0.05);
+  }
 }
 let demoAudioBuffer = null;
 let demoIsPlaying = false, demoStartTime = 0, demoOffset = 0;
@@ -9059,7 +8643,7 @@ function _demoDspPathUi() {
 
 function setDemoVocable(name, btn) {
   // the buttons are disabled while Humming is the mode, so this is only
-  // reachable if something calls it directly; the guard keeps the state honest.
+  // reachable if something calls it directly; the guard keeps the state accurate.
   if (demoMode === 'solo_humming' && demoVoiceEngine === 'dsp') return;
   if (demoIsPlaying) stopAudio(); // changing this mid-playback would leave a stale render on screen
   demoVocable = name;
@@ -9744,14 +9328,15 @@ function _fileKey(file) {
   return file ? `${file.name}|${file.size}` : null;
 }
 
-// THE UPLOAD'S OWN SEPARATION, for the live chunks' model input.
+// THE UPLOAD'S OWN SEPARATION, for the live chunks' model input AND for what
+// plays under the robot in the Neural engine's re-singing modes.
 //
 // This is the whole file's vocal/instrument split, made once per file in the
-// background as soon as it is picked. NOTHING of it is ever played: the page
-// plays the uploaded file itself, and no accompaniment channel is fetched or
-// mixed. It exists so that each live chunk can name its own position in the
-// track and be converted from the isolated lead vocal rather than from the
-// raw mix, where drums are what the model would be re-singing.
+// background as soon as it is picked. It answers two questions on this panel:
+// what the voice model is fed (the isolated lead vocal, so drums are never
+// re-sung), and what is heard under the robot's re-sung line -- the
+// accompaniment, i.e. the same file with the original singer taken out (see
+// _playbackTrackBuffer, which is the one place that choice is made).
 let demoSeparation = null; // { fileKey, trackKey } for the current upload
 
 function _warmSeparation(file) {
@@ -9804,12 +9389,12 @@ async function _fetchBandWhenReady(state, trackKey, fileKey) {
     const band = await demoAudioCtx.decodeAudioData(bytes);
     if (demoSeparation !== state) return;
     // NOT EVERY TRACK HAS A BAND. On an a cappella recording the separation
-    // honestly returns almost nothing, and playing that as "the track" would
+    // accurately returns almost nothing, and playing that as "the track" would
     // delete the person's file from the panel -- a silent backing under the
     // robot, with nothing on screen saying where their track went. So the band
     // is only adopted when it is a real share of the mix (within 18 dB of the
     // uploaded file's own loudness); a cappella keeps playing the upload, which
-    // is also the honest answer there, the singer's own voice under a robot
+    // is also the accurate answer there, the singer's own voice under a robot
     // singing the same line.
     const bandRms = _bufferRms(band);
     const uploadRms = demoAudioBuffer ? _bufferRms(demoAudioBuffer) : 0;
@@ -9865,23 +9450,64 @@ function _bufferRms(buffer) {
   return Math.sqrt(sum / Math.max(1, n));
 }
 
-// WHICH TRACK PLAYS UNDER THE ROBOT: ALWAYS THE UPLOADED FILE.
+// WHICH TRACK PLAYS UNDER THE ROBOT.
 //
-// This used to be conditional. When the Neural engine re-sings the singer's own
-// line, the page played the separated *band* instead of the upload, on the
-// reasoning that the recording's lead and the robot's copy of it would sum into
-// a chorus. That reasoning is about one thing and this function is about
-// another: what the person hears. Playing the band means TRACK VOLUME plays a
-// vocal-removed version of their file, so with ROBOT VOLUME down they were left
-// listening to karaoke of their own take and their own singing was simply gone
-// -- while the TRACK VOLUME row's own tooltip promised the opposite ("the track
-// is always your uploaded file itself, played back exactly as it came in, never
-// a re-recorded or vocal-removed version of it"). The separated band keeps its
-// real job, which is what the *model* is fed: the live chunks are still built
-// from the isolated lead vocal server-side, so drums never reach the voice. What
-// plays is the upload.
+// The uploaded file, in every engine EXCEPT the Neural engine's re-singing
+// modes. There the robot sings the recording's OWN line, word for word, off the
+// same notes, a few milliseconds behind it -- so playing the upload underneath
+// puts the original lead beside the robot's copy of that same lead. Two copies
+// of one vocal line are not a duet: they sum into comb filtering across the
+// whole vocal range, and the words inside it come out harder to pick out than
+// either voice alone. That is what "muddy, unclear, and there is music I cannot
+// place under it" actually is.
+//
+// The separated band is the file this app already builds for exactly this job
+// (see /api/neural/backing-bed): the same mix with the original singer taken
+// out and the instruments left in. So:
+//
+//   * every other engine and mode -> the uploaded file itself, untouched.
+//   * Neural re-singing, INSTRUMENTS On  -> the separated band, no original lead.
+//   * Neural re-singing, INSTRUMENTS Off -> nothing. The robot performs the line
+//     alone, which is what that toggle has always said it means.
+//
+// Call and response and humming are NOT re-singing -- the robot is answering the
+// singer, or humming over them, not replacing their line -- so those keep the
+// upload, because there the singer is exactly what should be heard.
+function _robotSingsTheLine() {
+  return demoVoiceEngine === 'neural'
+         && demoMode !== 'call_and_response' && demoMode !== 'solo_humming';
+}
+
 function _playbackTrackBuffer() {
-  return demoAudioBuffer;
+  if (!_robotSingsTheLine()) return demoAudioBuffer;
+  if (!demoInstrumentsEnabled) return null;
+  if (demoBandBuffer && demoBandKey === _fileKey(demoUploadedFile)) return demoBandBuffer;
+  return null;
+}
+
+// The band, started on the same instant and at the same offset as the track it
+// plays instead of, so the two never drift apart. One gain node for the page's
+// life, so TRACK VOLUME keeps working live after the first playback.
+function _startBandSource(ctx, buffer, when, offset) {
+  // A second playback must not leave the first one's band running: two copies of
+  // the accompaniment under one voice is the same doubling this rule exists to
+  // remove, just in the other direction.
+  if (demoBandSource) { try { demoBandSource.stop(); } catch (e) {} demoBandSource = null; }
+  if (!demoBandGain) {
+    demoBandGain = ctx.createGain();
+    demoBandGain.connect(ctx.destination);
+  }
+  demoBandGain.gain.value = demoSourceVolume;
+  demoBandSource = ctx.createBufferSource();
+  demoBandSource.buffer = buffer;
+  demoBandSource.connect(demoBandGain);
+  try {
+    demoBandSource.start(when, Math.max(0, offset || 0));
+  } catch (e) {
+    console.warn('[demo] could not start the separated band', e);
+    demoBandSource = null;
+  }
+  return demoBandSource;
 }
 
 function _currentSeparationKey() {
@@ -10022,22 +9648,27 @@ function _playDemoNeuralLive() {
   const sr = demoAudioBuffer.sampleRate;
   const startSample = Math.floor(demoOffset * sr);
 
+  // WHAT PLAYS UNDER THE CHUNKS IS THE TRACK, from the moment Play is pressed,
+  // while the converted chunks arrive over it one at a time on ROBOT VOLUME --
+  // and "the track" is the rule in _playbackTrackBuffer: the upload in every
+  // engine except Neural re-singing, the separated band there (INSTRUMENTS On),
+  // and nothing at all under a robot performing the line alone (INSTRUMENTS Off).
+  //
+  // The source the PAGE ANALYSES is always the upload, whatever is audible. The
+  // pitch readout, the note overlay and the progress clock are about the person
+  // singing, so they keep reading their own file even while the band is what is
+  // coming out of the speakers; the band, when there is one, is a second source
+  // started at the same instant as this one.
+  const underBuffer = _playbackTrackBuffer();
   demoSource = demoAudioCtx.createBufferSource();
-  demoSource.buffer = _playbackTrackBuffer();
+  demoSource.buffer = demoAudioBuffer;
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
   demoFreqBuf = new Float32Array(demoAnalyser.frequencyBinCount);
   demoSource.connect(demoAnalyser);
-  // WHAT PLAYS UNDER THE CHUNKS IS THE TRACK, from the moment Play is pressed,
-  // while the converted chunks arrive over it one at a time on ROBOT VOLUME.
-  // The track is always the uploaded file itself, exactly as it came in, in
-  // every engine and every mode (see _playbackTrackBuffer, and the TRACK VOLUME
-  // row's own tooltip, which promised exactly this). The analyser reads whatever
-  // is playing, so the pitch readouts and the progress clock stay on the track
-  // either way.
   if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
-  demoSourceGain.gain.value = demoSourceVolume;
+  demoSourceGain.gain.value = (underBuffer === demoAudioBuffer) ? demoSourceVolume : 0;
   demoSourceGain.connect(demoAudioCtx.destination);
   demoSource.connect(demoSourceGain);
 
@@ -10153,13 +9784,16 @@ function _playDemoNeuralLive() {
 
   const startTrackAndLine = () => {
     if (streamer._started || streamer._stopped) return;
-    if (demoOffset >= _playbackTrackBuffer().duration - 0.05) return; // nothing of the track left
+    if (demoOffset >= demoAudioBuffer.duration - 0.05) return; // nothing of the track left
     const t0 = demoAudioCtx.currentTime + 0.12;
     try {
       demoSource.start(t0, demoOffset);
     } catch (e) {
       console.warn('[demo live] could not start the track', e);
       return;
+    }
+    if (underBuffer && underBuffer !== demoAudioBuffer) {
+      _startBandSource(demoAudioCtx, underBuffer, t0, demoOffset);
     }
     demoStartTime = t0 - demoOffset;
     streamer._startAt = t0;
@@ -10209,7 +9843,7 @@ function _playDemoNeuralLive() {
   // DEMO_LIVE_CHUNK_OVERLAP_S before the previous one ended and the two are
   // crossed (equal-power, over that same instant of the performance). If
   // conversion ran late there is a real gap to cover instead, and the short
-  // fade-in is the honest shape for that. The tail always falls away on the
+  // fade-in is the accurate shape for that. The tail always falls away on the
   // same curve, so the next chunk has something to cross with and the very last
   // chunk of a track ends the line the same way.
   const placeChunk = (index, audioBuf, idealStart, startAt) => {
@@ -10571,6 +10205,11 @@ async function playAudioNeural() {
 // is for status: what the robot is doing right now.
 function _renderContentsLabel(buffer) {
   if (!buffer) return 'Render complete.';
+  if (_robotSingsTheLine()) {
+    return demoInstrumentsEnabled
+      ? 'Playing \u00b7 robot voice, your singer separated out of the band'
+      : 'Playing \u00b7 robot voice alone, no track under it';
+  }
   return 'Playing \u00b7 robot voice over your track';
 }
 
@@ -10733,7 +10372,7 @@ function _pitchShiftBufferPreserveDuration(audioCtx, buffer, cents) {
   return outBuffer;
 }
 
-// ── VOCAL FOLD VIBRATION, APPLIED LIVE ─────────────────────────────────────
+// VOCAL FOLD VIBRATION, APPLIED LIVE
 //
 // WHY THIS IS IN THE BROWSER AT ALL. This slider used to belong to the render:
 // the amount was part of the render's identity, so moving it made the NEXT Play
@@ -10767,7 +10406,7 @@ function _pitchShiftBufferPreserveDuration(audioCtx, buffer, cents) {
 // slider's tooltip names, no movement inside a stretch shorter than 0.22 s,
 // full depth on a note held 1.1 s or longer, arriving 0.26 s after a stretch
 // begins and opening up over 0.34 s, silence below 4% of the part's own
-// loud-frame peak, and a +/-3% loudness swing. What is deliberately NOT ported
+// loud-frame peak, and a +/-3% loudness swing. What is NOT ported
 // is the per-note rate and phase jitter and the slow drift: those are seeded
 // from the render's own material so that two renders of one setting wobble
 // identically, and live playback has no render to be identical to.
@@ -11079,7 +10718,7 @@ function _liveDemoPageOnScreen() {
 // already no-ops when there is nothing to stop. The rendered buffers it leaves
 // behind stay cached, so pressing Play on the page is still instant.
 // This runs when the live demo PAGE is left, and when the whole app is going
-// away (pagehide). It deliberately does not run on a tab switch: a background
+// away (pagehide). It does not run on a tab switch: a background
 // tab keeps playing, which is the whole point of a background tab.
 function _stopLiveDemoMedia() {
   // Each half is guarded on its own, because this runs from a page change and
@@ -11127,24 +10766,35 @@ function _startNeuralPlayback(renderedBuffer = demoNeuralRenderedBuffer) {
   // stays in the file the backend sent and is simply not played.
   const isStems = (demoVoiceEngine === 'dsp' || demoVoiceEngine === 'neural')
                   && renderedBuffer.numberOfChannels >= 2;
+  const stemsSplit = isStems ? _splitStemsBuffer(demoAudioCtx, renderedBuffer) : null;
 
+  // WHAT PLAYS UNDER THE ROBOT, the same rule as the live stream above and the
+  // downloads below (see _playbackTrackBuffer). A two-channel Neural render
+  // carries its own accompaniment -- the mix with the original singer separated
+  // out, already ducked under the voice and exactly as long as it -- so it is
+  // preferred over the whole-track band, which may still be separating when Play
+  // is pressed. With INSTRUMENTS Off there is nothing under the voice at all, so
+  // the robot is heard on its own rather than doubled by the recording.
+  let underBuffer = demoAudioBuffer;
+  if (_robotSingsTheLine()) {
+    underBuffer = !demoInstrumentsEnabled ? null
+      : (stemsSplit ? stemsSplit.bed : _playbackTrackBuffer());
+  }
+
+  // The source the page ANALYSES is always the upload (see the live path): the
+  // pitch readouts and the progress clock are about the person singing, not
+  // about whatever is audible. Its gain, not its buffer, decides whether it is
+  // heard.
   demoSource = demoAudioCtx.createBufferSource();
-  demoSource.buffer = _playbackTrackBuffer();
+  demoSource.buffer = demoAudioBuffer;
   demoAnalyser = demoAudioCtx.createAnalyser();
   demoAnalyser.fftSize = 2048;
   demoPitchBuf = new Float32Array(demoAnalyser.fftSize);
   demoFreqBuf = new Float32Array(demoAnalyser.frequencyBinCount);
   demoSource.connect(demoAnalyser); // keeps the source-pitch overlay working in both modes
 
-  // WHAT PLAYS UNDER THE ROBOT, and it is the same rule in the live stream above
-  // and in the downloads below: the uploaded file itself at TRACK VOLUME (0 is
-  // the way to ask for the robot on its own), except in the Neural engine's own
-  // re-singing modes, where the band does, because there the robot is the lead
-  // voice and the recording's lead would be a second one on the same line. See
-  // _playbackTrackBuffer. Whatever plays is the analyser's source, so the pitch
-  // readouts keep reading the track the person dropped in.
   if (!demoSourceGain) demoSourceGain = demoAudioCtx.createGain();
-  demoSourceGain.gain.value = demoSourceVolume;
+  demoSourceGain.gain.value = (underBuffer === demoAudioBuffer) ? demoSourceVolume : 0;
   demoSource.connect(demoSourceGain);
   demoSourceGain.connect(demoAudioCtx.destination);
 
@@ -11177,15 +10827,15 @@ function _startNeuralPlayback(renderedBuffer = demoNeuralRenderedBuffer) {
     demoActiveEchoNodes = [];
   }
 
-  // THE TWO-CHANNEL RENDER, AND WHY ONLY ITS VOICE CHANNEL IS USED.
-  // Channel 0 is the accompaniment with the lead vocal separated out, and it
-  // is dropped outright: the uploaded file is the track, and playing both
-  // would stack two different bands. Channel 1 is the voice, and everything
-  // the page does to a voice (the accompaniment mode's filter/echo/detune,
-  // the texture layers, the reverb, the pitch shift slider) still has to
-  // reach it, so it is pulled out into its own one-channel buffer and flows
-  // through exactly the chain a single-channel render would have used.
-  const voiceBuffer = isStems ? _splitStemsBuffer(demoAudioCtx, renderedBuffer).voice : renderedBuffer;
+  // THE TWO-CHANNEL RENDER, AND WHAT EACH CHANNEL IS FOR.
+  // Channel 0 is the accompaniment with the original lead separated out -- it is
+  // what underBuffer above plays under the robot when this is a re-singing
+  // mode -- and channel 1 is the voice. Everything the page does to a voice (the
+  // accompaniment mode's filter/echo/detune, the texture layers, the reverb, the
+  // pitch shift slider) reaches the VOICE channel only, so it is pulled out into
+  // its own one-channel buffer and flows through exactly the chain a
+  // single-channel render would have used.
+  const voiceBuffer = stemsSplit ? stemsSplit.voice : renderedBuffer;
 
   const bakedInSemitones = isDirect ? 0 : (MODE_SEMITONES[demoMode] ?? 0);
   // DSP output is never re-pitched here, full stop, see the download
@@ -11196,6 +10846,11 @@ function _startNeuralPlayback(renderedBuffer = demoNeuralRenderedBuffer) {
     : voiceBuffer;
 
   const playStartTime = demoAudioCtx.currentTime;
+
+  // THE BAND, ON THE SAME CLOCK AS THE VOICE LAYERS BELOW.
+  if (underBuffer && underBuffer !== demoAudioBuffer) {
+    _startBandSource(demoAudioCtx, underBuffer, playStartTime, demoOffset);
+  }
 
   const contourCurve = (isDirect && demoMode === 'contour_following')
     ? _computeContourGainCurve(modeShiftedBuffer)
@@ -11457,6 +11112,7 @@ function _killActiveEchoNetwork() {
 function pauseAudio() {
   demoOffset = demoLiveStreamer ? 0 : (demoAudioCtx.currentTime - demoStartTime);
   if (demoSource) { try { demoSource.stop(); } catch (e) {} }
+  if (demoBandSource) { try { demoBandSource.stop(); } catch (e) {} demoBandSource = null; }
   demoNeuralSources.forEach(s => { try { s.stop(); } catch (e) {} });
   demoNeuralSources = [];
   _clearLiveVibrato();
@@ -11476,6 +11132,7 @@ function stopAudio() {
   if (demoNeuralRenderAbort) { demoNeuralRenderAbort.abort(); demoNeuralRenderAbort = null; }
   if (demoDspRenderAbort) { demoDspRenderAbort.abort(); demoDspRenderAbort = null; }
   if (demoSource) { try { demoSource.stop(); } catch(e){} demoSource = null; }
+  if (demoBandSource) { try { demoBandSource.stop(); } catch(e){} demoBandSource = null; }
   demoNeuralSources.forEach(s => { try { s.stop(); } catch(e){} });
   demoNeuralSources = [];
   _clearLiveVibrato();
@@ -11548,15 +11205,19 @@ function _audioBufferToWavBlob(buffer) {
   return new Blob([arrayBuf], { type: 'audio/wav' });
 }
 
-// A two-channel render downloaded as one file: YOUR UPLOADED FILE at the TRACK
-// VOLUME slider's position, the robot's voice channel at the ROBOT VOLUME
-// slider's, i.e. exactly the balance that was just playing. The render's own
-// accompaniment channel is not used, here or in playback.
+// A two-channel render downloaded as one file, at the balance that was just
+// playing: the robot's voice channel at the ROBOT VOLUME slider's position, and
+// under it the same thing playback put there (see _playbackTrackBuffer). In the
+// Neural engine's re-singing modes that is THIS render's accompaniment channel --
+// the mix with the original singer separated out -- and with INSTRUMENTS Off it
+// is nothing. In every other engine it is the uploaded file, untouched.
 async function _mixStemsForDownload(stems) {
   const sr = stems.sampleRate;
   const frames = Math.max(1, Math.ceil(stems.duration * sr));
   const offline = new OfflineAudioContext(1, frames, sr);
   const voiceCh = Math.min(1, stems.numberOfChannels - 1);
+  const bedCh = stems.numberOfChannels >= 2 ? (voiceCh === 0 ? 1 : 0) : null;
+  const singsTheLine = _robotSingsTheLine() && bedCh !== null;
 
   const src = offline.createBufferSource();
   src.buffer = stems;
@@ -11567,6 +11228,13 @@ async function _mixStemsForDownload(stems) {
   voiceGain.gain.value = demoRobotVolume;
   splitter.connect(voiceGain, voiceCh);
   voiceGain.connect(offline.destination);
+
+  if (singsTheLine && demoInstrumentsEnabled) {
+    const bedGain = offline.createGain();
+    bedGain.gain.value = demoSourceVolume;
+    splitter.connect(bedGain, bedCh);
+    bedGain.connect(offline.destination);
+  }
 
   // THE FOLDS' MOVEMENT, SO THE SAVED FILE IS THE MIX THAT WAS HEARD. It is
   // applied to this source's pitch, and only the voice channel of the split is
@@ -11582,7 +11250,7 @@ async function _mixStemsForDownload(stems) {
     register: false,
   });
 
-  const trackBuffer = _playbackTrackBuffer();
+  const trackBuffer = singsTheLine ? null : _playbackTrackBuffer();
   if (trackBuffer) {
     const trackSrc = offline.createBufferSource();
     trackSrc.buffer = trackBuffer;
@@ -12470,7 +12138,7 @@ function micLoop() {
 // means converted audio is always at least one full chunk length behind
 // what you just sang, plus conversion time, there is no way around that
 // for ANY live-input voice conversion system without a GPU and much
-// smaller chunks; it's not a bug, it's what "convert audio that hasn't
+// smaller chunks; it's expected behaviour, it's what "convert audio that hasn't
 // finished being captured yet" would require.
 let micLiveStreamer = null;
 
@@ -12922,7 +12590,7 @@ function setCreeMicLanguage(lang) {
 // it, Vosk is smaller and less accurate, so it's only used for the
 // instant "something is happening" preview; the existing pipeline still
 // produces the accurate, hallucination-filtered, sentiment-integrated
-// entry once a phrase actually ends. See download_vosk_model.py.
+// entry once a phrase actually ends. See scripts/downloads/download_vosk_model.py.
 let creeLiveSocket = null;
 let creeLiveProcessor = null;
 let creeLiveSilentGain = null;
@@ -13055,7 +12723,7 @@ function pickRecorderMimeType() {
 // feature, no separate analysis needed.
 // This used to be a fixed 0.02. That number silently assumed the browser's
 // autoGainControl was boosting quiet mic input, but startCreeMic()
-// deliberately turns autoGainControl off (see comment there) to keep the
+// turns autoGainControl off (see comment there) to keep the
 // raw signal clean for pitch/loudness analysis. Without AGC, a lot of
 // mics/rooms never produce RMS values anywhere near 0.02 at normal
 // speaking volume, so vadIsSpeaking never flips true, endPhrase() never
@@ -13088,7 +12756,7 @@ function appendCreeTranscriptEntry(text, langTag, alreadyEnglish, vocal, queryTe
   }
 
   if (segments && segments.length) {
-    // Word-by-word (for confident segments) plus honest [non-lexical
+    // Word-by-word (for confident segments) plus accurate [non-lexical
     // vocals]/[drums] labels (for segments Whisper wasn't confident
     // about) instead of one flat, possibly-fabricated sentence. See
     // _classify_segments/_add_percussive_segments in server.py.
@@ -13627,6 +13295,19 @@ let archerChatTab = 'ask';
 let archerChatMode = 'text';
 let archerChatHistory = [];
 
+// A stable id for this browser, so the server can remember the conversation
+// even when the page is refreshed and its in-memory history is gone.
+const archerSessionId = (() => {
+  try {
+    let id = localStorage.getItem('archer_session');
+    if (!id) {
+      id = 's-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('archer_session', id);
+    }
+    return id;
+  } catch (e) { return 'local'; }
+})();
+
 function toggleArcherChat() {
   archerChatOpen = !archerChatOpen;
   document.getElementById('archer-chat-panel').classList.toggle('open', archerChatOpen);
@@ -13647,11 +13328,11 @@ async function checkArcherChatHealth() {
     const data = await resp.json();
     fab.classList.add('has-status');
     subtitle.textContent = data.rag_ready
-      ? `${data.model || 'local'} · ${data.rag_chunks_indexed} notes indexed`
-      : `${data.model || 'local'} · notes index not built yet`;
+      ? `${data.model || 'local'} · ${data.rag_chunks_indexed} passages indexed`
+      : `${data.model || 'local'} · notes index not built`;
   } catch (e) {
     fab.classList.remove('has-status');
-    subtitle.textContent = 'local · backend not reachable';
+    subtitle.textContent = 'Backend not reachable.';
   }
 }
 
@@ -13691,10 +13372,7 @@ function archerAppendMessage(role, text, opts = {}) {
   div.className = `ac-msg ${role}`;
   div.textContent = text;
   if (opts.sources && opts.sources.length) {
-    const src = document.createElement('span');
-    src.className = 'ac-sources';
-    src.textContent = `from: ${opts.sources.join(', ')}`;
-    div.appendChild(src);
+    archerAttachSources(div, opts.sources);
   }
   if (opts.audioBase64) {
     const audio = document.createElement('audio');
@@ -13709,6 +13387,7 @@ function archerAppendMessage(role, text, opts = {}) {
 
 function archerShowTyping() {
   const body = document.getElementById('ac-body-ask');
+  if (!body || document.getElementById('ac-typing-indicator')) return;
   const div = document.createElement('div');
   div.className = 'ac-typing';
   div.id = 'ac-typing-indicator';
@@ -13722,6 +13401,183 @@ function archerHideTyping() {
   if (el) el.remove();
 }
 
+function archerAttachSources(el, sources) {
+  if (!el || !sources || !sources.length) return;
+  const src = document.createElement('span');
+  src.className = 'ac-sources';
+  src.append('from: ');
+  sources.forEach((source, index) => {
+    if (index) src.append(', ');
+    if (/^https?:\/\//i.test(source)) {
+      const a = document.createElement('a');
+      a.href = source;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = source.replace(/^https?:\/\//i, '').slice(0, 60);
+      src.appendChild(a);
+    } else {
+      src.append(source);
+    }
+  });
+  el.appendChild(src);
+}
+
+// A correction is the only signal that says the model was wrong and what the
+// right answer was. It goes to the server, which stores it against this turn
+// and exports it as a DPO pair and a regression case.
+function archerAttachFeedback(el, turnId, question, reply) {
+  if (!el || !turnId) return;
+  const box = document.createElement('span');
+  box.className = 'ac-feedback';
+  box.style.cssText = 'display:block;margin-top:6px;font-size:11px;opacity:.85';
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.textContent = 'Helpful';
+  up.style.cssText = 'margin-right:6px;cursor:pointer';
+  up.onclick = () => archerSendFeedback(box, turnId, 'up', '');
+  const down = document.createElement('button');
+  down.type = 'button';
+  down.textContent = 'Wrong';
+  down.style.cssText = 'cursor:pointer';
+  down.onclick = () => {
+    const correction = window.prompt('What should the answer have been?');
+    if (correction === null) return;
+    archerSendFeedback(box, turnId, 'down', correction);
+  };
+  box.append(up, down);
+  el.appendChild(box);
+}
+
+async function archerSendFeedback(box, turnId, rating, correction) {
+  box.textContent = 'Saving…';
+  try {
+    const resp = await fetch('/api/chat/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: archerSessionId,
+        turn_id: turnId,
+        rating: rating,
+        correction: correction,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+    box.textContent = rating === 'up'
+      ? 'Thanks.'
+      : 'Saved. I will use that correction from now on.';
+  } catch (e) {
+    box.textContent = 'Could not save feedback: ' + e.message;
+  }
+}
+
+// THE PANEL READS THE ANSWER AS IT IS WRITTEN. The backend sends one
+// `data: {...}` frame per piece of text, and the first frame turns the typing
+// dots into a message that grows under them, so on a slow machine the answer
+// starts after a second instead of after the whole reply has been generated.
+// The frames are the same answer /api/chat gives: same route, same notes, same
+// model. If the stream cannot be opened at all (an older backend, a proxy that
+// buffers it), the panel falls back to the one-shot endpoint and behaves as it
+// always did.
+async function archerAskStreaming(payload) {
+  const resp = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok || !resp.body) {
+    const err = new Error('stream unavailable');
+    err.streamed = false;
+    throw err;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  const body = document.getElementById('ac-body-ask');
+  let buffer = '';
+  let reply = '';
+  let el = null;
+  let final = null;
+
+  const handleFrame = (frame) => {
+    const line = frame.split('\n').find((l) => l.startsWith('data:'));
+    if (!line) return;
+    let evt;
+    try { evt = JSON.parse(line.slice(5).trim()); } catch (e) { return; }
+
+    if (evt.type === 'token') {
+      if (!el) { archerHideTyping(); el = archerAppendMessage('bot', ''); }
+      reply += evt.text;
+      el.textContent = reply;
+      body.scrollTop = body.scrollHeight;
+    } else if (evt.type === 'done') {
+      final = evt;
+      if (evt.reply) reply = evt.reply;
+    } else if (evt.type === 'error') {
+      const err = new Error(evt.error || 'Chat failed.');
+      err.streamed = reply.length > 0;
+      throw err;
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      handleFrame(buffer.slice(0, cut));
+      buffer = buffer.slice(cut + 2);
+    }
+  }
+
+  archerHideTyping();
+  if (!el) {
+    const err = new Error('The model returned nothing.');
+    err.streamed = false;
+    throw err;
+  }
+  el.textContent = reply;
+  archerAttachSources(el, final && final.sources);
+  if (final && final.turn_id) {
+    archerAttachFeedback(el, final.turn_id, payload.message, reply);
+  }
+  archerChatHistory.push({ role: 'assistant', content: reply });
+}
+
+async function archerAskOnce(payload) {
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    archerHideTyping();
+
+    if (!resp.ok || data.error) {
+      archerAppendMessage('error', data.error || 'Something went wrong.');
+      return;
+    }
+
+    const el = archerAppendMessage('bot', data.reply, {
+      sources: data.sources,
+      audioBase64: data.audio_base64,
+    });
+    if (data.turn_id) {
+      archerAttachFeedback(el, data.turn_id, payload.message, data.reply);
+    }
+    archerChatHistory.push({ role: 'assistant', content: data.reply });
+
+    if (data.audio_error) {
+      archerAppendMessage('system', data.audio_error);
+    }
+  } catch (e) {
+    archerHideTyping();
+    archerAppendMessage('error', `Couldn't reach the local backend: ${e.message}`);
+  }
+}
+
 async function sendArcherChatMessage() {
   const input = document.getElementById('ac-input');
   const message = input.value.trim();
@@ -13733,36 +13589,37 @@ async function sendArcherChatMessage() {
   archerChatHistory.push({ role: 'user', content: message });
   archerShowTyping();
 
-  try {
-    const resp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        history: archerChatHistory.slice(0, -1),
-        mode: archerChatMode,
-      }),
-    });
-    const data = await resp.json();
-    archerHideTyping();
+  const payload = {
+    message,
+    history: archerChatHistory.slice(0, -1),
+    mode: archerChatMode,
+    session_id: archerSessionId,
+  };
 
-    if (!resp.ok || data.error) {
-      archerAppendMessage('error', data.error || 'Something went wrong.');
+  /* A spoken reply comes back as base64 audio with the text attached, which is
+     a finished thing rather than something to read as it appears. */
+  if (archerChatMode === 'audio') {
+    await archerAskOnce(payload);
+    return;
+  }
+
+  try {
+    await archerAskStreaming(payload);
+  } catch (e) {
+    if (e && e.streamed) {
+      archerHideTyping();
+      archerAppendMessage('error', e.message || 'The stream stopped before the answer did.');
       return;
     }
-
-    archerAppendMessage('bot', data.reply, {
-      sources: data.sources,
-      audioBase64: data.audio_base64,
-    });
-    archerChatHistory.push({ role: 'assistant', content: data.reply });
-
-    if (data.audio_error) {
-      archerAppendMessage('system', data.audio_error);
-    }
-  } catch (e) {
-    archerHideTyping();
-    archerAppendMessage('error', `Couldn't reach the local backend: ${e.message}`);
+    /* THE DOTS STAY UP WHILE THE FALLBACK ANSWERS.
+       A backend that has no /api/chat/stream answers with a 404 in a
+       millisecond, so the panel drops to the one-shot endpoint. Hiding the
+       typing dots on the way into that fallback is what left the panel blank
+       and silent for the whole wait: the visitor saw their own message and
+       nothing else. The dots are re-shown here (idempotently) and only come
+       down when the one-shot reply, or its error, arrives. */
+    archerShowTyping();
+    await archerAskOnce(payload);
   }
 }
 
@@ -13814,6 +13671,13 @@ let archerSingRecorder = null;
 let archerSingChunks = [];
 let archerSingRecording = false;
 
+function setArcherSingButton(recording) {
+  const title = document.getElementById('ac-sing-record-title');
+  const sub = document.getElementById('ac-sing-record-sub');
+  if (title) title.textContent = recording ? 'Stop recording' : 'Record a take';
+  if (sub) sub.textContent = recording ? 'Tap when you are done' : 'Tap to start, tap again to stop';
+}
+
 async function toggleArcherSingRecording() {
   if (archerSingRecording) {
     archerSingRecorder.stop();
@@ -13829,8 +13693,11 @@ async function toggleArcherSingRecording() {
     archerSingRecorder.start();
     archerSingRecording = true;
     document.getElementById('ac-sing-record-btn').classList.add('recording');
-    document.getElementById('ac-sing-status').textContent = 'Recording... tap to stop';
+    setArcherSingButton(true);
+    document.getElementById('ac-sing-status').textContent = 'Recording now.';
   } catch (e) {
+    setArcherSingButton(false);
+    document.getElementById('ac-sing-record-btn').classList.remove('recording');
     document.getElementById('ac-sing-status').textContent = `Mic error: ${e.message}`;
   }
 }
@@ -13838,6 +13705,7 @@ async function toggleArcherSingRecording() {
 async function archerSubmitSingRecording(mimeType) {
   archerSingRecording = false;
   document.getElementById('ac-sing-record-btn').classList.remove('recording');
+  setArcherSingButton(false);
   document.getElementById('ac-sing-status').textContent = 'Converting through the voice model...';
   document.getElementById('ac-sing-result').innerHTML = '';
 

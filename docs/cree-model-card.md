@@ -1,7 +1,7 @@
-# Model card — Cree SingSong (instrumental accompaniment)
+# Cree SingSong model card
 
 Status: **template**. Fill every `TODO` from the GPU run in
-[GPU_RUNBOOK.md](../GPU_RUNBOOK.md) before publishing. Anything still marked
+[singsong-training.md](singsong-training.md) before publishing. Anything still marked
 `TODO` means the run is not finished.
 
 ## 1. What the model does
@@ -56,10 +56,10 @@ research and educational use; check its terms before any commercial deployment.
 | Stage | Initialisation | Steps | Batch × accum | Hardware | Command |
 |---|---|---:|---|---|---|
 | codec (base) | random | TODO | TODO | TODO | `train-codec` (see runbook §9) |
-| semantic k-means (base) | random | 2,000,000 frames | — | TODO | `train-kmeans` (§10) |
+| semantic k-means (base) | random | 2,000,000 frames | n/a | TODO | `train-kmeans` (§10) |
 | stage 1+2 (base) | random | TODO | 8 × 64 | TODO | `train-stage12` (§12) |
 | stage 3 (base) | random | TODO | 1 × 512 | TODO | `train-fine` (§13) |
-| semantic k-means (Cree) | refit on Cree train split | 2,000,000 frames | — | TODO | `train-kmeans --config config/cree.yaml` (§15) |
+| semantic k-means (Cree) | refit on Cree train split | 2,000,000 frames | n/a | TODO | `train-kmeans --config config/cree.yaml` (§15) |
 | stage 1+2 (Cree) | base checkpoint | +10,000 | 8 × 64 | TODO | `train-stage12 --resume …` (§17) |
 | stage 3 (Cree) | base checkpoint | +10,000 | 1 × 512 | TODO | `train-fine --resume …` (§18) |
 

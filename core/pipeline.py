@@ -12,7 +12,7 @@ from analysis.rhythm_analyzer import RhythmAnalyzer
 from analysis.phonetic_analysis  import CreeTokenizer, PhonemeProfile
 from synthesis.harmony_engine    import HarmonyEngine
 from synthesis.vocable_synthesizer import VocableSynthesizer
-from output.timing_sync    import TimingSync
+from core.timing_sync      import TimingSync
 
 
 class Pipeline:

@@ -27,9 +27,7 @@ import librosa
 from loguru import logger
 
 
-# ============================================================
 # Formant-preserving pitch shift
-# ============================================================
 # librosa.effects.pitch_shift moves EVERYTHING in the spectrum together
 # fundamental pitch and formants (the vocal-tract resonances that make a
 # voice sound like an adult human voice) alike. That's fine for a small
@@ -269,7 +267,7 @@ class NeuralVocableBank:
         pitch, so one representative score per vocable is what the
         picker in harmony_engine.py actually consumes).
 
-        Deliberately relative rather than fixed thresholds: "bright"
+        relative rather than fixed thresholds: "bright"
         and "warm" only mean something in comparison to the rest of
         the loaded set, and this way the picker keeps working sensibly
         whether the configured vocable_set is four wordless syllables
@@ -587,7 +585,7 @@ class NeuralVocableBank:
         if hold:
             # A HELD note is not a repeated word, it is ONE sustained vowel
             # held for as long as the mode asks. Everything below this is
-            # deliberately about keeping a WORD intact, and for a drone that
+            # about keeping a WORD intact, and for a drone that
             # is exactly backwards: a drone_support note on a 35 second track
             # needs about 35 seconds of audio from a take under two seconds
             # long, so it took the whole-word-repeat branch and said the word

@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Preference tuning for faithfulness.
 #
 # The one model can be fluent and still be wrong: a dropped negation, a changed
@@ -7,7 +6,6 @@
 # becomes a rejected answer while the faithful one is chosen. The objective is
 # DPO, with the reference being the same model with its adapters switched off,
 # so no second copy is needed.
-# ─────────────────────────────────────────────────────────────────────────────
 CFG.dpo_enabled = CFG.dpo_enabled and CFG.dpo_epochs > 0
 
 pairs_train = read_jsonl(PROC / "parallel_train.jsonl")
@@ -57,11 +55,11 @@ for row in pairs_train:
 
 # Abstention is part of the same skill. A note answer that fills a gap with a
 # plausible invention is the failure this project cares about most, so the
-# honest reply is chosen and an invented one is rejected.
+# accurate reply is chosen and an invented one is rejected.
 # The title that belongs to `_horse_context`, which is not necessarily the
 # first note: the first section of the first note can be the held-out one.
 _abstain_title = _horse_title
-for question, honest, invented in [
+for question, accurate, invented in [
     (f"What key was {_abstain_title} recorded in?",
      "The notes do not say what key it was recorded in.",
      f"It was recorded in D major, in {_abstain_title}, at 92 BPM."),
@@ -73,11 +71,106 @@ for question, honest, invented in [
      "It was written in 2019 after a trip to Batoche, and it began as a round."),
 ]:
     prompt = f"<|song|><|note|>\nNotes on {_abstain_title}:\n{_horse_context}\n\nQuestion: {question}"
-    prefs.append({"prompt": prompt, "chosen": honest, "rejected": invented})
+    prefs.append({"prompt": prompt, "chosen": accurate, "rejected": invented})
+
+# Echo negatives. The installed model answers "hi" with "hi", "howdy" with
+# "howdy" and "good morning" with "good morning". That is a copy of the prompt,
+# not a reply, and preference training is the right place to penalise it: the
+# same prompt gets the real answer as chosen and the visitor's own words as
+# rejected. The General Preference Optimization paper and ParaPO both treat
+# verbatim reproduction as a preference failure rather than a sampling one.
+_echo_prefs: list[dict] = []
+_sft_path = PROC / "sft_train.jsonl"
+if _sft_path.exists():
+    for row in read_jsonl(_sft_path):
+        if row.get("task") not in {"casual", "persona"}:
+            continue
+        messages = row.get("messages") or []
+        users = [m for m in messages if m.get("role") == "user"]
+        answers = [m for m in messages if m.get("role") == "assistant"]
+        if not users or not answers:
+            continue
+        user = str(users[-1].get("content", ""))
+        assistant = str(answers[-1].get("content", ""))
+        clean_user = re.sub(r"<\|[^|]*\|>", " ", user)
+        clean_user = re.sub(r"\s+", " ", clean_user).strip()
+        if not clean_user or len(clean_user) > 120:
+            continue
+        if clean_user.lower().strip(" .,!?:;") == assistant.lower().strip(" .,!?:;"):
+            continue
+        _echo_prefs.append({"prompt": user, "chosen": assistant, "rejected": clean_user})
+        if len(_echo_prefs) >= 240:
+            break
+    log(f"DPO: {len(_echo_prefs)} echo negatives from the instruction set")
+
+# Language identification, as a preference rather than a rule. The identifier
+# trained on the parallel corpus inherits two biases from it: the Cree side
+# often carries English proper names, and the English side is often a two-word
+# gloss. The result is a model that answers "Plains Cree." for English
+# sentences that talk about Cree, and for short glosses that look like the
+# dictionary rows. Preference training shifts a boundary the model already has,
+# which is what these pairs do: the same prompt, the right label chosen and the
+# plausible wrong label rejected. English prose that names Cree is taken first,
+# because that is the class it gets wrong.
+_LANG_Q = "<|song|>\nWhich language is this?\n"
+_lang_prefs: list[dict] = []
+_lang_seen: set[str] = set()
+_CREE_MENTION = re.compile(r"\b(cree|n[êe]hiyaw|indian|syllabic)", re.IGNORECASE)
+
+
+def _lang_pref(text: str, chosen: str, rejected: str) -> None:
+    key = re.sub(r"\s+", " ", text).strip().lower()
+    if not key or key in _lang_seen or len(text.split()) < 3:
+        return
+    _lang_seen.add(key)
+    _lang_prefs.append({"prompt": _LANG_Q + text, "chosen": chosen, "rejected": rejected})
+
+
+_mention_rows = [r for r in pairs_train
+                 if _CREE_MENTION.search(str(r.get("english", "")))]
+for _row in _mention_rows + pairs_train:
+    if len(_lang_prefs) >= 200:
+        break
+    _cree = str(_row.get("cree", "")).strip()
+    _english = str(_row.get("english", "")).strip()
+    if _row.get("source") == "watkins1865" or re.search(r"\d", _cree + _english):
+        continue
+    if len(_english.split()) >= 4:
+        _lang_pref(_english, "English.", "Plains Cree.")
+    if len(_cree.split()) >= 3:
+        _lang_pref(_cree, "Plains Cree.", "English.")
+    if _cree and _english:
+        _lang_pref(f"{_cree} {_english}", "Mixed.", "English.")
+
+log(f"DPO: {len(_lang_prefs)} language-identification pairs "
+    f"({len(_mention_rows)} English rows name Cree)")
+
+# Corrections the visitor supplied at runtime. The same rows the app exports to
+# feedback_dpo.jsonl were previously invisible to training, so a correction
+# fixed one conversation and was lost before the next run. They are appended
+# after the synthetic cap so a crowd of generated pairs cannot push them out.
+_feedback_prefs: list[dict] = []
+_feedback_path = _feedback_path("feedback_dpo.jsonl")
+if _feedback_path is None:
+    log("DPO: no feedback_dpo.jsonl found (set ARCHER_FEEDBACK_DIR to include corrections)")
+else:
+    for n, row in enumerate(read_jsonl(_feedback_path), 1):
+        prompt, chosen, rejected = row.get("prompt"), row.get("chosen"), row.get("rejected")
+        if not all(isinstance(v, str) and v.strip() for v in (prompt, chosen, rejected)):
+            raise ValueError(f"{_feedback_path}:{n}: prompt, chosen and rejected must be non-empty strings")
+        if chosen.strip() == rejected.strip():
+            raise ValueError(f"{_feedback_path}:{n}: chosen and rejected are identical")
+        _feedback_prefs.append({"prompt": prompt.strip(), "chosen": chosen.strip(),
+                                "rejected": rejected.strip()})
+    log(f"DPO: {len(_feedback_prefs)} correction pairs from {_feedback_path}")
 
 pair_rng.shuffle(prefs)
 prefs = prefs[: 2000 if not SMOKE else 40]
-log(f"DPO: {len(prefs)} preference pairs")
+prefs.extend(_feedback_prefs)
+prefs.extend(_echo_prefs[: 10 if SMOKE else len(_echo_prefs)])
+prefs.extend(_lang_prefs[: 60 if SMOKE else len(_lang_prefs)])
+log(f"DPO: {len(prefs)} preference pairs ({len(_feedback_prefs)} feedback, "
+    f"{len(_echo_prefs)} echo, {len(_lang_prefs)} language)")
 
 print("\nexample preference:")
 print("  prompt  ", prefs[0]["prompt"].replace("\n", " | ")[:160])
@@ -108,7 +201,7 @@ def _sft_stamp() -> str:
 _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
-    sft=_sft_stamp(), corrupt="substitute-v1",
+    sft=_sft_stamp(), corrupt="substitute-echo-langid-v3",
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an

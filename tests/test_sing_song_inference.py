@@ -27,7 +27,7 @@ def test_fit_frames_pads_and_trims():
     assert _fit_frames(tokens, 7).shape == (1, 7)
 
 
-def test_engine_status_is_honest_before_any_weights_exist():
+def test_engine_status_is_accurate_before_any_weights_exist():
     cfg = SingSongConfig()
     engine = SingSongEngine(cfg)
     status = engine.status()

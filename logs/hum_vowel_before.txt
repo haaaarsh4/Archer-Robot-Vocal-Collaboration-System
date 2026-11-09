@@ -1,1 +1,0 @@
-2026-10-12 08:50:39.867 | INFO     | config.config_loader:get_config:23 - Config loaded from /home/harsh-upadhyay/Documents/CS Projects/Archer Robot/Archer-Robot-Vocal-Collaboration-System/config/config.yaml

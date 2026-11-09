@@ -1,0 +1,19 @@
+{
+  "vocab": 2000,
+  "results": [
+    {
+      "tokenizer": "standard BPE",
+      "fertility": 5.162,
+      "long_word_fertility": 6.74,
+      "boundary_precision": 0.471,
+      "boundary_recall": 0.572
+    },
+    {
+      "tokenizer": "morpheme-constrained BPE",
+      "fertility": 4.81,
+      "long_word_fertility": 6.25,
+      "boundary_precision": 0.351,
+      "boundary_recall": 0.999
+    }
+  ]
+}

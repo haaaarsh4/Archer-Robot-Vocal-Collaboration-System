@@ -1,6 +1,6 @@
 """The trained MySong model: arrays plus the small amount of metadata needed.
 
-The model is deliberately tiny (a few hundred kilobytes).  It is a generative
+The model is tiny (a few hundred kilobytes).  It is a generative
 model of chord sequences with a melody-observation likelihood, not a neural
 network, so it runs on a CPU at interactive speed and can be inspected.
 

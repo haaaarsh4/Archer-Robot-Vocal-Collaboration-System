@@ -179,7 +179,7 @@ class NeuralTimbreConverter:
         instead of mixing the whole ensemble down first and running one
         conversion pass over the mix. RVC's pitch stage (RMVPE) estimates
         a single f0 curve per call, handing it several simultaneous,
-        deliberately-detuned pitches at once doesn't produce a richer
+        -detuned pitches at once doesn't produce a richer
         result, it produces a mistracked pitch curve and smeared timbre,
         because the model was never built to separate overlapping voices.
         Converting one already-detuned voice at a time means RVC always

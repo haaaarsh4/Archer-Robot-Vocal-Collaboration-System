@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Corpus acquisition.
 #
 # Every loader returns (documents, pairs) and writes one line to the provenance
@@ -11,7 +10,6 @@
 #   * NonCommercial ShareAlike material is loaded only when
 #     CFG.include_noncommercial is True, and the model is then released under
 #     the same licence in the report card.
-# ─────────────────────────────────────────────────────────────────────────────
 
 import bz2
 import unicodedata
@@ -84,7 +82,7 @@ def _add_pair(cree: str, english: str, **meta) -> None:
     PAIRS.append({"cree": cree, "english": english, **meta})
 
 
-# ── 1. EdTeKLA Cree Corpus ───────────────────────────────────────────────────
+# 1. EdTeKLA Cree Corpus
 def load_edtekla() -> None:
     url = "https://codeload.github.com/EdTeKLA/IndigenousLanguages_Corpora/tar.gz/refs/heads/master"
     archive = download(url, RAW / "edtekla.tar.gz")
@@ -151,7 +149,7 @@ def load_edtekla() -> None:
     STATUS["edtekla"] = f"ok: {used} texts"
 
 
-# ── 2. Plains Cree figurative corpus (Bloomfield 1934 + audits) ──────────────
+# 2. Plains Cree figurative corpus (Bloomfield 1934 + audits)
 def load_figurative() -> None:
     from datasets import load_dataset
 
@@ -176,7 +174,7 @@ def load_figurative() -> None:
     STATUS["figurative"] = f"ok: {n} pairs"
 
 
-# ── 3. Wikipedia in Cree ─────────────────────────────────────────────────────
+# 3. Wikipedia in Cree
 def load_wikipedia() -> None:
     from datasets import load_dataset
 
@@ -197,7 +195,7 @@ def load_wikipedia() -> None:
     STATUS["wikipedia"] = f"ok: {n} articles"
 
 
-# ── 4. FineWeb-2 Cree slices ─────────────────────────────────────────────────
+# 4. FineWeb-2 Cree slices
 def load_fineweb() -> None:
     from datasets import load_dataset
 
@@ -227,7 +225,7 @@ def load_fineweb() -> None:
     STATUS["fineweb2"] = f"ok: {n} docs"
 
 
-# ── 4a. FinePDFs Cree slices ─────────────────────────────────────────────────
+# 4a. FinePDFs Cree slices
 #
 # FinePDFs extracts text from Common Crawl PDFs. Its Cree slices are small but
 # they are the densest modern prose available: 430 Latin-script documents and
@@ -263,7 +261,7 @@ def load_finepdfs() -> None:
     STATUS["finepdfs"] = f"ok: {n} docs"
 
 
-# ── 4b. FineTranslations Cree documents ──────────────────────────────────────
+# 4b. FineTranslations Cree documents
 #
 # FineTranslations pairs each FineWeb-2 document with an English translation.
 # The Cree side is human web text; the English side is machine translation, so
@@ -315,7 +313,7 @@ def load_finetranslations() -> None:
     STATUS["finetranslations"] = f"ok: {n_pairs} aligned chunks from {n_docs} documents"
 
 
-# ── 4c. GlotCC Cree slices ───────────────────────────────────────────────────
+# 4c. GlotCC Cree slices
 def load_glotcc() -> None:
     from datasets import load_dataset
 
@@ -343,7 +341,7 @@ def load_glotcc() -> None:
     STATUS["glotcc"] = f"ok: {n} docs"
 
 
-# ── 4d. Tatoeba Cree sentences ───────────────────────────────────────────────
+# 4d. Tatoeba Cree sentences
 def load_tatoeba() -> None:
     url = "https://downloads.tatoeba.org/exports/per_language/crk/crk_sentences.tsv.bz2"
     path = download(url, RAW / "tatoeba_crk.tsv.bz2")
@@ -365,7 +363,7 @@ def load_tatoeba() -> None:
     STATUS["tatoeba"] = f"ok: {n} sentences"
 
 
-# ── 4e. GlotStoryBook Cree rows ──────────────────────────────────────────────
+# 4e. GlotStoryBook Cree rows
 def load_storybook() -> None:
     from datasets import load_dataset
 
@@ -391,7 +389,7 @@ def load_storybook() -> None:
     STATUS["storybook"] = f"ok: {n} paragraphs"
 
 
-# ── 4f. Public-domain historical Cree books ───────────────────────────────────
+# 4f. Public-domain historical Cree books
 #
 # The modern web has almost no Plains Cree prose: FineWeb-2 carries 192 Cree
 # documents in total, and Cree Wikipedia has 187 articles. The nineteenth
@@ -465,6 +463,9 @@ _ARCHIVE_SEED = {
     "P002871": "Psalms in Plains Cree, 1905",
     "cihm_05447": "Psalter in Cree, 1875",
     "P000574": "Cree hymn book, 1870",
+    "rosettaproject_crk_vertxt-2": "Plains Cree Texts, Bloomfield 1934",
+    "rosettaproject_crk_book-1": "Plains Cree Texts, Bloomfield 1934 (book scan)",
+    "P000209": "Cree syllabic hymn book, 1841",
 }
 # Moosonee, James Bay and East Cree material is a different dialect. It is
 # excluded rather than blended, because a y-dialect model that quietly learns
@@ -546,8 +547,11 @@ def load_archive() -> None:
         candidates = [(ident, title, 0) for ident, title in _ARCHIVE_SEED.items()]
     log(f"archive: {len(candidates)} candidate books after dialect filter")
     n = rejected = attempts = 0
-    budget = 6 if SMOKE else 65
-    max_attempts = 12 if SMOKE else 110
+    # Use the whole public-domain shelf, not an arbitrary first sixty-five. The
+    # per-book OCR and language filters still reject bad scans; this only changes
+    # how many real books are examined.
+    budget = 6 if SMOKE else 250
+    max_attempts = 12 if SMOKE else 450
     for ident, label, _downloads in candidates:
         if n >= budget or attempts >= max_attempts:
             break
@@ -602,7 +606,71 @@ def load_archive() -> None:
     STATUS["archive"] = f"ok: {n} books, {rejected} rejected"
 
 
-# ── 4g. Plains Cree phrase recordings ────────────────────────────────────────
+# 4g. Little Cree Books (Plains Cree only)
+#
+# This is the open-licensed Little Cree Books collection: four Plains Cree
+# stories in SRO and syllabics, each with an English sibling. It is small, but
+# it is real community text under CC BY-NC-SA, and it is exactly the kind of
+# material the model should see. Swampy Cree stories 0005 and 0006 are excluded
+# by their own metadata; mixing an n-dialect into a y-dialect model is not a
+# size win.
+def load_lcb() -> None:
+    licence = "CC BY-NC-SA 3.0 (Little Cree Books)"
+    if _blocked_by_licence(licence):
+        ledger("Little Cree Books", "https://github.com/global-asp/lcb-source", licence,
+               "plains", "Latn + Cans", "skipped because the build is commercial", allowed=False)
+        STATUS["lcb"] = "skipped: noncommercial licence and commercial build"
+        return
+    url = "https://codeload.github.com/global-asp/lcb-source/tar.gz/refs/heads/master"
+    archive = download(url, RAW / "lcb-source.tar.gz")
+    root = RAW / "lcb-source"
+    if not (root / "lcb-source-master").exists():
+        with tarfile.open(archive) as tf:
+            tf.extractall(root)
+    base = root / "lcb-source-master"
+
+    def paragraphs(path: Path) -> list[str]:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        out: list[str] = []
+        for chunk in re.split(r"(?m)^##\s*$", text):
+            lines = []
+            for line in chunk.splitlines():
+                line = line.strip()
+                if not line or line.startswith(("#", "*", "[", "!")):
+                    continue
+                lines.append(line)
+            para = " ".join(lines).strip()
+            if len(para) >= 12:
+                out.append(para)
+        return out
+
+    n_docs = n_pairs = 0
+    for path in sorted(base.glob("*/[0-9]*_sro.md")):
+        # The README files do not always spell out the ISO code. Stories 0005
+        # and 0006 are Swampy Cree; every other story in this repository is
+        # Plains Cree SRO. Exclude by the explicit Swampy folder names rather
+        # than silently dropping a Plains story whose README omits a language.
+        if path.parent.name in {"0005_grandmother-fox", "0006_little-fox"}:
+            continue
+        story = path.parent.name
+        cree_paras = paragraphs(path)
+        en_path = path.with_name(path.name.replace("_sro.md", "_en.md"))
+        en_paras = paragraphs(en_path) if en_path.exists() else []
+        for i, cree in enumerate(cree_paras):
+            _add_doc(cree, lang="crk", script="Latn", source=f"lcb/{story}",
+                     doc_id=f"{story}#{i}", licence=licence, dialect="plains", kind="story")
+            n_docs += 1
+            if i < len(en_paras) and len(cree.split()) >= 2 and len(en_paras[i].split()) >= 2:
+                _add_pair(cree, en_paras[i], source="lcb", doc_id=f"{story}#{i}",
+                          licence=licence, dialect="plains", origin="human")
+                n_pairs += 1
+    ledger("Little Cree Books", "https://github.com/global-asp/lcb-source", licence,
+           "plains (Y-dialect)", "Latn + Cans",
+           f"{n_docs} SRO paragraphs, {n_pairs} English pairs; Swampy Cree excluded")
+    STATUS["lcb"] = f"ok: {n_docs} paragraphs, {n_pairs} pairs"
+
+
+# 4h. Plains Cree phrase recordings
 def load_plainscree() -> None:
     from datasets import load_dataset
 
@@ -629,7 +697,7 @@ def load_plainscree() -> None:
     STATUS["plainscree"] = f"ok: {n} phrases"
 
 
-# ── 5. This project's own data and notes ─────────────────────────────────────
+# 5. This project's own data and notes
 def load_project() -> None:
     # 5a. The aligned sentences already curated in the repository. The file also
     #     contains dictionary frequency rows; those are filtered below.
@@ -654,6 +722,7 @@ def load_project() -> None:
             _add_pair(cree, english, source="project", doc_id=f"parallel-{n}",
                       licence="project-owned", dialect="plains", origin="human")
             n += 1
+    parallel_pairs = n
     STATUS["project_parallel"] = f"ok: {n} pairs ({skipped_rows} numeric/short rows skipped)"
 
     # 5b. Archer's song notes: the grounding text for the assistant.
@@ -674,6 +743,7 @@ def load_project() -> None:
     STATUS["song_notes"] = f"ok: {len(notes)} notes"
 
     # 5c. Watkins 1865 dictionary entries, kept under their own dialect tag.
+    watkins_pairs = 0
     try:
         wpath = download(f"{PROJECT_RAW}/data/processed/watkins_entries.jsonl", RAW / "watkins.jsonl")
         n = 0
@@ -691,15 +761,24 @@ def load_project() -> None:
                           licence="public domain (1865)", dialect="watkins1865",
                           origin="historical")
                 n += 1
+        watkins_pairs = n
         STATUS["watkins"] = f"ok: {n} historical pairs ({skipped} OCR/annotation forms rejected)"
     except Exception as exc:
         STATUS["watkins"] = f"unavailable: {exc}"
+
+    # The completeness gate asks for one status per loader, but this loader
+    # reports its three parts under their own keys. Without a summary under
+    # "project" the source reads as "not run" even when every part succeeded,
+    # and the gate stops a corpus that is actually complete.
+    _total = parallel_pairs + len(notes) + watkins_pairs
+    STATUS["project"] = (f"ok: {_total} rows ({parallel_pairs} parallel pairs, "
+                         f"{len(notes)} song notes, {watkins_pairs} Watkins pairs)")
 
     ledger("Archer project data + song notes", f"https://github.com/{PROJECT_REPO}",
            "project-owned", "plains", "Latn", f"{len(notes)} song notes, parallel pairs, Watkins 1865")
 
 
-# ── 6. GiellaLT lexicon (validity only, not running text) ────────────────────
+# 6. GiellaLT lexicon (validity only, not running text)
 def load_giellalt() -> None:
     url = "https://codeload.github.com/giellalt/lang-crk/tar.gz/refs/heads/main"
     archive = download(url, RAW / "lang-crk.tar.gz")
@@ -742,7 +821,7 @@ def load_giellalt() -> None:
     STATUS["giellalt"] = f"ok: {len(LEXICON)} forms"
 
 
-# ── 7. Anything the user drops in ────────────────────────────────────────────
+# 7. Anything the user drops in
 def load_uploads() -> None:
     dirs = [Path(os.environ.get("CREE_UPLOAD_DIR", ROOT / "uploads"))]
     if IN_COLAB:
@@ -767,12 +846,13 @@ def load_uploads() -> None:
         STATUS["uploads"] = f"ok: {n} paragraphs"
 
 
-# ── run every loader independently ───────────────────────────────────────────
+# run every loader independently
 # On Drive this whole section is skipped once it has produced files. It is the
 # slowest part of the notebook (network, archive index, PDF extraction) and none
 # of it changes between sessions, so repeating it after a disconnect only burns
 # the time the checkpointing is meant to save.
-_CORPUS_KEY = fingerprint(corpus="v1", noncommercial=CFG.include_noncommercial)
+_CORPUS_KEY = fingerprint(corpus="v3", noncommercial=CFG.include_noncommercial,
+                         min_tokens=CFG.min_corpus_tokens)
 _READY = (RAW / "docs.jsonl", RAW / "pairs.jsonl", RAW / "lexicon.json")
 
 if all(f.exists() for f in _READY) and stage_done("corpus", _CORPUS_KEY, requires=RAW / "ledger.json"):
@@ -794,6 +874,7 @@ else:
         ("glotcc", load_glotcc),
         ("tatoeba", load_tatoeba),
         ("storybook", load_storybook),
+        ("lcb", load_lcb),
         ("plainscree", load_plainscree),
         # GiellaLT runs before the archive because its lexicon is what separates a
         # real 19th-century Cree page from a syllabic scan OCR turned into noise.
@@ -807,7 +888,61 @@ else:
             log(f"{name}: {STATUS.get(name, 'ok')}  ({time.time() - t0:.1f}s)")
         except Exception as exc:
             STATUS[name] = f"failed: {type(exc).__name__}: {exc}"
-            log(f"{name}: FAILED — {exc}")
+            log(f"{name}: FAILED: {exc}")
+
+    # A partial corpus must not be trained on quietly. Every source in the table
+    # is expected to contribute, and a download that failed, returned nothing, or
+    # produced zero documents is a corpus that looks finished and is not: the
+    # model then learns less Cree than the report claims. The run stops here
+    # unless the caller has explicitly accepted a partial corpus.
+    _expected = {
+        "edtekla", "figurative", "project", "wikipedia", "fineweb2", "finepdfs",
+        "finetranslations", "glotcc", "tatoeba", "storybook", "lcb", "plainscree",
+        "giellalt", "archive",
+    }
+
+    def _contributed(name: str) -> bool:
+        note = str(STATUS.get(name, ""))
+        if not note.startswith("ok"):
+            return False
+        # "ok: 0 docs" is a source that ran and contributed nothing.
+        return not re.search(r":\s*0\s", note)
+
+    _missing = sorted(n for n in _expected if not _contributed(n))
+    if _missing and not getattr(CFG, "allow_missing_sources", False):
+        raise RuntimeError(
+            "corpus incomplete, these sources did not contribute: "
+            + ", ".join(f"{n} [{STATUS.get(n, 'not run')}]" for n in _missing)
+            + ". Fix the download, or set allow_missing_sources on the profile if you "
+              "mean to train on less. Training on a partial corpus is how a model "
+              "ends up looking trained while it cannot write the language."
+        )
+    log(f"corpus complete: {len(_expected) - len(_missing)}/{len(_expected)} sources contributed")
+
+    # Source completeness is not corpus size. A run can download every
+    # collection, clean it, and still have only a small slice of the language.
+    # The 14B profiles warn loudly when that happens. Training continues and
+    # uses every token, because the user explicitly wants the model trained on
+    # all available, verified data. The warning is also written to the run so a
+    # report can never call a small corpus complete.
+    _est_tokens = int((sum(len(d["text"].split()) for d in DOCS)
+                       + sum(len(p["cree"].split()) + len(p["english"].split()) for p in PAIRS))
+                      * 1.4)
+    _corpus_size = {
+        "estimated_tokens": _est_tokens,
+        "minimum_for_profile": CFG.min_corpus_tokens,
+        "documents": len(DOCS),
+        "pairs": len(PAIRS),
+        "ready": not (not SMOKE and CFG.min_corpus_tokens and _est_tokens < CFG.min_corpus_tokens),
+    }
+    jdump(RAW / "corpus_size.json", _corpus_size)
+    if not _corpus_size["ready"]:
+        STATUS["corpus_size"] = (f"warning: {_est_tokens:,} tokens below "
+                                 f"{CFG.min_corpus_tokens:,}; training still uses all data")
+        log("WARNING: corpus size is below the profile target; training continues with all data")
+    else:
+        STATUS["corpus_size"] = f"ok: {_est_tokens:,} estimated tokens"
+    log(f"corpus size: about {_est_tokens:,} tokens (profile target {CFG.min_corpus_tokens:,})")
 
     write_jsonl(RAW / "docs.jsonl", DOCS)
     write_jsonl(RAW / "pairs.jsonl", PAIRS)

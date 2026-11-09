@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Continued pretraining (CPT).
 #
 # Instruction tuning alone teaches a model what to say, not how the language
@@ -16,7 +15,6 @@
 # not rebuilt and the English replay is not downloaded again, the trained
 # adapter is loaded, and the cell moves on. If it was interrupted, the trainer
 # continues from its last checkpoint on Drive.
-# ─────────────────────────────────────────────────────────────────────────────
 _CPT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,

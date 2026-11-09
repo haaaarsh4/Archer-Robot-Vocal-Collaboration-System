@@ -72,7 +72,30 @@ async def _prewarm_rmvpe():
         except Exception as e:
             print(f"[startup] RMVPE pre-warm failed: {e}")
 
+        threading.Thread(target=_load, daemon=True).start()
+
+
+@app.on_event("startup")
+async def _warm_chat_model():
+    """Load the chat model once, at startup, and ask Ollama to hold it.
+
+    A 4.7 GB model that is loaded on the first question makes the first question
+    of a session the slowest thing on the site; loading it here moves that cost
+    to boot, where nothing is waiting on it and the console says it happened.
+    """
+
+    def _load():
+        try:
+            from chat.chat_api import warm_chat_model
+            if warm_chat_model():
+                print("[startup] Archer chat model loaded and held.")
+            else:
+                print("[startup] Archer chat model not warmed (see the log above).")
+        except Exception as e:  # noqa: BLE001 - the site still runs without chat
+            print(f"[startup] chat model warm-up failed: {e}")
+
     threading.Thread(target=_load, daemon=True).start()
+
 
 broadcast_queue: _queue.Queue = _queue.Queue(maxsize=64)
 pipeline_running = False
@@ -114,7 +137,7 @@ roberta_load_error = None
 
 if not os.path.isdir(SENTIMENT_MODEL_DIR):
     roberta_load_error = (
-        f"{SENTIMENT_MODEL_DIR} not found. Run 'python download_sentiment_model.py' once "
+        f"{SENTIMENT_MODEL_DIR} not found. Run 'python scripts/downloads/download_sentiment_model.py' once "
         "first (needs internet access to huggingface.co, one-time only) to populate it. "
         "server.py itself never downloads this model or makes any network call for it."
     )
@@ -135,7 +158,7 @@ else:
         roberta_load_error = str(e)
         print(f"RoBERTa sentiment model failed to load from {SENTIMENT_MODEL_DIR}: {roberta_load_error}")
         print("Falling back to VADER. If the directory looks right but this still fails, "
-              "try re-running download_sentiment_model.py, it may be an incomplete download.")
+              "try re-running scripts/downloads/download_sentiment_model.py, it may be an incomplete download.")
 
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -333,8 +356,8 @@ def _load_faster_whisper_backend(model_size: str, model_dir: str, legacy_checkpo
 
     error = (
         f"Neither faster-whisper ({model_dir}) nor the legacy checkpoint ({legacy_checkpoint}) "
-        f"were found. Run 'python download_faster_whisper_model.py' once (needs internet, one-time "
-        f"only) or 'python download_whisper_model.py' for the older backend."
+        f"were found. Run 'python scripts/downloads/download_whisper_model.py' once (needs internet, one-time "
+        f"only)."
     )
     print(f"Whisper model not loaded ({model_size}): {error}")
     return None, None, error
@@ -356,14 +379,14 @@ whisper_model_track, whisper_backend_track, whisper_load_error_track = _load_fas
     # no confirmed benefit to synthesis speed to show for it, the synthesis chunk in that same
     # run still took 94 seconds, i.e. still very slow regardless. A machine that's genuinely CPU-
     # constrained enough for both heavy workloads to contend this badly doesn't have this much
-    # spare capacity to redistribute either way; deliberately handicapping transcription's own
+    # spare capacity to redistribute either way; handicapping transcription's own
     # budget just cost it speed without visibly buying the other side anything.
     TRACK_WHISPER_MODEL_SIZE, TRACK_WHISPER_MODEL_DIR, _legacy_whisper_checkpoint,
     num_workers=min(4, os.cpu_count() or 1)
 )
 if whisper_model_track is None and whisper_model_mic is not None:
     print("Track-upload model not available; falling back to the mic model for /api/transcribe/annotated too "
-          "(less accurate than large-v3-turbo would be, run download_faster_whisper_model.py to fix this).")
+          "(less accurate than large-v3-turbo would be, run scripts/downloads/download_whisper_model.py to fix this).")
     whisper_model_track, whisper_backend_track = whisper_model_mic, whisper_backend_mic
 
 whisper_model = whisper_model_mic or whisper_model_track
@@ -385,7 +408,7 @@ if os.path.isdir(VOSK_MODEL_DIR):
         print(f"Vosk failed to load: {vosk_load_error}")
 else:
     vosk_load_error = (
-        f"{VOSK_MODEL_DIR} not found. Run 'python download_vosk_model.py' once (needs internet, "
+        f"{VOSK_MODEL_DIR} not found. Run 'python scripts/downloads/download_vosk_model.py' once (needs internet, "
         "one-time only) to enable instant local live captions. Optional, everything else in this "
         "file works without it."
     )
@@ -441,15 +464,13 @@ except Exception as e:
     print("This is non-fatal, the rest of the app runs without the chatbot.")
 
 
-# ---------------------------------------------------------------------------
 # SingSong: a separate generative accompaniment system.
 #
-# This is deliberately lazy.  Importing torch and constructing three
+# Imports are lazy. Importing torch and constructing three
 # transformers at `python server.py` startup would add seconds to every run of
 # the app even when nobody opens the SingSong page, and on a machine with no
 # checkpoints there is nothing to construct anyway.  The engine is created on
 # the first status/render request; status never loads weights, render does.
-# ---------------------------------------------------------------------------
 _sing_song_engine = None
 _sing_song_engine_error = None
 
@@ -649,14 +670,12 @@ async def singsong_render(
     )
 
 
-# ---------------------------------------------------------------------------
 # MySong: symbolic chord accompaniment from a sung or hummed take.
 #
 # Like SingSong this is lazy: the model is tiny, but loading it pulls in
 # PyTorch for the optional BiGRU tagger, and a machine that never opens the
 # Live Demo page should not pay for that at process start.  Inference itself
 # is CPU-only by design.
-# ---------------------------------------------------------------------------
 _mysong_model = None
 _mysong_model_path = None
 _mysong_model_error = None
@@ -1132,7 +1151,7 @@ def cree_orthography(req: OrthographyRequest):
     return describe(text)
 
 
-# ------------------------------------------------------- nêhiyawêwin speech --
+# nêhiyawêwin speech
 #
 # Transcription of the language Archer actually sings in. Whisper cannot do it:
 # `language="cr"` is not a Plains Cree decoder, it is the English decoder with a
@@ -2245,7 +2264,7 @@ def _apply_vocal_vibration_amount(audio: np.ndarray, sample_rate: int,
     One door for every renderer (the DSP whole-track render, the locked-word
     render, the Neural full render and the live converted chunks) so that the
     setting means the same thing everywhere, which is the only way a slider can
-    be honest about "all modes, both engines". `None` means the request did not
+    be explicit about "all modes, both engines". `None` means the request did not
     say, and the shared default is used (see synthesis.vibrato); an explicit 0
     is a straight tone and is left exactly as it was rendered.
     """
@@ -2399,7 +2418,7 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
     # would leave the note out of tune across most of its length, and a long
     # note that loops the syllable would replay that sweep once per loop. After
     # flattening, a syllable holds ONE pitch, so the shift lands the note
-    # exactly and the musical movement is added on top of it deliberately.
+    # exactly and the musical movement is added on top of it.
     # `take_f0` is no longer what a syllable's pitch is taken from: the median
     # of its own measured pitch curve is.
     register_hz = take_f0(raw_audio, sample_rate)
@@ -2672,7 +2691,7 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
     if start is not None:
         phrase_spans.append((start, n_frames * frame_size))
 
-    # ==== the melody ======================================================
+    # the melody
     # Notes come from the singing itself, octave-corrected and de-jittered
     # (see synthesis/melody_voice.py). Everything below is placed on this
     # grid rather than on a generic onset detector's.
@@ -2723,7 +2742,7 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
         # decides where the part is actually silent)
         return note_hz[i]
 
-    # There is deliberately no note grid here any more. The grid used to be
+    # There is no note grid here any more. The grid used to be
     # built (each sung note plus the track's own onsets as re-articulations)
     # and then used to slice the part note by note; the phrase loop below
     # never slices, and melody_hz_at already answers "what is being sung at
@@ -2770,7 +2789,7 @@ def _render_track_single_vocable_offline(raw_audio_bytes: bytes, pitch_method: s
                       f"{phrase_octave - octave_k:+d} octave from the part's placement "
                       f"to keep it near the take's own register ({len(phrase_notes)} notes).")
 
-        # ==== the phrase, sung through in one pass =========================
+        # the phrase, sung through in one pass
         # WHAT PLAYS. The take is read from its own start, continuously, for as
         # long as the phrase lasts: the whole word, at its own recorded pace,
         # starting over when it runs out (with a short re-articulation at that
@@ -3182,7 +3201,7 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
             pitch_input = frame if pitch.method == "rmvpe" else clean
             hz, conf = pitch.detect(pitch_input)
             # A HESITATION IS NOT A MELODY. The detector's own confidence gate is
-            # deliberately low (0.3) because it is shared with the live pipeline,
+            # low (0.3) because it is shared with the live pipeline,
             # where a fraction of a second's lag matters more than a wobble. On a
             # track, a reading that weak is usually breath, a consonant, or a
             # voice buried in the mix -- and taking it moves the robot to a note
@@ -3390,7 +3409,7 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
         # a sung line breathes, so peak-matching a drone makes it the loudest
         # thing in the panel. This puts the same average energy into the mix as
         # every other mode does, and the peak ceiling below keeps the headroom
-        # honest. Only ever upward, so a hum that is already there is left alone.
+        # Conservative. Only ever upward, so a hum that is already there is left alone.
         hum_rms = float(np.sqrt(np.mean(np.square(robot, dtype=np.float64)))) if robot.size else 0.0
         if 0.0 < hum_rms < HUM_RMS_TARGET:
             gain = HUM_RMS_TARGET / hum_rms
@@ -3441,7 +3460,7 @@ def _render_track_offline(raw_audio_bytes: bytes, pitch_method: str, texture: st
 
     # THE MOVEMENT IN EVERY HELD NOTE, for every mode, in both engines.
     #
-    # Applied here, deliberately: after the whole part exists (so it does not
+    # Applied here: after the whole part exists (so it does not
     # care which mode built any of it, or how the notes were joined), and BEFORE
     # the neural pass below (so a converted part is handed a voice that already
     # has the folds' movement in it, and the model carries the movement rather
@@ -3801,7 +3820,6 @@ def _decode_mono_for_conversion(raw_audio_bytes: bytes, floor: int = 44100):
     return np.ascontiguousarray(audio, dtype=np.float32), sample_rate
 
 
-# ===========================================================================
 # THE TRACK'S OWN BACKING TRACK, SEPARATED ONCE.
 #
 # Live mode cannot afford Demucs per chunk, a call costs tens of seconds and a
@@ -4080,7 +4098,7 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds:
     # two beds that arrive at full band level (the separated ones). 4 dB is the
     # same shallow lead-vocal duck the single-vocable render has always used
     # see _duck_accompaniment_under_voice for why that is what makes the words
-    # audible. The per-chunk fallback bed below is already a deliberately thin
+    # audible. The per-chunk fallback bed below is already a thin
     # drums-only reconstruction sitting ~9 dB under the voice, so it is left
     # alone: ducking that as well would pull the only rhythmic anchor out of the
     # mix exactly where it is needed.
@@ -4190,7 +4208,7 @@ def _convert_track_direct(raw_audio_bytes: bytes, voice_index: int, pad_seconds:
             #    instead of the uploaded recording's own lead vocal singing
             #    along with the robot.
             #
-            # Tier 2's rebuild deliberately does NOT require that the
+            # Tier 2's rebuild does NOT require that the
             # span-muting above actually changed anything. A short chunk is very
             # often one unbroken phrase with no instrumental gap in it at all,
             # and the first version of this skipped the bed entirely in that
@@ -4524,7 +4542,7 @@ def _decode_audio_via_ffmpeg(raw_audio_bytes: bytes, target_sr: int) -> np.ndarr
     which is that same channel unchanged, and a stereo upload with `-ac 2`,
     which is those two channels unchanged. Anything with more than two channels
     (5.1, ambisonic) goes through ffmpeg's own stereo downmix and then the same
-    average, since there is no honest two-channel answer to average there.
+    average, since there is no single two-channel answer to average there.
     """
     with tempfile.NamedTemporaryFile(suffix=".input", delete=False) as tmp_in:
         tmp_in.write(raw_audio_bytes)
@@ -4849,7 +4867,7 @@ _REPEAT_RUN_RE = re.compile(
 def _anglicize_cleanup(text: str, max_repeats: int = 3) -> str:
     """Turn a raw, not-fully-confident Whisper decode into a readable anglicized line.
 
-    This is deliberately NOT translation and never touches meaning, it only cleans up the
+    This is not translation and never touches meaning, it only cleans up the
     artifacts of forcing an English decoder to render sounds (including Cree words and
     wordless vocables) it doesn't have real words for: bracketed meta-tags, music-note
     glyphs, and the repeated-token loops Whisper falls into when it isn't sure what it's
@@ -5206,7 +5224,7 @@ def _collapse_repeated_vocal_rows(annotated: list, max_merged_s: float = 6.0,
     uses (three rows reading "Way" come out as one row reading "Way, Way"), which
     is what that helper exists for.
     Word-level timings are dropped on a merged row: they describe the words the
-    row no longer has, and the panel's own even-spacing fallback is the honest
+    row no longer has, and the panel's own even-spacing fallback is the appropriate
     highlight for a collapsed vocable line.
     """
     out: list = []
@@ -5319,7 +5337,7 @@ def _classify_segments(raw_segments: list) -> list:
 # class a row may NAME is mapped here to the name a person would use for it, so consecutive
 # windows that keep hearing the same family merge into the one row the ear actually hears.
 # (The mapping is also the allow-list: a class that is not in it is not something this project
-# is willing to name, which is what keeps a label honest instead of merely confident.)
+# is willing to name, which is what keeps a label accurate instead of merely confident.)
 _PANNS_INSTRUMENT_LABELS = {
     # Percussion: the kit, and everything else that is hit rather than pitched.
     "Drum": "drums playing", "Drum kit": "drums playing", "Bass drum": "drums playing",
@@ -5357,7 +5375,7 @@ _PANNS_INSTRUMENT_LABELS = {
 # for all ten classes -- a singer who is humming and a choir holding a chant were written the
 # same way, in the one phrasing that says nothing at all about what is being heard. Each
 # class now names the sound it stands for ("<humming>", "<chanting>", "<choir singing>", ...),
-# which is both more use to the person reading the log and strictly more honest: PANNs is being
+# which is both more use to the person reading the log and more accurate: PANNs is being
 # asked which of these it hears, and this is the answer it gave.
 _PANNS_VOICE_LABELS = {
     "Singing": "singing",
@@ -5376,7 +5394,7 @@ _PANNS_VOICE_LABELS = {
 # dropped silently rather than shown (see _name_span_from_panns).
 _PANNS_LABELS = {**_PANNS_INSTRUMENT_LABELS, **_PANNS_VOICE_LABELS}
 
-# Below this, PANNs is not saying anything worth writing down. Deliberately where it is: a
+# Below this, PANNs is not saying anything worth writing down. where it is: a
 # mislabelled instrument is worse than no label at all (this project's own rule for the
 # fallback path too), and the scores on real music are low -- this project's reference track
 # peaks around 0.3, and most windows never pass 0.2.
@@ -5420,7 +5438,7 @@ def _name_instrument_span(audio: np.ndarray, sr: int, start_s: float, end_s: flo
       * if it is tone, is the tone down low? A span whose energy sits under a
         couple of hundred hertz with little above it is a bass, not a fiddle.
 
-    Anything it cannot tell apart stays the honest generic label. A
+    Anything it cannot tell apart stays the generic label. A
     mislabelled instrument would be worse than no label, which is why this
     never guesses between two instruments it cannot separate.
     """
@@ -5520,7 +5538,7 @@ def _detect_instrument_spans(raw_bytes: bytes, min_duration_s: float) -> list:
 
 
 def _what_is_sounding(start_s: float, end_s: float, instrument_spans: list) -> tuple:
-    """The honest name for a stretch Whisper heard no words in, and whether that
+    """The name for a stretch Whisper heard no words in, and whether that
     name is an instrument's or a voice's.
 
     WHY THIS EXISTS AT ALL. The forced-decode path below hands a pitch-scanned
@@ -5843,7 +5861,7 @@ def _transcribe_track_annotated(raw: bytes, language: str = "en") -> dict:
                     # written <like this>, and a label still in square brackets
                     # is a Whisper tag the panel is supposed to be hiding. The
                     # chunk is vocal by construction (the pitch scan said so),
-                    # so the honest name for it is the same one the
+                    # so the name for it is the same one the
                     # anglicized-sung path uses.
                     label = text.strip() if text else ""
                     row_type = "vocal"
@@ -6533,7 +6551,7 @@ def run_local_pipeline(stop_event, input_device: int):
         from analysis.pitch_detector import PitchDetector
         from analysis.rhythm_analyzer import RhythmAnalyzer
         from analysis.phonetic_analysis import CreeTokenizer
-        from output.timing_sync import TimingSync
+        from core.timing_sync import TimingSync
         import librosa as _lib
 
         cfg          = get_config()
@@ -6659,7 +6677,7 @@ def run_local_pipeline(stop_event, input_device: int):
                     timing.flush()
                     currently_singing = False
 
-            # else: "Mix" selected, deliberately does nothing (no robot
+            # else: "Mix" selected, does nothing (no robot
             # audio at all) for now. decision (above) is still computed
             # so the pitch-tracking telemetry message below keeps
             # working; it's just no longer used to drive any synthesis.

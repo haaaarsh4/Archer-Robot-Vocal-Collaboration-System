@@ -35,12 +35,14 @@ from typing import ClassVar, Iterable, Sequence
 
 import numpy as np
 
+from mysong.expression import apply_expression
 from mysong.harmonize import ChordSegment, Harmonization
+from mysong.percussion import render_percussion
 from mysong.theory import Chord, voice_leading_cost
 
-# --------------------------------------------------------------------------- #
+# #
 # Data
-# --------------------------------------------------------------------------- #
+# #
 
 @dataclass
 class ArrangementNote:
@@ -120,14 +122,19 @@ class ArrangementStyle:
                                  percussion="jingle_dress"),
             # Métis fiddle: a reel line on the fiddle over a two-step guitar
             # and an upright two-feel bass.  No drum kit.
+            # GM 110 is the solo fiddle, not 41's violin section: one player
+            # with a bow and a wooden body, which is the instrument this band is.
             "metis_fiddle": dict(intensity=0.58, drums=False, pad=False, guitar=True,
                                  bass=True, reverb=0.18, humanize=0.66,
-                                 programmes={"piano": 41}),
+                                 programmes={"piano": 110}),
             # Cedar flute: long tones with air around them, a soft drum and a
             # warm pad underneath.
+            # GM 75 is the pan flute: wood and breath.  Programme 73 is the
+            # bright metal flute, which is a different instrument in a
+            # different material.
             "cedar_flute": dict(intensity=0.40, drums=True, pad=True, bass=True,
                                 reverb=0.30, humanize=0.62, percussion="light",
-                                programmes={"piano": 73}),
+                                programmes={"piano": 75}),
             # --- other bands -------------------------------------------------
             "pop": dict(intensity=0.60, drums=True, pad=False, reverb=0.20),
             "ballad": dict(intensity=0.46, drums=False, pad=True, reverb=0.32),
@@ -197,9 +204,9 @@ class Arrangement:
         return path
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Voicing
-# --------------------------------------------------------------------------- #
+# #
 
 def _chord_pitch_classes(chord: Chord) -> list[int]:
     pcs = list(dict.fromkeys(chord.pitch_classes(False)))
@@ -295,9 +302,9 @@ def choose_voicings(
     return chosen
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Patterns
-# --------------------------------------------------------------------------- #
+# #
 
 def _swing_offset(beat: float, swing: float) -> float:
     """Delay the second eighth of every beat by up to a triplet feel."""
@@ -642,16 +649,19 @@ def _drum_pattern(
                         hit(origin + offset, drum, velocity)
         elif style.percussion == "jingle_dress":
             # The side-step: a hand drum on the pulse with the cone jingles
-            # ringing as the dancer steps, so the jingles sit on the beat and
-            # on the step after it, never as a hi-hat pattern.
+            # ringing on every step the dancer takes, and a lighter shift of
+            # weight on the half beat between them.  A dress full of cones does
+            # not stop ringing between steps -- the jingles of the step that has
+            # just landed are still sounding under the next one -- so both the
+            # beat and its half carry cones, never a hi-hat pattern.
             for beat in range(max(1, int(round(meter)))):
                 at = origin + beat
                 if at >= total_beats:
                     break
                 hit(at, "tom_low", 92 if beat % 2 == 0 else 68)
-                hit(at, "shaker", 56 if beat % 2 == 0 else 46)
-                if beat % 2:
-                    hit(at + 0.5, "shaker", 34)
+                hit(at, "shaker", 58 if beat % 2 == 0 else 48)
+                if at + 0.5 < total_beats:
+                    hit(at + 0.5, "shaker", 30 if beat % 2 == 0 else 38)
         elif style.percussion == "light":
             # Two soft strokes a bar and a quiet rattle, under a flute.
             hit(origin, "tom_low", 68)
@@ -716,9 +726,9 @@ def _drum_pattern(
     return notes
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Arrangement assembly
-# --------------------------------------------------------------------------- #
+# #
 
 def arrange(
     harmony: Harmonization,
@@ -772,9 +782,9 @@ def arrange(
     )
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Synthesis
-# --------------------------------------------------------------------------- #
+# #
 
 def _adsr(n: int, sr: int, attack: float, decay: float, sustain: float, release: float) -> np.ndarray:
     """A compact ADSR envelope for one note of ``n`` samples."""
@@ -865,10 +875,22 @@ def _pad_note(midi: int, velocity: int, seconds: float, sr: int, detune_cents: f
     return ((velocity / 127.0) * 0.4 * tone).astype(np.float32)
 
 
+#: General MIDI drum note -> the fallback synth's voice.  This is the numpy
+#: engine only: the indigenous bands keep their notes but are played by
+#: mysong.percussion, and a note with no entry here is skipped rather than
+#: raising, so a pattern may write a voice the fallback does not have.
+_DRUM_VOICES = {
+    36: "kick", 38: "snare", 42: "hat", 46: "open_hat", 51: "ride",
+    49: "crash", 45: "tom_low", 47: "tom_mid", 50: "tom_high",
+    69: "shaker", 54: "rattle",
+}
+
+
 def _drum_hit(kind: str, velocity: int, sr: int) -> np.ndarray:
     rng = np.random.default_rng({
         "kick": 1, "snare": 2, "hat": 3, "open_hat": 4, "ride": 5,
         "crash": 6, "tom_low": 7, "tom_mid": 8, "tom_high": 9,
+        "shaker": 10, "rattle": 11,
     }[kind])
     amplitude = (velocity / 127.0) ** 1.3
     if kind == "kick":
@@ -893,6 +915,17 @@ def _drum_hit(kind: str, velocity: int, sr: int) -> np.ndarray:
         kernel = np.ones(12) / 12.0
         noise = noise - np.convolve(noise, kernel, mode="same")
         return (amplitude * 0.35 * noise * np.exp(-t * (70.0 if kind == "hat" else 14.0))).astype(np.float32)
+    if kind in ("shaker", "rattle"):
+        # A gourd rattle and a cone cluster are played by mysong.percussion for
+        # the bands that use them; this is only the numpy fallback for a machine
+        # without FluidSynth, and it must not raise for a note the patterns emit.
+        n = int((0.12 if kind == "shaker" else 0.2) * sr)
+        t = np.arange(n) / sr
+        noise = rng.normal(0, 1, n)
+        kernel = np.ones(4) / 4.0
+        noise = noise - np.convolve(noise, kernel, mode="same")
+        return (amplitude * 0.3 * noise
+                * np.exp(-t * (34.0 if kind == "shaker" else 20.0))).astype(np.float32)
     if kind in ("tom_low", "tom_mid", "tom_high"):
         base = {"tom_low": 110.0, "tom_mid": 145.0, "tom_high": 190.0}[kind]
         n = int(0.35 * sr)
@@ -968,6 +1001,10 @@ def _render_arrangement_synth(
     total_samples = max(1, int(total_beats * spb * sample_rate) + sample_rate // 2)
     buffer = np.zeros((total_samples, 2), dtype=np.float32)
     rng = np.random.default_rng(seed)
+    # The hand drum and the cone jingles of a jingle dress are played by
+    # mysong.percussion.  No General MIDI bank has either instrument, which is
+    # why these bands used to come back as a tom and a cabasa.
+    percussion = render_percussion(arrangement, sample_rate=sample_rate, seed=seed + 1)
     for note in arrangement.notes:
         start = max(0, int(note.start * spb * sample_rate))
         seconds = max(0.05, note.duration * spb + 0.35)
@@ -985,12 +1022,16 @@ def _render_arrangement_synth(
             signal = _pad_note(note.pitch, note.velocity, seconds + 0.8, sample_rate)
             _add(buffer, signal, start, gain=0.22, pan=float(np.clip((note.pitch - 60) / 50.0, -0.6, 0.6)))
         elif note.instrument == "drums":
-            drum = {
-                36: "kick", 38: "snare", 42: "hat", 46: "open_hat", 51: "ride",
-                49: "crash", 45: "tom_low", 47: "tom_mid", 50: "tom_high",
-            }[note.pitch]
+            if percussion is not None:
+                continue
+            drum = _DRUM_VOICES.get(note.pitch)
+            if drum is None:
+                continue
             signal = _drum_hit(drum, note.velocity, sample_rate)
             _add(buffer, signal, start, gain=0.5, pan=0.0)
+    if percussion is not None:
+        span = min(len(buffer), len(percussion))
+        buffer[:span] += percussion[:span]
     # A touch of stereo width from a short decorrelation delay.
     delay = int(0.012 * sample_rate)
     if len(buffer) > delay:
@@ -1016,9 +1057,9 @@ def _render_arrangement_synth(
     return buffer.astype(np.float32)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # SoundFont rendering
-# --------------------------------------------------------------------------- #
+# #
 
 _SOUNDFONT_CANDIDATES = (
     "/usr/share/sounds/sf2/FluidR3_GM.sf2",
@@ -1113,11 +1154,17 @@ def render_arrangement_soundfont(
     total_samples = max(1, int(total_beats * spb * sample_rate) + sample_rate // 2)
     mix = np.zeros((total_samples, 2), dtype=np.float32)
 
+    # A hide drum and a dress full of brass cones exist in no General MIDI bank,
+    # so those two instruments are rendered from their acoustics and summed with
+    # the sampled stems below (see mysong.percussion).
+    percussion = render_percussion(arrangement, sample_rate=sample_rate, seed=seed + 1)
+
     with tempfile.TemporaryDirectory(prefix="mysong-sf2-") as tmp:
         tmp_path = Path(tmp)
         present = {note.instrument for note in arrangement.notes}
         for instrument in [slot for slot in ("piano", "guitar", "bass", "pad", "drums")
-                           if slot in present]:
+                           if slot in present
+                           and not (slot == "drums" and percussion is not None)]:
             notes = arrangement.notes_for(instrument)
             if not notes:
                 continue
@@ -1163,7 +1210,20 @@ def render_arrangement_soundfont(
                     stem[delay:, 1] += 0.20 * stem[:-delay, 0]
             elif instrument == "bass":
                 stem *= 0.92  # keep the low end centered and out of the way
+            # A sampled patch has no bow, breath or pick.  Those are what make
+            # a fiddle read as a person and a flute as wood rather than a sine,
+            # so they are generated from the notes actually played.
+            layer = EXPRESSIVE.get(arrangement.style.name, {}).get(instrument)
+            if layer:
+                stem = apply_expression(
+                    stem, notes, kind=layer, sample_rate=sample_rate,
+                    seconds_per_beat=spb, total=total_samples, seed=seed,
+                )
             mix += stem
+
+    if percussion is not None:
+        span = min(len(mix), len(percussion))
+        mix[:span] += percussion[:span]
 
     # Shared bus treatment: a short, natural room, gentle glue compression and
     # a limiter.  The SoundFont supplies the timbre; this supplies the record.
@@ -1215,9 +1275,19 @@ def render_arrangement(
     return _render_arrangement_synth(arrangement, sample_rate=sample_rate, seed=seed)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Mixing with the voice
-# --------------------------------------------------------------------------- #
+# #
+
+#: Which rendered slot of which band gets a playing layer from
+#: mysong.expression, and what kind.  A sample has no bow, breath or pick, so
+#: these are the slots where a General MIDI patch alone sounds synthetic.
+EXPRESSIVE: dict[str, dict[str, str]] = {
+    "metis_fiddle": {"piano": "fiddle", "guitar": "guitar"},
+    "cedar_flute": {"piano": "flute"},
+    "round_dance": {"guitar": "guitar"},
+    "jingle_dress": {"guitar": "guitar"},
+}
 
 #: The band every path uses unless it is told otherwise: the hand drum this
 #: project's artist has sung with since 1982, not a generic pop kit.
@@ -1393,9 +1463,9 @@ def mix_stems(stems: dict[str, np.ndarray], sample_rate: int) -> np.ndarray:
     return _soft_limit(out)
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Standard MIDI File
-# --------------------------------------------------------------------------- #
+# #
 
 def _vlq(value: int) -> bytes:
     if value < 0:

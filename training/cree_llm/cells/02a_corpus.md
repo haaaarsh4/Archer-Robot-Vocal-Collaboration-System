@@ -8,7 +8,7 @@ There is the contemporary web: Cree Wikipedia, FineWeb-2 (192 documents), FinePD
 
 There is reference material: Tatoeba's Cree sentences, 64 Plains Cree phrase recordings, and GiellaLT's public texts. There is Archer's own material: the project's aligned pairs, the song notes, and the 1865 Watkins dictionary, kept under its own historical tag. Finally there is a folder you can drop your own texts into.
 
-The complete run accepts 12,743 documents and 2.02 million raw words, which cleaning reduces to 1,124,146 training words across 66,071 sentences, 10,934 training pairs and 203 held-out pairs. That is the largest honest Plains Cree corpus this notebook can assemble without scraping a copyrighted site or inventing sentences.
+The complete run accepts 12,743 documents and 2.02 million raw words, which cleaning reduces to 1,124,146 training words across 66,071 sentences, 10,934 training pairs and 203 held-out pairs. That is the largest verified Plains Cree corpus this notebook can assemble without scraping a copyrighted site or inventing sentences.
 
 Every item is written with its source, licence, dialect and script. Nothing is silently merged into an anonymous blob, because a model card that cannot say where its Cree came from is not a model card.
 

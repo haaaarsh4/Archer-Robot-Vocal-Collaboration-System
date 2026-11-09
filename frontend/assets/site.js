@@ -246,7 +246,7 @@
        class coming off is what stops the spring, and `arrived()` is what
        disarms its timer. Taking the class off is safe on every other path
        it is not there to begin with, and nothing puts it back, and there is
-       deliberately no check before it, because a click that arrives without a
+       no check before it, because a click that arrives without a
        pointer press (a key, a script) never gets the listener's cleanup.
        (`arriving` and `arrived` are set up further down the file; `var` and a
        function declaration are both hoisted, so both are there in time.) */

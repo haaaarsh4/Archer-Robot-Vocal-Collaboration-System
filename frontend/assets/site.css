@@ -144,8 +144,7 @@ img { max-width: 100%; display: block; }
 /* Three slots, and the middle one is the whole point of the bar: the wordmark
    with the pipeline's own state under it, centred, so the name sits on the
    window's centre line on every page and the status reads as a caption to it.
-   The slots stay pinned to their columns, and the first one is deliberately
-   empty: the 1fr either side of the wordmark is what holds it on the centre
+   The slots stay pinned to their columns, and the first one is empty: the 1fr either side of the wordmark is what holds it on the centre
    line, and nothing on the left can pull it off. */
 .sig-block {
   grid-column: 2; justify-self: center;
@@ -2219,7 +2218,7 @@ body.page-enter #page-about .about-hero .about-lead { animation: hero-rise 0.95s
 body.page-enter #page-about .about-hero-foot { animation: hero-rise 0.8s var(--ease) 0.6s both; }
 @keyframes hero-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
 
-/* There is deliberately no second stroke anywhere below the hero. One line,
+/* There is no second stroke anywhere below the hero. One line,
    above the sentence, and nothing under it: a pen that carried on down the
    sheet read as a stray rule between the statement and the first chapter
    rather than as a drawing. */

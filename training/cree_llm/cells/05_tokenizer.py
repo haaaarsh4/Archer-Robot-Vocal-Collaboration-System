@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # A tokenizer that knows Cree.
 #
 # The base model's tokenizer was trained mostly on English. For a language with
@@ -11,7 +10,6 @@
 # model's byte-level vocabulary, and the surviving pieces are added as ordinary
 # tokens. The next cell initialises their embeddings from the pieces the base
 # model already knows, so a new token starts life already meaning something.
-# ─────────────────────────────────────────────────────────────────────────────
 
 from transformers import AutoTokenizer
 from sentencepiece import SentencePieceTrainer
@@ -186,7 +184,7 @@ else:
         "old_size": old_size,
     })
 
-    # ── figure ───────────────────────────────────────────────────────────────────
+    # figure
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))

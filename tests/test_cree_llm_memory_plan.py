@@ -123,11 +123,16 @@ def test_precision_follows_the_card(nb):
     assert plan(15.0, 0.5, False) is False
 
 
+def _save_graft(nb, rows):
+    """A graft file the way the current cell writes it: rows plus their key."""
+    torch.save({"key": nb["_GRAFT_KEY"], "start": 32, "rows": rows}, nb["GRAFTED"])
+
+
 def test_graft_survives_a_reload(nb):
     model = _tiny_model(nb)
     tok = _Tok(34)
     rows = torch.arange(2 * 16, dtype=torch.float32).reshape(2, 16) / 100
-    torch.save({"start": 32, "rows": rows}, nb["GRAFTED"])
+    _save_graft(nb, rows)
 
     nb["graft_rows"](model, tok)
     assert model.get_input_embeddings().weight.shape[0] == 34
@@ -141,7 +146,7 @@ def test_graft_is_what_makes_the_resize_meaningful(nb):
     model = _tiny_model(nb)
     tok = _Tok(34)
     rows = torch.full((2, 16), 0.25)
-    torch.save({"start": 32, "rows": rows}, nb["GRAFTED"])
+    _save_graft(nb, rows)
 
     nb["graft_rows"](model, tok)
     first = model.get_input_embeddings().weight[32:34].detach().clone()
@@ -155,6 +160,52 @@ def test_graft_is_what_makes_the_resize_meaningful(nb):
 
     nb["graft_rows"](fresh, tok)
     assert torch.allclose(fresh.get_input_embeddings().weight[32:34].detach(), first)
+
+
+def test_a_graft_without_a_key_is_rebuilt_not_trusted(nb):
+    """A file from an older build has no key. It may belong to another vocabulary."""
+    model = _tiny_model(nb)
+    torch.save({"start": 32, "rows": torch.zeros(2, 16)}, nb["GRAFTED"])
+
+    class Decomposer:
+        unk_token_id = 0
+
+        @staticmethod
+        def encode(text, add_special_tokens=False):
+            return {"nêhiyaw": [3, 4], "maskwa": [5, 6]}[text]
+
+    class Factory:
+        @staticmethod
+        def from_pretrained(path):
+            return Decomposer()
+
+    nb["AutoTokenizer"] = Factory
+    nb["graft_rows"](model, _Tok(34))
+
+    saved = torch.load(nb["GRAFTED"], map_location="cpu", weights_only=True)
+    assert saved.get("key") == nb["_GRAFT_KEY"]
+    assert not torch.allclose(saved["rows"], torch.zeros(2, 16))
+    emb = model.get_input_embeddings().weight
+    expected = torch.stack([emb[[3, 4]].mean(0), emb[[5, 6]].mean(0)])
+    assert torch.allclose(saved["rows"], expected, atol=1e-6)
+
+
+def test_an_uncheckable_graft_is_used_when_it_cannot_be_rebuilt(nb):
+    """The export must not die because the base tokenizer folder is gone."""
+    model = _tiny_model(nb)
+    rows = torch.full((2, 16), 0.5)
+    torch.save({"start": 32, "rows": rows}, nb["GRAFTED"])
+
+    class Factory:
+        @staticmethod
+        def from_pretrained(path):
+            raise OSError("no tokenizer here")
+
+    nb["AutoTokenizer"] = Factory
+    nb["graft_rows"](model, _Tok(34))
+
+    got = model.get_input_embeddings().weight[32:34].detach()
+    assert torch.allclose(got, rows.to(got.dtype))
 
 
 def test_first_load_builds_the_graft_from_pieces(nb):

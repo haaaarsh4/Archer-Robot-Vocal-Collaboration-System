@@ -32,9 +32,9 @@ from mysong.corpus import NoteEvent
 from mysong.theory import Key, estimate_key, metric_weight, pc_name
 
 
-# --------------------------------------------------------------------------- #
+# #
 # The shared representation
-# --------------------------------------------------------------------------- #
+# #
 
 class Melody:
     """Metric-weighted chroma on a quarter-note frame grid.
@@ -230,9 +230,9 @@ def _soft_pitch_classes(midi_pitch: float, sigma_semitones: float) -> list[tuple
     return [(pc, weight / total) for pc, weight in values]
 
 
-# --------------------------------------------------------------------------- #
+# #
 # Audio front-end
-# --------------------------------------------------------------------------- #
+# #
 
 @dataclass
 class TempoEstimate:

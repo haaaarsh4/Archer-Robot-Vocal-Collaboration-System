@@ -462,7 +462,7 @@ class TokenDataset:
 
     Each item is the fixed 10 s token set: semantic [250], coarse [4, 500],
     fine [8, 500].  The training script uses a DistributedSampler when run
-    under torchrun, so this class stays deliberately small.
+    under torchrun, so this class stays small.
     """
 
     def __init__(self, token_dir: str | Path, *, expected_frames: int | None = None):

@@ -1,0 +1,12 @@
+elector eligibility
+are you eligible to vote at this location ?
+electoral division :
+polling station no .
+to vote at this location you must be :
+a canadian citizen ,
+at least years of age ,
+ordinarily resident in alberta , and
+ordinarily resident in one of the polling subdivisions served
+by the polling stations located here today .
+if you live in another electoral division or polling subdivision , you cannot vote here .
+please speak to an election officer for assistance in determining where you can vote .

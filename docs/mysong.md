@@ -6,7 +6,7 @@ renders an arrangement with piano, bass, drums or pad, a mix and a MIDI file.
 It is a strict superset of Simon, Morris and Basu's CHI 2008 MySong, with the
 parts of that design that no longer hold up replaced and measured.
 
-The package is deliberately separate from the live robot pipeline. It has no
+The package is separate from the live robot pipeline. It has no
 side effects at import, runs on CPU, and its model is a few hundred kilobytes
 plus an optional 2 MB neural tagger.
 
@@ -71,7 +71,7 @@ melody matrix is shared because pilot testing found the two modes similar.
 
 ### Audio front end
 
-Autocorrelation pitch tracking at **100 samples/second**, deliberately *without*
+Autocorrelation pitch tracking at **100 samples/second**, *without*
 the dynamic-programming cleanup a normal tracker uses. The authors argue that
 keeping the noisy, continuous pitch trace is more robust for untrained singers
 than quantising it into notes. The recording's tuning offset is estimated by
@@ -252,7 +252,7 @@ change.
 
 The structural tables (transitions, durations, extensions, bass) still come
 from OpenEWLD in the streaming run.  The large tagger is the observation model;
-this isolates the effect of adding data and keeps the evaluation honest.
+this isolates the effect of adding data and keeps the evaluation independent.
 
 ```bash
 python tools/build_autoharmonizer_corpus.py --workers 8
@@ -261,18 +261,18 @@ python tools/train_mysong_tagger_large.py \
   --out-model data/mysong/model/mysong_large.npz
 ```
 
-On a GPU server use `--device cuda` and [GPU_MYSONG.md](../GPU_MYSONG.md).  The
+On a GPU server use `--device cuda` and [mysong-training.md](mysong-training.md). The
 checkpoint is always written as CPU tensors, so inference does not need CUDA.
-The supported GPU path for the shipped weights — 60 epochs, two seeds for the
+The supported GPU path for the shipped weights, 60 epochs, two seeds for the
 ensemble, checkpoints every 10 epochs, and the tagger metadata rewritten on the
-structural model — is the Colab notebook
-[`MySong_Colab_Training.ipynb`](../MySong_Colab_Training.ipynb).
+structural model, is the Colab notebook
+[`MySong_Colab_Training.ipynb`](../training/notebooks/MySong_Colab_Training.ipynb).
 
 Model artefacts:
 
 | File | Contents | Size |
 |---|---|---|
-| `data/mysong/model/mysong.npz` | transitions, start/end, duration/phase priors, extension/bass tables, chord classifier, key classifier, key profiles, metadata — including the attached tagger's architecture and run report | ~75 KiB |
+| `data/mysong/model/mysong.npz` | transitions, start/end, duration/phase priors, extension/bass tables, chord classifier, key classifier, key profiles, metadata, including the attached tagger's architecture and run report | ~75 KiB |
 | `data/mysong/model/mysong_tagger.npz` | 256-unit BiGRU weights + architecture metadata, plain numpy (a `.pt` copy is written too) | ~7.1 MiB |
 | `data/mysong/model/mysong_tagger2.npz` | the second 256-unit tagger (same data, different seed); `MySongModel.load` loads it as a 2-model log-probability ensemble | ~7.1 MiB |
 | `data/mysong/model/mysong_large.npz` | the same structural model, paired with the large-corpus tagger | ~75 KiB |
@@ -281,7 +281,7 @@ Model artefacts:
 | `data/mysong/model/mysong_tagger_archive_small.npz` | 128-unit BiGRU kept for the ablation row | ~1.9 MB |
 
 `python -m mysong.cli status` reports which parts are present.  The shipped
-weights come from the Colab notebook [`MySong_Colab_Training.ipynb`](../MySong_Colab_Training.ipynb);
+weights come from the Colab notebook [`MySong_Colab_Training.ipynb`](../training/notebooks/MySong_Colab_Training.ipynb);
 `reports/mysong_colab/model_card.md` records the run, the corpus counts, the
 assembly hashes and the ablation behind the table below.
 
@@ -317,7 +317,7 @@ roughly doubles its root accuracy.
 The shipped tagger is trained on the OpenEWLD training split (409 songs) plus
 4,571 auxiliary scores. The test split is never used for gradients or early
 stopping, and no test melody appears in the auxiliary corpus. The table above
-is therefore the honest held-out number for the shipped model. The previous
+is therefore the held-out number for the shipped model. The previous
 128-unit tagger, trained on the same training split without the auxiliary
 corpus, scored 0.544 root / 0.932 exact key; the larger network and the extra
 in-domain examples bought about five points of root accuracy.
@@ -464,7 +464,7 @@ model is present.
 
 ---
 
-## 6. Limitations and honest gaps
+## 6. Limitations
 
 * **One global key.** The decoder assumes a single key per performance, as the
   paper does. Local modulation is not tracked; a song that changes key will
@@ -500,7 +500,7 @@ model is present.
 python -m mysong.cli corpus        # if data/mysong/corpus.jsonl is absent
 python -m mysong.cli train         # structural model + small tagger
 
-# large corpus (download/build it first; see GPU_MYSONG.md section 2)
+# large corpus (download/build it first; see mysong-training.md section 2)
 python tools/build_autoharmonizer_corpus.py --workers 8
 python tools/train_mysong_tagger_large.py \
   --epochs 60 --hidden 256 \
@@ -514,7 +514,7 @@ python -m pytest -q tests/test_mysong.py
 The small tagger takes a few minutes on CPU.  The large-corpus run took about
 50 minutes on this 16-core CPU and about 20 minutes on a Colab T4 for the
 shipped 60-epoch, two-seed recipe; `--device cuda`,
-[GPU_MYSONG.md](../GPU_MYSONG.md) and the Colab notebook are the server paths.
+[mysong-training.md](mysong-training.md) and the Colab notebook are the server paths.
 `--no-tagger` trains only the numpy models and is enough for the CLI fallback.
 
 ### References

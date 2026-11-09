@@ -211,8 +211,8 @@ It prints the exact missing paths and exits non-zero if anything is missing.
 
 ## 5. Training
 
-For the complete GPU runbook — corpus download, featurizer setup, all five
-commands, resume behavior, time/VRAM expectations, and troubleshooting — see
+For the complete GPU runbook, corpus download, featurizer setup, all five
+commands, resume behavior, time/VRAM expectations, and troubleshooting, see
 **[singsong-training.md](singsong-training.md)**. The summary below is the
 short version.
 

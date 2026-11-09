@@ -6,7 +6,7 @@
     python -m mysong.cli analyze take.wav
     python -m mysong.cli render take.wav --out renders/take --style jazz
 
-The CLI deliberately uses the same functions as the HTTP app, so a result
+The CLI uses the same functions as the HTTP app, so a result
 reproduced on the command line is the result the app returns.
 """
 

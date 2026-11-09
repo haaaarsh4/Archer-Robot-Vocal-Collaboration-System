@@ -372,7 +372,7 @@ synthesis:
     # one is ever trained for it.
     index_paths:
       - "assets/female2/female2_added_IVF1701_Flat_nprobe_1_female2_v2.index"
-      - ""
+      - "assets/female3/female3_added_IVF2564_Flat_nprobe_1_female3_v2.index"
       - "assets/synthesis_models/mi-test_added_IVF1003_Flat_nprobe_1_mi-test_v2.index"
     offline_render_timeout_s: 900  # max wait for the ONE whole-track sidecar call used by
                                     # the Upload-MP3 panel's Neural (offline render) mode
@@ -536,7 +536,84 @@ logging:
 chat:
   backend: ollama
   ollama_url: http://127.0.0.1:11434
-  model: archer:7b
-  gguf_path: null                # archer-7b.Q4_K_M.gguf, used only for llama_cpp
+  model: archer:14b
+  gguf_path: null                # archer-14b.Q4_K_M.gguf, used only for llama_cpp
+  # GREEDY DECODING IS NOT THE SAFE CHOICE HERE, but sampling is not the fix
+  # either. At 0.0 this tag hands the visitor's own sentence back: "hi" -> "hi"
+  # in about half a second, "howdy, hows your day been big bro" -> "Howdy, how is
+  # your day been, big bro?". Measured on the four greetings this panel receives,
+  # 3 of 4 came back as echoes at 0.4, at 0.6 and at 0.7 as well; sampling only
+  # changes which one escapes. That is not a decoding setting, it is the SFT set:
+  # it carries almost no casual conversation, so the likeliest continuation of
+  # "hi" is "hi". 0.3 is the tag's own default and keeps a translation more
+  # reproducible than 0.7 did, so it is what the app asks for. The greeting voice
+  # and the persona are taught in training/cree_llm/cells/08_sft_data.py now, and
+  # they reach the weights on the next SFT run, not through this number.
   temperature: 0.3
-  max_tokens: 500
+  # A ceiling, not a target: every answer here is a few sentences, and the
+  # longest legitimate one (a note answer) is well under a page. At roughly
+  # five tokens a second on this CPU, 500 was two minutes of the model
+  # talking to itself when it lost the thread; 260 keeps a runaway reply to
+  # under a minute and still leaves room for four retrieved passages.
+  max_tokens: 260
+  # How long Ollama is asked to keep the weights in memory. Its own default is
+  # five minutes, and the reload that follows is what made a message sent ten
+  # minutes after the last one take minutes instead of seconds.
+  keep_alive: 1h
+  # Threads for the CPU backend. 0 hands the choice back to Ollama, which takes
+  # every core -- and on this machine every core is what it does not have, since
+  # the neural stages, a browser and the swap file are already using them.
+  # Measured here with the note prompt: 16 threads generated 0.3-3.5 tokens a
+  # second, 6 gave 3.6-4.7, and 4-5 gave about 5.3. Five is the setting.
+  num_thread: 5
+  # === how the next token is chosen ===
+  # MIN-P INSTEAD OF TOP-P (Nguyen et al., "Min-p sampling", ICLR 2025). Keep
+  # every token at least min_p times as likely as the best one. The cut follows
+  # the model's own confidence, so unlike top-p it does not need retuning when
+  # temperature changes, and the paper measures it beating top-p and top-k on
+  # quality and diversity over five model families and in a human study. 0.05
+  # is the paper's default. Set it to 0 to go back to plain temperature
+  # sampling.
+  min_p: 0.05
+  # Sent at the values that DISABLE them. Ollama applies top-p and top-k too,
+  # and its 0.9 / 40 defaults would cut the tail before min_p ever saw it, which
+  # would make min_p look like it did nothing. 1.0 and 0 are "off".
+  top_p: 1.0
+  top_k: 0
+  # DRY (arXiv 2608.22761), for the failure this app actually showed: a clause,
+  # or the visitor's whole sentence, repeated back. It penalises continuing a
+  # span that is already in the text, and only once the match passes
+  # dry_allowed_length tokens, so a repeated particle ("ê ê") is untouched and
+  # a stuck three-token loop is charged for. 0 turns it off. base 1.75 and
+  # allowed_length 2 are llama.cpp's own defaults.
+  dry_multiplier: 0.8
+  dry_base: 1.75
+  dry_allowed_length: 2
+  # Unset means the Modelfile's own PARAMETER repeat_penalty 1.08 still governs,
+  # so the exported tag and the app do not disagree. Set a number only to
+  # override it during an experiment.
+  repeat_penalty: null
+  repeat_last_n: null
+  # === memory and the web ===
+  # The weights do not change between runs, so behaviour changes by changing
+  # what the model is given. Every turn is stored in SQLite under data/, every
+  # correction is kept beside the answer it corrects, and a relevant correction
+  # or fact is placed in the prompt for the next similar question. Set enabled
+  # to false to keep the assistant stateless; nothing is sent off the machine
+  # either way. recall is how many remembered items may enter one prompt.
+  memory:
+    enabled: true
+    recall: 3
+  # mode: auto searches for an explicit request ("search for ...") and for a
+  # question about something that changes (news, prices, dates). always
+  # searches every chat message. off never searches. Exa, Tavily and Brave are
+  # used when EXA_API_KEY, TAVILY_API_KEY or BRAVE_SEARCH_API_KEY is set; with
+  # no key it tries DuckDuckGo's HTML endpoint, then its instant-answer API,
+  # then Wikipedia. Each has its own failure path, so a bot challenge on one
+  # does not silence the whole search. max_results and timeout are the only
+  # two numbers the search itself has.
+  web_search:
+    mode: auto
+    max_results: 5
+    timeout: 8
+    cache_seconds: 600

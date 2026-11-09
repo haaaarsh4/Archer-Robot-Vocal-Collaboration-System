@@ -14,7 +14,6 @@ torch.load = _patched_torch_load
 
 import os as _os
 
-#---------------------------------------------------------------------------
 # HOW MANY THREADS, and this is the single number that decides whether Live
 # mode can keep up with the track at all.
 #
@@ -157,6 +156,20 @@ def _load_voices():
             _voice_params.append(None)
             continue
         index_path = _index_paths[i] if i < len(_index_paths) else None
+        # A CONFIGURED-BUT-MISSING INDEX MUST SAY SO. The retrieval index is what
+        # keeps a voice sounding like the checkpoint it was trained from: with
+        # the file gone, this pipeline silently drops to index_rate 0 and the
+        # voice comes back duller and less like itself, with no error anywhere
+        # and nothing on the page to notice -- which reads as "the model got
+        # worse overnight". That is exactly what happened here: the RVC log
+        # folders holding these indexes were deleted, the configured paths were
+        # symlinks into them, and every voice with a slot quietly ran without
+        # one. One line of output costs nothing and names the cause.
+        if index_path and not os.path.exists(index_path):
+            print(f"[WARN] Model {i + 1} (voice {i}): its retrieval index is configured but "
+                  f"missing at '{index_path}'. This voice will run at index_rate 0 and sound "
+                  "noticeably less like the voice it was trained to be. Restore the file, or "
+                  "clear that slot in synthesis.neural.index_paths.")
         try:
             voice = RVCOfflineVoice(model_path, index_path=index_path, device=device, is_half=is_half,
                                      quantize_hubert=quantize_hubert)
@@ -227,6 +240,8 @@ def health():
                 "warmup_ms": _warmup_ms.get(i),
                 "model_path": _model_paths[i] if i < len(_model_paths) else None,
                 "model_fingerprint": os.path.basename(_model_paths[i]) if i < len(_model_paths) else None,
+                "index_configured": bool(_index_paths[i]) if i < len(_index_paths) else False,
+                "index_loaded": (v.index is not None) if v is not None else None,
                 "transpose_semitones": _voice_params[i]["transpose_semitones"] if _voice_params[i] else None,
                 "clarity": _voice_params[i].get("clarity") if _voice_params[i] else None,
             }
@@ -291,7 +306,7 @@ async def convert(
     # offered a model the sidecar had not loaded (a stale sidecar, or a main app
     # whose config.yaml has more entries than the running sidecar) could ask for
     # Model 3 and be answered by Model 1 -- audibly the wrong voice, with no
-    # error anywhere. Refusing is the honest answer, and the page now disables a
+    # error anywhere. Refusing is the accurate answer, and the page now disables a
     # slot the running sidecar does not have.
     if voice_index < 0 or voice_index >= len(_voices):
         return JSONResponse(

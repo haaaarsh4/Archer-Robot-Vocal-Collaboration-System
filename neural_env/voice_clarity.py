@@ -8,7 +8,7 @@ front half of every consonant -- several dB under the voice it was handed. The
 words are still in the output; they are just harder to make out, which is
 exactly the "some models you can barely hear the words" complaint.
 
-This stage is deliberately not an EQ preset. It measures the presence the
+This stage is not an EQ preset. It measures the presence the
 singer's own material has (2-5 kHz against the 300-1500 Hz body of the voice)
 and restores only the part of it the model lost, with a zero-phase high shelf
 that is capped at +3 dB by default. A model that already returns the input's
@@ -24,7 +24,7 @@ only ever turns a too-hot take down; it never normalises a quiet one up.
 Measured on the project's own material: the baked neural takes carry between
 0.4 and 3.0 per cent of their energy in 2-5 kHz, i.e. the same order as the
 differences this is here to remove. The stage is held to its promises in
-tests/test_voice_clarity.py, which builds a reference vowel, a deliberately
+tests/test_voice_clarity.py, which builds a reference vowel, a 
 dull copy of it, and checks the restored copy on band ratio, loudness, length
 and peak rather than on how it "sounds".
 """

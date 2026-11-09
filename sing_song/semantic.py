@@ -1,7 +1,7 @@
 """Semantic tokens: a self-supervised speech/music encoder plus k-means.
 
 The paper uses intermediate w2v-BERT representations at 25 Hz, quantized with a
-1024-centre k-means trained on the corpus.  The encoder is deliberately a thin
+1024-centre k-means trained on the corpus.  The encoder is a thin
 adapter around Hugging Face's w2v-BERT/HuBERT implementations: the SingSong
 contribution is the conditional cascade, not a new self-supervised objective,
 and reimplementing w2v-BERT would only make the checkpoint incompatible with
@@ -78,9 +78,7 @@ class SemanticEncoder:
         self.model_type = ""
         self.kmeans: KMeansTokenizer | None = None
 
-    # ------------------------------------------------------------------
     # Loading
-    # ------------------------------------------------------------------
     def load(self, *, kmeans_path: str | Path | None = None) -> "SemanticEncoder":
         from transformers import AutoConfig, AutoModel
 
@@ -110,9 +108,7 @@ class SemanticEncoder:
             self.kmeans = KMeansTokenizer.load(kmeans_path)
         return self
 
-    # ------------------------------------------------------------------
     # Feature extraction
-    # ------------------------------------------------------------------
     @torch.no_grad()
     def embeddings(
         self,

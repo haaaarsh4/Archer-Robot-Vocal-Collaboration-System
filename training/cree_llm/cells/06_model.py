@@ -1,4 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # The model: quantised base, resized vocabulary, statistically initialised new
 # embeddings, and LoRA adapters.
 #
@@ -7,7 +6,6 @@
 # initialised at random has to be learned from scratch, and with a corpus this
 # size it never fully is. Starting from the pieces it replaces means the model
 # already reads the word, and training only has to refine it.
-# ─────────────────────────────────────────────────────────────────────────────
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
@@ -25,11 +23,10 @@ NEW_TOKENS = _TOKEN_INFO["tokens"]
 NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Weights that are actually readable.
 #
 # `SafetensorError: Error while deserializing header: header too large` is not a
-# transformers bug and not a bug in this notebook. It means the first eight bytes
+# transformers bug and expected behaviour in this notebook. It means the first eight bytes
 # of a shard do not decode to a valid header length, which is what a
 # multi-gigabyte file looks like when the filesystem it was written to never
 # finished syncing it. In Colab that filesystem is almost always the Google
@@ -37,7 +34,6 @@ NEW_TOKEN_START = _TOKEN_INFO["new_token_start"]
 #
 # So every shard is checked here, before transformers ever mmaps it, and a
 # damaged shard is fetched again on its own rather than re-downloading 15 GB.
-# ─────────────────────────────────────────────────────────────────────────────
 SAFETENSORS_HEADER_LIMIT = 100_000_000  # the ceiling the safetensors format itself enforces
 _WEIGHT_PATTERNS = ["*.safetensors", "*.json", "*.model", "*.txt", "*.jinja", "tokenizer*"]
 _SKIP_PATTERNS = ["*.bin", "*.h5", "*.msgpack", "*.gguf", "*.onnx", "*.onnx_data", "*.pth", "*.pt"]
@@ -230,6 +226,14 @@ def _dtype_kwargs(dtype=None) -> dict:
 # 3,949 rows of 3,584 values is 28 MB; keeping them separate is what lets the
 # embedding table stay frozen, and that is the whole memory fix.
 GRAFTED = PROC / "grafted_embeddings.pt"
+# Which vocabulary these rows belong to. A rebuilt tokenizer puts different
+# tokens at the same offsets, so a saved file cannot be reused just because it
+# exists: the graft would quietly hand a new token another token's embedding,
+# and every number measured afterwards would be measured on that.
+_GRAFT_KEY = fingerprint(
+    base=CFG.base_model, start=NEW_TOKEN_START, n=len(NEW_TOKENS),
+    tokens=sha1("\n".join(NEW_TOKENS)),
+)
 
 
 def graft_rows(model, tok) -> None:
@@ -242,19 +246,43 @@ def graft_rows(model, tok) -> None:
     training saw.
     """
     n = len(tok)
+    saved = None
     if GRAFTED.exists():
-        saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
-    elif n > model.get_input_embeddings().weight.shape[0]:
-        model.resize_token_embeddings(n)
-        decomposer = AutoTokenizer.from_pretrained(PROC / "base_tokenizer")
-        init_new_embeddings(model, decomposer, NEW_TOKENS, NEW_TOKEN_START)
-        rows = model.get_input_embeddings().weight[NEW_TOKEN_START: NEW_TOKEN_START + len(NEW_TOKENS)]
-        rows = rows.detach().cpu().clone()
-        saved = {"start": NEW_TOKEN_START, "rows": rows}
-        torch.save(saved, GRAFTED)
-        log(f"grafted {len(NEW_TOKENS)} new rows from base subword pieces -> {GRAFTED.name}")
-    else:
-        return
+        try:
+            saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
+        except Exception as exc:
+            log(f"graft: {GRAFTED.name} is unreadable ({exc}); rebuilding it")
+            saved = None
+        if saved is not None and saved.get("key") != _GRAFT_KEY:
+            reason = ("these rows predate the vocabulary key" if "key" not in saved
+                      else "the vocabulary changed")
+            log(f"graft: {reason}; rebuilding the rows from the base pieces")
+            saved = None
+
+    if saved is None:
+        if model.get_input_embeddings().weight.shape[0] < n:
+            model.resize_token_embeddings(n)
+        try:
+            decomposer = AutoTokenizer.from_pretrained(PROC / "base_tokenizer")
+        except Exception as exc:
+            # A file written before the key existed cannot be checked, and the
+            # rows cannot be recomputed without the base tokenizer. Using them
+            # unchecked is the old behaviour and is right whenever the
+            # vocabulary did not change, so warn rather than stop an export that
+            # is otherwise finished.
+            if not GRAFTED.exists():
+                raise RuntimeError(
+                    f"the vocabulary graft is missing and cannot be rebuilt: {exc}"
+                ) from exc
+            log(f"graft: {GRAFTED.name} cannot be checked or rebuilt ({exc}); using its rows as they are")
+            saved = torch.load(GRAFTED, map_location="cpu", weights_only=True)
+        if saved is None:
+            init_new_embeddings(model, decomposer, NEW_TOKENS, NEW_TOKEN_START)
+            rows = model.get_input_embeddings().weight[NEW_TOKEN_START: NEW_TOKEN_START + len(NEW_TOKENS)]
+            rows = rows.detach().cpu().clone()
+            saved = {"key": _GRAFT_KEY, "start": NEW_TOKEN_START, "rows": rows}
+            torch.save(saved, GRAFTED)
+            log(f"grafted {len(NEW_TOKENS)} new rows from base subword pieces -> {GRAFTED.name}")
 
     # Applied whenever the file exists, even if the sizes already agree: a model
     # that was resized elsewhere carries random rows, and matching a length is
@@ -298,13 +326,19 @@ def reset_stale_checkpoints() -> None:
     frozen table mixes two incompatible checkpoints, and the mismatch surfaces
     hours later. Renaming keeps the old run instead of deleting it.
     """
+    # `four_bit` is not part of this. It describes how the base was
+    # loaded in that session and changes not one adapter tensor, so two runs of
+    # the same recipe on cards with different free memory must not move each
+    # other's adapters aside. Older plan files carry the field; dropping it from
+    # the comparison is what keeps this change from reading as a plan change.
     plan = {
         "base": CFG.base_model,
-        "four_bit": USE_4BIT,
         "trainable_embeddings": False,
         "lora_r": CFG.lora_r,
     }
     previous = jload(PLAN_FILE) if PLAN_FILE.exists() else None
+    if isinstance(previous, dict):
+        previous.pop("four_bit", None)
     if previous and previous != plan:
         stamp = time.strftime("%Y%m%d-%H%M%S")
         for name in TRAIN_STAGES:
@@ -418,7 +452,7 @@ _LOADED_ADAPTER = ""
 def best_adapter(upto: str | None = None) -> Path | None:
     """The newest finished adapter at or before `upto`.
 
-    This is what keeps a fresh kernel honest. Re-running the SFT cell after a
+    This is what keeps a fresh kernel accurate. Re-running the SFT cell after a
     disconnect used to load the bare base model and quietly train instruction
     tuning without the Cree pretraining underneath it, which is worse than not
     training at all because the scores still look plausible.

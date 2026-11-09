@@ -65,7 +65,7 @@ def ok(msg: str) -> None:
     say(f"  [ok]   {msg}")
 
 
-# ---------------------------------------------------------------- test inputs
+# test inputs
 def make_inputs(workdir: str = "/tmp/demo_matrix") -> tuple[dict[str, bytes], dict[str, np.ndarray]]:
     """The two shapes of input the panel receives, and the music inside each.
 
@@ -143,7 +143,7 @@ def make_inputs(workdir: str = "/tmp/demo_matrix") -> tuple[dict[str, bytes], di
     return out, refs
 
 
-# ------------------------------------------------------------------ measuring
+# measuring
 def analyse(x: np.ndarray, sr: int, reference: np.ndarray | None = None,
             reference_sr: int = 44100) -> dict:
     """Everything measurable about one rendered part.
@@ -343,7 +343,7 @@ def verdict(label: str, info: dict, expect_sec: float, minsrc: bool = True) -> N
     return
 
 
-# ------------------------------------------------------------------ the matrix
+# the matrix
 def main() -> int:
     cfg_sample_rate = 44100
     inputs, refs = make_inputs()
@@ -368,7 +368,7 @@ def main() -> int:
 
     durations: dict[str, float] = {}
     with TestClient(server.app) as client:
-        # ------------------------------------------------ 1. input fidelity
+        # 1. input fidelity
         say("\n=== 1. the upload itself: does it survive the way in ===")
         for name, raw in inputs.items():
             mono_ref = refs[name]
@@ -444,7 +444,7 @@ def main() -> int:
                     fail(f"{name}: the two decoders disagree about the same file "
                          f"(corr {agree_corr:.4f}, {agree_db:+.2f} dB)")
 
-        # ------------------------------------------------ 2. DSP x every mode
+        # 2. DSP x every mode
         say("\n=== 2. DSP engine: every accompaniment mode (as the page posts it) ===")
         for name, mode in MODE_LABELS.items():
             # `name` is the key the panel posts (demoMode); `mode` is only the
@@ -494,7 +494,7 @@ def main() -> int:
                     verdict(label, info, expect_sec=src_audio.shape[0] / src_sr,
                             minsrc=name not in ("call_and_response",))
 
-        # ------------------------------------------------ 3. Neural x every mode
+        # 3. Neural x every mode
         if neural_up:
             say("\n=== 3. Neural engine: every accompaniment mode x every configured voice ===")
             for name, mode in MODE_LABELS.items():
@@ -538,7 +538,7 @@ def main() -> int:
         else:
             NOTES.append("Neural matrix skipped: sidecar not reachable")
 
-        # ------------------------------------------------ 4. textures & the other routes
+        # 4. textures & the other routes
         say("\n=== 4. textures, the convert route and the backing bed ===")
         for texture in TEXTURES:
             label = f"DSP Unison texture={texture}"

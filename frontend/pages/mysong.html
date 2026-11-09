@@ -114,7 +114,7 @@
     <h2 class="paper-h2">Five hundred songs to prove it, four thousand to hear it</h2>
     <p class="paper-lede">The base corpus is OpenEWLD, the public-domain subset of the Essen folksong collection: 502 songs, 52,417 melody notes, 19,569 chord spans. Splits are by song, 409 train, 49 dev, 44 test. The model is deterministic given a seed.</p>
     <p class="paper-p">Five hundred lead sheets are enough to prove a decoder; making the observer strong takes more, which is why the large corpus exists. It is built from the 5,204-score AutoHarmonizer/Wikifonia archive, with two kinds of duplicate removed: normalised title and, more importantly, a transposition-invariant melody signature. Title matching alone missed 40 of the 44 test songs; the signature check removes them. The result is 4,571 extra scores with zero melody overlap against OpenEWLD train, dev or test.</p>
-    <p class="paper-p">The large tagger is trained by streaming one score at a time and keeping only the per-beat features. A naive load of five thousand songs plus the training graph exceeded 10 GB on a 27 GB laptop; the streaming path stays around 1.5 GB. The structural tables still come from OpenEWLD, which isolates the effect of the extra data and keeps the evaluation honest.</p>
+    <p class="paper-p">The large tagger is trained by streaming one score at a time and keeping only the per-beat features. A naive load of five thousand songs plus the training graph exceeded 10 GB on a 27 GB laptop; the streaming path stays around 1.5 GB. The structural tables still come from OpenEWLD, which isolates the effect of the extra data and keeps the evaluation independent.</p>
 
     <div class="paper-stats">
       <div class="paper-stat"><b>502</b><span>base songs</span></div>

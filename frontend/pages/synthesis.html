@@ -31,7 +31,7 @@
         </tbody>
       </table>
     </div>
-    <div class="paper-note"><b>No silent engine swap.</b> If the selected wavetable engine cannot find its files, that note is silent. It does not quietly switch to a different-sounding engine, because a wrong voice arriving unannounced is worse than an honest gap.</div>
+    <div class="paper-note"><b>No silent engine swap.</b> If the selected wavetable engine cannot find its files, that note is silent. It does not quietly switch to a different-sounding engine, because a wrong voice arriving unannounced is worse than a silent gap.</div>
   </section>
 
   <section class="paper-card">
@@ -133,7 +133,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
           <canvas id="fs-canvas" width="420" height="120" style="width:100%;height:120px;margin-top:12px;border-radius:8px;background:#0b1120"></canvas>
         </div>
       </div>
-      <p class="paper-caption" style="margin-top:14px">This is a browser model of the same source–filter idea: a sawtooth source through three bandpass formants, with a vibrato LFO. It is deliberately simple enough to hear each control separately. The Python engine adds the bank, the phoneme tracking and the ensemble.</p>
+      <p class="paper-caption" style="margin-top:14px">This is a browser model of the same source–filter idea: a sawtooth source through three bandpass formants, with a vibrato LFO. It is simple enough to hear each control separately. The Python engine adds the bank, the phoneme tracking and the ensemble.</p>
     </div>
   </section>
 
@@ -142,7 +142,7 @@ A bright, open vowel. The first formant sits high, the second close enough to it
     <h2 class="paper-h2">Several voices, not one voice turned up</h2>
     <p class="paper-lede">A choir preset is not a louder solo. It is several independently rendered layers, each with its own small detune, onset jitter and vocal-tract scale, mixed together and sent through a short algorithmic reverb. The differences are what the ear reads as separate people.</p>
     <p class="paper-p">The texture is chosen per mode. Unison defaults to choir, octave to duet, delayed response and call-and-response to solo, contour and drone to duet. The parameters live in <code>synthesis.texture</code>: voice count, detune spread, formant spread, jitter, reverb and level. A thirty-millisecond crossfade removes clicks at note boundaries, and the reverb is built from a handful of comb and allpass filters rather than an impulse response, so it costs almost nothing and never needs a file.</p>
-    <p class="paper-p">The detune is deliberately not random per note. It is locked per phrase, so a voice keeps its own slightly sharp or flat identity instead of wandering between notes. That is the difference between a section and a chorus effect.</p>
+    <p class="paper-p">The detune is not random per note. It is locked per phrase, so a voice keeps its own slightly sharp or flat identity instead of wandering between notes. That is the difference between a section and a chorus effect.</p>
   </section>
 
   <section class="paper-card">

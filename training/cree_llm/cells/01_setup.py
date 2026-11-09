@@ -1,8 +1,7 @@
-# ─────────────────────────────────────────────────────────────────────────────
 # Configuration. One place for every knob; every later cell reads from here.
-# ─────────────────────────────────────────────────────────────────────────────
 from __future__ import annotations
 
+import collections
 import gc
 import hashlib
 import io
@@ -57,32 +56,35 @@ _PRESETS = {
     # A tiny model and a handful of steps: proves every cell runs, changes nothing.
     "smoke": dict(base="Qwen/Qwen2.5-0.5B-Instruct", seq=384, lora_r=8,
                   cpt_epochs=1, sft_epochs=1, dpo_epochs=1, eval_n=2,
-                  max_cpt_packs=6, max_sft=48),
+                  max_cpt_packs=6, max_sft=48, min_tokens=0),
     # Free / pay-as-you-go T4 (16 GB). Shorter context, two passes.
     "t4": dict(base="Qwen/Qwen2.5-7B-Instruct", seq=1024, lora_r=32,
                cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=120,
-               max_cpt_packs=100_000, max_sft=100_000),
+               max_cpt_packs=100_000, max_sft=100_000, min_tokens=3_000_000),
     # A100 40 GB: the intended run.
     "a100": dict(base="Qwen/Qwen2.5-7B-Instruct", seq=2048, lora_r=64,
                  cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                 max_cpt_packs=100_000, max_sft=100_000),
-    # A100 80 GB / H100: the 14B model. Set CREE_PROFILE=big.
+                 max_cpt_packs=100_000, max_sft=100_000, min_tokens=5_000_000),
+    # A100 80 GB / H100: the 14B model. Set CREE_PROFILE=big. The token target is
+    # deliberately 20M: a 14B model trained on the small repository slice is
+    # still the weak model with more parameters. The run warns below it, reports
+    # the number, and still trains on every verified token.
     "big": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=2048, lora_r=64,
                 cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                max_cpt_packs=100_000, max_sft=100_000),
+                max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
     # One 24 GB card (RTX 4090, A10): the 14B in nf4 at a shorter context. This
     # is the largest base that fits a single 24 GB card; the merge runs on CPU
-    # and needs about 64 GB of system RAM. Slower than the 7B, and deliberately
+    # and needs about 64 GB of system RAM. Slower than the 7B, and 
     # not chosen by `auto`, because it is a different bet on quality vs time.
     "big24": dict(base="Qwen/Qwen2.5-14B-Instruct", seq=1024, lora_r=32,
                   cpt_epochs=2, sft_epochs=2, dpo_epochs=1, eval_n=180,
-                  max_cpt_packs=100_000, max_sft=100_000),
+                  max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
     # The largest preset that fits one 80 GB card with QLoRA. Merging and
     # quantising a 32B needs a separate high-memory step; the notebook says so
     # rather than pretending it fits everywhere.
     "huge": dict(base="Qwen/Qwen2.5-32B-Instruct", seq=2048, lora_r=64,
                  cpt_epochs=3, sft_epochs=2, dpo_epochs=1, eval_n=250,
-                 max_cpt_packs=100_000, max_sft=100_000),
+                 max_cpt_packs=100_000, max_sft=100_000, min_tokens=20_000_000),
 }
 
 
@@ -112,6 +114,10 @@ class Config:
     eval_n: int = P["eval_n"]
     max_cpt_packs: int = P["max_cpt_packs"]
     max_sft: int = P["max_sft"]
+    # Estimated tokens below which a profile warns. Training still consumes all
+    # verified data; the warning prevents a small corpus from being reported as
+    # ready. The smoke profile has no warning threshold.
+    min_corpus_tokens: int = P["min_tokens"]
     cpt_lr: float = 2e-4
     sft_lr: float = 1.5e-4
     # Preference tuning moves an already-instruction-tuned policy, so it needs a
@@ -147,7 +153,7 @@ MODEL_TAG = next(
 )
 MODEL_STEM = f"archer-{MODEL_TAG}"
 
-# ── where everything lives ────────────────────────────────────────────────────
+# where everything lives
 if IN_COLAB and os.environ.get("CREE_USE_DRIVE", "1") == "1":
     try:
         from google.colab import drive  # type: ignore
@@ -172,7 +178,7 @@ PLOTS = OUT / "plots"
 for d in (RAW, PROC, CKPT, OUT, PLOTS):
     d.mkdir(parents=True, exist_ok=True)
 
-# ── where the Hugging Face cache lives ────────────────────────────────────────
+# where the Hugging Face cache lives
 # Model weights are never cached on Drive. Drive's FUSE mount does not reliably
 # finish writing multi-gigabyte binary files, and a shard that reads back with a
 # damaged header is exactly the `SafetensorError: header too large` that stops
@@ -285,7 +291,7 @@ def download(url: str, dest: Path, timeout: int = 120) -> Path:
     return dest
 
 
-# ── crash-safe run state ─────────────────────────────────────────────────────
+# crash-safe run state
 # Colab ends a runtime without asking: a closed tab, an idle timeout, a GPU
 # reset. So every step that takes longer than a minute leaves two traces on
 # Drive. A stage marker records that the step finished, and periodic
