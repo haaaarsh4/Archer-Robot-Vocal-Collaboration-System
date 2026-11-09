@@ -64,3 +64,6 @@ data/raw/**/*.WAV
 # Large retrieval index kept locally only (199 MB, GitHub rejects big files)
 assets/female2/*.index
 *.index.tmp
+
+# Local agent instructions: kept on disk, never published
+AGENTS.md
