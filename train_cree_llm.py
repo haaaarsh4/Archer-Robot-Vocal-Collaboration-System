@@ -2279,7 +2279,7 @@ def norm_key(text: str) -> str:
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version="clean-v2",
+    version="clean-v3",  # v3 purges held-out sentences from train and dev
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -2615,6 +2615,34 @@ else:
     _duplicate_failures = [name for name, ok in audit["checks"].items() if not ok]
     if _duplicate_failures:
         raise RuntimeError("duplicate audit failed: " + ", ".join(_duplicate_failures))
+
+    # A held-out set is only held out if the same sentence is not also in
+    # training. Sentences, not pairs, are the unit: one Cree sentence can carry
+    # several English glosses, and the language-model split is drawn
+    # independently of the pair split, so the same text reached training through
+    # another row. check_cree_leakage.py found 84 of 110 test rows doing exactly
+    # that, which inflated every chrF number the eval stage printed. Both sides
+    # of every test row are removed from train and dev before anything is
+    # written, so no later stage can re-learn them.
+    _heldout: set[str] = set()
+    for _row in tr_test_modern:
+        _heldout.add(norm_key(str(_row.get("cree", ""))))
+        _heldout.add(norm_key(str(_row.get("english", ""))))
+    for _row in lm["test"]:
+        _heldout.add(norm_key(str(_row.get("text", ""))))
+    _heldout.discard("")
+
+    def _without_heldout(rows: list[dict], fields: tuple[str, ...]) -> list[dict]:
+        return [r for r in rows
+                if not any(norm_key(str(r.get(f, ""))) in _heldout for f in fields)]
+
+    _lm_before, _tr_before = len(lm["train"]), len(tr["train"])
+    lm["train"] = _without_heldout(lm["train"], ("text",))
+    lm["dev"] = _without_heldout(lm["dev"], ("text",))
+    tr["train"] = _without_heldout(tr["train"], ("cree", "english"))
+    tr["dev"] = _without_heldout(tr["dev"], ("cree", "english"))
+    log(f"held-out purge: {_lm_before - len(lm['train'])} lm and "
+        f"{_tr_before - len(tr['train'])} pair train rows repeated the test set")
 
     write_jsonl(PROC / "lm_train.jsonl", lm["train"])
     write_jsonl(PROC / "lm_dev.jsonl", lm["dev"])
@@ -3917,16 +3945,16 @@ for i, row in enumerate(train_pairs):
 _gloss_seen: set[str] = set()
 gloss_used = 0
 for row in train_pairs:
-    if gloss_used >= 900:
+    if gloss_used >= 2500:
         break
     cree, english = row["cree"].strip(), row["english"].strip()
     if row.get("source") == "watkins1865":
         continue
-    if not (1 <= len(cree.split()) <= 2 and 1 <= len(english.split()) <= 3):
+    if not (1 <= len(cree.split()) <= 3 and 1 <= len(english.split()) <= 5):
         continue
     if norm_key(cree) in _gloss_seen or norm_key(cree) in test_guard:
         continue
-    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+)?", cree, re.I):
+    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+){0,2}", cree, re.I):
         continue
     _gloss_seen.add(norm_key(cree))
     gloss_used += 1
@@ -3994,7 +4022,7 @@ def _add_language(text: str, label: str) -> None:
 
 
 for _row in train_pairs:
-    if len(_language_examples) >= 1200:
+    if len(_language_examples) >= 2600:
         break
     _cree, _english = _row["cree"].strip(), _row["english"].strip()
     if len(_cree.split()) >= 2:
@@ -4005,12 +4033,12 @@ for _row in train_pairs:
         _add_language(f"{_cree} {_english}", "Mixed.")
 
 for _row in lm_train:
-    if len(_language_examples) >= 1450:
+    if len(_language_examples) >= 5200:
         break
     _add_language(_row["text"], "Plains Cree.")
 
 for _row in notes:
-    if len(_language_examples) >= 1650:
+    if len(_language_examples) >= 5600:
         break
     _add_language(first_sentences(_row["text"], n=2), "English.")
 
