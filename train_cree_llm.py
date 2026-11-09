@@ -2270,20 +2270,69 @@ def norm_key(text: str) -> str:
     return re.sub(r"[^\wâêîô]+", "", normalize_sro(text))
 
 
+# The held-out guard has to compare text the same way tools/check_cree_leakage.py
+# does, or the purge and the audit disagree and a leak survives both.
+_LEAK_SENTENCE_END = re.compile(r"[.!?;]+")
+_LEAK_SEPARATOR = re.compile(r"[^a-z'\-\u00c0-\u024f]+")
+
+
+def leak_key(text: str) -> str:
+    """The comparison key the leakage checker uses."""
+    text = str(text or "").lower().replace("’", "'").replace("‘", "'")
+    return " ".join(_LEAK_SEPARATOR.sub(" ", text).split())
+
+
+def leak_sentences(value):
+    """Every sentence inside a row, whatever shape the row is."""
+    if isinstance(value, str):
+        for piece in _LEAK_SENTENCE_END.split(value):
+            key = leak_key(piece)
+            if key:
+                yield key
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from leak_sentences(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from leak_sentences(item)
+
+
+def held_out_keys() -> set[str]:
+    """The sentences the evaluation reports on, read from the finished splits."""
+    keys: set[str] = set()
+    for name in ("parallel_test.jsonl", "lm_test.jsonl"):
+        path = PROC / name
+        if path.exists():
+            for row in read_jsonl(path):
+                keys.update(leak_sentences(row))
+    return keys
+
+
+def without_held_out(rows: list[dict], keys: set[str]) -> list[dict]:
+    """Rows with no sentence that the held-out split also contains."""
+    if not keys:
+        return rows
+    return [r for r in rows if not (set(leak_sentences(r)) & keys)]
+
+
 # documents -> sentences
 # The splits are the thing every later cell reads, so they are built once and
 # then read back. Rebuilding them is not just slow: the near-duplicate filter is
 # randomised by insertion order, so a second build could produce slightly
 # different splits under the same names and quietly invalidate a benchmark that
 # was already computed.
+# One version string for the cleaned corpus, deliberately part of every stage
+# key downstream of it. Those keys are computed when this file is imported,
+# which is *before* the clean stage rewrites the files they hash, so a size-only
+# key cannot notice a rewrite that happens later in the same run. That is how a
+# purged corpus went to training with the tokenizer and CPT both "already
+# finished". Bump this whenever the cleaned data changes.
+CLEAN_VERSION = "clean-v5"
+
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    # v3 purges held-out sentences from train and dev. The server's discarded
-    # local commits had already spent the name "clean-v3" on data that was not
-    # purged, so the same key came back and the stage skipped itself; v4 is the
-    # value that means this code.
-    version="clean-v4",
+    version=CLEAN_VERSION,
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -2630,21 +2679,15 @@ else:
     # written, so no later stage can re-learn them.
     _heldout: set[str] = set()
     for _row in tr_test_modern:
-        _heldout.add(norm_key(str(_row.get("cree", ""))))
-        _heldout.add(norm_key(str(_row.get("english", ""))))
+        _heldout.update(leak_sentences(_row))
     for _row in lm["test"]:
-        _heldout.add(norm_key(str(_row.get("text", ""))))
-    _heldout.discard("")
-
-    def _without_heldout(rows: list[dict], fields: tuple[str, ...]) -> list[dict]:
-        return [r for r in rows
-                if not any(norm_key(str(r.get(f, ""))) in _heldout for f in fields)]
+        _heldout.update(leak_sentences(_row))
 
     _lm_before, _tr_before = len(lm["train"]), len(tr["train"])
-    lm["train"] = _without_heldout(lm["train"], ("text",))
-    lm["dev"] = _without_heldout(lm["dev"], ("text",))
-    tr["train"] = _without_heldout(tr["train"], ("cree", "english"))
-    tr["dev"] = _without_heldout(tr["dev"], ("cree", "english"))
+    lm["train"] = without_held_out(lm["train"], _heldout)
+    lm["dev"] = without_held_out(lm["dev"], _heldout)
+    tr["train"] = without_held_out(tr["train"], _heldout)
+    tr["dev"] = without_held_out(tr["dev"], _heldout)
     log(f"held-out purge: {_lm_before - len(lm['train'])} lm and "
         f"{_tr_before - len(tr['train'])} pair train rows repeated the test set")
 
@@ -2757,6 +2800,7 @@ _TOKENIZER_KEY = fingerprint(
     spm_vocab=CFG.spm_vocab,
     budget=CFG.new_token_budget,
     specials=len(SPECIAL_TOKENS),
+    clean=CLEAN_VERSION,
 )
 
 if ((PROC / "tokenizer" / "tokenizer_config.json").exists()
@@ -3733,6 +3777,7 @@ print("model helpers ready")
 _CPT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
+    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
@@ -4680,6 +4725,18 @@ for row, title, secs in note_rows:
                 ],
             })
 
+# Instruction rows quote corpus text, song notes and dictionary entries, so a
+# held-out sentence can still reach training here even though every split it was
+# built from was purged. The guard runs on the finished rows, compared the way
+# tools/check_cree_leakage.py compares them.
+_leak_keys = held_out_keys()
+_train_before, _val_before = len(train), len(val)
+train = without_held_out(train, _leak_keys)
+val = without_held_out(val, _leak_keys)
+if len(train) != _train_before or len(val) != _val_before:
+    log(f"SFT: dropped {_train_before - len(train)} train and "
+        f"{_val_before - len(val)} validation rows that quoted a held-out sentence")
+
 write_jsonl(PROC / "sft_train.jsonl", train)
 write_jsonl(PROC / "sft_val.jsonl", val)
 write_jsonl(PROC / "sft_notes_eval.jsonl", eval_notes)
@@ -4748,6 +4805,7 @@ _SFT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.sft_epochs, examples=len(train_rows),
     data=_file_digest(PROC / "sft_train.jsonl"),
+    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
@@ -5015,6 +5073,7 @@ _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
     sft=_sft_stamp(), corrupt="substitute-echo-langid-v3",
+    clean=CLEAN_VERSION,
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an
