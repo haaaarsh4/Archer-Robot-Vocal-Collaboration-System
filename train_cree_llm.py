@@ -2279,7 +2279,11 @@ def norm_key(text: str) -> str:
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version="clean-v3",  # v3 purges held-out sentences from train and dev
+    # v3 purges held-out sentences from train and dev. The server's discarded
+    # local commits had already spent the name "clean-v3" on data that was not
+    # purged, so the same key came back and the stage skipped itself; v4 is the
+    # value that means this code.
+    version="clean-v4",
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
