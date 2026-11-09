@@ -41,8 +41,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from chat.archer_prompt import ARCHER_SYSTEM_PROMPT, route          # noqa: E402
-from chat.chat_api import ChatRequest, chat                        # noqa: E402
+from chat.cree_glossary import gloss_of                             # noqa: E402
 from chat.llm_client import LLMConfig, LocalLLMClient              # noqa: E402
+
+try:
+    from chat.chat_api import ChatRequest, chat as _app_chat         # noqa: E402
+except Exception as _api_error:  # fastapi and soundfile live there; a training box has neither
+    _app_chat = None
+    _APP_CHAT_ERROR = _api_error
+else:
+    _APP_CHAT_ERROR = None
 
 ROOT = Path(__file__).resolve().parents[1]
 _SYLLABICS = re.compile(r"[\u1400-\u167F\u18B0-\u18FF]")
@@ -111,6 +119,26 @@ def ask(client: LocalLLMClient, message: str) -> tuple[str, float]:
     started = time.perf_counter()
     reply = client.chat(plan.prompt, [], ARCHER_SYSTEM_PROMPT)
     return reply, time.perf_counter() - started
+
+
+def app_reply(client: LocalLLMClient, message: str) -> str:
+    """The app's own answer when its API stack imports, otherwise the model direct.
+
+    The audit must not need FastAPI or an audio library to grade a model: those
+    are the web server's dependencies, not the model's.
+    """
+    if _app_chat is not None:
+        return _app_chat(ChatRequest(message=message))["reply"]
+    plan = route(message, [], [])
+    return client.chat(plan.prompt, [], ARCHER_SYSTEM_PROMPT)
+
+
+def gloss_reply(client: LocalLLMClient, word: str) -> str:
+    """A word's gloss, from the app endpoint or straight from the dictionaries."""
+    if _app_chat is not None:
+        return _app_chat(ChatRequest(message=word))["reply"]
+    entry = gloss_of(word)
+    return f"{word} - {entry[0]}" if entry else ""
 
 
 def lexicon() -> frozenset[str]:
@@ -220,6 +248,13 @@ def main() -> int:
         cfg.temperature = args.temp
     client = LocalLLMClient(cfg)
 
+    if _app_chat is None:
+        print(
+            f"note: chat_api not importable ({type(_APP_CHAT_ERROR).__name__}: "
+            f"{_APP_CHAT_ERROR}); glosses come from the dictionaries and prompts "
+            f"straight from route()\n"
+        )
+
     failures: list[str] = []
     print(
         f"model {cfg.model}  temperature {cfg.temperature}  "
@@ -250,7 +285,7 @@ def main() -> int:
 
     print("cree_words: a word with a dictionary gloss is answered from the data")
     for word, wanted in (("maskisin", "shoe"), ("tânisi", "hello")):
-        reply = chat(ChatRequest(message=word))["reply"]
+        reply = gloss_reply(client, word)
         hit = wanted in reply.lower()
         if not hit:
             failures.append(f"gloss miss: {word}")
@@ -286,7 +321,7 @@ def main() -> int:
         print("syllabics: a request for syllabics must come back in syllabics")
         shares = []
         for phrase in ("nêhiyawêwin", "kîsikâw mîna sîpiy"):
-            reply = chat(ChatRequest(message=f"Write {phrase} in syllabics"))["reply"]
+            reply = app_reply(client, f"Write {phrase} in syllabics")
             letters = [c for c in reply if c.isalpha()]
             share = sum(bool(_SYLLABICS.match(c)) for c in letters) / max(1, len(letters))
             shares.append(share)
