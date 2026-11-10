@@ -20,6 +20,12 @@ translation short held-out English must come back in Cree, compared by token
 cree_words  a known word asked in isolation must produce its gloss (this one is
             answered from the dictionaries in chat/cree_glossary.py, not by the
             model, and is here so a model failure is not blamed on the lookup)
+language    Cree text must be called Plains Cree, mixed text must be called
+            mixed. "French." for a Cree sentence is the exact failure this
+            check exists to catch, and the dictionary path cannot see it
+word_gloss  the same word asked of the model must come back with its gloss and
+            not as the word repeated, which is what a model that has not
+            learned the task does
 validity    the Cree in the translation replies must be attested in the
             project's own lexicon, not merely plausible-looking. The distinct
             phonotactic count is printed beside it because the recorded 92.4%
@@ -216,10 +222,81 @@ def short_pairs(n: int) -> list[dict]:
     return rows[:n]
 
 
+BENCHMARK = ROOT / "data" / "eval" / "model_benchmark_1000.jsonl"
+_LANGUAGE_NAMES = {
+    "cree": ("cree", "nêhiyawêwin", "nehiyawewin", "nehiyaw"),
+    "english": ("english",),
+    "mixed": ("mixed", "a mix", "both languages"),
+}
+
+
+def benchmark_rows(category: str, n: int) -> list[dict]:
+    """Real rows for one category, chosen deterministically so runs compare."""
+    if not BENCHMARK.exists():
+        return []
+    rows = []
+    with BENCHMARK.open(encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("category") == category:
+                rows.append(row)
+    rows.sort(key=lambda r: str(r.get("id")))
+    return rows[:n]
+
+
+def names_language(reply: str, wanted: str) -> bool:
+    """Does the reply name the language it was shown, and only that one?"""
+    # Not norm(): that strips the accents and turns nêhiyawêwin into "n hiyaw win".
+    text = reply.lower().replace("\u2019", "'")
+    if not any(name in text for name in _LANGUAGE_NAMES[wanted]):
+        return False
+    # "a mix of Cree and English" is a mixed answer, not a Cree one, and naming
+    # two languages for a single-language message is the confusion being tested.
+    # The guard applies to a Cree claim only: "English." names English on purpose.
+    return wanted != "cree" or "english" not in text
+
+
+def perf(client: LocalLLMClient) -> None:
+    """Ollama counts the tokens and times them; read those numbers, do not infer."""
+    import requests
+
+    body = {
+        "model": client.cfg.model,
+        "messages": [{"role": "user", "content": "<|song|>\nhello"}],
+        "stream": False,
+        "keep_alive": client.cfg.keep_alive,
+        "options": {"temperature": 0.0, "num_predict": 128, "num_ctx": client.cfg.n_ctx},
+    }
+    started = time.perf_counter()
+    resp = requests.post(f"{client.cfg.ollama_url}/api/chat", json=body, timeout=(10.0, 600.0))
+    resp.raise_for_status()
+    wall = time.perf_counter() - started
+    payload = resp.json()
+
+    def per_second(count: int, duration_ns: int) -> str:
+        return f"{count / (duration_ns / 1e9):.1f} tok/s" if count and duration_ns else "n/a"
+
+    print("performance: one fixed 128-token request, from Ollama's own timers")
+    print(f"  weights loaded in {(payload.get('load_duration') or 0) / 1e9:.2f}s")
+    print(f"  prompt {payload.get('prompt_eval_count') or 0} tokens at "
+          f"{per_second(payload.get('prompt_eval_count') or 0, payload.get('prompt_eval_duration') or 0)}")
+    print(f"  generated {payload.get('eval_count') or 0} tokens at "
+          f"{per_second(payload.get('eval_count') or 0, payload.get('eval_duration') or 0)}")
+    print(f"  whole request took {wall:.1f}s wall clock\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="skip the translation sample")
     ap.add_argument("--temp", type=float, default=None, help="override config temperature")
+    ap.add_argument("--perf", action="store_true",
+                    help="also measure prompt and generation speed from Ollama's timers")
+    ap.add_argument("--model", default=None,
+                    help="grade this Ollama tag instead of chat.model, so a build "
+                         "can be tested before it replaces the installed one")
     args = ap.parse_args()
 
     # The audit has to run with what the app asks for, or it measures a
@@ -246,6 +323,8 @@ def main() -> int:
     )
     if args.temp is not None:
         cfg.temperature = args.temp
+    if args.model:
+        cfg.model = args.model
     client = LocalLLMClient(cfg)
 
     if _app_chat is None:
@@ -348,6 +427,37 @@ def main() -> int:
         if declined < 2:
             failures.append(f"abstention {declined}/3 declined")
         print()
+
+    print("language: a message must be named for the language it is in")
+    for category, wanted in (("language_id_cree", "cree"),
+                             ("language_id_english", "english"),
+                             ("language_id_mixed", "mixed")):
+        for row in benchmark_rows(category, 3):
+            text = row["prompt"].split("\n", 2)[-1][:60]
+            reply = client.chat(row["prompt"], [], ARCHER_SYSTEM_PROMPT)
+            hit = names_language(reply, wanted)
+            if not hit:
+                failures.append(f"language wrong: {text!r} should be {wanted}")
+            print(f"  {'ok  ' if hit else 'FAIL'} {text!r} -> {reply[:60]!r}")
+    print()
+
+    print("word_gloss: the model itself must gloss a word, not hand it back")
+    for row in benchmark_rows("word_explain", 6):
+        needle = str(row.get("must_contain") or "").lower()
+        asked = re.search(r"What does (\S+) mean", row["prompt"])
+        word = asked.group(1) if asked else ""
+        reply = client.chat(row["prompt"], [], ARCHER_SYSTEM_PROMPT)
+        glossed = bool(needle) and needle in reply.lower()
+        repeated = bool(word) and norm(reply) == norm(word)
+        ok = glossed and not repeated
+        if not ok:
+            failures.append(f"gloss wrong: {word!r} should mention {needle!r}")
+        note = " (repeated the word)" if repeated else ""
+        print(f"  {'ok  ' if ok else 'FAIL'} {word!r} -> {reply[:70]!r}{note}")
+    print()
+
+    if args.perf:
+        perf(client)
 
     if failures:
         print("FAILED")
