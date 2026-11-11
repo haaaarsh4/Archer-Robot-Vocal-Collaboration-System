@@ -102,13 +102,52 @@ def _pairs(processed: Path, require_held_out: bool) -> tuple[list[dict], bool]:
     return rows, False
 
 
+def _sense_free(text: str) -> str:
+    """Drop the sense number a dictionary entry carries: "hard 1" is "hard"."""
+    return re.sub(r"\s+", " ", re.sub(r"\b\d+\b", " ", _clean(text))).strip(" .,")
+
+
+def _gloss_pair(row: dict) -> dict | None:
+    """One dictionary word and its English gloss, or None.
+
+    A dictionary entry is a word, not a sentence, so the two-word rule that keeps
+    concordance fragments out of the sentence pools cannot apply here: it would
+    throw away every entry like "maskisin" -> "shoe", which is the whole pool.
+    What marks a fragment is the sense number, and that is stripped rather than
+    used to reject the row.
+    """
+    cree, english = _clean(row.get("cree")), _clean(row.get("english"))
+    if not cree or not english or not cree[0].isalpha() or not english[0].isalpha():
+        return None
+    if len(cree.split()) > 3 or len(english.split()) > 4:
+        return None
+    cree, english = _sense_free(cree), _sense_free(english)
+    if not cree or not english:
+        return None
+    # "jspimik. (more) awusim4" is a fragment of a dictionary entry, not an
+    # entry: a digit stuck to a letter survives the sense strip, and a bracketed
+    # editorial note is the dictionary talking about the word, not the word.
+    if re.search(r"[\d()\[\]]", cree + english):
+        return None
+    return {"cree": cree, "english": english}
+
+
 def _words(processed: Path, pairs: list[dict]) -> list[dict]:
-    rows = [r for r in _load(processed / "watkins_dictionary_pairs.jsonl")
-            if _usable(r.get("cree")) and _usable(r.get("english"))]
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for row in _load(processed / "watkins_dictionary_pairs.jsonl"):
+        pair = _gloss_pair(row)
+        if pair and pair["cree"] not in seen:
+            seen.add(pair["cree"])
+            rows.append(pair)
     if rows:
         return rows
-    return [{"cree": r["cree"], "english": r["english"]} for r in pairs
-            if len(_clean(r["cree"]).split()) <= 2 and len(_clean(r["english"]).split()) <= 3]
+    for row in pairs:
+        pair = _gloss_pair(row)
+        if pair and pair["cree"] not in seen:
+            seen.add(pair["cree"])
+            rows.append(pair)
+    return rows
 
 
 IDENTITY = [
@@ -277,14 +316,18 @@ def main() -> int:
         rows.append(row)
         return True
 
-    for category, count in counts.items():
+    for category, count in list(counts.items()):
         pool_size = {
             "word_explain": len(words),
             "identity": len(IDENTITY),
             "echo": len(ECHO),
         }.get(category, len(pairs))
         if pool_size < count:
-            raise SystemExit(f"{category} needs {count} unique rows but its pool has {pool_size}")
+            # The benchmark is bounded by the corpus that exists. Stopping here
+            # turned a small held-out split into no benchmark at all, which is
+            # how a 1,000-row target ended up with nothing to score.
+            print(f"note: {category} pool has {pool_size} rows; building {pool_size}, not {count}")
+            counts[category] = count = pool_size
         added = 0
         candidate = 0
         while added < count:
