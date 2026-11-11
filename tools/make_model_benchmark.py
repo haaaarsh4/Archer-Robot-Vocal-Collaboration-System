@@ -78,6 +78,53 @@ def _usable(text: str) -> bool:
     return _sentence(clean)
 
 
+# English function words are a closed class: Cree does not use "the", "is" or
+# "why", and no Plains Cree sentence reaches a third of its words from this list.
+# A row whose Cree column holds English is not a Cree sample, and asking a model
+# to identify one taught nothing: the test was wrong, not the answer.
+_ENGLISH_FUNCTION = frozenset(
+    "a an and are as at be been being but by can could did do does for from had "
+    "has have he her here him his how i if in into is it its me more most my no "
+    "not of on or our out she should so some than that the their them then there "
+    "these they this those to too up us was we were what when where which who "
+    "whom why will with would you your".split()
+)
+
+
+def _english_share(text: str) -> float:
+    words = re.findall(r"[^\W\d_]+", text.lower())
+    if not words:
+        return 0.0
+    return sum(word in _ENGLISH_FUNCTION for word in words) / len(words)
+
+
+def _looks_cree(text: str) -> bool:
+    """Is this the Cree side of a pair, or English sitting in that column?
+
+    A Cree diacritic or a syllabics character settles it positively. Otherwise
+    the closed class of English function words decides, which keeps unmarked Cree
+    like "maskisin" and drops "why are you going home ?".
+    """
+    clean = _clean(text)
+    if not clean:
+        return False
+    if re.search(r"[\u00e2\u00ea\u00ee\u00f4\u0101\u0113\u012b\u014d]", clean, re.I):
+        return True
+    if re.search(r"[\u1400-\u167f]", clean):
+        return True
+    return _english_share(clean) < 0.34
+
+
+def _usable_pair(row: dict) -> bool:
+    """Both sides are sentences, the Cree side is Cree, and it is not Watkins."""
+    return (
+        _usable(row.get("cree"))
+        and _usable(row.get("english"))
+        and _looks_cree(row.get("cree"))
+        and row.get("source") != "watkins1865"
+    )
+
+
 def _choose_processed(work: Path | None) -> tuple[Path, bool]:
     if work is not None:
         processed = work / "processed"
@@ -90,15 +137,13 @@ def _choose_processed(work: Path | None) -> tuple[Path, bool]:
 def _pairs(processed: Path, require_held_out: bool) -> tuple[list[dict], bool]:
     test = processed / "parallel_test.jsonl"
     if test.exists():
-        rows = [r for r in _load(test) if _usable(r.get("cree")) and _usable(r.get("english"))
-                and r.get("source") != "watkins1865"]
+        rows = [r for r in _load(test) if _usable_pair(r)]
         if rows:
             return rows, True
     if require_held_out:
         raise SystemExit(f"{test} is missing or empty; run the clean stage first")
     fallback = processed / "parallel_cr_en.jsonl"
-    rows = [r for r in _load(fallback) if _usable(r.get("cree")) and _usable(r.get("english"))
-            and r.get("source") != "watkins1865"]
+    rows = [r for r in _load(fallback) if _usable_pair(r)]
     return rows, False
 
 
