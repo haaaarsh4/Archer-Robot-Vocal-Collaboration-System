@@ -30,7 +30,6 @@ from collections import defaultdict
 from pathlib import Path
 
 import requests
-import sacrebleu
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROWS = ROOT / "data" / "eval" / "model_benchmark_1000.jsonl"
@@ -58,12 +57,65 @@ def _token_f1(pred: str, gold: str) -> float:
 
 
 def _chrf(pred: str, gold: str) -> float:
+    # Imported here so the language and word rows can be scored on a machine
+    # without the sacrebleu wheel; only translation needs it.
+    import sacrebleu
+
     return float(sacrebleu.corpus_chrf([pred], [[gold]], word_order=2).score)
+
+
+# A language-identification row asks one thing: does the reply name the right
+# language? Grading it by string equality failed "Cree." beside "Plains Cree."
+# and failed a correct "Mixed. It contains English and Tagalog." as well, which
+# is how a model that identified the language got zero for doing so.
+_LANGUAGE_WORDS = {
+    "cree": ("cree", "n\u00eahiyaw\u00eawin", "nehiyawewin", "nehiyaw"),
+    "english": ("english",),
+    "mixed": ("mixed", "a mix", "both languages"),
+}
+_OTHER_LANGUAGES = (
+    "ojibwa", "ojibwe", "arabic", "hebrew", "tagalog", "french", "german",
+    "spanish", "latin", "greek", "italian", "portuguese", "russian",
+    "chinese", "japanese", "inuktitut", "navajo", "mohawk", "blackfoot",
+    "dutch", "hindi",
+)
+
+
+def _language_of(expected: str) -> str | None:
+    text = _norm(expected)
+    if text in ("plains cree", "cree"):
+        return "cree"
+    if text == "english":
+        return "english"
+    if text == "mixed":
+        return "mixed"
+    return None
+
+
+def _language_score(reply: str, wanted: str) -> tuple[float, bool, str]:
+    text = reply.lower().replace("\u2019", "'")
+    if not any(name in text for name in _LANGUAGE_WORDS[wanted]):
+        return 0.0, False, f"did not name {wanted}"
+    # A mixed answer may name what it is mixed from. A single-language answer may
+    # not: naming Ojibwa for a Cree sentence is the confusion being measured.
+    if wanted == "mixed":
+        return 1.0, True, "named mixed"
+    named = [name for name in _OTHER_LANGUAGES if name in text]
+    if wanted == "cree" and "english" in text:
+        named.append("english")
+    if named:
+        return 0.0, False, f"named {named[0]} instead of {wanted}"
+    return 1.0, True, f"named {wanted}"
 
 
 def _score_row(row: dict, reply: str) -> tuple[float, bool, str]:
     metric = row.get("metric", "chrf")
     expected = str(row.get("expected") or "")
+    # Rows written before this change store that test as "exact"; the expected
+    # label is what decides, so both old and new files score the same way.
+    language = _language_of(expected)
+    if language:
+        return _language_score(reply, language)
     if metric == "chrf":
         score = _chrf(reply, expected) / 100.0
         return score, score > 0.0, f"chrF++ {score:.3f}"

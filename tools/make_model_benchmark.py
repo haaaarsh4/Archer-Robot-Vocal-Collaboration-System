@@ -10,7 +10,8 @@ sentences, and they still carry an explicit expected result.
 Every row says how it must be scored:
 
     chrf       translation, scored against the reference with chrF++
-    exact      language label, must match exactly
+    language   the reply must name the language the row is labelled with
+    exact      an answer that must match exactly
     contains   identity or explanation, must contain the expected fact
     not_echo   the reply must not be the prompt repeated back
 
@@ -59,6 +60,24 @@ def _sentence(text: str) -> bool:
     return 2 <= len(_clean(text).split()) <= 40
 
 
+def _usable(text: str) -> bool:
+    """A sentence, not a concordance entry or a verse number.
+
+    The Cree Bible sources were split on verse markers, so "boanerges 1 caesar 3"
+    and "herod 11 heroda 2" survived cleaning as if they were sentences. Each is
+    a name plus a sense number. A language row built from one asks the model to
+    call Hebrew names Plains Cree, and a translation row built from one asks it
+    to translate a verse number, so both measure nothing. A digit is the tell,
+    and no real sentence here starts with one.
+    """
+    clean = _clean(text)
+    if not clean or not clean[0].isalpha():
+        return False
+    if re.search(r"\d", clean):
+        return False
+    return _sentence(clean)
+
+
 def _choose_processed(work: Path | None) -> tuple[Path, bool]:
     if work is not None:
         processed = work / "processed"
@@ -71,21 +90,21 @@ def _choose_processed(work: Path | None) -> tuple[Path, bool]:
 def _pairs(processed: Path, require_held_out: bool) -> tuple[list[dict], bool]:
     test = processed / "parallel_test.jsonl"
     if test.exists():
-        rows = [r for r in _load(test) if _sentence(r.get("cree")) and _sentence(r.get("english"))
+        rows = [r for r in _load(test) if _usable(r.get("cree")) and _usable(r.get("english"))
                 and r.get("source") != "watkins1865"]
         if rows:
             return rows, True
     if require_held_out:
         raise SystemExit(f"{test} is missing or empty; run the clean stage first")
     fallback = processed / "parallel_cr_en.jsonl"
-    rows = [r for r in _load(fallback) if _sentence(r.get("cree")) and _sentence(r.get("english"))
+    rows = [r for r in _load(fallback) if _usable(r.get("cree")) and _usable(r.get("english"))
             and r.get("source") != "watkins1865"]
     return rows, False
 
 
 def _words(processed: Path, pairs: list[dict]) -> list[dict]:
     rows = [r for r in _load(processed / "watkins_dictionary_pairs.jsonl")
-            if _clean(r.get("cree")) and _clean(r.get("english"))]
+            if _usable(r.get("cree")) and _usable(r.get("english"))]
     if rows:
         return rows
     return [{"cree": r["cree"], "english": r["english"]} for r in pairs
@@ -161,7 +180,7 @@ def _language_row(category: str, index: int, row: dict, held_out: bool) -> dict:
         "category": category,
         "prompt": f"<|song|>\nWhich language is this?\n{text}",
         "expected": expected,
-        "metric": "exact",
+        "metric": "language",
         "answer_language": "en",
         "held_out": held_out,
         "source": "parallel_test" if held_out else "repository",
