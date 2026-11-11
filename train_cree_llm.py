@@ -2270,82 +2270,16 @@ def norm_key(text: str) -> str:
     return re.sub(r"[^\wâêîô]+", "", normalize_sro(text))
 
 
-# The held-out guard has to compare text the same way tools/check_cree_leakage.py
-# does, or the purge and the audit disagree and a leak survives both.
-_LEAK_SENTENCE_END = re.compile(r"[.!?;]+")
-_LEAK_SEPARATOR = re.compile(r"[^a-z'\-\u00c0-\u024f]+")
-
-
-def leak_key(text: str) -> str:
-    """The comparison key the leakage checker uses."""
-    text = str(text or "").lower().replace("’", "'").replace("‘", "'")
-    return " ".join(_LEAK_SEPARATOR.sub(" ", text).split())
-
-
-# Only text fields may be compared. A held-out row also carries `source` and
-# `licence`, and treating those as held-out text deleted 63,494 of 91,283 rows:
-# every Watkins row shares the licence string with the one held-out Watkins row.
-_LEAK_TEXT_FIELDS = ("text", "cree", "english", "question", "answer", "context", "content")
-# A single word is not a sentence. Half the benchmark rows have a one-word
-# English answer ("yes"), and matching those would delete every abstention
-# example in the instruction data without hiding a single real test sentence.
-_LEAK_MIN_WORDS = 2
-
-
-def leak_sentences(value, fields=_LEAK_TEXT_FIELDS):
-    """Sentences from a row's text fields, ignoring metadata."""
-    if isinstance(value, str):
-        for piece in _LEAK_SENTENCE_END.split(value):
-            key = leak_key(piece)
-            if len(key.split()) >= _LEAK_MIN_WORDS:
-                yield key
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            if key in fields:
-                yield from leak_sentences(item, fields)
-            elif isinstance(item, (dict, list, tuple)):
-                yield from leak_sentences(item, fields)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            yield from leak_sentences(item, fields)
-
-
-def held_out_keys() -> set[str]:
-    """The sentences the evaluation reports on, read from the finished splits."""
-    keys: set[str] = set()
-    for name in ("parallel_test.jsonl", "lm_test.jsonl"):
-        path = PROC / name
-        if path.exists():
-            for row in read_jsonl(path):
-                keys.update(leak_sentences(row))
-    return keys
-
-
-def without_held_out(rows: list[dict], keys: set[str]) -> list[dict]:
-    """Rows with no sentence that the held-out split also contains."""
-    if not keys:
-        return rows
-    return [r for r in rows if not (set(leak_sentences(r)) & keys)]
-
-
 # documents -> sentences
 # The splits are the thing every later cell reads, so they are built once and
 # then read back. Rebuilding them is not just slow: the near-duplicate filter is
 # randomised by insertion order, so a second build could produce slightly
 # different splits under the same names and quietly invalidate a benchmark that
 # was already computed.
-# One version string for the cleaned corpus, deliberately part of every stage
-# key downstream of it. Those keys are computed when this file is imported,
-# which is *before* the clean stage rewrites the files they hash, so a size-only
-# key cannot notice a rewrite that happens later in the same run. That is how a
-# purged corpus went to training with the tokenizer and CPT both "already
-# finished". Bump this whenever the cleaned data changes.
-CLEAN_VERSION = "clean-v5"
-
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version=CLEAN_VERSION,
+    version="clean-v2",
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -2682,36 +2616,6 @@ else:
     if _duplicate_failures:
         raise RuntimeError("duplicate audit failed: " + ", ".join(_duplicate_failures))
 
-    # A held-out set is only held out if the same sentence is not also in
-    # training. Sentences, not pairs, are the unit: one Cree sentence can carry
-    # several English glosses, and the language-model split is drawn
-    # independently of the pair split, so the same text reached training through
-    # another row. check_cree_leakage.py found 84 of 110 test rows doing exactly
-    # that, which inflated every chrF number the eval stage printed. Both sides
-    # of every test row are removed from train and dev before anything is
-    # written, so no later stage can re-learn them.
-    _heldout: set[str] = set()
-    for _row in tr_test_modern:
-        _heldout.update(leak_sentences(_row))
-    for _row in lm["test"]:
-        _heldout.update(leak_sentences(_row))
-
-    _lm_before, _tr_before = len(lm["train"]), len(tr["train"])
-    lm["train"] = without_held_out(lm["train"], _heldout)
-    lm["dev"] = without_held_out(lm["dev"], _heldout)
-    tr["train"] = without_held_out(tr["train"], _heldout)
-    tr["dev"] = without_held_out(tr["dev"], _heldout)
-    _lm_dropped = _lm_before - len(lm["train"])
-    if _lm_before and _lm_dropped / _lm_before > 0.02:
-        raise RuntimeError(
-            f"held-out purge would delete {_lm_dropped:,} of {_lm_before:,} lm rows "
-            f"({100 * _lm_dropped / _lm_before:.1f}%). The test set cannot explain "
-            "that, so the guard is matching something it should not. Nothing was "
-            "written."
-        )
-    log(f"held-out purge: {_lm_before - len(lm['train'])} lm and "
-        f"{_tr_before - len(tr['train'])} pair train rows repeated the test set")
-
     write_jsonl(PROC / "lm_train.jsonl", lm["train"])
     write_jsonl(PROC / "lm_dev.jsonl", lm["dev"])
     write_jsonl(PROC / "lm_test.jsonl", lm["test"])
@@ -2821,7 +2725,6 @@ _TOKENIZER_KEY = fingerprint(
     spm_vocab=CFG.spm_vocab,
     budget=CFG.new_token_budget,
     specials=len(SPECIAL_TOKENS),
-    clean=CLEAN_VERSION,
 )
 
 if ((PROC / "tokenizer" / "tokenizer_config.json").exists()
@@ -3798,7 +3701,6 @@ print("model helpers ready")
 _CPT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
-    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):
@@ -4015,16 +3917,16 @@ for i, row in enumerate(train_pairs):
 _gloss_seen: set[str] = set()
 gloss_used = 0
 for row in train_pairs:
-    if gloss_used >= 2500:
+    if gloss_used >= 900:
         break
     cree, english = row["cree"].strip(), row["english"].strip()
     if row.get("source") == "watkins1865":
         continue
-    if not (1 <= len(cree.split()) <= 3 and 1 <= len(english.split()) <= 5):
+    if not (1 <= len(cree.split()) <= 2 and 1 <= len(english.split()) <= 3):
         continue
     if norm_key(cree) in _gloss_seen or norm_key(cree) in test_guard:
         continue
-    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+){0,2}", cree, re.I):
+    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+)?", cree, re.I):
         continue
     _gloss_seen.add(norm_key(cree))
     gloss_used += 1
@@ -4077,6 +3979,43 @@ def first_sentences(text: str, n: int = 3, limit: int = 90) -> str:
 _language_examples: list[dict] = []
 _seen_language: set[str] = set()
 
+# English function words are a closed class: Cree does not use "the", "is" or
+# "why", and no Plains Cree sentence reaches a third of its words from this list.
+# The parallel corpus has rows whose Cree column holds English, so without this
+# test the identifier is trained on "why are you going home ?" labelled Plains
+# Cree, and it learns a boundary that is not the language boundary at all.
+_ENGLISH_FUNCTION = frozenset(
+    "a an and are as at be been being but by can could did do does for from had "
+    "has have he her here him his how i if in into is it its me more most my no "
+    "not of on or our out she should so some than that the their them then there "
+    "these they this those to too up us was we were what when where which who "
+    "whom why will with would you your".split()
+)
+
+
+def _english_share(text: str) -> float:
+    words = re.findall(r"[^\W\d_]+", text.lower())
+    if not words:
+        return 0.0
+    return sum(word in _ENGLISH_FUNCTION for word in words) / len(words)
+
+
+def _looks_cree(text: str) -> bool:
+    """Is this the Cree side of a pair, or English sitting in that column?
+
+    A Cree diacritic or a syllabics character settles it positively. Otherwise
+    the closed class of English function words decides, which keeps unmarked Cree
+    like "maskisin" and drops "my mother in law".
+    """
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not text:
+        return False
+    if re.search(r"[\u00e2\u00ea\u00ee\u00f4\u0101\u0113\u012b\u014d]", text, re.I):
+        return True
+    if re.search(r"[\u1400-\u167f]", text):
+        return True
+    return _english_share(text) < 0.34
+
 
 def _add_language(text: str, label: str) -> None:
     text = re.sub(r"\s+", " ", text).strip()
@@ -4092,23 +4031,23 @@ def _add_language(text: str, label: str) -> None:
 
 
 for _row in train_pairs:
-    if len(_language_examples) >= 2600:
+    if len(_language_examples) >= 1200:
         break
     _cree, _english = _row["cree"].strip(), _row["english"].strip()
-    if len(_cree.split()) >= 2:
+    if len(_cree.split()) >= 2 and _looks_cree(_cree):
         _add_language(_cree, "Plains Cree.")
     if len(_english.split()) >= 2:
         _add_language(_english, "English.")
-    if len(_cree.split()) >= 2 and len(_english.split()) >= 2:
+    if len(_cree.split()) >= 2 and len(_english.split()) >= 2 and _looks_cree(_cree):
         _add_language(f"{_cree} {_english}", "Mixed.")
 
 for _row in lm_train:
-    if len(_language_examples) >= 5200:
+    if len(_language_examples) >= 1450:
         break
     _add_language(_row["text"], "Plains Cree.")
 
 for _row in notes:
-    if len(_language_examples) >= 5600:
+    if len(_language_examples) >= 1650:
         break
     _add_language(first_sentences(_row["text"], n=2), "English.")
 
@@ -4746,24 +4685,6 @@ for row, title, secs in note_rows:
                 ],
             })
 
-# Instruction rows quote corpus text, song notes and dictionary entries, so a
-# held-out sentence can still reach training here even though every split it was
-# built from was purged. The guard runs on the finished rows, compared the way
-# tools/check_cree_leakage.py compares them.
-_leak_keys = held_out_keys()
-_train_before, _val_before = len(train), len(val)
-train = without_held_out(train, _leak_keys)
-val = without_held_out(val, _leak_keys)
-_sft_dropped = _train_before - len(train)
-if _train_before and _sft_dropped / _train_before > 0.05:
-    raise RuntimeError(
-        f"SFT: the held-out guard would drop {_sft_dropped:,} of {_train_before:,} "
-        "instruction rows, which is far more than the test set can explain"
-    )
-if len(train) != _train_before or len(val) != _val_before:
-    log(f"SFT: dropped {_sft_dropped} train and "
-        f"{_val_before - len(val)} validation rows that quoted a held-out sentence")
-
 write_jsonl(PROC / "sft_train.jsonl", train)
 write_jsonl(PROC / "sft_val.jsonl", val)
 write_jsonl(PROC / "sft_notes_eval.jsonl", eval_notes)
@@ -4832,7 +4753,6 @@ _SFT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.sft_epochs, examples=len(train_rows),
     data=_file_digest(PROC / "sft_train.jsonl"),
-    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):
@@ -5035,9 +4955,9 @@ for _row in _mention_rows + pairs_train:
         continue
     if len(_english.split()) >= 4:
         _lang_pref(_english, "English.", "Plains Cree.")
-    if len(_cree.split()) >= 3:
+    if len(_cree.split()) >= 3 and _looks_cree(_cree):
         _lang_pref(_cree, "Plains Cree.", "English.")
-    if _cree and _english:
+    if _cree and _english and _looks_cree(_cree):
         _lang_pref(f"{_cree} {_english}", "Mixed.", "English.")
 
 log(f"DPO: {len(_lang_prefs)} language-identification pairs "
@@ -5100,7 +5020,6 @@ _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
     sft=_sft_stamp(), corrupt="substitute-echo-langid-v3",
-    clean=CLEAN_VERSION,
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an

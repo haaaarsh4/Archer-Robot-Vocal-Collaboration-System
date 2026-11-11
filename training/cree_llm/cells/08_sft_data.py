@@ -211,6 +211,43 @@ def first_sentences(text: str, n: int = 3, limit: int = 90) -> str:
 _language_examples: list[dict] = []
 _seen_language: set[str] = set()
 
+# English function words are a closed class: Cree does not use "the", "is" or
+# "why", and no Plains Cree sentence reaches a third of its words from this list.
+# The parallel corpus has rows whose Cree column holds English, so without this
+# test the identifier is trained on "why are you going home ?" labelled Plains
+# Cree, and it learns a boundary that is not the language boundary at all.
+_ENGLISH_FUNCTION = frozenset(
+    "a an and are as at be been being but by can could did do does for from had "
+    "has have he her here him his how i if in into is it its me more most my no "
+    "not of on or our out she should so some than that the their them then there "
+    "these they this those to too up us was we were what when where which who "
+    "whom why will with would you your".split()
+)
+
+
+def _english_share(text: str) -> float:
+    words = re.findall(r"[^\W\d_]+", text.lower())
+    if not words:
+        return 0.0
+    return sum(word in _ENGLISH_FUNCTION for word in words) / len(words)
+
+
+def _looks_cree(text: str) -> bool:
+    """Is this the Cree side of a pair, or English sitting in that column?
+
+    A Cree diacritic or a syllabics character settles it positively. Otherwise
+    the closed class of English function words decides, which keeps unmarked Cree
+    like "maskisin" and drops "my mother in law".
+    """
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not text:
+        return False
+    if re.search(r"[\u00e2\u00ea\u00ee\u00f4\u0101\u0113\u012b\u014d]", text, re.I):
+        return True
+    if re.search(r"[\u1400-\u167f]", text):
+        return True
+    return _english_share(text) < 0.34
+
 
 def _add_language(text: str, label: str) -> None:
     text = re.sub(r"\s+", " ", text).strip()
@@ -229,11 +266,11 @@ for _row in train_pairs:
     if len(_language_examples) >= 1200:
         break
     _cree, _english = _row["cree"].strip(), _row["english"].strip()
-    if len(_cree.split()) >= 2:
+    if len(_cree.split()) >= 2 and _looks_cree(_cree):
         _add_language(_cree, "Plains Cree.")
     if len(_english.split()) >= 2:
         _add_language(_english, "English.")
-    if len(_cree.split()) >= 2 and len(_english.split()) >= 2:
+    if len(_cree.split()) >= 2 and len(_english.split()) >= 2 and _looks_cree(_cree):
         _add_language(f"{_cree} {_english}", "Mixed.")
 
 for _row in lm_train:

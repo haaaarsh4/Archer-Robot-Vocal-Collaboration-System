@@ -137,9 +137,9 @@ for _row in _mention_rows + pairs_train:
         continue
     if len(_english.split()) >= 4:
         _lang_pref(_english, "English.", "Plains Cree.")
-    if len(_cree.split()) >= 3:
+    if len(_cree.split()) >= 3 and _looks_cree(_cree):
         _lang_pref(_cree, "Plains Cree.", "English.")
-    if _cree and _english:
+    if _cree and _english and _looks_cree(_cree):
         _lang_pref(f"{_cree} {_english}", "Mixed.", "English.")
 
 log(f"DPO: {len(_lang_prefs)} language-identification pairs "
