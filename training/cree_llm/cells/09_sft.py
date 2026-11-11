@@ -26,6 +26,7 @@ _SFT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.sft_epochs, examples=len(train_rows),
     data=_file_digest(PROC / "sft_train.jsonl"),
+    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("sft", _SFT_KEY, requires=CKPT / "sft" / "adapter_config.json"):

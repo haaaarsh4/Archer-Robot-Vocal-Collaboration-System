@@ -149,16 +149,16 @@ for i, row in enumerate(train_pairs):
 _gloss_seen: set[str] = set()
 gloss_used = 0
 for row in train_pairs:
-    if gloss_used >= 900:
+    if gloss_used >= 2500:
         break
     cree, english = row["cree"].strip(), row["english"].strip()
     if row.get("source") == "watkins1865":
         continue
-    if not (1 <= len(cree.split()) <= 2 and 1 <= len(english.split()) <= 3):
+    if not (1 <= len(cree.split()) <= 3 and 1 <= len(english.split()) <= 5):
         continue
     if norm_key(cree) in _gloss_seen or norm_key(cree) in test_guard:
         continue
-    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+)?", cree, re.I):
+    if not re.fullmatch(r"[a-zâêîô'-]+(?: [a-zâêîô'-]+){0,2}", cree, re.I):
         continue
     _gloss_seen.add(norm_key(cree))
     gloss_used += 1
@@ -225,7 +225,10 @@ _ENGLISH_FUNCTION = frozenset(
 )
 
 
-def _english_share(text: str) -> float:
+def _english_function_share(text: str) -> float:
+    # Not the corpus cell's `_english_share`: that one counts a short list tuned
+    # for archive pages and misses "why", "are" and "my", which is exactly the
+    # English that hides in this corpus.
     words = re.findall(r"[^\W\d_]+", text.lower())
     if not words:
         return 0.0
@@ -246,7 +249,7 @@ def _looks_cree(text: str) -> bool:
         return True
     if re.search(r"[\u1400-\u167f]", text):
         return True
-    return _english_share(text) < 0.34
+    return _english_function_share(text) < 0.34
 
 
 def _add_language(text: str, label: str) -> None:
@@ -263,7 +266,7 @@ def _add_language(text: str, label: str) -> None:
 
 
 for _row in train_pairs:
-    if len(_language_examples) >= 1200:
+    if len(_language_examples) >= 2600:
         break
     _cree, _english = _row["cree"].strip(), _row["english"].strip()
     if len(_cree.split()) >= 2 and _looks_cree(_cree):
@@ -274,12 +277,12 @@ for _row in train_pairs:
         _add_language(f"{_cree} {_english}", "Mixed.")
 
 for _row in lm_train:
-    if len(_language_examples) >= 1450:
+    if len(_language_examples) >= 5200:
         break
     _add_language(_row["text"], "Plains Cree.")
 
 for _row in notes:
-    if len(_language_examples) >= 1650:
+    if len(_language_examples) >= 5600:
         break
     _add_language(first_sentences(_row["text"], n=2), "English.")
 
@@ -916,6 +919,24 @@ for row, title, secs in note_rows:
                     {"role": "assistant", "content": first_sentences(body)},
                 ],
             })
+
+# Instruction rows quote corpus text, song notes and dictionary entries, so a
+# held-out sentence can still reach training here even though every split it was
+# built from was purged. The guard runs on the finished rows, compared the way
+# tools/check_cree_leakage.py compares them.
+_leak_keys = held_out_keys()
+_train_before, _val_before = len(train), len(val)
+train = without_held_out(train, _leak_keys)
+val = without_held_out(val, _leak_keys)
+_sft_dropped = _train_before - len(train)
+if _train_before and _sft_dropped / _train_before > 0.05:
+    raise RuntimeError(
+        f"SFT: the held-out guard would drop {_sft_dropped:,} of {_train_before:,} "
+        "instruction rows, which is far more than the test set can explain"
+    )
+if len(train) != _train_before or len(val) != _val_before:
+    log(f"SFT: dropped {_sft_dropped} train and "
+        f"{_val_before - len(val)} validation rows that quoted a held-out sentence")
 
 write_jsonl(PROC / "sft_train.jsonl", train)
 write_jsonl(PROC / "sft_val.jsonl", val)

@@ -202,6 +202,7 @@ _DPO_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, epochs=CFG.dpo_epochs,
     lr=CFG.dpo_lr, pairs=len(prefs), ref="sft-adapter-v1",
     sft=_sft_stamp(), corrupt="substitute-echo-langid-v3",
+    clean=CLEAN_VERSION,
 )
 
 # `SCORING_ONLY` is set by the model cell: a scoring run is asking what an

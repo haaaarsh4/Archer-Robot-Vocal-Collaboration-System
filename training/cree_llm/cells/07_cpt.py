@@ -18,6 +18,7 @@
 _CPT_KEY = fingerprint(
     base=CFG.base_model, seq=CFG.seq_len, lora=CFG.lora_r,
     epochs=CFG.cpt_epochs, sentences=(PROC / "lm_train.jsonl").stat().st_size,
+    clean=CLEAN_VERSION,
 )
 
 if SCORING_ONLY or stage_done("cpt", _CPT_KEY, requires=CKPT / "cpt" / "adapter_config.json"):

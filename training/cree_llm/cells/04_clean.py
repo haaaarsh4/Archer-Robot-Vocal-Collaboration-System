@@ -115,16 +115,82 @@ def norm_key(text: str) -> str:
     return re.sub(r"[^\wâêîô]+", "", normalize_sro(text))
 
 
+# The held-out guard has to compare text the same way tools/check_cree_leakage.py
+# does, or the purge and the audit disagree and a leak survives both.
+_LEAK_SENTENCE_END = re.compile(r"[.!?;]+")
+_LEAK_SEPARATOR = re.compile(r"[^a-z'\-\u00c0-\u024f]+")
+
+
+def leak_key(text: str) -> str:
+    """The comparison key the leakage checker uses."""
+    text = str(text or "").lower().replace("’", "'").replace("‘", "'")
+    return " ".join(_LEAK_SEPARATOR.sub(" ", text).split())
+
+
+# Only text fields may be compared. A held-out row also carries `source` and
+# `licence`, and treating those as held-out text deleted 63,494 of 91,283 rows:
+# every Watkins row shares the licence string with the one held-out Watkins row.
+_LEAK_TEXT_FIELDS = ("text", "cree", "english", "question", "answer", "context", "content")
+# A single word is not a sentence. Half the benchmark rows have a one-word
+# English answer ("yes"), and matching those would delete every abstention
+# example in the instruction data without hiding a single real test sentence.
+_LEAK_MIN_WORDS = 2
+
+
+def leak_sentences(value, fields=_LEAK_TEXT_FIELDS):
+    """Sentences from a row's text fields, ignoring metadata."""
+    if isinstance(value, str):
+        for piece in _LEAK_SENTENCE_END.split(value):
+            key = leak_key(piece)
+            if len(key.split()) >= _LEAK_MIN_WORDS:
+                yield key
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if key in fields:
+                yield from leak_sentences(item, fields)
+            elif isinstance(item, (dict, list, tuple)):
+                yield from leak_sentences(item, fields)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from leak_sentences(item, fields)
+
+
+def held_out_keys() -> set[str]:
+    """The sentences the evaluation reports on, read from the finished splits."""
+    keys: set[str] = set()
+    for name in ("parallel_test.jsonl", "lm_test.jsonl"):
+        path = PROC / name
+        if path.exists():
+            for row in read_jsonl(path):
+                keys.update(leak_sentences(row))
+    return keys
+
+
+def without_held_out(rows: list[dict], keys: set[str]) -> list[dict]:
+    """Rows with no sentence that the held-out split also contains."""
+    if not keys:
+        return rows
+    return [r for r in rows if not (set(leak_sentences(r)) & keys)]
+
+
 # documents -> sentences
 # The splits are the thing every later cell reads, so they are built once and
 # then read back. Rebuilding them is not just slow: the near-duplicate filter is
 # randomised by insertion order, so a second build could produce slightly
 # different splits under the same names and quietly invalidate a benchmark that
 # was already computed.
+# One version string for the cleaned corpus, deliberately part of every stage
+# key downstream of it. Those keys are computed when this file is imported,
+# which is *before* the clean stage rewrites the files they hash, so a size-only
+# key cannot notice a rewrite that happens later in the same run. That is how a
+# purged corpus went to training with the tokenizer and CPT both "already
+# finished". Bump this whenever the cleaned data changes.
+CLEAN_VERSION = "clean-v5"
+
 _CLEAN_KEY = fingerprint(
     docs=(RAW / "docs.jsonl").stat().st_size,
     pairs=(RAW / "pairs.jsonl").stat().st_size,
-    version="clean-v2",
+    version=CLEAN_VERSION,
 )
 _SPLIT_FILES = [PROC / f"lm_{s}.jsonl" for s in ("train", "dev", "test")]
 _SPLIT_FILES += [PROC / "parallel_train.jsonl", PROC / "parallel_test.jsonl"]
@@ -460,6 +526,36 @@ else:
     _duplicate_failures = [name for name, ok in audit["checks"].items() if not ok]
     if _duplicate_failures:
         raise RuntimeError("duplicate audit failed: " + ", ".join(_duplicate_failures))
+
+    # A held-out set is only held out if the same sentence is not also in
+    # training. Sentences, not pairs, are the unit: one Cree sentence can carry
+    # several English glosses, and the language-model split is drawn
+    # independently of the pair split, so the same text reached training through
+    # another row. check_cree_leakage.py found 84 of 110 test rows doing exactly
+    # that, which inflated every chrF number the eval stage printed. Both sides
+    # of every test row are removed from train and dev before anything is
+    # written, so no later stage can re-learn them.
+    _heldout: set[str] = set()
+    for _row in tr_test_modern:
+        _heldout.update(leak_sentences(_row))
+    for _row in lm["test"]:
+        _heldout.update(leak_sentences(_row))
+
+    _lm_before, _tr_before = len(lm["train"]), len(tr["train"])
+    lm["train"] = without_held_out(lm["train"], _heldout)
+    lm["dev"] = without_held_out(lm["dev"], _heldout)
+    tr["train"] = without_held_out(tr["train"], _heldout)
+    tr["dev"] = without_held_out(tr["dev"], _heldout)
+    _lm_dropped = _lm_before - len(lm["train"])
+    if _lm_before and _lm_dropped / _lm_before > 0.02:
+        raise RuntimeError(
+            f"held-out purge would delete {_lm_dropped:,} of {_lm_before:,} lm rows "
+            f"({100 * _lm_dropped / _lm_before:.1f}%). The test set cannot explain "
+            "that, so the guard is matching something it should not. Nothing was "
+            "written."
+        )
+    log(f"held-out purge: {_lm_before - len(lm['train'])} lm and "
+        f"{_tr_before - len(tr['train'])} pair train rows repeated the test set")
 
     write_jsonl(PROC / "lm_train.jsonl", lm["train"])
     write_jsonl(PROC / "lm_dev.jsonl", lm["dev"])

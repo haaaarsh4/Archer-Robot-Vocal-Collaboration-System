@@ -28,6 +28,7 @@ _TOKENIZER_KEY = fingerprint(
     spm_vocab=CFG.spm_vocab,
     budget=CFG.new_token_budget,
     specials=len(SPECIAL_TOKENS),
+    clean=CLEAN_VERSION,
 )
 
 if ((PROC / "tokenizer" / "tokenizer_config.json").exists()
