@@ -363,13 +363,20 @@ def load_model(adapter: Path | None = None, trainable: bool = True):
             bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=DTYPE,
         )
-        kwargs["device_map"] = {"": 0}
+        # No device_map on the quantised path. With one, transformers runs
+        # caching_allocator_warmup, which reserves a block the size of the whole
+        # model in bf16 -- 27.5 GiB for the 14B -- before the first quantised
+        # weight exists, and dies on any card that cannot spare it even though
+        # the 4-bit model it is about to build needs 9.25 GiB. Quantising on the
+        # CPU and moving the finished model asks for the real footprint.
     elif DEVICE == "cuda":
         kwargs["device_map"] = {"": 0}
     # No device_map on CPU: a single-device map buys nothing there and would
     # make the CPU smoke run depend on `accelerate` being installed.
 
     model = AutoModelForCausalLM.from_pretrained(ensure_base_weights(), **kwargs)
+    if USE_4BIT and DEVICE == "cuda":
+        model.to("cuda:0")
     model.config.pad_token_id = tok.pad_token_id
     graft_rows(model, tok)
 
