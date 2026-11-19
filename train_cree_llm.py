@@ -667,7 +667,14 @@ def plan_weights(gpu_gb: float, params_b: float, smoke: bool) -> bool:
     return 2 * params_b > gpu_gb * 0.55
 
 
-USE_4BIT = plan_weights(GPU_GB, BASE_PARAMS_B, SMOKE)
+# A card's total memory is not its usable memory. On a shared node other users
+# can hold most of an 80 GB card, and bf16 weights chosen from the total then
+# cannot be loaded at all, so the run dies before its first step. CREE_FORCE_4BIT=1
+# quantises anyway, which is the only way to train on what is actually free
+# without waiting for someone else's job to end.
+USE_4BIT = plan_weights(GPU_GB, BASE_PARAMS_B, SMOKE) or (
+    os.environ.get("CREE_FORCE_4BIT", "").strip() not in ("", "0")
+)
 
 
 def log(msg: str) -> None:
