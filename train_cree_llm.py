@@ -3409,16 +3409,23 @@ def load_model(adapter: Path | None = None, trainable: bool = True):
             # differently -- which is why the map is set here rather than
             # avoided.
             kwargs["device_map"] = {"": 0}
+        log(f"4-bit load: allocator warm-up off, device_map={kwargs.get('device_map')}")
     elif DEVICE == "cuda":
         kwargs["device_map"] = {"": 0}
     # No device_map on CPU: a single-device map buys nothing there and would
     # make the CPU smoke run depend on `accelerate` being installed.
 
     model = AutoModelForCausalLM.from_pretrained(ensure_base_weights(), **kwargs)
-    if USE_4BIT and DEVICE == "cuda" and not getattr(model, "hf_device_map", None):
-        # Only if the loader ignored the map; normally the weights are already
-        # on the card and a move here would materialise them in fp16.
-        model.to("cuda:0")
+    if USE_4BIT and DEVICE == "cuda":
+        # Never move a quantised model by its module: transformers' bitsandbytes
+        # `to()` materialises the fp16 weights first -- 27.51 GiB for this 14B.
+        # `hf_device_map` cannot be used to tell whether the move is needed,
+        # because a single-device map never goes through dispatch_model and the
+        # attribute stays unset; read the parameter's own device instead.
+        where = next(model.parameters()).device
+        if where.type == "cpu":
+            model.to("cuda:0")
+        log(f"base weights on {next(model.parameters()).device}")
     model.config.pad_token_id = tok.pad_token_id
     graft_rows(model, tok)
 
