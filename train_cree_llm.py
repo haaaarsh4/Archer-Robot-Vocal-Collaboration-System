@@ -3388,11 +3388,9 @@ def load_model(adapter: Path | None = None, trainable: bool = True):
             bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=DTYPE,
         )
-        # No device_map on the quantised path: with one, transformers sizes its
-        # loading plan from the map instead of from the finished footprint.
-        #
-        # Even without a map it then runs caching_allocator_warmup, which asks
-        # the card for a block the size of the whole model in fp16 -- 27.5 GiB
+        # The warm-up is disabled before the loader runs, because even without a
+        # device map transformers runs caching_allocator_warmup, which asks the
+        # card for a block the size of the whole model in fp16 -- 27.5 GiB
         # for the 14B -- before the first quantised weight exists, and dies on
         # any card that cannot spare it although the 4-bit model it is about to
         # build needs 9.25 GiB. A shared 80 GB card usually cannot spare it, so
@@ -3401,13 +3399,25 @@ def load_model(adapter: Path | None = None, trainable: bool = True):
         from transformers import modeling_utils as _modeling_utils
 
         _modeling_utils.caching_allocator_warmup = lambda *args, **kwargs: None
+        if DEVICE == "cuda":
+            # Load straight onto the card. With the warm-up disabled there is no
+            # 27.5 GiB fp16 block to pay for, and bitsandbytes streams each
+            # weight to the device as it quantises it, so the model never exists
+            # at full precision anywhere. Moving a finished 4-bit model with
+            # `.to()` instead makes transformers push it through the fp16
+            # weights -- 27.51 GiB on this 14B, the same allocation spelled
+            # differently -- which is why the map is set here rather than
+            # avoided.
+            kwargs["device_map"] = {"": 0}
     elif DEVICE == "cuda":
         kwargs["device_map"] = {"": 0}
     # No device_map on CPU: a single-device map buys nothing there and would
     # make the CPU smoke run depend on `accelerate` being installed.
 
     model = AutoModelForCausalLM.from_pretrained(ensure_base_weights(), **kwargs)
-    if USE_4BIT and DEVICE == "cuda":
+    if USE_4BIT and DEVICE == "cuda" and not getattr(model, "hf_device_map", None):
+        # Only if the loader ignored the map; normally the weights are already
+        # on the card and a move here would materialise them in fp16.
         model.to("cuda:0")
     model.config.pad_token_id = tok.pad_token_id
     graft_rows(model, tok)
